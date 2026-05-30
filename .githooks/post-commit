@@ -1,0 +1,9 @@
+#!/bin/sh
+# Post-commit hook — non-blocking background analyses (never fails the commit).
+#   - reflexion trigger: queues adversarial review when a diff is large (size-gated inside)
+#   - surface-concerns: proactive surfacing on wave-boundary / L-effort commits
+# Both run detached; their output goes to gitignored *-queue/ paths.
+ROOT="$(git rev-parse --show-toplevel)"
+sh "$ROOT/scripts/auto-reflexion-trigger.sh" >/dev/null 2>&1 &
+node "$ROOT/scripts/surface-concerns.mjs" >/dev/null 2>&1 &
+exit 0

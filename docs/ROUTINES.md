@@ -98,9 +98,9 @@ For true scheduled routines, OS-level cron is the right primitive. Claude sessio
 |---|---|---|---|
 | Weekly bundle | `npm run routine:weekly` → bash | OS cron (or manual) | `docs/audit-reports/routine-weekly-*.md` |
 | Monthly bundle | `npm run routine:monthly` → bash | OS cron (or manual) | `docs/audit-reports/routine-monthly-*.md` |
-| Per-wave SI Reviewer | `.husky/post-commit` → bash | Auto on commit when wave-NN % 5 == 0 | `.claude/self-improvement-queue/wave-NN.md` |
-| Per-commit Reflexion | `.husky/post-commit` → bash | Auto when diff > 100 TS LOC + > 3 files | `.claude/reflexion-queue/<sha>.md` |
-| Per-commit wave-artifact | `.husky/commit-msg` → bash | Every commit with wave-NN subject | inline error if missing |
+| Per-wave SI Reviewer | `.githooks/post-commit` → bash | Auto on commit when wave-NN % 5 == 0 | `.claude/self-improvement-queue/wave-NN.md` |
+| Per-commit Reflexion | `.githooks/post-commit` → bash | Auto when diff > 100 TS LOC + > 3 files | `.claude/reflexion-queue/<sha>.md` |
+| Per-commit wave-artifact | `.githooks/commit-msg` → bash | Every commit with wave-NN subject | inline error if missing |
 
 5 distinct cadences, each closing a class of drift the next-finer cadence misses (per wave-41 architecture).
 

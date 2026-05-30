@@ -63,7 +63,7 @@ verdicts:
   Add a new entry to `docs/ANTI_PATTERNS_CATALOG.md` before the next wave dispatch.
 
 This check fires automatically on every commit via the post-commit hook
-(`.husky/post-commit`). Running it manually here surfaces any regression before
+(`.githooks/post-commit`). Running it manually here surfaces any regression before
 the session begins, not after the first commit.
 
 ---

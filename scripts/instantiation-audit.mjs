@@ -58,9 +58,9 @@ let ghosts = 0, dormant = 0;
 // ── Class 1 — ghost automation ────────────────────────────────────────────────
 console.log('\x1b[1m▌ Class 1 — ghost automation (declared in docs/code, not on disk)\x1b[0m');
 const autoRefs = [...new Set(
-  grepLines('\\.(github/workflows/[A-Za-z0-9_.-]+\\.ya?ml|husky/[A-Za-z0-9_.-]+)')
+  grepLines('\\.(github/workflows/[A-Za-z0-9_.-]+\\.ya?ml|husky/[A-Za-z0-9_.-]+|githooks/[A-Za-z0-9_.-]+)')
     .map(r => r.replace(/[.\s]+$/, ''))                          // strip trailing prose dots/space
-    .filter(r => /workflows\/.+\.ya?ml$|husky\/[A-Za-z0-9_-]+$/.test(r)) // require a real file name, not "..."
+    .filter(r => /workflows\/.+\.ya?ml$|(?:husky|githooks)\/[A-Za-z0-9_-]+$/.test(r)) // real file name, not "..."
 )];
 let c1 = 0;
 for (const ref of autoRefs) {

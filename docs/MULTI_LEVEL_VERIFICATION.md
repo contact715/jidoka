@@ -221,20 +221,20 @@ post-commit hook → run-tier-1-checks (parallel, ~60s)
 ### Hooks integration
 
 ```
-.husky/pre-commit
+.githooks/pre-commit
   - cascade-validate (wave-117 — hierarchical specs)
   - INDEX/COVERAGE regen (wave-95)
 
-.husky/commit-msg
+.githooks/commit-msg
   - AC traceability check (wave-95)
   - wave-artifact validation
 
-.husky/post-commit
+.githooks/post-commit
   - SDD memory sync (wave-95)
   - Bypass logging when hard-block active (wave-95)
   - **Verification pipeline async dispatch (wave-103)**
 
-.husky/pre-merge
+.githooks/pre-merge-commit
   - **Tier 1 + Tier 2 quality gates (wave-102 + wave-103)**
   - **Block on Tier 3 unresolved verdict (wave-103)**
 ```
@@ -256,7 +256,7 @@ post-commit hook → run-tier-1-checks (parallel, ~60s)
 
 ## 7. Known limitations
 
-1. **`.husky/pre-merge`** fires only on local `git merge` — NOT on GitHub PR UI merges. Workaround: run `npm run verify` manually before clicking merge OR adopt GitHub Actions equivalent.
+1. **`.githooks/pre-merge-commit`** fires only on local `git merge` — NOT on GitHub PR UI merges. Workaround: run `npm run verify` manually before clicking merge OR adopt GitHub Actions equivalent.
 2. **debate-engine** requires LLM API calls — adds 2-5 minutes per Tier 3 invocation. Cost: ~$0.50-2.00 per debate (mitigated by triggers being narrow).
 3. **Best-of-N** uses `git worktree` — requires git ≥ 2.5. Mac/Linux default works; Windows users may need WSL2.
 4. **Self-consistency** budget guard — skips sampling если within 10% of monthly LLM budget ceiling. Returns "medium confidence" fallback instead of high.

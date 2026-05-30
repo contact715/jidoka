@@ -85,9 +85,9 @@ Each cadence closes a class of drift the next-finer one misses. Don't add a 6th 
 
 | Cadence | Trigger | What runs | Output |
 |---|---|---|---|
-| **Per-commit (size-gated)** | `.husky/post-commit` when diff > 100 TS LOC + > 3 files | Reflexion Critic queued for adversarial review | `.claude/reflexion-queue/<sha>.md` |
-| **Per-commit (selective)** | `.husky/commit-msg` when subject contains `wave-NN` | Wave-artifact validator | inline error if metrics row / retro missing |
-| **Per-5-waves** | `.husky/post-commit` when wave-NN % 5 == 0 | Self-Improvement Reviewer queued | `.claude/self-improvement-queue/wave-NN.md` |
+| **Per-commit (size-gated)** | `.githooks/post-commit` when diff > 100 TS LOC + > 3 files | Reflexion Critic queued for adversarial review | `.claude/reflexion-queue/<sha>.md` |
+| **Per-commit (selective)** | `.githooks/commit-msg` when subject contains `wave-NN` | Wave-artifact validator | inline error if metrics row / retro missing |
+| **Per-5-waves** | `.githooks/post-commit` when wave-NN % 5 == 0 | Self-Improvement Reviewer queued | `.claude/self-improvement-queue/wave-NN.md` |
 | **Weekly** | OS cron (opt-in) or `npm run routine:weekly` | Skills aging + design drift + audit backlog + outcomes | `docs/audit-reports/routine-weekly-YYYY-WNN.md` |
 | **Monthly** | OS cron (opt-in) or `npm run routine:monthly` | Security patterns + dependency drift + bundle size + deep-audits queue | `docs/audit-reports/routine-monthly-YYYY-MM.md` |
 
@@ -259,7 +259,7 @@ Tier 3 does NOT activate for `S`-effort waves unless security or billing paths a
 
 ### L0.97 DEADLOCK protocol
 
-When debate-judge emits `DEADLOCK`, `debate-engine.mjs` sets `deadlock: true` in its return value. The pipeline orchestrator (`run-verification-pipeline.mjs`) triggers Tier 4 automatically without requiring additional human input. The `.husky/pre-merge` hook blocks merge if a DEADLOCK verdict exists in `docs/debates/wave-NN-debate.md`.
+When debate-judge emits `DEADLOCK`, `debate-engine.mjs` sets `deadlock: true` in its return value. The pipeline orchestrator (`run-verification-pipeline.mjs`) triggers Tier 4 automatically without requiring additional human input. The `.githooks/pre-merge-commit` hook blocks merge if a DEADLOCK verdict exists in `docs/debates/wave-NN-debate.md`.
 
 ### L0.97 Skills (canonical mirror)
 

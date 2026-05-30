@@ -60,7 +60,7 @@ scripts/surface-concerns.mjs          (entry point: cron / manual / post-wave ho
   writes docs/surfacing-concerns-current.md (replace each run)
     appends diff entry to docs/audit-reports/surfaced-concerns-log.md
 
-.husky/post-commit
+.githooks/post-commit
   if wave-NN % 5 == 0  → node scripts/surface-concerns.mjs &
   if "L effort" in subject  → node scripts/surface-concerns.mjs &
 
@@ -96,8 +96,8 @@ Sorted in output: BLOCKING concerns first, then IMPORTANT, then NICE.
 
 | Condition | Trigger | Mechanism |
 |---|---|---|
-| Wave number divisible by 5 | Post-commit | `.husky/post-commit` runs `node scripts/surface-concerns.mjs &` |
-| L-effort commit | Post-commit (subject contains "L effort") | `.husky/post-commit` runs `node scripts/surface-concerns.mjs &` |
+| Wave number divisible by 5 | Post-commit | `.githooks/post-commit` runs `node scripts/surface-concerns.mjs &` |
+| L-effort commit | Post-commit (subject contains "L effort") | `.githooks/post-commit` runs `node scripts/surface-concerns.mjs &` |
 | Session start | AI reads CLAUDE.md step 4 | `npm run surface:concerns` |
 | Manual | Developer runs directly | `npm run surface:concerns` or `node scripts/surface-concerns.mjs` |
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Wave-41 — self-improvement queue trigger.
 #
-# Runs from .husky/post-commit. When a commit lands a "wave-NN" message
+# Runs from .githooks/post-commit. When a commit lands a "wave-NN" message
 # where NN is divisible by 5, drops a queue file at
 # .claude/self-improvement-queue/wave-NN.md telling the next agent to
 # dispatch the Self-Improvement Reviewer.

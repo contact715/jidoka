@@ -1,0 +1,22 @@
+# auto-strengthen — weekly soft→hard gate promotion review (dry-run).
+# scripts/auto-strengthen.mjs referenced this workflow in its issue-body text; it now
+# exists. Runs in --dry-run so it reports promotion candidates without mutating config.
+name: auto-strengthen
+
+on:
+  schedule:
+    - cron: '0 7 * * 1' # weekly, Monday 07:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  strengthen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: gate-promotion review (dry-run)
+        run: node scripts/auto-strengthen.mjs --dry-run

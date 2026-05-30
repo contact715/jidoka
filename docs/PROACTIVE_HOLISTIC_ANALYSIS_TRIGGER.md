@@ -235,7 +235,7 @@ Root cause: the wave-117 retro fix treated a behavioral rule as closable via doc
 
 Enforcement mechanisms added in wave-145:
 - Completion-audit block (`.claude/skills/completion-audit.md`) — must precede any "done" claim
-- Partial-fix detection hook (`.husky/commit-msg`, wave-145 block) — warns on docs-only closure verbs
+- Partial-fix detection hook (`.githooks/commit-msg`, wave-145 block) — warns on docs-only closure verbs
 - Meta-process-auditor (`L0.98`, `scripts/audit-meta-process.mjs`) — detects recurrence across waves
 - Anti-pattern catalog (`docs/ANTI_PATTERNS_CATALOG.md`) — 7 entries with enforcement escalation paths
 - Git-tracked skill mirror (`docs/skills/`) — portability fix so skills survive fresh-machine provisioning

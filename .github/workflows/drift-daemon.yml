@@ -1,0 +1,22 @@
+# drift-daemon — daily spec↔code↔roster drift scan (the scheduled half of detect-drift).
+# Per-commit drift runs via the local hook; this is the comprehensive daily sweep that
+# docs/ANTI_PATTERNS_CATALOG.md references. Real scheduled CI, calling a real, green script.
+name: drift-daemon
+
+on:
+  schedule:
+    - cron: '0 6 * * *' # daily 06:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: comprehensive drift scan
+        run: node scripts/detect-drift.mjs --comprehensive

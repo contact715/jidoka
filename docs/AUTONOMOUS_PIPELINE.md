@@ -87,7 +87,7 @@ If a human-required escalation was triggered but resolved without BLOCK, pipelin
 
 ## Known limitations
 
-- **pre-merge fires on local `git merge` only.** The `.husky/pre-merge` hook fires when running `git merge` locally. It does NOT fire when merging a pull request via the GitHub UI. Teams using GitHub's merge button bypass this gate. To enforce quality gates on GitHub merges, configure branch protection rules with required status checks in GitHub Actions CI.
+- **pre-merge fires on local `git merge` only.** The `.githooks/pre-merge-commit` hook fires when running `git merge` locally. It does NOT fire when merging a pull request via the GitHub UI. Teams using GitHub's merge button bypass this gate. To enforce quality gates on GitHub merges, configure branch protection rules with required status checks in GitHub Actions CI.
 
 - **semgrep and trufflehog require external installation.** Neither is an npm package. The security-scanner agent degrades gracefully (SKIP) if they are not in PATH. For full security coverage, install both on the development machine:
   - semgrep: `brew install semgrep` or `pip install semgrep`

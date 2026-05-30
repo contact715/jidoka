@@ -1,0 +1,9 @@
+#!/bin/sh
+# Commit-msg hook — wave-artifact validation when the subject names a wave (wave-NN).
+# Informational by default: the check surfaces a missing metrics row / retro but does
+# not block the commit (the wave-complete gate enforces hard).
+ROOT="$(git rev-parse --show-toplevel)"
+if grep -qiE 'wave-[0-9]+' "$1" 2>/dev/null; then
+  sh "$ROOT/scripts/check-wave-artifacts.sh" "$1" || echo "↑ wave-artifact check flagged (informational, not blocking)"
+fi
+exit 0

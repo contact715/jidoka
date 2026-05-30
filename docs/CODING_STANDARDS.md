@@ -803,7 +803,7 @@ Mid-execution tool calls are never blocked (MCAS principle: unbounded blocking i
 
 **Audit log:** `docs/audits/checklist-runs.jsonl` — append-only. Never call `writeFileSync`, `truncate`, or `unlink` on this file.
 
-**Note on `andonCord.enabled: false`**: If `andonCord.enabled: false`, halt-state is still written by PFCA BLOCK but the pre-commit halt-state check (`.husky/pre-commit:1-15`) fires only when `andonCord.enabled: true`. The two config flags are independent.
+**Note on `andonCord.enabled: false`**: If `andonCord.enabled: false`, halt-state is still written by PFCA BLOCK but the pre-commit halt-state check (`.githooks/pre-commit:1-15`) fires only when `andonCord.enabled: true`. The two config flags are independent.
 
 ---
 
@@ -838,8 +838,8 @@ Wave-155 ships the proactive-surfacing-agent (L0.99-1) — a concern queue that 
 | Condition | Mechanism |
 |---|---|
 | Session start (every session) | CLAUDE.md step 4: run `npm run surface:concerns`, read output |
-| wave-NN % 5 == 0 post-commit | `.husky/post-commit` fires `node scripts/surface-concerns.mjs &` |
-| L-effort commit | `.husky/post-commit` fires `node scripts/surface-concerns.mjs &` (subject contains "L effort") |
+| wave-NN % 5 == 0 post-commit | `.githooks/post-commit` fires `node scripts/surface-concerns.mjs &` |
+| L-effort commit | `.githooks/post-commit` fires `node scripts/surface-concerns.mjs &` (subject contains "L effort") |
 | Manual | `npm run surface:concerns` |
 
 ### Manual command

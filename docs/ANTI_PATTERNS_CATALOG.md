@@ -40,7 +40,7 @@
 **Examples from history**:
 - wave-117 retro: proactive-holistic-analysis trigger doc was written. Within the same session, AI shipped 60-70% of the actual enforcement and declared done. The skill existed; enforcement hooks did not. Wave-145 closes the gap.
 - wave-150 closes the recursive instance where the auditor itself was convention-only.
-  Enforcement artifact: `.husky/post-commit:87-88` — `node scripts/common-launcher.mjs scripts/audit-meta-process.mjs`.
+  Enforcement artifact: `.githooks/post-commit:87-88` — `node scripts/common-launcher.mjs scripts/audit-meta-process.mjs`.
   Closure type: active post-commit hook (not documentation). PFCA K3: satisfied.
 
 **Escalation path**: Completion-audit block must show enforcement type as something other than "documentation" for any closure claim about a behavioral rule. If enforcement type remains "documentation", the completion audit closure level must be < 100% with explicit deferred items.
@@ -169,7 +169,7 @@
 
 **Memory MCP entity**: `anti-pattern-dispatch-brief-vs-master-spec-drift`
 
-**Specimen case** (wave-153): Orchestrator's dispatch brief to chief-architect listed ~12 files (scripts/check-cross-line-dispatch.mjs, docs/THREE_LINES_OF_DEFENSE.md, .husky/post-commit edits, docs/CODING_STANDARDS section, .claude/agents/*.md YAML, etc.). Chief-architect synthesized a narrower master spec per Cartographer EXTEND verdict (5 files, documentation-only). this project-front-agent followed master spec exactly. Orchestrator pre-judged impl as 80% partial-closure based on dispatch brief breadth, not master spec ACs. Reflexion Critic verdict was correctly PASS — all 10 master spec ACs satisfied. The deferred items in frontend-agent's completion-audit were per chief-architect's D1 explicit deferral to wave-154, not partial-closure.
+**Specimen case** (wave-153): Orchestrator's dispatch brief to chief-architect listed ~12 files (scripts/check-cross-line-dispatch.mjs, docs/THREE_LINES_OF_DEFENSE.md, .githooks/post-commit edits, docs/CODING_STANDARDS section, .claude/agents/*.md YAML, etc.). Chief-architect synthesized a narrower master spec per Cartographer EXTEND verdict (5 files, documentation-only). this project-front-agent followed master spec exactly. Orchestrator pre-judged impl as 80% partial-closure based on dispatch brief breadth, not master spec ACs. Reflexion Critic verdict was correctly PASS — all 10 master spec ACs satisfied. The deferred items in frontend-agent's completion-audit were per chief-architect's D1 explicit deferral to wave-154, not partial-closure.
 
 **Examples from history**:
 - wave-153 (initial detection): Orchestrator anticipated REVISE based on file-count mismatch with dispatch brief. Reflexion Critic correctly identified that frontend-agent followed master spec, and the broader scope was the dispatch brief overreach. Cataloged as new anti-pattern.

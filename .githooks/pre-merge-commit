@@ -1,0 +1,8 @@
+#!/bin/sh
+# pre-merge-commit hook — fast verification signal before a local merge commit.
+# (git's real hook is pre-merge-commit; ".husky/pre-merge" in older docs was a husky-ism.)
+# Full adversarial verification is `npm run verify`; this surfaces recurring-mistake
+# regressions cheaply and never blocks (merge discipline stays human/CI-enforced).
+ROOT="$(git rev-parse --show-toplevel)"
+node "$ROOT/scripts/meta-audit.mjs" || echo "↑ meta-audit flagged a regression/recurrence (informational)"
+exit 0

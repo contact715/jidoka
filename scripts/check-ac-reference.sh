@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Wave-95 — AC traceability check (soft warn by default, hard block if enabled).
 #
-# Called from .husky/commit-msg:
+# Called from .githooks/commit-msg:
 #   bash scripts/check-ac-reference.sh "$1"
 #
 # $1 = path to the commit message file (provided by git to commit-msg hook).

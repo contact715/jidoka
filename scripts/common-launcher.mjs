@@ -11,7 +11,7 @@
  * Usage:
  *   node scripts/common-launcher.mjs <script-path> [args...]
  *
- * Example (from .husky/post-commit):
+ * Example (from .githooks/post-commit):
  *   node scripts/common-launcher.mjs scripts/run-quality-gates.mjs --skip-e2e
  *   node scripts/common-launcher.mjs scripts/surface-concerns.mjs
  *
