@@ -22,59 +22,19 @@
 //   node scripts/meta-audit.mjs            # analyze, exit 1 if a class recurs
 //   node scripts/meta-log.mjs ...          # append a mistake to the ledger
 
-import { readFileSync, existsSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { loadLedger, groupByClass, daysBetween, todayISO, recurrencesAfter } from './meta-lib.mjs';
+import { REMEDIES } from './meta-remedies.mjs'; // single source of truth for gates
 
-const LEDGER = process.env.META_LEDGER || 'docs/audits/meta-mistakes.jsonl';
-
-// class -> architectural remedy WITH its activation date. `since` is the date the
-// gate went live: incidents on/before it are what PROVOKED the gate; incidents
-// strictly AFTER it are recurrences the gate failed to stop = regressions.
-// `mechanism` is the executable that enforces the gate (null = documented-only,
-// which is weaker and flagged as such). The date is what closes the learning loop:
-// without it the engine can't tell "still broken" from "gate now stands".
-// An unregistered recurring class is escalated (see bottom).
-const REMEDIES = {
-  'declaration-over-implementation': {
-    since: '2026-05-29',
-    mechanism: 'scripts/proof-gate.mjs',
-    gate:
-      'A claim of "implemented / wired / mechanical / fixed / done" MUST ship an EXECUTABLE proof in the same turn: ' +
-      'a test that passes, a hook that blocks, or a command whose output is shown. No proof artifact in the turn → ' +
-      'status is NOT done. Enforce as a done-gate; do not rely on the agent recalling verification-before-completion.',
-  },
-  'tree-not-history': {
-    since: '2026-05-29',
-    mechanism: 'scripts/pre-publish-guard.mjs',
-    gate: 'Cleanup/security claims must scan full history, not current state. Mechanism scans git log -p.',
-  },
-  'scope-narrowed-silently': {
-    since: '2026-05-29',
-    mechanism: null,
-    gate: 'If a task is bounded (top-N, sampled, partial), the boundary must be stated explicitly in the same turn. Silent truncation reads as full coverage.',
-  },
-};
-
-function load() {
-  if (!existsSync(LEDGER)) return [];
-  return readFileSync(LEDGER, 'utf8').split('\n').filter(Boolean).map((line, i) => {
-    try { return JSON.parse(line); }
-    catch { console.error(`meta-audit: skipping malformed ledger line ${i + 1}`); return null; }
-  }).filter(Boolean);
-}
-
-const rows = load();
+const rows = loadLedger();
 if (rows.length === 0) { console.log('meta-audit: ledger empty — nothing to analyze.'); process.exit(0); }
 
-const byClass = {};
-for (const r of rows) (byClass[r.class] ??= []).push(r);
-
-const classes = Object.entries(byClass).sort((a, b) => b[1].length - a[1].length);
+const classes = Object.entries(groupByClass(rows)).sort((a, b) => b[1].length - a[1].length);
 console.log(`meta-audit: ${rows.length} logged mistakes across ${classes.length} class(es)\n`);
 
-const today = new Date().toISOString().slice(0, 10);
+const today = todayISO();
 const QUARANTINE_DAYS = 14; // days a gate must hold with zero recurrences before we trust it
 const incident = it => `    · ${it.date}: claimed "${it.claimed}"\n        → reality: ${it.real} [caught by ${it.caught_by}]`;
-const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 
 let ungated = 0, regressed = 0, holding = 0, brokenGate = 0;
 
@@ -82,9 +42,7 @@ for (const [cls, items] of classes) {
   const sorted = [...items].sort((a, b) => a.date.localeCompare(b.date));
   const remedy = REMEDIES[cls];
   const recurring = items.length >= 2;
-  // Strictly-after: an incident dated the same day as activation is what provoked
-  // the gate (a "before" case), not a recurrence through it.
-  const after = remedy?.since ? sorted.filter(it => it.date > remedy.since) : [];
+  const after = recurrencesAfter(items, remedy?.since); // strictly-after = recurrence through the gate
 
   if (remedy?.since && after.length > 0) {
     // The gate existed and the class recurred anyway. Worst signal: not bad luck, a leaky gate.
