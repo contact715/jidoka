@@ -1,0 +1,9 @@
+#!/bin/sh
+# Pre-commit hook — fast mechanical gates before a commit lands.
+#   1. meta-honesty: BLOCKS if the mistake ledger has self-confirming (garbage-in) entries.
+#   2. instantiation-audit --warn: surfaces declaration-over-implementation ghosts (informational).
+# Activated by: git config core.hooksPath .githooks
+ROOT="$(git rev-parse --show-toplevel)"
+node "$ROOT/scripts/meta-honesty.mjs" || exit 1
+node "$ROOT/scripts/instantiation-audit.mjs" --warn || true
+exit 0

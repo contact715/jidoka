@@ -1,0 +1,45 @@
+# CI — runs the framework's own gates automatically on every push and PR.
+#
+# This file closes the #1 gap the holistic audit found: the gates existed but were
+# only triggered by a local pre-push hook, while docs referenced a .github/workflows
+# CI that did not exist. Every step below is a gate that is GREEN on a clean checkout
+# (verified before this file was written) — no step references an unseeded object, so
+# this CI is real, not a ghost. instantiation-audit runs in --warn (soft) until the
+# known registry ghosts are filled, then the flag is dropped to make it block.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history: pre-publish-guard scans git log -p, meta-audit reads the ledger
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # ── Meta-Mistake Engine ────────────────────────────────────────────────
+      - name: meta-audit (recurrence / regression gate)
+        run: node scripts/meta-audit.mjs
+      - name: meta-honesty (ledger signal quality)
+        run: node scripts/meta-honesty.mjs
+
+      # ── Structural / security / privacy gates ──────────────────────────────
+      - name: structural decomposition gate
+        run: npm run check:structural
+      - name: security pattern gate
+        run: npm run check:security
+      - name: pre-publish privacy guard (tree + history)
+        run: node scripts/pre-publish-guard.mjs
+
+      # ── Instantiation gate — soft trial (declaration-over-implementation at scale) ──
+      - name: instantiation-audit (soft trial — does scaffolding point at real objects?)
+        run: node scripts/instantiation-audit.mjs --warn
