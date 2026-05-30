@@ -1,0 +1,97 @@
+#!/usr/bin/env node
+// instantiation-audit — does the framework's scaffolding point at things that exist?
+//
+// A holistic audit of this repo found a systemic pattern: validators, gates, and
+// docs are written and described as working, but the OBJECTS they act on don't
+// exist on disk, the automation they claim isn't mounted, and the counts they
+// publish have drifted. That is declaration-over-implementation at framework
+// scale — the exact class meta-audit gates for one ledger entry. This makes it a
+// mechanism: it scans the whole system and fails when a claim has no instance.
+//
+// It does the opposite of trusting the scaffolding: a written validator proves
+// nothing if its input is a ghost. Three classes, each detected a reliable way:
+//
+//   Class 1 — ghost automation : docs/scripts cite .github/workflows/* or .husky/*
+//                                 that are not on disk → the automatic gate is imaginary
+//   Class 2 — doc-count drift   : README publishes agent/skill/script counts that no
+//                                 longer match reality → docs have silently rotted
+//   Class 3 — registry ghosts   : a curated manifest of critical INPUT objects that
+//                                 validators require but that are absent → the gate
+//                                 throws ENOENT instead of guarding anything
+//
+// Class 3 is a curated manifest, NOT a full auto-scan — boundary stated explicitly
+// so this does not read as exhaustive coverage (the scope-narrowed-silently gate).
+// Output objects (telemetry .jsonl streams, baselines) are deliberately excluded:
+// they are lazily created and their absence is normal, not a ghost.
+//
+// Usage: node scripts/instantiation-audit.mjs   (exit 1 if any ghost is found)
+
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+
+const count = (dir, ext = '.md') => { try { return readdirSync(dir).filter(f => f.endsWith(ext)).length; } catch { return 0; } };
+const grepLines = re => { try { return execSync(`git grep -hoE ${JSON.stringify(re)} -- docs scripts package.json README.md 2>/dev/null || true`, { encoding: 'utf8' }).split('\n').filter(Boolean); } catch { return []; } };
+const refCount = needle => { try { return execSync(`git grep -lF ${JSON.stringify(needle)} -- scripts 2>/dev/null | wc -l`, { encoding: 'utf8' }).trim(); } catch { return '0'; } };
+const refFile = needle => { try { return execSync(`git grep -lF ${JSON.stringify(needle)} -- docs scripts 2>/dev/null | head -1`, { encoding: 'utf8' }).trim(); } catch { return ''; } };
+
+let ghosts = 0;
+
+// ── Class 1 — ghost automation ────────────────────────────────────────────────
+console.log('\x1b[1m▌ Class 1 — ghost automation (declared in docs/code, not on disk)\x1b[0m');
+const autoRefs = [...new Set(grepLines('\\.(github/workflows/[A-Za-z0-9_.-]+\\.ya?ml|husky/[A-Za-z0-9_.-]+)'))];
+let c1 = 0;
+for (const ref of autoRefs) {
+  const path = ref.replace(/^\.?/, '').replace(/^/, '.'); // normalize to .github/... or .husky/...
+  const onDisk = existsSync(ref.startsWith('.') ? ref : '.' + ref) || existsSync(ref);
+  if (!onDisk) { c1++; ghosts++; console.log(`  \x1b[31m👻 ${ref}\x1b[0m — cited in ${refFile(ref) || '(docs)'} but not on disk`); }
+}
+if (c1 === 0) console.log('  \x1b[32m✓ every cited workflow/hook exists\x1b[0m');
+
+// ── Class 2 — doc-count drift ─────────────────────────────────────────────────
+console.log('\n\x1b[1m▌ Class 2 — doc-count drift (README claims vs reality)\x1b[0m');
+const readme = existsSync('README.md') ? readFileSync('README.md', 'utf8') : '';
+const real = { agent: count('.claude/agents'), skill: count('.claude/skills'), script: count('scripts', '.mjs') + count('scripts', '.sh') };
+const labels = { agent: /(\d+)(\+?)\s*(?:агент|agent)/i, skill: /(\d+)(\+?)\s*(?:навык|skill)/i, script: /(\d+)(\+?)\s*(?:скрипт|script)/i };
+let c2 = 0;
+for (const [key, re] of Object.entries(labels)) {
+  const m = readme.match(re);
+  if (!m) continue;
+  const claimed = +m[1], plus = m[2] === '+', actual = real[key];
+  const drifted = plus ? actual < claimed : actual !== claimed;
+  if (drifted) { c2++; ghosts++; console.log(`  \x1b[31m👻 ${key}s: README says ${claimed}${plus ? '+' : ''}, real ${actual}\x1b[0m`); }
+}
+if (c2 === 0) console.log('  \x1b[32m✓ README counts match reality (or make no claim)\x1b[0m');
+
+// ── Class 3 — registry ghosts (curated manifest of required INPUT objects) ─────
+console.log('\n\x1b[1m▌ Class 3 — registry ghosts (validators whose required object is absent)\x1b[0m');
+const MANIFEST = [
+  ['docs/evals',                              'golden datasets for run-evals.mjs (agent quality regression)'],
+  ['docs/security/dr-scenario-catalog.json',  'DR catalog required by validate-dr-catalog.mjs'],
+  ['docs/security/api-contract-registry.json','API surface required by validate-contract.mjs'],
+  ['docs/security/agent-access-registry.json','tool grants required by validate-agent-access.mjs'],
+  ['docs/governance/raci.json',               'RACI matrix required by validate-raci.mjs'],
+  ['docs/metrics/slo-definitions.json',       'SLO definitions required by compute-slos.mjs'],
+  ['docs/metrics/dora-definitions.json',      'DORA definitions required by compute-dora.mjs'],
+  ['docs/specs/_LINEAGE.json',                'spec lineage required by query-graph.mjs'],
+];
+let c3 = 0;
+for (const [path, note] of MANIFEST) {
+  if (existsSync(path)) continue;
+  const refs = refCount(path.split('/').pop());
+  if (refs === '0') continue; // nothing references it → not a live expectation, skip (honest)
+  c3++; ghosts++;
+  console.log(`  \x1b[31m👻 ${path}\x1b[0m — ${note}; referenced by ${refs} script(s), 0 on disk`);
+}
+if (c3 === 0) console.log('  \x1b[32m✓ every manifest registry is present\x1b[0m');
+console.log(`  \x1b[2m(Class 3 checks a curated manifest of ${MANIFEST.length} critical registries, not a full auto-scan.)\x1b[0m`);
+
+// ── verdict ───────────────────────────────────────────────────────────────────
+console.log(`\n\x1b[1m— instantiation-audit summary —\x1b[0m`);
+console.log(`  ghosts: ${ghosts}  (class1 automation: ${c1}, class2 doc-drift: ${c2}, class3 registries: ${c3})`);
+if (ghosts > 0) {
+  console.log(`\n\x1b[31m${ghosts} ghost(s). The scaffolding is real; the objects are not. This is`);
+  console.log(`declaration-over-implementation at framework scale — fill the object or delete the claim.\x1b[0m`);
+  process.exit(1);
+}
+console.log('\n\x1b[32m✓ every declared mechanism points at something that exists.\x1b[0m');
+process.exit(0);

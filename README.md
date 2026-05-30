@@ -17,13 +17,13 @@
 
 ```
 .claude/
-  agents/            28 агентов-ролей (chief-architect, reflexion-critic,
+  agents/            29 агентов-ролей (chief-architect, reflexion-critic,
                      best-of-N-judge, debate-*, security-scanner, ...)
-  skills/            33 навыка (переиспользуемые паттерны)
+  skills/            34 навыка (переиспользуемые паттерны)
   AGENT_PLAYBOOK.md  главный плейбук агентства
   settings.local.json
 
-scripts/             92+ скрипта-движка:
+scripts/             100+ скриптов-движка:
                      andon-halt (stop-the-line), run-tla (формальная проверка),
                      compute-dora/slos/cost/carbon (observability),
                      detect-injection/drift/hallucinations (защита),
