@@ -10,6 +10,7 @@
 //   e.g. node scripts/proof-gate.mjs "guard blocks leaks" "node scripts/pre-publish-guard.mjs"
 
 import { execSync } from 'node:child_process';
+import { recordTrip } from './meta-lib.mjs';
 
 const [, , claim, proof] = process.argv;
 if (!claim || !proof) {
@@ -29,6 +30,7 @@ try {
 } catch (e) {
   if (e.stdout) process.stdout.write(e.stdout);
   if (e.stderr) process.stderr.write(e.stderr);
+  recordTrip('declaration-over-implementation', 'scripts/proof-gate.mjs'); // gate fired: a claim was rejected
   console.error('\n\x1b[31m✗ PROOF FAILED — claim REJECTED, status is NOT done\x1b[0m');
   process.exit(1);
 }

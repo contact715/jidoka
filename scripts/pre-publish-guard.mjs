@@ -11,6 +11,7 @@
 
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { recordTrip } from './meta-lib.mjs';
 
 // Files that legitimately contain pattern *definitions* or doc examples —
 // skip these so the guard does not flag its own detection patterns.
@@ -64,6 +65,7 @@ if (existsSync('.jidoka-denylist')) {
 }
 
 if (findings.length) {
+  recordTrip('tree-not-history', 'scripts/pre-publish-guard.mjs'); // gate fired: a publish was blocked
   console.error('\n\x1b[31m✗ pre-publish-guard BLOCKED this push — private data found:\x1b[0m\n');
   for (const f of findings.slice(0, 40)) console.error('  ' + f);
   if (findings.length > 40) console.error(`  … and ${findings.length - 40} more`);
