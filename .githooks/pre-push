@@ -1,5 +1,9 @@
 #!/bin/sh
-# Pre-push hook — mechanical pre-publish guard.
-# Blocks the push if private data is found in the working tree or git history.
+# Pre-push hook — mechanical gates before publication.
+#   1. pre-publish-guard: BLOCKS the push if private data is in tree or history.
+#   2. meta-audit: surfaces recurring process mistakes (informational, non-blocking).
 # Activated by: git config core.hooksPath .githooks
-exec node "$(git rev-parse --show-toplevel)/scripts/pre-publish-guard.mjs"
+ROOT="$(git rev-parse --show-toplevel)"
+node "$ROOT/scripts/pre-publish-guard.mjs" || exit 1
+node "$ROOT/scripts/meta-audit.mjs" || echo "↑ meta-audit: recurring class(es) flagged (informational, not blocking)"
+exit 0

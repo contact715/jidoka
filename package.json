@@ -1,8 +1,11 @@
 {
-	"name": "mos-engine",
+	"name": "jidoka",
 	"version": "0.1.0",
 	"private": true,
 	"scripts": {
+		"meta:audit": "node scripts/meta-audit.mjs",
+		"meta:log": "node scripts/meta-log.mjs",
+		"proof": "node scripts/proof-gate.mjs",
 		"dev": "next dev --webpack",
 		"build": "next build",
 		"start": "next start",

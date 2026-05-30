@@ -1,0 +1,2 @@
+{"date":"2026-05-29","class":"declaration-over-implementation","claimed":"private data cleaned, ready to publish to public repo","real":"only the working tree was checked; git history still leaked /Users/<user> (x24) and a personal name","caught_by":"user"}
+{"date":"2026-05-29","class":"declaration-over-implementation","claimed":"mechanically enforced so the mistake is caught automatically","real":"wrote a skill document + anti-pattern entry; no executable mechanism existed until the user challenged it","caught_by":"user"}
