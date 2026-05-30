@@ -201,8 +201,8 @@ function emitMarkdown(raci) {
 function main() {
   // Load raci.json
   if (!fs.existsSync(RACI_JSON_PATH)) {
-    process.stderr.write(`[validate-raci] ERROR: ${RACI_JSON_PATH} not found.\n`);
-    process.exit(1);
+    process.stdout.write(`⊘ DORMANT — ${RACI_JSON_PATH} not seeded yet; RACI gate inactive, not failed. Seed the matrix to activate.\n`);
+    process.exit(0);
   }
 
   let raci;

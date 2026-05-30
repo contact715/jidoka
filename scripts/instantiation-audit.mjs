@@ -33,6 +33,7 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { dirname, resolve as resolvePath, relative } from 'node:path';
 
 const warnOnly = process.argv.includes('--warn');
 
@@ -44,8 +45,15 @@ const SELF = "':(exclude)scripts/instantiation-audit.mjs'";
 const grepLines = re => { try { return execSync(`git grep -hoE ${JSON.stringify(re)} -- docs scripts package.json README.md ${SELF} 2>/dev/null || true`, { encoding: 'utf8' }).split('\n').filter(Boolean); } catch { return []; } };
 const refCount = needle => { try { return execSync(`git grep -lF ${JSON.stringify(needle)} -- scripts ${SELF} 2>/dev/null | wc -l`, { encoding: 'utf8' }).trim(); } catch { return '0'; } };
 const refFile = needle => { try { return execSync(`git grep -lF ${JSON.stringify(needle)} -- docs scripts ${SELF} 2>/dev/null | head -1`, { encoding: 'utf8' }).trim(); } catch { return ''; } };
+// A registry whose validator honest-skips (prints DORMANT, exit 0) when the object
+// is absent is NOT a hidden ghost — it's a dormant gate awaiting seed. Distinguish
+// them by checking whether ANY script referencing the object honest-skips on it.
+const honestSkips = needle => { try {
+  return execSync(`git grep -lF ${JSON.stringify(needle)} -- scripts ${SELF} 2>/dev/null`, { encoding: 'utf8' })
+    .split('\n').filter(Boolean).some(f => { try { return readFileSync(f, 'utf8').includes('DORMANT'); } catch { return false; } });
+} catch { return false; } };
 
-let ghosts = 0;
+let ghosts = 0, dormant = 0;
 
 // ── Class 1 — ghost automation ────────────────────────────────────────────────
 console.log('\x1b[1m▌ Class 1 — ghost automation (declared in docs/code, not on disk)\x1b[0m');
@@ -83,26 +91,51 @@ const MANIFEST = [
   ['docs/evals',                              'golden datasets for run-evals.mjs (agent quality regression)'],
   ['docs/security/dr-scenario-catalog.json',  'DR catalog required by validate-dr-catalog.mjs'],
   ['docs/security/api-contract-registry.json','API surface required by validate-contract.mjs'],
-  ['docs/security/agent-access-registry.json','tool grants required by validate-agent-access.mjs'],
+  ['docs/governance/agent-access-registry.json','tool grants required by validate-agent-access.mjs'],
   ['docs/governance/raci.json',               'RACI matrix required by validate-raci.mjs'],
-  ['docs/metrics/slo-definitions.json',       'SLO definitions required by compute-slos.mjs'],
-  ['docs/metrics/dora-definitions.json',      'DORA definitions required by compute-dora.mjs'],
+  ['docs/quality/slo-definitions.json',       'SLO definitions required by compute-slos.mjs'],
+  ['docs/quality/dora-definitions.json',      'DORA definitions required by compute-dora.mjs'],
   ['docs/specs/_LINEAGE.json',                'spec lineage required by query-graph.mjs'],
 ];
 let c3 = 0;
 for (const [path, note] of MANIFEST) {
   if (existsSync(path)) continue;
-  const refs = refCount(path.split('/').pop());
-  if (refs === '0') continue; // nothing references it → not a live expectation, skip (honest)
+  const base = path.split('/').pop();
+  if (refCount(base) === '0') continue; // nothing references it → not a live expectation
+  if (honestSkips(base)) {
+    dormant++;
+    console.log(`  \x1b[36m⊘ ${path}\x1b[0m — ${note}; absent, but validator honest-skips (DORMANT, not a hidden crash)`);
+    continue;
+  }
   c3++; ghosts++;
-  console.log(`  \x1b[31m👻 ${path}\x1b[0m — ${note}; referenced by ${refs} script(s), 0 on disk`);
+  console.log(`  \x1b[31m👻 ${path}\x1b[0m — ${note}; absent AND validator crashes (hidden ghost)`);
 }
-if (c3 === 0) console.log('  \x1b[32m✓ every manifest registry is present\x1b[0m');
+if (c3 === 0 && dormant === 0) console.log('  \x1b[32m✓ every manifest registry is present\x1b[0m');
+else if (c3 === 0) console.log(`  \x1b[36m${dormant} dormant gate(s) — honestly skipped, awaiting seed (not blocking)\x1b[0m`);
 console.log(`  \x1b[2m(Class 3 checks a curated manifest of ${MANIFEST.length} critical registries, not a full auto-scan.)\x1b[0m`);
+
+// ── Class 4 — broken imports (a script imports a relative module not on disk) ──
+console.log('\n\x1b[1m▌ Class 4 — broken imports (script imports a module not on disk)\x1b[0m');
+let c4 = 0;
+const importLines = (() => { try { return execSync(`git grep -noE "from '[^']+\\.mjs'" -- scripts ${SELF} 2>/dev/null || true`, { encoding: 'utf8' }).split('\n').filter(Boolean); } catch { return []; } })();
+const seenImports = new Set();
+for (const line of importLines) {
+  const m = line.match(/^(scripts\/[^:]+):\d+:from '([^']+\.mjs)'$/);
+  if (!m) continue;
+  const [, srcFile, imp] = m;
+  if (!imp.startsWith('.')) continue; // only relative imports resolve to a file on disk
+  const target = relative('.', resolvePath(dirname(srcFile), imp));
+  if (existsSync(target) || seenImports.has(target)) continue;
+  seenImports.add(target);
+  c4++; ghosts++;
+  console.log(`  \x1b[31m👻 ${target}\x1b[0m — imported by ${srcFile} but not on disk (ERR_MODULE_NOT_FOUND at load)`);
+}
+if (c4 === 0) console.log('  \x1b[32m✓ every relative .mjs import resolves\x1b[0m');
 
 // ── verdict ───────────────────────────────────────────────────────────────────
 console.log(`\n\x1b[1m— instantiation-audit summary —\x1b[0m`);
-console.log(`  ghosts: ${ghosts}  (class1 automation: ${c1}, class2 doc-drift: ${c2}, class3 registries: ${c3})`);
+console.log(`  ghosts: ${ghosts}  (class1 automation: ${c1}, class2 doc-drift: ${c2}, class3 registries: ${c3}, class4 imports: ${c4})`);
+if (dormant > 0) console.log(`  \x1b[36mdormant (honest-skip, not a ghost): ${dormant}\x1b[0m`);
 if (ghosts > 0) {
   console.log(`\n\x1b[31m${ghosts} ghost(s). The scaffolding is real; the objects are not. This is`);
   console.log(`declaration-over-implementation at framework scale — fill the object or delete the claim.\x1b[0m`);

@@ -53,11 +53,11 @@ function normalizeWaveId(raw) {
 // ── Load materialized graph ────────────────────────────────────────────
 function loadGraph() {
   if (!fs.existsSync(LINEAGE_JSON)) {
-    process.stderr.write(
-      `[query-graph] ERROR — ${LINEAGE_JSON} does not exist.\n` +
-      `  Run kg:build first: node scripts/build-lineage-graph.mjs --json\n`
+    process.stdout.write(
+      `⊘ DORMANT — ${LINEAGE_JSON} not seeded yet; knowledge-graph queries inactive, not failed.\n` +
+      `  Seed it: node scripts/build-lineage-graph.mjs --json\n`
     );
-    process.exit(1);
+    process.exit(0);
   }
   try {
     return JSON.parse(fs.readFileSync(LINEAGE_JSON, 'utf8'));

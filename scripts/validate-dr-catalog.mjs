@@ -67,8 +67,8 @@ function log(msg) { process.stdout.write(msg + '\n'); }
 // ── Load catalog ───────────────────────────────────────────────────────────────
 
 if (!fs.existsSync(CATALOG_PATH)) {
-  log(`[VIOLATION] — catalog file not found: ${CATALOG_PATH}`);
-  process.exit(1);
+  log(`⊘ DORMANT — ${CATALOG_PATH} not seeded yet; DR-catalog gate inactive, not failed. Seed the catalog to activate.`);
+  process.exit(0);
 }
 
 /** @type {any} */

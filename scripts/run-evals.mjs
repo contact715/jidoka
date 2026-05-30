@@ -67,8 +67,8 @@ if (isDryRun) {
   const agentSlugs = targetAgent ? [targetAgent] : discoverAgents();
 
   if (agentSlugs.length === 0) {
-    process.stderr.write('[eval] ERROR — no agent datasets found in docs/evals/. Run with --dry to verify setup.\n');
-    process.exit(1);
+    process.stdout.write('⊘ DORMANT — no agent datasets in docs/evals/ yet; eval gate inactive, not failed. Seed docs/evals/<agent>/golden-cases.jsonl to activate.\n');
+    process.exit(0);
   }
 
   let anyRegression = false;

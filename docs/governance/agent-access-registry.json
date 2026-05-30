@@ -1,0 +1,361 @@
+{
+  "_generated_by": "scripts/generate-agent-access-registry.mjs",
+  "_source": ".claude/agents/*.md tools: frontmatter + docs/AGENT_ROSTER.md Line cells",
+  "_note": "declared_tools mirror .md exactly (I0 by construction); write_scope set only where role is scope-contradicting (I1), null elsewhere (I2 warn, non-blocking)",
+  "agents": [
+    {
+      "slug": "_TEMPLATE",
+      "declared_tools": [
+        "Read",
+        "Bash"
+      ],
+      "write_scope": null,
+      "line": "",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "a11y-auditor",
+      "declared_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: Second — Risk-Compliance",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "best-of-N-judge",
+      "declared_tools": [
+        "Read",
+        "Grep",
+        "Bash"
+      ],
+      "write_scope": null,
+      "line": "Line: Third — Independent Audit",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "chief-architect",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "WebFetch",
+        "WebSearch",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: Pre-wave / Support",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "constitutional-reviewer",
+      "declared_tools": [
+        "Read",
+        "Grep",
+        "Bash"
+      ],
+      "write_scope": null,
+      "line": "Line: Second — Risk-Compliance",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "coverage-auditor",
+      "declared_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: Second — Risk-Compliance",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "debate-defender",
+      "declared_tools": [
+        "Read",
+        "Grep",
+        "Bash"
+      ],
+      "write_scope": null,
+      "line": "Line: Second — Risk-Compliance",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "debate-judge",
+      "declared_tools": [
+        "Read",
+        "Grep",
+        "Bash"
+      ],
+      "write_scope": null,
+      "line": "Line: Third — Independent Audit",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "debate-prosecutor",
+      "declared_tools": [
+        "Read",
+        "Grep",
+        "Bash"
+      ],
+      "write_scope": null,
+      "line": "Line: Second — Risk-Compliance",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "debug-agent",
+      "declared_tools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Edit",
+        "Write",
+        "Bash"
+      ],
+      "write_scope": null,
+      "line": "Line: First — Operations",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "design-system-architect",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: Pre-wave / Support",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "error-recovery",
+      "declared_tools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash",
+        "Edit",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "integration-tester",
+      "declared_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: First — Operations",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "macro-architect",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "WebFetch",
+        "WebSearch",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: Pre-wave / Support",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "meta-process-auditor",
+      "declared_tools": [
+        "Read",
+        "Grep",
+        "Bash"
+      ],
+      "write_scope": null,
+      "line": "Line: Third — Independent Audit",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "metrics-aggregator",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: Pre-wave / Support",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "micro-architect",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: Pre-wave / Support",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "perf-profiler",
+      "declared_tools": [
+        "Read",
+        "Bash",
+        "Grep"
+      ],
+      "write_scope": null,
+      "line": "Line: Second — Risk-Compliance",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "pfca-agent",
+      "declared_tools": [
+        "Read",
+        "Bash"
+      ],
+      "write_scope": null,
+      "line": "Line: Second — Risk-Compliance",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "reflexion-critic",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Write"
+      ],
+      "write_scope": ".claude/reflexion-queue/**",
+      "line": "Line: Second — Risk-Compliance",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "security-scanner",
+      "declared_tools": [
+        "Read",
+        "Bash",
+        "Grep"
+      ],
+      "write_scope": null,
+      "line": "Line: Second — Risk-Compliance",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "self-improvement-reviewer",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write"
+      ],
+      "write_scope": ".claude/self-improvement-queue/**",
+      "line": "Line: Second — Risk-Compliance",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "skill-extractor",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "mcp__memory__create_entities",
+        "mcp__memory__search_nodes"
+      ],
+      "write_scope": ".claude/skills/**, docs/retros/_FINDINGS.md",
+      "line": "Line: Pre-wave / Support",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "surface-cartographer",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: Pre-wave / Support",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "test-engineer",
+      "declared_tools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Write",
+        "Edit"
+      ],
+      "write_scope": "**/*.test.ts, **/*.spec.ts",
+      "line": "Line: First — Operations",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "test-runner",
+      "declared_tools": [
+        "Read",
+        "Bash",
+        "Grep",
+        "Glob",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: First — Operations",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "visual-qa",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "mcp__computer-use__screenshot",
+        "mcp__computer-use__screenshot_and_ask"
+      ],
+      "write_scope": null,
+      "line": "Line: Second — Risk-Compliance",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    }
+  ]
+}

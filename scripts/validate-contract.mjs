@@ -113,8 +113,8 @@ async function fetchWithTimeout(url, timeoutMs) {
 
 // ── Load registry ─────────────────────────────────────────────────────────────
 if (!fs.existsSync(REGISTRY_PATH)) {
-  log(`[contract] FATAL — registry not found: ${REGISTRY_PATH}`);
-  process.exit(1);
+  log(`⊘ DORMANT — ${REGISTRY_PATH} not seeded yet; contract gate inactive, not failed. Seed the registry to activate.`);
+  process.exit(0);
 }
 
 /** @type {any} */

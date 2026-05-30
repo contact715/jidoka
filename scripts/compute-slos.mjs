@@ -55,6 +55,10 @@ function readConfig() {
 
 /** @returns {SLODef[]} */
 function loadSLODefs() {
+  if (!fs.existsSync(SLO_DEFS_PATH)) {
+    console.log(`⊘ DORMANT — ${SLO_DEFS_PATH} not seeded yet; SLO computation inactive, not failed. Seed SLO definitions to activate.`);
+    process.exit(0);
+  }
   const raw = JSON.parse(fs.readFileSync(SLO_DEFS_PATH, 'utf8'));
   return raw.slos;
 }

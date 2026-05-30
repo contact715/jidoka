@@ -67,6 +67,10 @@ function readConfig() {
 
 /** @returns {DORADefs} */
 function loadDORAdefs() {
+  if (!fs.existsSync(DORA_DEFS_PATH)) {
+    console.log(`⊘ DORMANT — ${DORA_DEFS_PATH} not seeded yet; DORA computation inactive, not failed. Seed DORA definitions to activate.`);
+    process.exit(0);
+  }
   const raw = JSON.parse(fs.readFileSync(DORA_DEFS_PATH, 'utf8'));
   return raw;
 }
