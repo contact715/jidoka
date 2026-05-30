@@ -179,3 +179,17 @@
 **Additional trigger condition** (wave-158 FORCED_RESUME gap): A scenario described in the dispatch brief is not reflected in the spec's AC set. The spec is synthesized from the brief but a specific scenario (e.g., FORCED_RESUME on `--no-verify` bypass) is mentioned in the brief yet has no corresponding binary-testable AC. The gap is detectable before dispatch but no mechanism existed to catch it. Detection question: "Does each scenario in the brief have a corresponding AC in the spec?"
 
 **Prevention rule (PFCA K2)**: PFCA K2 must flag missing AC coverage before dispatch — if any scenario or behavior described in the brief or spec §2 Current State section lacks a binary-testable verification command in the AC set, K2 returns `no` and the checklist emits WARN or BLOCK. This closes the wave-158 class of gap.
+
+---
+
+### 10. tree-clean-claimed-as-history-clean
+
+**Pattern**: Orchestrator cleans a working tree (removes secrets / private paths / brand), verifies the **tree** is clean, and declares "all clean, published" — but the cleanup happened AFTER commits were already made, so git **history** still carries the private data. On a public repo, history is visible to everyone. Verification covered state, not history.
+
+**Trigger**: Any public push or repo-made-public where cleanup was incremental (commit first, clean later) instead of clean-before-first-commit. Detection: `git log --all -p | grep -iE '<private patterns>'` returns > 0 while the working tree returns 0.
+
+**Root cause**: the quality environment's gates (security-scanner, andon, PFCA) are wired to product code; the orchestrator's own irreversible meta-operations (publication, git history) bypass them. A critical irreversible action ran without the environment applied to itself.
+
+**Prevention rule**: `.claude/skills/pre-publish-checklist.md` — before any irreversible outward-facing action, clean BEFORE the first commit, and scan git HISTORY, not just the tree. Tree-clean ≠ history-clean. A clean rewrite + force-push is insufficient on a public repo (dangling commits stay reachable by SHA until GC) — set the repo private immediately, then delete + recreate.
+
+**Source**: 2026-05-29 session — this framework's first public push exposed `/Users/<user>` (×24) and a personal name in history; caught only when the user asked to re-scan. The irreversible operation should have been treated as a critical phase (Constitution §8) and gated like product code.
