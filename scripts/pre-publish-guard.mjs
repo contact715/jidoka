@@ -13,9 +13,12 @@ import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { recordTrip } from './meta-lib.mjs';
 
-// Files that legitimately contain pattern *definitions* or doc examples —
-// skip these so the guard does not flag its own detection patterns.
-const SELF_REFERENCE = /pre-publish-guard|pre-publish-checklist|run-pentest-harness|ANTI_PATTERNS_CATALOG|\.jidoka-denylist/;
+// Files that legitimately contain pattern *definitions*, doc examples, or PII-shaped
+// test fixtures — skip these so the guard does not flag its own detection patterns or
+// the redaction utility's tests (a PII-redactor's tests must contain sample PII).
+// Matched against each grep line, which in history diffs carries the code, not the
+// filename — hence redactPii (the function name appears on every fixture line).
+const SELF_REFERENCE = /pre-publish-guard|pre-publish-checklist|run-pentest-harness|ANTI_PATTERNS_CATALOG|\.jidoka-denylist|redact-pii|redactPii/;
 
 const RULES = [
   { name: 'absolute home path', re: '(/Users/|/home/)[A-Za-z0-9._-]+/', allow: /\/(Users|home)\/(you|user|runner|me|<)/ },
