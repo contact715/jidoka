@@ -60,3 +60,36 @@ Or via npm script: `npm run check:security`.
 ## generate-vertical-images.mjs
 
 One-off generator for vertical asset images. See file header for usage.
+
+## Meta-Mistake Engine (`meta-*`)
+
+A self-improving system that turns recurring PROCESS mistakes into enforced gates,
+then checks whether those gates actually hold over time. The premise: a repeated
+miss is not bad luck, it is a missing mechanism.
+
+| Script | Role |
+|---|---|
+| `meta-log.mjs <class> <claimed> <real> [caught_by]` | append a mistake to the ledger |
+| `meta-audit.mjs` | closed-loop detector: holding / regression / ungated / broken-gate (exit 1 on regression or ungated recurrence) |
+| `meta-trend.mjs` | learning curve over time: gate coverage, time-to-gate, regression rate, verdict |
+| `meta-honesty.mjs` | adversarial audit of the signal: self-confirming entries, booster language, self-reported misses (exit 1 on garbage-in) |
+| `meta-premortem.mjs "<planned action>"` | preventive check of an action against known classes before you act (exit 1 on unaddressed risk) |
+| `meta-generalize.mjs [class]` | family map; reuse an existing gate for a variant class instead of building a new one |
+| `meta-decay.mjs` | age out gates that no longer earn hard status, without removing a working one |
+| `meta-lib.mjs`, `meta-remedies.mjs` | shared core: ledger/trip loaders, date math, and the single-source-of-truth gate registry |
+
+The registry (`meta-remedies.mjs`) is the single source of truth: each class maps to
+its gate, the date it went live (`since`), the enforcing mechanism, the `family` of
+adjacent classes it also covers, and the `premortem` risk signature.
+
+Every engine accepts env overrides so it is testable without touching production data:
+`META_LEDGER`, `META_TRIP_LOG`, `META_TODAY`.
+
+```bash
+node scripts/meta-audit.mjs        # is any gate leaking, or any class ungated?
+node scripts/meta-trend.mjs        # are we getting better over time?
+node scripts/meta-honesty.mjs      # can we trust the ledger we learn from?
+node scripts/meta-premortem.mjs "fixed the bug, ready to publish"
+node scripts/meta-generalize.mjs   # what does each lesson already cover?
+node scripts/meta-decay.mjs        # which gates can relax, which must stay hard?
+```
