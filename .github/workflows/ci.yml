@@ -32,6 +32,10 @@ jobs:
       - name: meta-honesty (ledger signal quality)
         run: node scripts/meta-honesty.mjs
 
+      # ── Engine unit tests (zero-dep node:test — runs without npm install) ───
+      - name: engine unit tests
+        run: npm run test:engine
+
       # ── Structural / security / privacy gates ──────────────────────────────
       - name: structural decomposition gate
         run: npm run check:structural
@@ -40,6 +44,6 @@ jobs:
       - name: pre-publish privacy guard (tree + history)
         run: node scripts/pre-publish-guard.mjs
 
-      # ── Instantiation gate — soft trial (declaration-over-implementation at scale) ──
-      - name: instantiation-audit (soft trial — does scaffolding point at real objects?)
-        run: node scripts/instantiation-audit.mjs --warn
+      # ── Instantiation gate — HARD (all known ghosts closed this session; now blocks any new one) ──
+      - name: instantiation-audit (does scaffolding point at real objects?)
+        run: node scripts/instantiation-audit.mjs
