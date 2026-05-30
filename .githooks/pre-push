@@ -1,0 +1,5 @@
+#!/bin/sh
+# Pre-push hook — mechanical pre-publish guard.
+# Blocks the push if private data is found in the working tree or git history.
+# Activated by: git config core.hooksPath .githooks
+exec node "$(git rev-parse --show-toplevel)/scripts/pre-publish-guard.mjs"

@@ -50,3 +50,15 @@ Force-push of a clean rewrite is **NOT sufficient** on a public repo: it leaves 
 ## The principle (why this is in the framework)
 
 **Apply the environment to itself.** The orchestrator's own irreversible actions are a *critical phase* under Constitution §8 and deserve the same gate discipline as product code. Quality-first is not only for the code we ship — it's for *how we ship it*. An environment that verifies everything except its own publication steps has a hole exactly where the cost of a mistake is highest (irreversible, public, personal data).
+
+---
+
+## Mechanical enforcement (not just this checklist)
+
+A checklist that relies on the agent remembering to read it is not mechanical. This one is backed by a real gate:
+
+- **`scripts/pre-publish-guard.mjs`** scans the working tree AND full git history (`git log --all -p`) for secrets, absolute home paths (`/Users/…`, `/home/…`), and an optional `.jidoka-denylist` of brand/personal terms. Exit 1 blocks.
+- **`.githooks/pre-push`** runs the guard on every `git push`. Activate once per clone: `git config core.hooksPath .githooks`.
+- **Verified to actually block**: injecting `/Users/<name>/` into a tracked file makes the guard fail the push (naming file:line); removing it unblocks. The check is unavoidable, not advisory.
+
+To extend coverage, add brand or personal terms (one per line) to `.jidoka-denylist`.
