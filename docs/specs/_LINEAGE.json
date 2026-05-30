@@ -1,0 +1,488 @@
+{
+  "nodes": [
+    {
+      "id": "spec:docs/AGENTIC_ENGINEERING_TZ.md",
+      "kind": "spec",
+      "label": "ТЗ — Agentic Engineering для this project",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/AGENTIC_ENGINEERING_TZ.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/AGENTIC_ENGINEERING_TZ_V2.md",
+      "kind": "spec",
+      "label": "ТЗ — Agentic Engineering V2 (this project + the backend)",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/AGENTIC_ENGINEERING_TZ_V2.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/AGENT_LAYER_ARCHITECTURE.md",
+      "kind": "spec",
+      "label": "Agent Layer Architecture — this project",
+      "resolved": true,
+      "level": "L1",
+      "version": "1.3.0",
+      "path": "docs/AGENT_LAYER_ARCHITECTURE.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/MISSION.md",
+      "kind": "spec",
+      "label": "docs/MISSION.md",
+      "resolved": true,
+      "path": "docs/MISSION.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/PRODUCT_PHILOSOPHY.md",
+      "kind": "missing",
+      "label": "docs/PRODUCT_PHILOSOPHY.md",
+      "resolved": false,
+      "path": "docs/PRODUCT_PHILOSOPHY.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/AGENT_LAYER_QUALITY_SPEC.md",
+      "kind": "spec",
+      "label": "Agent Layer Quality & Safety Specification — this project",
+      "resolved": true,
+      "level": "L1",
+      "version": "1.0.0",
+      "path": "docs/AGENT_LAYER_QUALITY_SPEC.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/AGENT_ROSTER.md",
+      "kind": "spec",
+      "label": "Agent Roster (canonical reference)",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/AGENT_ROSTER.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/ANTI_PATTERNS_CATALOG.md",
+      "kind": "spec",
+      "label": "Anti-Patterns Catalog",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/ANTI_PATTERNS_CATALOG.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/AUTONOMOUS_PIPELINE.md",
+      "kind": "spec",
+      "label": "Autonomous Quality Pipeline",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/AUTONOMOUS_PIPELINE.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/CODING_STANDARDS.md",
+      "kind": "spec",
+      "label": "Coding Standards",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/CODING_STANDARDS.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/CONSTITUTION.md",
+      "kind": "spec",
+      "label": "this project Constitution",
+      "resolved": true,
+      "level": "L0",
+      "version": "1.0.0",
+      "path": "docs/CONSTITUTION.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/DEBUGGING.md",
+      "kind": "spec",
+      "label": "Debugging Guide",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/DEBUGGING.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/DEVOPS.md",
+      "kind": "spec",
+      "label": "DevOps",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/DEVOPS.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/DOD.md",
+      "kind": "spec",
+      "label": "Definition of Done (DOD)",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/DOD.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/DOR.md",
+      "kind": "spec",
+      "label": "Definition of Ready (DOR)",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/DOR.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/ENGINEERING_SYSTEM_ASSESSMENT.md",
+      "kind": "spec",
+      "label": "Agentic Engineering Framework для Claude Code — оценка системы",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/ENGINEERING_SYSTEM_ASSESSMENT.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/GROUNDING_CONTRACT.md",
+      "kind": "spec",
+      "label": "Grounding Contract — Source Citation Requirements",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/GROUNDING_CONTRACT.md",
+      "revisions": []
+    },
+    {
+      "id": "wave:wave-163",
+      "kind": "wave",
+      "label": "wave-163",
+      "resolved": true,
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/HIERARCHICAL_SPEC_SYSTEM.md",
+      "kind": "spec",
+      "label": "Hierarchical Spec System — this project",
+      "resolved": true,
+      "level": "L1",
+      "version": "1.0.0",
+      "path": "docs/HIERARCHICAL_SPEC_SYSTEM.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/KAIZEN_PHILOSOPHY.md",
+      "kind": "spec",
+      "label": "this project — Kaizen Philosophy",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/KAIZEN_PHILOSOPHY.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/MEMORY_MERGE_PROTOCOL.md",
+      "kind": "spec",
+      "label": "Memory MCP merge protocol",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/MEMORY_MERGE_PROTOCOL.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/MODULE_SPEC_SYSTEM.md",
+      "kind": "spec",
+      "label": "Module Spec System",
+      "resolved": true,
+      "level": "L1",
+      "version": "1.0.0",
+      "path": "docs/MODULE_SPEC_SYSTEM.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/MULTI_LEVEL_VERIFICATION.md",
+      "kind": "spec",
+      "label": "Multi-Level Verification System — this project Dev Environment",
+      "resolved": true,
+      "level": "L1",
+      "version": "1.0.0",
+      "path": "docs/MULTI_LEVEL_VERIFICATION.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/PROACTIVE_HOLISTIC_ANALYSIS_TRIGGER.md",
+      "kind": "spec",
+      "label": "Mandatory: Proactive Holistic Analysis Trigger",
+      "resolved": true,
+      "level": "L1",
+      "version": "1.0.0",
+      "path": "docs/PROACTIVE_HOLISTIC_ANALYSIS_TRIGGER.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/PROACTIVE_SURFACING_PROTOCOL.md",
+      "kind": "spec",
+      "label": "Proactive Surfacing Protocol",
+      "resolved": true,
+      "level": "L1",
+      "version": "1.0.0",
+      "path": "docs/PROACTIVE_SURFACING_PROTOCOL.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/ROUTINES.md",
+      "kind": "spec",
+      "label": "Routines — scheduled maintenance",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/ROUTINES.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/SECURITY.md",
+      "kind": "spec",
+      "label": "Security Model",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/SECURITY.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/SELF_IMPROVEMENT_PROTOCOL.md",
+      "kind": "spec",
+      "label": "Self-Improvement Protocol",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/SELF_IMPROVEMENT_PROTOCOL.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/SESSION_START.md",
+      "kind": "spec",
+      "label": "Session Start Checklist",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/SESSION_START.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/TESTING.md",
+      "kind": "spec",
+      "label": "Testing Strategy",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/TESTING.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/TOYOTA_WAY.md",
+      "kind": "spec",
+      "label": "The Toyota Way — our dev system",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/TOYOTA_WAY.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/WEB_STANDARDS.md",
+      "kind": "spec",
+      "label": "Web Standards",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/WEB_STANDARDS.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/formal/README.md",
+      "kind": "spec",
+      "label": "Formal Model: AndonHalt (TLA+)",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/formal/README.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/quality/glossary.md",
+      "kind": "spec",
+      "label": "Ubiquitous Language — Domain Glossary",
+      "resolved": true,
+      "level": "L1",
+      "version": "1.0.0",
+      "path": "docs/quality/glossary.md",
+      "revisions": []
+    },
+    {
+      "id": "wave:wave-179",
+      "kind": "wave",
+      "label": "wave-179",
+      "resolved": true,
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/quality/qas-template.md",
+      "kind": "spec",
+      "label": "Quality Attribute Scenario Template (SEI 6-field format)",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/quality/qas-template.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/quality/stride-template.md",
+      "kind": "spec",
+      "label": "STRIDE Threat Model Template",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/quality/stride-template.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/surfacing-concerns-current.md",
+      "kind": "spec",
+      "label": "Proactive Surfacing — No Concerns Found",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/surfacing-concerns-current.md",
+      "revisions": []
+    }
+  ],
+  "edges": [
+    {
+      "src": "spec:docs/AGENT_LAYER_ARCHITECTURE.md",
+      "rel": "implements",
+      "dst": "spec:docs/MISSION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/AGENT_LAYER_ARCHITECTURE.md",
+      "rel": "refines",
+      "dst": "spec:docs/PRODUCT_PHILOSOPHY.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/AGENT_LAYER_QUALITY_SPEC.md",
+      "rel": "implements",
+      "dst": "spec:docs/MISSION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/AGENT_LAYER_QUALITY_SPEC.md",
+      "rel": "refines",
+      "dst": "spec:docs/PRODUCT_PHILOSOPHY.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/GROUNDING_CONTRACT.md",
+      "rel": "belongs-to",
+      "dst": "wave:wave-163",
+      "wave": "wave-163",
+      "agent": null
+    },
+    {
+      "src": "spec:docs/HIERARCHICAL_SPEC_SYSTEM.md",
+      "rel": "implements",
+      "dst": "spec:docs/MISSION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/HIERARCHICAL_SPEC_SYSTEM.md",
+      "rel": "refines",
+      "dst": "spec:docs/PRODUCT_PHILOSOPHY.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/MODULE_SPEC_SYSTEM.md",
+      "rel": "implements",
+      "dst": "spec:docs/MISSION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/MODULE_SPEC_SYSTEM.md",
+      "rel": "refines",
+      "dst": "spec:docs/PRODUCT_PHILOSOPHY.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/MULTI_LEVEL_VERIFICATION.md",
+      "rel": "implements",
+      "dst": "spec:docs/MISSION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/MULTI_LEVEL_VERIFICATION.md",
+      "rel": "refines",
+      "dst": "spec:docs/PRODUCT_PHILOSOPHY.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/PROACTIVE_HOLISTIC_ANALYSIS_TRIGGER.md",
+      "rel": "implements",
+      "dst": "spec:docs/MISSION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/PROACTIVE_HOLISTIC_ANALYSIS_TRIGGER.md",
+      "rel": "refines",
+      "dst": "spec:docs/PRODUCT_PHILOSOPHY.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/PROACTIVE_SURFACING_PROTOCOL.md",
+      "rel": "implements",
+      "dst": "spec:docs/MISSION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/quality/glossary.md",
+      "rel": "belongs-to",
+      "dst": "wave:wave-179",
+      "wave": "wave-179",
+      "agent": null
+    }
+  ],
+  "meta": {
+    "_do_not_edit": true,
+    "built_at": "2026-05-30T16:25:35.606Z",
+    "wave_id_scheme": "wave-NNN (3-digit zero-padded)",
+    "r2_normalization": "wave-NNN.R2 collapsed to wave-NNN base ID; revision labels stored in revisions[]",
+    "mcp_boundary": "This graph does not mirror live MCP entities. It covers only file-accessible governance surfaces: specs, ADRs, anti-patterns, waves, files. Memory snapshot staleness bound: last npm run memory:snapshot run."
+  }
+}

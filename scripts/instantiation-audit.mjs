@@ -90,18 +90,23 @@ console.log('\n\x1b[1m▌ Class 3 — registry ghosts (validators whose required
 const MANIFEST = [
   ['docs/evals',                              'golden datasets for run-evals.mjs (agent quality regression)'],
   ['docs/security/dr-scenario-catalog.json',  'DR catalog required by validate-dr-catalog.mjs'],
-  ['docs/security/api-contract-registry.json','API surface required by validate-contract.mjs'],
+  ['docs/security/api-contract-registry.json','API surface required by validate-contract.mjs', 'product'],
   ['docs/governance/agent-access-registry.json','tool grants required by validate-agent-access.mjs'],
   ['docs/governance/raci.json',               'RACI matrix required by validate-raci.mjs'],
   ['docs/quality/slo-definitions.json',       'SLO definitions required by compute-slos.mjs'],
   ['docs/quality/dora-definitions.json',      'DORA definitions required by compute-dora.mjs'],
   ['docs/specs/_LINEAGE.json',                'spec lineage required by query-graph.mjs'],
 ];
-let c3 = 0;
-for (const [path, note] of MANIFEST) {
+let c3 = 0, naCount = 0;
+for (const [path, note, scope] of MANIFEST) {
   if (existsSync(path)) continue;
   const base = path.split('/').pop();
   if (refCount(base) === '0') continue; // nothing references it → not a live expectation
+  if (scope === 'product') {
+    naCount++;
+    console.log(`  \x1b[2m○ ${path}\x1b[0m — ${note}; N/A: this repo exposes no HTTP API (product-repo gate, not a framework gap)`);
+    continue;
+  }
   if (honestSkips(base)) {
     dormant++;
     console.log(`  \x1b[36m⊘ ${path}\x1b[0m — ${note}; absent, but validator honest-skips (DORMANT, not a hidden crash)`);
@@ -110,8 +115,8 @@ for (const [path, note] of MANIFEST) {
   c3++; ghosts++;
   console.log(`  \x1b[31m👻 ${path}\x1b[0m — ${note}; absent AND validator crashes (hidden ghost)`);
 }
-if (c3 === 0 && dormant === 0) console.log('  \x1b[32m✓ every manifest registry is present\x1b[0m');
-else if (c3 === 0) console.log(`  \x1b[36m${dormant} dormant gate(s) — honestly skipped, awaiting seed (not blocking)\x1b[0m`);
+if (c3 === 0 && dormant === 0 && naCount === 0) console.log('  \x1b[32m✓ every manifest registry is present\x1b[0m');
+else if (c3 === 0) console.log(`  \x1b[36m${dormant} dormant (awaiting seed)\x1b[0m\x1b[2m, ${naCount} n/a (product-repo gate) — none blocking\x1b[0m`);
 console.log(`  \x1b[2m(Class 3 checks a curated manifest of ${MANIFEST.length} critical registries, not a full auto-scan.)\x1b[0m`);
 
 // ── Class 4 — broken imports (a script imports a relative module not on disk) ──
@@ -135,7 +140,7 @@ if (c4 === 0) console.log('  \x1b[32m✓ every relative .mjs import resolves\x1b
 // ── verdict ───────────────────────────────────────────────────────────────────
 console.log(`\n\x1b[1m— instantiation-audit summary —\x1b[0m`);
 console.log(`  ghosts: ${ghosts}  (class1 automation: ${c1}, class2 doc-drift: ${c2}, class3 registries: ${c3}, class4 imports: ${c4})`);
-if (dormant > 0) console.log(`  \x1b[36mdormant (honest-skip, not a ghost): ${dormant}\x1b[0m`);
+if (dormant > 0 || naCount > 0) console.log(`  \x1b[36mdormant: ${dormant}\x1b[0m\x1b[2m, n/a (product-scope): ${naCount} — neither is a ghost\x1b[0m`);
 if (ghosts > 0) {
   console.log(`\n\x1b[31m${ghosts} ghost(s). The scaffolding is real; the objects are not. This is`);
   console.log(`declaration-over-implementation at framework scale — fill the object or delete the claim.\x1b[0m`);

@@ -113,7 +113,7 @@ async function fetchWithTimeout(url, timeoutMs) {
 
 // ── Load registry ─────────────────────────────────────────────────────────────
 if (!fs.existsSync(REGISTRY_PATH)) {
-  log(`⊘ DORMANT — ${REGISTRY_PATH} not seeded yet; contract gate inactive, not failed. Seed the registry to activate.`);
+  log(`○ N/A — ${REGISTRY_PATH} absent; this repo exposes no HTTP API (framework/CLI engine). The contract gate is for product repos that declare an API surface — not a gap here.`);
   process.exit(0);
 }
 

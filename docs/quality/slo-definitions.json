@@ -1,0 +1,36 @@
+{
+  "version": "1.0.0",
+  "_note": "SLOs over the framework's OWN telemetry streams (agent-pipeline reliability, not a product service). Each targets a real docs/audits/*.jsonl stream; compute-slos.mjs gracefully reports a stream as absent until telemetry accrues, so these activate as the pipeline runs.",
+  "slos": [
+    {
+      "id": "andon-halt-budget",
+      "version": "1.0.0",
+      "name": "Andon halt budget",
+      "rationale": "Pipeline andon-halts should be rare. A spike means the gates are tripping systemically — investigate before continuing waves.",
+      "stream": "docs/audits/halt-events.jsonl",
+      "event_filter": {},
+      "budget_7d": 5,
+      "agent": null
+    },
+    {
+      "id": "gate-trip-budget",
+      "version": "1.0.0",
+      "name": "Quality-gate trip budget",
+      "rationale": "Gates blocking work is healthy in moderation; a high trip rate signals upstream quality erosion (spec or implementation).",
+      "stream": "docs/audits/gate-trips.jsonl",
+      "event_filter": {},
+      "budget_7d": 20,
+      "agent": null
+    },
+    {
+      "id": "security-finding-budget",
+      "version": "1.0.0",
+      "name": "Security finding budget (zero-tolerance)",
+      "rationale": "Any high/critical security finding reaching telemetry is a budget breach — the security gate should have blocked it earlier.",
+      "stream": "docs/audits/security-events.jsonl",
+      "event_filter": { "type": "injection_detected" },
+      "budget_7d": 0,
+      "agent": "security-scanner"
+    }
+  ]
+}

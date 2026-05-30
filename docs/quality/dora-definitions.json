@@ -1,0 +1,55 @@
+{
+  "version": "1.0.0",
+  "_note": "Standard DORA four-keys bands (Google DORA / Accelerate, State of DevOps). Bands are the public industry reference; compute-dora.mjs classifies the framework's own wave-delivery proxy against them. This is a published standard, not fabricated data.",
+  "metrics": [
+    {
+      "id": "deployment-frequency",
+      "version": "1.0.0",
+      "name": "Deployment Frequency",
+      "rationale": "How often the team ships to mainline. Framework proxy (D2): unique waves delivered via conventional-commit subjects (feat(scope): wave-NN).",
+      "bands": {
+        "elite": "On-demand, multiple per day (>= 7/week)",
+        "high": "Between once per day and once per week (>= 1/week)",
+        "medium": "Between once per week and once per month",
+        "low": "Fewer than once per month"
+      }
+    },
+    {
+      "id": "lead-time-for-changes",
+      "version": "1.0.0",
+      "name": "Lead Time for Changes",
+      "rationale": "Time from commit to it being live on mainline. Framework proxy: time from spec approval to wave-complete tag.",
+      "bands": {
+        "elite": "Less than one day",
+        "high": "Between one day and one week",
+        "medium": "Between one week and one month",
+        "low": "More than one month"
+      }
+    },
+    {
+      "id": "change-failure-rate",
+      "version": "1.0.0",
+      "name": "Change Failure Rate",
+      "rationale": "Share of deployments causing a failure requiring remediation (revert, hotfix, rollback). Framework proxy: waves with a follow-up fix(...) revert commit.",
+      "bands": {
+        "elite": "0-5%",
+        "high": "5-10%",
+        "medium": "10-15%",
+        "low": "More than 15%"
+      }
+    },
+    {
+      "id": "mean-time-to-recovery",
+      "version": "1.0.0",
+      "name": "Failed Deployment Recovery Time",
+      "rationale": "Time to restore service after a failed change. Framework proxy: time from a halt-event to the matching andon-resume.",
+      "bands": {
+        "elite": "Less than one hour",
+        "high": "Less than one day",
+        "medium": "Less than one week",
+        "low": "More than one week"
+      }
+    }
+  ],
+  "ai_calibration_note": "These are human-team DORA bands applied to an agent-driven pipeline as a proxy. Deployment = wave delivery to mainline, not a production release (the framework orchestrates Claude Code; it does not deploy a service). Treat absolute bands as directional until a real deploy target is wired."
+}

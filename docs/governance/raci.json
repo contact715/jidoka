@@ -1,0 +1,61 @@
+{
+  "_note": "RACI/DACI for the framework's own wave lifecycle. Accountable is always human: (EU AI Act Art 14 — a human owns each gate). Responsible are real agents from AGENT_ROSTER.md. No agent both owns and executes the same row (R3).",
+  "activities": [
+    {
+      "id": "RA-SPEC",
+      "label": "Author the master spec for a wave",
+      "frame": "RACI",
+      "accountable": "human:tech-lead",
+      "responsible": ["chief-architect"],
+      "consulted": ["micro-architect", "macro-architect", "surface-cartographer", "design-system-architect"],
+      "informed": ["reflexion-critic"]
+    },
+    {
+      "id": "RA-IMPL",
+      "label": "Implement a wave to the approved spec",
+      "frame": "RACI",
+      "accountable": "human:tech-lead",
+      "responsible": ["frontend-agent"],
+      "consulted": ["chief-architect"],
+      "informed": ["test-engineer"]
+    },
+    {
+      "id": "RA-VERIFY",
+      "label": "Verify a change before merge",
+      "frame": "RACI",
+      "accountable": "human:tech-lead",
+      "responsible": ["reflexion-critic", "constitutional-reviewer"],
+      "consulted": ["debate-prosecutor", "debate-defender"],
+      "informed": ["debate-judge"]
+    },
+    {
+      "id": "RA-SECURITY",
+      "label": "Run the security gate on a change",
+      "frame": "RACI",
+      "accountable": "human:tech-lead",
+      "responsible": ["security-scanner"],
+      "consulted": ["pfca-agent"],
+      "informed": ["meta-process-auditor"]
+    },
+    {
+      "id": "RA-MERGE",
+      "label": "Approve and trigger the merge",
+      "frame": "RACI",
+      "accountable": "human:tech-lead",
+      "responsible": ["orchestrator"],
+      "consulted": ["meta-process-auditor"],
+      "informed": ["metrics-aggregator"]
+    }
+  ],
+  "daci_decisions": [
+    {
+      "id": "DA-ARCH",
+      "label": "Adopt an architecture decision (ADR)",
+      "frame": "DACI",
+      "driver": "chief-architect",
+      "approver": "human:tech-lead",
+      "contributors": ["micro-architect", "macro-architect", "surface-cartographer"],
+      "informed": ["reflexion-critic"]
+    }
+  ]
+}

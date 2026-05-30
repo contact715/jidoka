@@ -1,0 +1,45 @@
+{
+  "_note": "Disaster-recovery scenarios for the FRAMEWORK ITSELF (agent memory, andon pipeline, repo hygiene). recovery_script paths resolve to real engine scripts. last_measured_rta is 'untested' until a real drill is run — honest seed state, not a claim of tested recovery.",
+  "scenarios": [
+    {
+      "scenario_id": "DR-MEMORY-01",
+      "title": "Agent memory graph corruption or accidental loss",
+      "impact": "Self-improvement loops lose accumulated lessons/skills; retros no longer feed the engines.",
+      "recovery_label": "automated",
+      "recovery_script": "scripts/restore-memory-from-snapshots.mjs",
+      "rto_target": "15m",
+      "rpo_target": "1 wave (last memory snapshot)",
+      "last_measured_rta": "untested"
+    },
+    {
+      "scenario_id": "DR-ANDON-01",
+      "title": "Pipeline stuck in andon-halt state",
+      "impact": "No new waves can dispatch until the halt is cleared.",
+      "recovery_label": "automated",
+      "recovery_script": "scripts/andon-resume.mjs",
+      "rto_target": "5m",
+      "rpo_target": "0 (halt is pre-merge; no committed work lost)",
+      "last_measured_rta": "untested"
+    },
+    {
+      "scenario_id": "DR-MEMORY-SNAPSHOT-01",
+      "title": "Capture a memory snapshot before a risky migration",
+      "impact": "Preventive: ensures DR-MEMORY-01 has a recent restore point.",
+      "recovery_label": "automated",
+      "recovery_script": "scripts/export-memory-snapshot.mjs",
+      "rto_target": "10m",
+      "rpo_target": "0",
+      "last_measured_rta": "untested"
+    },
+    {
+      "scenario_id": "DR-REPO-HISTORY-01",
+      "title": "Secret or personal data leaked into git history before publish",
+      "impact": "Privacy/security breach on publish to a public remote.",
+      "recovery_label": "manual-only",
+      "recovery_script": "manual",
+      "rto_target": "TBD",
+      "rpo_target": "0 (history rewrite required: git filter-repo)",
+      "last_measured_rta": "untested"
+    }
+  ]
+}
