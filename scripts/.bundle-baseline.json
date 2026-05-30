@@ -1,0 +1,5 @@
+{
+  "_comment": "Bundle baseline. Update via 'node scripts/bundle-size-check.mjs --update' after intentional changes. First `npm run check:bundle` after a build will populate chunks.",
+  "lastUpdated": "2026-05-09",
+  "chunks": {}
+}

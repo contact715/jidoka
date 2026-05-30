@@ -1,0 +1,12 @@
+{
+  "raw_hex_files": 367,
+  "raw_hex_strict": 284,
+  "inline_style_files": 530,
+  "raw_fetch_files": 31,
+  "console_instances": 70,
+  "as_any_instances": 8,
+  "comp_over_400": 86,
+  "page_over_200": 117,
+  "store_over_800": 0,
+  "generatedAt": "2026-05-29"
+}

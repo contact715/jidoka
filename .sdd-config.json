@@ -1,0 +1,126 @@
+{
+  "_comment": "SDD enforcement config. Set hard_block_ac to true after 30-day soft trial.",
+  "hard_block_ac": false,
+  "soft_trial_started": "2026-05-29",
+  "cascade_hard_block": false,
+  "partial_fix_hard_block": false,
+  "meta_audit_enabled": true,
+  "crossLineBlock": {
+    "enabled": false,
+    "hardBlockEnabled": false
+  },
+  "andonCord": {
+    "enabled": true,
+    "hardBlockEnabled": false
+  },
+  "pfca": {
+    "enabled": false,
+    "hardBlockEnabled": false
+  },
+  "recurrenceDetection": {
+    "enabled": false,
+    "autoActionEnabled": false
+  },
+  "securityScan": {
+    "_comment": "wave-165: hardBlockEnabled=true causes detect-injection.mjs to call writeHaltState and exit 42. Default false = soft-flag (event emitted, dispatch continues).",
+    "hardBlockEnabled": false
+  },
+  "constitutionalDrift": {
+    "_comment": "wave-166: hardBlockEnabled=true causes detect-constitutional-drift.mjs to call writeHaltState and exit 42. Default false = soft-flag (event emitted, script exits 0).",
+    "hardBlockEnabled": false
+  },
+  "driftDetection": {
+    "enabled": false,
+    "hardBlockEnabled": false,
+    "dailyEnabled": false
+  },
+  "metaProcessAuditor": {
+    "autoHaltEnabled": false
+  },
+  "preMortem": {
+    "enabled": false,
+    "requiredForL1Plus": false
+  },
+  "sloMonitoring": {
+    "enabled": false,
+    "hardBlockEnabled": false
+  },
+  "doraMonitoring": {
+    "_comment": "wave-168: doraMonitoring.hardBlockEnabled=true causes compute-dora.mjs to call writeHaltState on Low-band metric breach. Default false = report only (exit 0 regardless of band).",
+    "enabled": false,
+    "hardBlockEnabled": false
+  },
+  "costMonitoring": {
+    "_comment": "wave-177: costMonitoring. hardBlockEnabled=true causes compute-cost.mjs to call writeHaltState on budget breach (Elevated or Spike band). Default false = report only (exit 0 regardless of band). budgetThreshold_usd: rolling monthly threshold; covers observed run rate (~$0.03-$1.20 per wave) with headroom.",
+    "enabled": false,
+    "hardBlockEnabled": false,
+    "budgetThreshold_usd": 200
+  },
+  "carbonMonitoring": {
+    "_comment": "wave-186: carbonMonitoring. hardBlockEnabled=true causes compute-carbon.mjs to call writeHaltState on budget breach (Elevated or Spike band). Default false = report only (exit 0 regardless of band). carbonBudget_gco2e: soft reference budget (50,000 gCO2e = ~50 kg CO2e). At central estimate (~0.442 gCO2e per 1K tokens) this covers ~113M tokens — well above current pipeline run rate. All gCO2e outputs are factor-based estimations, not measurements.",
+    "enabled": false,
+    "hardBlockEnabled": false,
+    "carbonBudget_gco2e": 50000
+  },
+  "hallucination": {
+    "enabled": false,
+    "hardBlockEnabled": false,
+    "sampleRate": 1
+  },
+  "autoStrengthen": {
+    "enabled": false,
+    "allowLevel1": false,
+    "allowLevel2": false,
+    "cooldownDays": 14,
+    "thresholds": {
+      "driftDetection.hardBlockEnabled": {
+        "promote": 5,
+        "window_days": 7,
+        "demote_clear_days": 14
+      },
+      "recurrenceDetection.autoActionEnabled": {
+        "promote": 3,
+        "window_days": 7,
+        "demote_clear_days": 14
+      },
+      "recurrenceDetection.enabled": {
+        "promote": 5,
+        "window_days": 7,
+        "demote_clear_days": 14
+      },
+      "pfca.hardBlockEnabled": {
+        "promote": 5,
+        "window_days": 7,
+        "demote_clear_days": 14
+      },
+      "andonCord.hardBlockEnabled": {
+        "promote": 3,
+        "window_days": 7,
+        "demote_clear_days": 14
+      },
+      "cascade_hard_block": {
+        "promote": 5,
+        "window_days": 7,
+        "demote_clear_days": 14
+      },
+      "hard_block_ac": {
+        "promote": 5,
+        "window_days": 7,
+        "demote_clear_days": 14
+      },
+      "crossLineBlock.hardBlockEnabled": {
+        "promote": 3,
+        "window_days": 7,
+        "demote_clear_days": 14
+      }
+    }
+  },
+  "verificationGate": {
+    "_comment": "Blocking verification gate (verify-gate.mjs). pre-commit runs tsc; pre-push runs tsc+tests+build. hardBlockEnabled:true = broken code cannot commit/push.",
+    "enabled": true,
+    "hardBlockEnabled": true,
+    "runTsc": true,
+    "runTests": true,
+    "runBuild": true
+  }
+}

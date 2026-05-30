@@ -1,0 +1,17 @@
+# Runtime state — not source
+.sdd-halt-state.json
+*-queue/
+memory-staging/
+worktrees/
+
+# OS / editor
+.DS_Store
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+
+# Dependencies (if a host project adds them)
+node_modules/
+.claude/settings.local.json

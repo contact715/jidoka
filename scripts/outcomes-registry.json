@@ -1,0 +1,54 @@
+{
+  "$comment": "Wave-53 — outcomes registry. Each outcome is a NAMED, MACHINE-CHECKABLE definition of 'done'. The orchestrator wraps dispatches with outcome checks: dispatch → check → if not met, dispatch again. Cap iterations with `budget`. Add new outcomes by appending to this list and shipping a corresponding wave.",
+  "$schema": "v1",
+  "outcomes": [
+    {
+      "name": "design-drift-zero-heights",
+      "description": "All raw control heights (h-5..h-16 on interactive elements) replaced with h-cta / h-control / h-chip / h-icon tokens.",
+      "check": "test \"$(jq -r .raw_control_heights scripts/.design-drift-baseline.json)\" -le 0",
+      "current_baseline_path": "scripts/.design-drift-baseline.json",
+      "current_baseline_key": "raw_control_heights",
+      "target": 0,
+      "owner_wave": "wave-48"
+    },
+    {
+      "name": "design-drift-zero-text-px",
+      "description": "All raw pixel text sizes (text-[12px+]) replaced with Tailwind text-* scale.",
+      "check": "test \"$(jq -r .raw_text_px scripts/.design-drift-baseline.json)\" -le 0",
+      "current_baseline_path": "scripts/.design-drift-baseline.json",
+      "current_baseline_key": "raw_text_px",
+      "target": 0,
+      "owner_wave": "wave-48b"
+    },
+    {
+      "name": "design-drift-zero-tinted-files",
+      "description": "Tinted-surface files (bg-{color}-500/N) migrated to Toast pattern (surface + colored border).",
+      "check": "test \"$(jq -r .tinted_surface_files scripts/.design-drift-baseline.json)\" -le 0",
+      "current_baseline_path": "scripts/.design-drift-baseline.json",
+      "current_baseline_key": "tinted_surface_files",
+      "target": 0,
+      "owner_wave": "wave-49b"
+    },
+    {
+      "name": "funnel-coupling-complete",
+      "description": "Every vertical-pack template in PipelineTemplateSelector.tsx is decisioned — either carries a funnelTemplateId reference to Registry A, or carries a TODO(wave-49c) comment explaining why no Registry A match exists yet.",
+      "check": "node -e \"const f=require('fs').readFileSync('components/pipeline/PipelineTemplateSelector.tsx','utf8'); const total=(f.match(/isVerticalPack: true/g)||[]).length; const wired=(f.match(/funnelTemplateId: \\\"/g)||[]).length; const todos=(f.match(/TODO\\\\(wave-49c\\\\)/g)||[]).length; process.exit(total === wired + todos ? 0 : 1);\"",
+      "target": "total_vertical_packs === wired + todos",
+      "owner_wave": "wave-49b"
+    },
+    {
+      "name": "audit-backlog-clean",
+      "description": "No ESCALATED proposals (age >= 5 waves) in the audit backlog.",
+      "check": "bash scripts/audit-backlog-status.sh | grep -q 'escalated (≥5) : 0'",
+      "target": "escalated_count === 0",
+      "owner_wave": "wave-47"
+    },
+    {
+      "name": "typecheck-clean",
+      "description": "TypeScript compiles cleanly across the repo.",
+      "check": "npx tsc --noEmit --skipLibCheck",
+      "target": "exit_0",
+      "owner_wave": "always"
+    }
+  ]
+}
