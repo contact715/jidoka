@@ -1,5 +1,7 @@
 # ТЗ — Agentic Engineering для this project
 
+> ⚠️ **ПРИМЕР из боевого проекта, не часть переносимого ядра.** Этот ТЗ содержит specifics конкретного продукта (backend, роли, эндпоинты, имена). Он включён как референс применения фреймворка. При переносе — замените своим. Структура переносима, specifics — нет. Для оценки самого фреймворка смотрите `docs/ENGINEERING_SYSTEM_ASSESSMENT.md`.
+
 **Дата:** 2026-05-05
 **Owner:** Yura (BE) + Frontend lead
 **Источник идей:** Karpathy «From Vibe Coding to Agentic Engineering» (YouTube, 2026-05)

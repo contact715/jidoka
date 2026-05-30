@@ -17,13 +17,13 @@
 
 ```
 .claude/
-  agents/            29 агентов-ролей (chief-architect, reflexion-critic,
+  agents/            28 агентов-ролей + _TEMPLATE (31 роль в roster c L0) (chief-architect, reflexion-critic,
                      best-of-N-judge, debate-*, security-scanner, ...)
-  skills/            34 навыка (переиспользуемые паттерны)
+  skills/            31 навык + _INDEX/_TEMPLATE (переиспользуемые паттерны)
   AGENT_PLAYBOOK.md  главный плейбук агентства
   settings.local.json
 
-scripts/             100+ скриптов-движка:
+scripts/             105 скриптов-движка (90 .mjs + 15 .sh):
                      andon-halt (stop-the-line), run-tla (формальная проверка),
                      compute-dora/slos/cost/carbon (observability),
                      detect-injection/drift/hallucinations (защита),
@@ -43,7 +43,7 @@ docs/
   retros/_TEMPLATE.md        формат ретроспективы
   metrics/_TEMPLATE.md       формат метрик волны
 
-package.json         97 npm-команд автоматизации
+package.json         100 npm-команд автоматизации
 CLAUDE.md            пример project-instructions (generic-шаблон)
 ```
 

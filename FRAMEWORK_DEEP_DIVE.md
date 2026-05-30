@@ -70,7 +70,7 @@ Claude Code из коробки — один агент, который пише
 ### Навыки (`.claude/skills/`, 33)
 Переиспользуемые паттерны, накопленные из ретроспектив: `tdd-flow`, `root-cause-over-patch`, `proactive-holistic-analysis`, `adversarial-self-review`, `ears-acceptance-criteria` и другие. Это «мышечная память» среды.
 
-### Движок (`scripts/`, 92+ скрипта)
+### Движок (`scripts/`, 105 скриптов: 90 .mjs + 15 .sh)
 - **Andon**: `andon-halt-helpers.mjs` (остановка линии), `run-tla.mjs` (формальная проверка)
 - **Observability**: `compute-dora`, `compute-slos`, `compute-cost`, `compute-carbon`, `emit-telemetry`
 - **Защита**: `detect-injection` (prompt injection), `detect-hallucinations`, `detect-drift`, `detect-constitutional-drift`
@@ -138,7 +138,7 @@ Claude Code из коробки — один агент, который пише
 2. `scripts/` → движок. Часть скриптов генерирует baseline на первом прогоне.
 3. `docs/CONSTITUTION.md` + `docs/MISSION.md` → замени контент на свой, структуру (разделы, Mission Compass) оставь.
 4. Процессные доки (`AUTONOMOUS_PIPELINE`, `MULTI_LEVEL_VERIFICATION`, `HIERARCHICAL_SPEC_SYSTEM`, `SELF_IMPROVEMENT_PROTOCOL`, `TOYOTA_WAY`) → как есть.
-5. `package.json` → нужные команды из секции scripts (их 97).
+5. `package.json` → нужные команды из секции scripts (их 100).
 
 ---
 

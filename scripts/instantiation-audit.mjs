@@ -37,7 +37,9 @@ import { dirname, resolve as resolvePath, relative } from 'node:path';
 
 const warnOnly = process.argv.includes('--warn');
 
-const count = (dir, ext = '.md') => { try { return readdirSync(dir).filter(f => f.endsWith(ext)).length; } catch { return 0; } };
+// Count functional files only — exclude scaffolding (_TEMPLATE, _INDEX, README) so a
+// "28 agent roles" doc claim matches reality instead of counting the template as a role.
+const count = (dir, ext = '.md') => { try { return readdirSync(dir).filter(f => f.endsWith(ext) && !/^_|^README/i.test(f)).length; } catch { return 0; } };
 // Exclude this file from every scan: it contains the detection patterns/manifest
 // literally, so git grep would otherwise flag the detector's own regex as a ghost
 // (the declaration-over-implementation false positive a self-scanner must guard).

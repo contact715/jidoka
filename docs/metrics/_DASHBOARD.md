@@ -2,6 +2,12 @@
 
 Aggregated per-wave economics. One row per wave. Written by the Metrics Aggregator agent.
 
+> ⚠️ **Snapshot from the battle-tested product, not this repo.** The wave rows below are
+> the real economics of the product the framework was forged on. This framework repo has a
+> short git history (no `wave-NNN` commits), so a live recompute here returns 0 / "insufficient
+> data" — `npm run compute:dora` will NOT reproduce these numbers. They are a historical record
+> of the framework in production, kept as evidence; they are not generated from this repo's state.
+
 | Wave | Date | Total tokens | Cache hit rate | Agent count | Wall-clock | Status | Budget % |
 |---|---|---|---|---|---|---|---|
 | wave-20 | 2026-05-23 | ~580K | n/a | 8 | ~25 min | Shipped | ~58% |

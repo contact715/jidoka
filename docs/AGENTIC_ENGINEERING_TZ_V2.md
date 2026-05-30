@@ -1,5 +1,7 @@
 # ТЗ — Agentic Engineering V2 (this project + the backend)
 
+> ⚠️ **ПРИМЕР из боевого проекта, не часть переносимого ядра.** Содержит specifics backend конкретного продукта (BaseAgent / AgentThought / эндпоинты / роли). Референс применения, не переносимое ядро. При переносе — замените своим. Для оценки фреймворка смотрите `docs/ENGINEERING_SYSTEM_ASSESSMENT.md`.
+
 **Дата:** 2026-05-05
 **Owner:** Yura (BE) + Frontend lead
 **Источники:**
