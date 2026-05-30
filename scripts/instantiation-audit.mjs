@@ -24,26 +24,41 @@
 // Output objects (telemetry .jsonl streams, baselines) are deliberately excluded:
 // they are lazily created and their absence is normal, not a ghost.
 //
-// Usage: node scripts/instantiation-audit.mjs   (exit 1 if any ghost is found)
+// Usage:
+//   node scripts/instantiation-audit.mjs          exit 1 if any ghost (hard gate)
+//   node scripts/instantiation-audit.mjs --warn    report + exit 0 (soft trial, for CI onboarding)
+//
+// The --warn mode follows the framework's own soft→hard gate doctrine: observe and
+// report while the known ghosts are being filled, then drop --warn to make it block.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
+const warnOnly = process.argv.includes('--warn');
+
 const count = (dir, ext = '.md') => { try { return readdirSync(dir).filter(f => f.endsWith(ext)).length; } catch { return 0; } };
-const grepLines = re => { try { return execSync(`git grep -hoE ${JSON.stringify(re)} -- docs scripts package.json README.md 2>/dev/null || true`, { encoding: 'utf8' }).split('\n').filter(Boolean); } catch { return []; } };
-const refCount = needle => { try { return execSync(`git grep -lF ${JSON.stringify(needle)} -- scripts 2>/dev/null | wc -l`, { encoding: 'utf8' }).trim(); } catch { return '0'; } };
-const refFile = needle => { try { return execSync(`git grep -lF ${JSON.stringify(needle)} -- docs scripts 2>/dev/null | head -1`, { encoding: 'utf8' }).trim(); } catch { return ''; } };
+// Exclude this file from every scan: it contains the detection patterns/manifest
+// literally, so git grep would otherwise flag the detector's own regex as a ghost
+// (the declaration-over-implementation false positive a self-scanner must guard).
+const SELF = "':(exclude)scripts/instantiation-audit.mjs'";
+const grepLines = re => { try { return execSync(`git grep -hoE ${JSON.stringify(re)} -- docs scripts package.json README.md ${SELF} 2>/dev/null || true`, { encoding: 'utf8' }).split('\n').filter(Boolean); } catch { return []; } };
+const refCount = needle => { try { return execSync(`git grep -lF ${JSON.stringify(needle)} -- scripts ${SELF} 2>/dev/null | wc -l`, { encoding: 'utf8' }).trim(); } catch { return '0'; } };
+const refFile = needle => { try { return execSync(`git grep -lF ${JSON.stringify(needle)} -- docs scripts ${SELF} 2>/dev/null | head -1`, { encoding: 'utf8' }).trim(); } catch { return ''; } };
 
 let ghosts = 0;
 
 // ── Class 1 — ghost automation ────────────────────────────────────────────────
 console.log('\x1b[1m▌ Class 1 — ghost automation (declared in docs/code, not on disk)\x1b[0m');
-const autoRefs = [...new Set(grepLines('\\.(github/workflows/[A-Za-z0-9_.-]+\\.ya?ml|husky/[A-Za-z0-9_.-]+)'))];
+const autoRefs = [...new Set(
+  grepLines('\\.(github/workflows/[A-Za-z0-9_.-]+\\.ya?ml|husky/[A-Za-z0-9_.-]+)')
+    .map(r => r.replace(/[.\s]+$/, ''))                          // strip trailing prose dots/space
+    .filter(r => /workflows\/.+\.ya?ml$|husky\/[A-Za-z0-9_-]+$/.test(r)) // require a real file name, not "..."
+)];
 let c1 = 0;
 for (const ref of autoRefs) {
-  const path = ref.replace(/^\.?/, '').replace(/^/, '.'); // normalize to .github/... or .husky/...
-  const onDisk = existsSync(ref.startsWith('.') ? ref : '.' + ref) || existsSync(ref);
-  if (!onDisk) { c1++; ghosts++; console.log(`  \x1b[31m👻 ${ref}\x1b[0m — cited in ${refFile(ref) || '(docs)'} but not on disk`); }
+  if (existsSync(ref)) continue;
+  c1++; ghosts++;
+  console.log(`  \x1b[31m👻 ${ref}\x1b[0m — cited in ${refFile(ref) || '(docs)'} but not on disk`);
 }
 if (c1 === 0) console.log('  \x1b[32m✓ every cited workflow/hook exists\x1b[0m');
 
@@ -91,6 +106,7 @@ console.log(`  ghosts: ${ghosts}  (class1 automation: ${c1}, class2 doc-drift: $
 if (ghosts > 0) {
   console.log(`\n\x1b[31m${ghosts} ghost(s). The scaffolding is real; the objects are not. This is`);
   console.log(`declaration-over-implementation at framework scale — fill the object or delete the claim.\x1b[0m`);
+  if (warnOnly) { console.log('\x1b[2m(--warn: soft trial, exiting 0)\x1b[0m'); process.exit(0); }
   process.exit(1);
 }
 console.log('\n\x1b[32m✓ every declared mechanism points at something that exists.\x1b[0m');
