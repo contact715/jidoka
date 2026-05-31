@@ -28,3 +28,5 @@ docs/audit-reports/
 
 # jidoka: cron-audit runtime log (not committed)
 docs/audits/cron-runs.jsonl
+docs/audits/approval-queue.jsonl
+docs/audits/decision-log.jsonl

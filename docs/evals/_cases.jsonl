@@ -29,4 +29,5 @@
 {"id":"agent-trace/self-test","cmd":"node scripts/agent-trace.mjs --self-test","assert":{"exit":0,"contains":["aggregation correct"]}}
 {"id":"execution-gate/self-test","cmd":"node scripts/execution-gate.mjs --self-test","assert":{"exit":0,"contains":["verify-command detection correct"]}}
 {"id":"code-map/self-test","cmd":"node scripts/code-map.mjs --self-test","assert":{"exit":0,"contains":["import/export graph correct"]}}
+{"id":"approval-queue/self-test","cmd":"node scripts/approval-queue.mjs --self-test","assert":{"exit":0,"contains":["readiness + decision logic correct"]}}
 {"id":"runtime-feedback/self-test","cmd":"node scripts/runtime-feedback.mjs --self-test","assert":{"exit":0,"contains":["event routing correct"]}}
