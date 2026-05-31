@@ -5,3 +5,5 @@
 {"id":"meta-honesty/trustworthy","cmd":"node scripts/meta-honesty.mjs","env":{"META_TODAY":"2026-06-20"},"ledger":[{"date":"2026-05-29","class":"declaration-over-implementation","claimed":"private data cleaned ready to publish","real":"only the working tree was checked; git history still leaked home paths","caught_by":"user"}],"assert":{"exit":0,"contains":["TRUSTWORTHY"]}}
 {"id":"meta-honesty/compromised","cmd":"node scripts/meta-honesty.mjs","ledger":[{"date":"2026-05-01","class":"vacuous","claimed":"all tests pass","real":"tests pass","caught_by":"self"},{"date":"2026-05-02","class":"vacuous","claimed":"the feature is done","real":"done","caught_by":"self"}],"assert":{"exit":1,"contains":["COMPROMISED"]}}
 {"id":"judge-panel/self-test","cmd":"node scripts/judge-panel.mjs --self-test","assert":{"exit":0,"contains":["aggregation + rotation correct"]}}
+{"id":"budget-gate/self-test","cmd":"node scripts/budget-gate.mjs --self-test","assert":{"exit":0,"contains":["enforcement correct"]}}
+{"id":"budget-gate/over-budget","cmd":"node scripts/budget-gate.mjs --tier trivial --used '{\"tool_calls\":999}'","assert":{"exit":1,"contains":["BUDGET EXCEEDED"]}}
