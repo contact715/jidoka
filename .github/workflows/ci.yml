@@ -35,6 +35,8 @@ jobs:
       # ── Engine unit tests (zero-dep node:test — runs without npm install) ───
       - name: engine unit tests
         run: npm run test:engine
+      - name: agent eval suite (deterministic fitness signal — regression-gated)
+        run: npm run eval
 
       # ── Structural / security / privacy gates ──────────────────────────────
       - name: structural decomposition gate

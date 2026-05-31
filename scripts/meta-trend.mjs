@@ -15,6 +15,7 @@
 //
 // Usage: node scripts/meta-trend.mjs        (META_LEDGER overrides the ledger path)
 
+import { readFileSync, existsSync } from 'node:fs';
 import { loadLedger, groupByClass, daysBetween, todayISO, monthOf, recurrencesAfter } from './meta-lib.mjs';
 import { REMEDIES } from './meta-remedies.mjs';
 
@@ -75,6 +76,8 @@ const pct = n => (n === null ? 'n/a' : `${n}%`);
 console.log('\n\x1b[1m  learning indicators\x1b[0m');
 console.log(`    gate coverage ......... ${pct(coverage)} (${gatedRecurring.length}/${recurring.length} recurring classes gated)   want ↑`);
 console.log(`    mean time-to-gate ..... ${meanTTG === null ? 'n/a' : meanTTG + 'd'} (first incident → gate live)            want ↓`);
+const evalBase = existsSync('docs/evals/_baseline.json') ? JSON.parse(readFileSync('docs/evals/_baseline.json', 'utf8')) : null;
+if (evalBase) console.log(`    eval fitness .......... ${(evalBase.pass_rate * 100).toFixed(0)}% (${evalBase.passed}/${evalBase.total} engine mechanisms pass to spec)   want ↑`);
 console.log(`    regression rate ....... ${pct(regRate)} (${leaked.length}/${gated.length} gates leaked after going live)   want ↓`);
 console.log(`    incident frequency .... ${freq.join(' → ')}   ${arrow}`);
 
