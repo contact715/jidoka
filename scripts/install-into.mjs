@@ -40,7 +40,7 @@ log(`\n\x1b[1minstall-into:\x1b[0m ${target}  (git: ${isGit ? 'yes' : 'NO'}, fro
 const CORE = [
   'meta-lib.mjs', 'meta-remedies.mjs', 'meta-audit.mjs', 'meta-honesty.mjs',
   'meta-trend.mjs', 'meta-premortem.mjs', 'meta-log.mjs', 'proof-gate.mjs',
-  'pre-publish-guard.mjs',
+  'pre-publish-guard.mjs', 'northstar-check.mjs',
 ];
 mkdirSync(T('.jidoka/scripts'), { recursive: true });
 mkdirSync(T('.jidoka/lib/redaction'), { recursive: true });
@@ -93,7 +93,8 @@ if (!isGit) {
   log('    Integrate by adding to the existing pre-commit hook:');
   log('      node "$(git rev-parse --show-toplevel)/.jidoka/scripts/meta-honesty.mjs" || exit 1');
   log('      node "$(git rev-parse --show-toplevel)/.jidoka/scripts/meta-audit.mjs"   || exit 1');
-  log('    and to pre-push: node "$(git rev-parse --show-toplevel)/.jidoka/scripts/pre-publish-guard.mjs" || exit 1\x1b[0m');
+  log('    and to pre-push: node "$(git rev-parse --show-toplevel)/.jidoka/scripts/pre-publish-guard.mjs" || exit 1');
+  log('    and (if docs/NORTH_STAR.md exists): node "$(git rev-parse --show-toplevel)/.jidoka/scripts/northstar-check.mjs" --doc docs/NORTH_STAR.md || exit 1\x1b[0m');
 } else {
   mkdirSync(T('.githooks'), { recursive: true });
   const preCommit = `#!/bin/sh
@@ -104,9 +105,14 @@ node "$ROOT/.jidoka/scripts/meta-audit.mjs"   || exit 1
 exit 0
 `;
   const prePush = `#!/bin/sh
-# jidoka pre-push — mechanical secret/PII guard (scans tree + full git history).
+# jidoka pre-push — secret/PII guard + North Star completeness (only if the product has one).
 ROOT="$(git rev-parse --show-toplevel)"
 node "$ROOT/.jidoka/scripts/pre-publish-guard.mjs" || exit 1
+if [ -f "$ROOT/docs/NORTH_STAR.md" ]; then
+  node "$ROOT/.jidoka/scripts/northstar-check.mjs" --doc "$ROOT/docs/NORTH_STAR.md" || exit 1
+else
+  echo "  ○ no docs/NORTH_STAR.md yet — the CPO owns it; create one so features can be checked against the goal"
+fi
 exit 0
 `;
   writeFileSync(T('.githooks/pre-commit'), preCommit); chmodSync(T('.githooks/pre-commit'), 0o755);
