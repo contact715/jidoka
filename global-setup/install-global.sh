@@ -14,9 +14,12 @@ FW="$(cd "$SRC/.." && pwd)"            # framework root (source of truth for eng
 DEST="$HOME/.claude"
 mkdir -p "$DEST/hooks" "$DEST/skills/dev-pipeline" "$DEST/jidoka/scripts" "$DEST/jidoka/lib/redaction" "$DEST/agents"
 
-# 1. hooks
-cp "$SRC/hooks/"*.sh "$DEST/hooks/"; chmod +x "$DEST/hooks/"*.sh
+# 1. hooks (shell guards + node policy-enforce hook)
+cp "$SRC/hooks/"*.sh "$DEST/hooks/" 2>/dev/null; chmod +x "$DEST/hooks/"*.sh 2>/dev/null || true
+cp "$SRC/hooks/"*.mjs "$DEST/hooks/" 2>/dev/null || true
 echo "  ✓ hooks → ~/.claude/hooks/"
+# wire policy-enforce-hook into PreToolUse (idempotent, preserves any existing hooks)
+node -e 'const fs=require("fs"),os=require("os");const p=os.homedir()+"/.claude/settings.json";let s={};try{s=JSON.parse(fs.readFileSync(p,"utf8"))}catch{}s.hooks=s.hooks||{};s.hooks.PreToolUse=s.hooks.PreToolUse||[];const c="node "+os.homedir()+"/.claude/hooks/policy-enforce-hook.mjs";if(!s.hooks.PreToolUse.some(e=>(e.hooks||[]).some(h=>(h.command||"").includes("policy-enforce-hook")))){s.hooks.PreToolUse.push({matcher:"Write|Edit|MultiEdit|NotebookEdit",hooks:[{type:"command",command:c,timeout:15}]});fs.writeFileSync(p,JSON.stringify(s,null,2)+"\n")}' 2>/dev/null && echo "  ✓ policy-enforce-hook wired into PreToolUse"
 
 # 2. dev-pipeline skill
 cp "$SRC/skills/dev-pipeline/SKILL.md" "$DEST/skills/dev-pipeline/"

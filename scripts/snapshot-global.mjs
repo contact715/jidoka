@@ -20,6 +20,7 @@ const FILES = [
   'CLAUDE.md',
   'hooks/jidoka-guard.sh',
   'hooks/jidoka-feature-reminder.sh',
+  'hooks/policy-enforce-hook.mjs',
   'skills/dev-pipeline/SKILL.md',
 ];
 
