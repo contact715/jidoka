@@ -11,3 +11,4 @@
 {"id":"orchestration-planner/self-test","cmd":"node scripts/orchestration-planner.mjs --self-test","assert":{"exit":0,"contains":["composes correct graphs"]}}
 {"id":"memory-consolidate/self-test","cmd":"node scripts/memory-consolidate.mjs --self-test","assert":{"exit":0,"contains":["clusters + weights + decays correctly"]}}
 {"id":"northstar-check/self-test","cmd":"node scripts/northstar-check.mjs --self-test","assert":{"exit":0,"contains":["structural North Star validation correct"]}}
+{"id":"pipeline-contract/self-test","cmd":"node scripts/pipeline-contract.mjs --self-test","assert":{"exit":0,"contains":["orchestrator graph is well-formed"]}}

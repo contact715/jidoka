@@ -54,6 +54,8 @@ export function plan(task = {}) {
 
 const agentsIn = (g) => new Set(g.phases.flatMap(p => p.agents));
 
+const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
+if (isMain) {
 if (process.argv.includes('--self-test')) {
   const trivial = plan({ risk: 'trivial', surfaces: ['frontend'] });
   const critical = plan({ risk: 'critical', surfaces: ['backend', 'frontend'] });
@@ -79,8 +81,10 @@ if (process.argv.includes('--self-test')) {
 const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
 const task = JSON.parse(arg('--task') || '{"type":"feature","risk":"normal","surfaces":["frontend"]}');
 const g = plan(task);
+if (process.argv.includes('--json')) { console.log(JSON.stringify(g)); process.exit(0); }
 console.log(`orchestration plan for ${JSON.stringify(task)}:`);
 g.phases.forEach((p, i) => console.log(`  ${i + 1}. ${p.phase}${p.parallel ? ' (parallel)' : ''}: ${p.agents.join(', ')}`));
 if (g.note) console.log(`  note: ${g.note}`);
 console.log(`  total: ${g.phases.length} phases, ${agentsIn(g).size} distinct agents`);
 process.exit(0);
+}

@@ -157,6 +157,8 @@ function selfTest() {
   process.exit(0);
 }
 
+const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
+if (isMain) {
 if (process.argv.includes('--self-test')) selfTest();
 
 // CLI: read episodic ledger → consolidate → write semantic digest
@@ -171,3 +173,4 @@ const top = model.clusters.slice(0, 3).map(c => `${c.cls}(${c.score})`).join(', 
 console.log(`memory-consolidate: ${model.total} episodes → ${model.classes} semantic lessons → ${OUTPUT}`);
 console.log(`  top: ${top || '—'}   retros scanned: ${retro.scanned}`);
 process.exit(0);
+}

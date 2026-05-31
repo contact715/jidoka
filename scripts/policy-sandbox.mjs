@@ -49,6 +49,8 @@ export function checkTools(agent, tools, registry) {
   return { ok: violations.length === 0, granted: [...granted], violations };
 }
 
+const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
+if (isMain) {
 if (process.argv.includes('--self-test')) {
   const reg = { agents: [
     { slug: 'skill-extractor', write_scope: '.claude/skills/**, docs/retros/_FINDINGS.md', declared_tools: ['Read', 'Grep', 'Write'] },
@@ -89,3 +91,4 @@ if (arg('--tools')) {
   else { bad = true; console.error(`\x1b[31m✗ ${agent}: ungranted tools:\x1b[0m ${r.violations.join(', ')}  (granted: ${r.granted.join(', ')})`); }
 }
 process.exit(bad ? 1 : 0);
+}

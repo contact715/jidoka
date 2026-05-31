@@ -54,6 +54,8 @@ export function aggregate(votes) {
 // ── CLI ──────────────────────────────────────────────────────────────────────
 const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
 
+const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
+if (isMain) {
 if (process.argv.includes('--self-test')) {
   const T = [
     { votes: ['PASS', 'PASS', 'PASS'], expect: 'PASS', mode: 'consensus' },
@@ -94,3 +96,4 @@ console.log(`judge-panel: ${n} distinct rubrics for this run (seed ${seed}):`);
 for (const r of pickRubrics(n, seed)) console.log(`  · ${r.id}: ${r.frame}`);
 console.log('\nLLM judging is DORMANT (wire a model like run-evals). Aggregation/rotation logic is live & self-tested.');
 process.exit(0);
+}

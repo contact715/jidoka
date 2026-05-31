@@ -87,6 +87,8 @@ Every feature is run helps / neutral / conflicts before build; conflicts trigger
   process.exit(0);
 }
 
+const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
+if (isMain) {
 if (process.argv.includes('--self-test')) selfTest();
 
 const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
@@ -110,3 +112,4 @@ if (specPath && existsSync(specPath) && !checkBinding(readFileSync(specPath, 'ut
 console.log(`\x1b[32m✓ North Star at ${docPath} exists and is complete${specPath ? ', and the spec is bound to it' : ''}.\x1b[0m`);
 console.log(`  \x1b[2mhelps/neutral/conflicts is the CPO's semantic call (not automatable here) — this gate guarantees the compass exists to make it against.\x1b[0m`);
 process.exit(0);
+}

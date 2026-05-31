@@ -36,6 +36,8 @@ const DEFAULT_POLICY = { tiers: {
   critical: { tool_calls: 1000, est_tokens: 6000000, solo_agent_cap: 300 },
 } };
 
+const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
+if (isMain) {
 if (process.argv.includes('--self-test')) {
   const P = DEFAULT_POLICY;
   const T = [
@@ -68,3 +70,4 @@ console.error(`\x1b[31m✗ BUDGET EXCEEDED [${tier}]:\x1b[0m`);
 for (const b of r.breaches) console.error(`  · ${b}`);
 console.error('  Halt the wave — a hard ceiling fired. Raise the tier deliberately or stop the runaway.');
 process.exit(1);
+}
