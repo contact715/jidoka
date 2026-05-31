@@ -37,6 +37,16 @@ the spec system is `HIERARCHICAL_SPEC_SYSTEM.md`, the mission/constitution are a
    не берутся как данность. `node ~/.claude/jidoka/scripts/northstar-check.mjs --doc <проект>/docs/NORTH_STAR.md`
    проверяет, что документ есть и заполнен.
 
+0.5. **Федерация — говори со СТРАЖЕМ проекта, не лезь в файлы напрямую.** Если работаешь ВНУТРИ
+   проекта (Mosco, Castells, любой — не в самом фреймворке): найди `project-steward` проекта и
+   прочитай его `docs/PROJECT_CHARTER.md` (+ North Star). Прежде чем что-то менять, предъяви ПЛАН
+   стражу. Он прогоняет Defense Process: helps/neutral → ок (маршрутизирует к агентам проекта);
+   **conflicts → расследование** (intent → breach → reject / adapt / evolve-philosophy), НИКОГДА
+   молча. Нет charter → страж создаёт из `PROJECT_CHARTER_TEMPLATE.md`. Проверка:
+   `node <проект>/.jidoka/scripts/charter-check.mjs --doc <проект>/docs/PROJECT_CHARTER.md --plan <план>`
+   (контракт есть + план привязан). Двусторонне: страж может и сам прислать задачу фреймворку. Не
+   переписывай продукт, противореча его дереву (North Star → Charter → фичи) — это защита целостности.
+
 1. **Бизнес-вопросы по фиче (+ Kaizen-вопрос).** Пойми ЧТО и ЗАЧЕМ до того как КАК. Через
    AskUserQuestion уточни бизнес-логику, пользователей, ограничения, критерии успеха. И
    ОБЯЗАТЕЛЬНО задай Kaizen-вопрос: какую бизнес-метрику эта фича/продукт двигает

@@ -1071,6 +1071,18 @@ GSD installs Claude Code session-level hooks. We have `.husky/post-commit` runni
 
 ---
 
+## Federation with projects — talk to the project's steward
+
+When this framework's Orchestrator works INSIDE another project (not the framework repo), it does
+NOT edit the project's files directly. It does a handshake with that project's `project-steward` —
+the project's head-to-toe guardian — and presents a plan. The steward runs the Defense Process
+against the project's Integrity Charter (`docs/PROJECT_CHARTER.md`, grown from `NORTH_STAR.md`):
+helps/neutral → route to the project's own agents; conflicts → a defense investigation (intent →
+breach → reject / adapt / evolve-philosophy), never a silent edit. Bidirectional — the steward can
+also open requests to the framework. Spec: `docs/specs/wave-federation_MASTER_SPEC.md`.
+
+---
+
 ## Where this file lives
 
 `<project>/.claude/AGENT_PLAYBOOK.md`. Referenced from project [CLAUDE.md](../CLAUDE.md). Read at session start by Claude.
