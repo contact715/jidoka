@@ -70,7 +70,7 @@ Claude Code из коробки — один агент, который пише
 ### Навыки (`.claude/skills/`, 33)
 Переиспользуемые паттерны, накопленные из ретроспектив: `tdd-flow`, `root-cause-over-patch`, `proactive-holistic-analysis`, `adversarial-self-review`, `ears-acceptance-criteria` и другие. Это «мышечная память» среды.
 
-### Движок (`scripts/`, 105 скриптов: 90 .mjs + 15 .sh)
+### Движок (`scripts/`, 106 скриптов: 91 .mjs + 15 .sh)
 - **Andon**: `andon-halt-helpers.mjs` (остановка линии), `run-tla.mjs` (формальная проверка)
 - **Observability**: `compute-dora`, `compute-slos`, `compute-cost`, `compute-carbon`, `emit-telemetry`
 - **Защита**: `detect-injection` (prompt injection), `detect-hallucinations`, `detect-drift`, `detect-constitutional-drift`
