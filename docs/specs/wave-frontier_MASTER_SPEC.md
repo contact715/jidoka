@@ -1,6 +1,15 @@
 # wave-frontier Master Spec — Close the gap to frontier autonomous agentic development
 
-**Status:** Active · **Level:** L1 · **Owner:** platform · **Created:** 2026-05-30
+**Status:** Complete (all 6 modules shipped 2026-05-31) · **Level:** L1 · **Owner:** platform · **Created:** 2026-05-30
+
+> **Shipped 2026-05-31.** All 6 modules: deterministic self-test green, in CI via `npm run eval`
+> (12/12 = 100%), instantiation-audit 0 ghosts, counts + global snapshot refreshed, committed.
+> M1 eval-suite `scripts/eval-suite.mjs` · M2 judge-panel `scripts/judge-panel.mjs` · M3 budget
+> `scripts/budget-gate.mjs` · M4 policy `scripts/policy-sandbox.mjs` · M5 orchestration
+> `scripts/orchestration-planner.mjs` · M6 memory `scripts/memory-consolidate.mjs`. Two real
+> mistakes were caught in-loop and turned into mechanisms (policy-glob crash → eval caught it;
+> baseline-fixation → eval-suite now refuses to baseline a failing suite). Honesty: M1-M6 cores
+> are FULL; LLM judging (M2) and OS-level isolation (M4) remain PROXY/DORMANT as labeled in §1.
 
 > Goal: move jidoka from ~35-45% of autonomous frontier toward "agents do the work, the human
 > only makes business decisions". Based on a cited comparative analysis against Anthropic
