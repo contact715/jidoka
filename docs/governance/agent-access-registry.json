@@ -28,6 +28,21 @@
       "llm06_category": "none"
     },
     {
+      "slug": "backend-agent",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Edit",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: First — Operations",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
       "slug": "best-of-N-judge",
       "declared_tools": [
         "Read",
@@ -36,6 +51,21 @@
       ],
       "write_scope": null,
       "line": "Line: Third — Independent Audit",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "business-process-architect",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "WebFetch",
+        "WebSearch",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: Pre-wave / Support",
       "blast_radius": "low",
       "llm06_category": "none"
     },
@@ -51,6 +81,21 @@
       ],
       "write_scope": null,
       "line": "Line: Pre-wave / Support",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "chief-product-officer",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "WebFetch",
+        "WebSearch",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: First — Operations",
       "blast_radius": "low",
       "llm06_category": "none"
     },
@@ -76,6 +121,49 @@
       ],
       "write_scope": null,
       "line": "Line: Second — Risk-Compliance",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "data-analyst",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: First — Operations",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "data-engineer",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Edit",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: First — Operations",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "data-lead",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: First — Operations",
       "blast_radius": "low",
       "llm06_category": "none"
     },
@@ -144,6 +232,35 @@
       "llm06_category": "none"
     },
     {
+      "slug": "devops-lead",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: First — Operations",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "engineering-lead",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Edit",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: First — Operations",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
       "slug": "error-recovery",
       "declared_tools": [
         "Read",
@@ -159,6 +276,21 @@
       "llm06_category": "none"
     },
     {
+      "slug": "frontend-agent",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Edit",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: First — Operations",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
       "slug": "integration-tester",
       "declared_tools": [
         "Read",
@@ -169,6 +301,21 @@
       ],
       "write_scope": null,
       "line": "Line: First — Operations",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "kaizen-officer",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "mcp__memory__create_entities",
+        "mcp__memory__search_nodes"
+      ],
+      "write_scope": null,
+      "line": "Line: Second — Risk-Compliance",
       "blast_radius": "low",
       "llm06_category": "none"
     },
@@ -250,6 +397,21 @@
       "llm06_category": "none"
     },
     {
+      "slug": "product-strategist",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "WebFetch",
+        "WebSearch",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: Pre-wave / Support",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
       "slug": "reflexion-critic",
       "declared_tools": [
         "Read",
@@ -260,6 +422,21 @@
       ],
       "write_scope": ".claude/reflexion-queue/**",
       "line": "Line: Second — Risk-Compliance",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "release-engineer",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Edit",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: First — Operations",
       "blast_radius": "low",
       "llm06_category": "none"
     },
@@ -341,6 +518,49 @@
       ],
       "write_scope": null,
       "line": "Line: First — Operations",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "user-researcher",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "WebFetch",
+        "WebSearch",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: Pre-wave / Support",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "ux-designer",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "WebFetch",
+        "WebSearch",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: Pre-wave / Support",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "ux-writer",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "Line: Pre-wave / Support",
       "blast_radius": "low",
       "llm06_category": "none"
     },

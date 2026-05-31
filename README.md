@@ -17,7 +17,7 @@
 
 ```
 .claude/
-  agents/            32 агента-роли + _TEMPLATE (вкл. продуктовую команду CPO) (chief-architect, reflexion-critic,
+  agents/            43 агента-роли + _TEMPLATE (полная продуктовая студия: продукт/архитектура/build/дизайн/данные/запуск/качество) (chief-architect, reflexion-critic,
                      best-of-N-judge, debate-*, security-scanner, ...)
   skills/            31 навык + _INDEX/_TEMPLATE (переиспользуемые паттерны)
   AGENT_PLAYBOOK.md  главный плейбук агентства

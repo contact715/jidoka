@@ -29,7 +29,7 @@ Every agent in this roster carries a `Line:` annotation classifying it per the I
 
 Cross-line dispatch is governed by `scripts/check-cross-line-dispatch.mjs` (wave-154). When a First Line agent dispatches a Second Line agent (or vice versa), the script exits 1 (BLOCK) in hard-block mode and emits a WARN in soft-trial mode. Every verdict is written as an append-only record to `docs/audits/cross-line-verdicts.jsonl` (EU AI Act Article 14 audit artifact). To approve a cross-line dispatch, the dispatch descriptor must carry `crossLineOverride: { "approver": "<name>", "reason": "<justification>" }` with non-empty fields. Anonymous bypasses (empty approver) are rejected at exit 1. The `.sdd-config.json` `crossLineBlock.hardBlockEnabled` flag controls hard vs soft mode.
 
-### 31-agent line-assignment table
+### 44-agent line-assignment table
 
 Wave-lifecycle accountability assignments are in `docs/governance/raci.md` (generated) and `docs/governance/raci.json` (source of truth).
 
@@ -66,6 +66,31 @@ Wave-lifecycle accountability assignments are in `docs/governance/raci.md` (gene
 | Skill Extractor | Post-wave | Line: Pre-wave / Support |
 | Metrics Aggregator | Post-wave | Line: Pre-wave / Support |
 | pfca-agent | L0.99 | Line: Second — Risk-Compliance |
+| product-strategist | L0.7 | Line: Pre-wave / Support |
+| user-researcher | L0.7 | Line: Pre-wave / Support |
+| business-process-architect | L0.7 | Line: Pre-wave / Support |
+| kaizen-officer | L0.9 | Line: Second — Risk-Compliance |
+| engineering-lead | L1 | Line: First — Operations |
+| backend-agent | L1 | Line: First — Operations |
+| data-engineer | L1 | Line: First — Operations |
+| ux-designer | L0.7 | Line: Pre-wave / Support |
+| ux-writer | L0.7 | Line: Pre-wave / Support |
+| data-lead | L0.9 | Line: First — Operations |
+| data-analyst | L0.7 | Line: First — Operations |
+| devops-lead | L0.9 | Line: First — Operations |
+| release-engineer | L0.96 | Line: First — Operations |
+
+### Product-studio teams (wave-189 — full lifecycle coverage)
+
+The roster now covers the full product lifecycle, not just verification. Teams and their leads:
+
+- **Product & Business** — lead `chief-product-officer`: product-strategist, user-researcher, business-process-architect, kaizen-officer. Owns WHY + the daily-improvement loop; kaizen-officer feeds reusable patterns back into jidoka.
+- **Architecture** — lead `chief-architect`: micro / macro / surface-cartographer / design-system-architect. Owns the spec.
+- **Implementation** — lead `engineering-lead`: backend-agent, frontend-agent, data-engineer. Builds to the spec.
+- **Design** — lead `design-system-architect`: ux-designer (flows/states), ux-writer (interface copy).
+- **Data** — lead `data-lead`: data-analyst. Governs metrics; closes the Kaizen loop with real numbers.
+- **Delivery** — lead `devops-lead`: release-engineer. Ships with a tested rollback; feeds DORA.
+- **Quality / Audit** — reflexion, debate×3, best-of-N, coverage/a11y/perf/security, test×3, visual-qa, pfca, meta-process, self-improvement. Verifies everything above.
 
 When adding a new agent entry to this roster: the entry MUST include a `Line:` annotation (wave-153 staleness prevention rule).
 
