@@ -63,6 +63,21 @@ Fail: any violation of questions 3 or 4.
 
 ---
 
+## Verdict severity — BLOCK vs REVISE (by the NATURE of the failure, not just the round)
+
+The iteration cap below is the floor, not the rule. Classify by what KIND of failure it is:
+
+- **BLOCK** (round-independent): the change FUNDAMENTALLY contradicts the spec — it violates an
+  EXPLICIT spec invariant (e.g. the spec says "pure function" and the diff adds disk / network /
+  global side effects), OR it introduces an undeclared dangerous side effect (network, disk,
+  code-execution, secret handling). This is "the wrong thing / unsafe", not "finish it" — emit
+  BLOCK even on round 1.
+- **REVISE**: the change is INCOMPLETE but its direction matches the spec and the gap is fixable
+  WITHOUT breaking an invariant (a missing edge case, missing test coverage, a partial AC).
+- **PASS**: spec match, no new regressions, Mission Q3/Q4 hold.
+
+---
+
 ## Iteration cap
 
 - Round 1 (first critique): emit PASS / REVISE.

@@ -16,7 +16,7 @@
 {"id":"llm-eval-score/cr-run","cmd":"node scripts/llm-eval-score.mjs --golden docs/evals/constitutional-reviewer/golden-cases.jsonl --run docs/evals/constitutional-reviewer/run-2026-05-31.jsonl","assert":{"exit":0,"contains":["6/6 correct"]}}
 {"id":"kaizen-loop/self-test","cmd":"node scripts/kaizen-loop.mjs --self-test","assert":{"exit":0,"contains":["metric-vs-goal assessment correct"]}}
 {"id":"agent-eval-dashboard/self-test","cmd":"node scripts/agent-eval-dashboard.mjs --self-test","assert":{"exit":0,"contains":["classification correct"]}}
-{"id":"llm-eval-score/reflexion-run","cmd":"node scripts/llm-eval-score.mjs --golden docs/evals/reflexion-critic/golden-cases.jsonl --run docs/evals/reflexion-critic/run-2026-05-31.jsonl","assert":{"exit":0,"contains":["2/3 correct"]}}
+{"id":"llm-eval-score/reflexion-run","cmd":"node scripts/llm-eval-score.mjs --golden docs/evals/reflexion-critic/golden-cases.jsonl --run docs/evals/reflexion-critic/run-2026-05-31.jsonl","assert":{"exit":0,"contains":["3/3 correct"]}}
 {"id":"llm-eval-score/debate-run","cmd":"node scripts/llm-eval-score.mjs --golden docs/evals/debate-judge/golden-cases.jsonl --run docs/evals/debate-judge/run-2026-05-31.jsonl","assert":{"exit":0,"contains":["3/3 correct"]}}
 {"id":"policy-enforce-hook/self-test","cmd":"node scripts/policy-enforce-hook.mjs --self-test","assert":{"exit":0,"contains":["protected-path enforcement correct"]}}
 {"id":"charter-check/self-test","cmd":"node scripts/charter-check.mjs --self-test","assert":{"exit":0,"contains":["integrity-charter validation correct"]}}
