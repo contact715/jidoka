@@ -17,13 +17,13 @@
 
 ```
 .claude/
-  agents/            43 агента-роли + _TEMPLATE (полная продуктовая студия: продукт/архитектура/build/дизайн/данные/запуск/качество) (chief-architect, reflexion-critic,
+  agents/            44 агента-роли + _TEMPLATE (вкл. project-steward — хранитель целостности проекта) (полная продуктовая студия: продукт/архитектура/build/дизайн/данные/запуск/качество) (chief-architect, reflexion-critic,
                      best-of-N-judge, debate-*, security-scanner, ...)
   skills/            31 навык + _INDEX/_TEMPLATE (переиспользуемые паттерны)
   AGENT_PLAYBOOK.md  главный плейбук агентства
   settings.local.json
 
-scripts/             119 скриптов-движка (104 .mjs + 15 .sh):
+scripts/             120 скриптов-движка (105 .mjs + 15 .sh):
                      andon-halt (stop-the-line), run-tla (формальная проверка),
                      compute-dora/slos/cost/carbon (observability),
                      detect-injection/drift/hallucinations (защита),
