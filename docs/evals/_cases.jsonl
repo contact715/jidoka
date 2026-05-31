@@ -33,4 +33,6 @@
 {"id":"validate-dr-catalog","cmd":"node scripts/validate-dr-catalog.mjs","assert":{"exit":0,"contains":["0 violations"]}}
 {"id":"chaos-inject/5-scenarios","cmd":"node scripts/chaos-inject.mjs","assert":{"exit":0,"contains":["5/5 scenarios PASSED"]}}
 {"id":"parallel-guard/self-test","cmd":"node scripts/parallel-guard.mjs --self-test","assert":{"exit":0,"contains":["scope-overlap analysis correct"]}}
+{"id":"llm-eval-score/best-of-n-run","cmd":"node scripts/llm-eval-score.mjs --golden docs/evals/best-of-N-judge/golden-cases.jsonl --run docs/evals/best-of-N-judge/run-2026-05-31.jsonl","assert":{"exit":0,"contains":["3/3 correct"]}}
+{"id":"llm-eval-score/security-run","cmd":"node scripts/llm-eval-score.mjs --golden docs/evals/security-scanner/golden-cases.jsonl --run docs/evals/security-scanner/run-2026-05-31.jsonl","assert":{"exit":0,"contains":["3/3 correct"]}}
 {"id":"runtime-feedback/self-test","cmd":"node scripts/runtime-feedback.mjs --self-test","assert":{"exit":0,"contains":["event routing correct"]}}

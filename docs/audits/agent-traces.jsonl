@@ -12,3 +12,9 @@
 {"agent":"debate-judge","label":"DJ-DEADLOCK-01","outcome":"DEADLOCK","tokens":11086,"ms":2607,"ts":"2026-05-31"}
 {"agent":"red-team","label":"synonym-pile-hunt","outcome":"VULN-FOUND","tokens":22411,"ms":83477,"ts":"2026-05-31"}
 {"agent":"project-steward","label":"defense-dry-run","outcome":"REJECT","tokens":39048,"ms":5407,"ts":"2026-05-31"}
+{"agent":"best-of-N-judge","label":"BN-CORRECT-01","outcome":"A","tokens":13109,"ms":2839,"ts":"2026-05-31"}
+{"agent":"best-of-N-judge","label":"BN-SPEC-01","outcome":"A","tokens":13081,"ms":2134,"ts":"2026-05-31"}
+{"agent":"best-of-N-judge","label":"BN-QUALITY-01","outcome":"B","tokens":13103,"ms":2921,"ts":"2026-05-31"}
+{"agent":"security-scanner","label":"SEC-SQLI-01","outcome":"FAIL","tokens":10987,"ms":3322,"ts":"2026-05-31"}
+{"agent":"security-scanner","label":"SEC-CLEAN-01","outcome":"PASS","tokens":10972,"ms":2695,"ts":"2026-05-31"}
+{"agent":"security-scanner","label":"SEC-SECRET-01","outcome":"FAIL","tokens":10976,"ms":2711,"ts":"2026-05-31"}

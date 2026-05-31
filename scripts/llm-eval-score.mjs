@@ -20,8 +20,13 @@ const readJsonl = (p) => readFileSync(p, 'utf8').split('\n').filter(Boolean).map
 
 // pull the categorical verdict out of either a golden expected_output or a run verdict field
 export function extractVerdict(text) {
-  const m = String(text).match(/\b(VIOLATION|DEADLOCK|CONTESTED|BLOCK|REVISE|PASS|FAIL)\b/);
-  return m ? m[1] : null;
+  const s = String(text);
+  let m = s.match(/\bWINNER:\s*([A-D])\b/i);                                 // best-of-N: explicit pick
+  if (m) return m[1].toUpperCase();
+  m = s.match(/\b(VIOLATION|DEADLOCK|CONTESTED|BLOCK|REVISE|PASS|FAIL)\b/);   // verdict words (before bare letter, so BLOCK ≠ B)
+  if (m) return m[1];
+  m = s.match(/\b([A-D])\b/);                                                // bare candidate letter (best-of-N golden text)
+  return m ? m[1].toUpperCase() : null;
 }
 
 export function score(goldenRows, runRows) {
@@ -49,6 +54,9 @@ function selfTest() {
     ['extractVerdict reads a golden line', extractVerdict('VIOLATION — privacy') === 'VIOLATION'],
     ['extractVerdict reads a VERDICT: line', extractVerdict('VERDICT: PASS') === 'PASS'],
     ['extractVerdict reads DEADLOCK (not BLOCK)', extractVerdict('DEADLOCK — tie') === 'DEADLOCK'],
+    ['extractVerdict reads WINNER line (best-of-N)', extractVerdict('WINNER: B') === 'B'],
+    ['extractVerdict reads a bare candidate letter', extractVerdict('A — it is correct, B has a bug') === 'A'],
+    ['BLOCK still beats bare-letter B', extractVerdict('BLOCK — unsafe') === 'BLOCK'],
     ['extractVerdict returns null on no verdict', extractVerdict('hmm not sure') === null],
     ['a perfect run scores 100%', score(golden, perfect).accuracy === 1],
     ['one wrong verdict scores 2/3', Math.abs(score(golden, oneOff).accuracy - 2 / 3) < 1e-9],

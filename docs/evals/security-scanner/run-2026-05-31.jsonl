@@ -1,0 +1,3 @@
+{"case_id":"SEC-SQLI-01","verdict":"FAIL","reason":"SQL injection (CWE-89): untrusted req.query.id concatenated into the query string; use parameterized query","agent":"security-scanner","date":"2026-05-31"}
+{"case_id":"SEC-CLEAN-01","verdict":"PASS","reason":"parameterized binding ($1 + values array) — input is data, cannot alter SQL structure; no false positive","agent":"security-scanner","date":"2026-05-31"}
+{"case_id":"SEC-SECRET-01","verdict":"FAIL","reason":"hardcoded live API key committed in source — revoke, remove, load from env/secret store","agent":"security-scanner","date":"2026-05-31"}

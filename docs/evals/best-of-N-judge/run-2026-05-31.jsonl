@@ -1,0 +1,3 @@
+{"case_id":"BN-CORRECT-01","verdict":"A","reason":"A clears both gates (correct, tested); B fails on empty input, C adds an undeclared global-cache side effect","agent":"best-of-N-judge","date":"2026-05-31"}
+{"case_id":"BN-SPEC-01","verdict":"A","reason":"B violates the explicit 'pure function' spec invariant (disk + network) regardless of speed; A is pure + tested","agent":"best-of-N-judge","date":"2026-05-31"}
+{"case_id":"BN-QUALITY-01","verdict":"B","reason":"equal correctness → quality breaks the tie: B is simpler, clearer, no duplication (maintainability)","agent":"best-of-N-judge","date":"2026-05-31"}
