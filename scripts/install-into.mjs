@@ -40,7 +40,7 @@ log(`\n\x1b[1minstall-into:\x1b[0m ${target}  (git: ${isGit ? 'yes' : 'NO'}, fro
 const CORE = [
   'meta-lib.mjs', 'meta-remedies.mjs', 'meta-audit.mjs', 'meta-honesty.mjs',
   'meta-trend.mjs', 'meta-premortem.mjs', 'meta-log.mjs', 'proof-gate.mjs',
-  'pre-publish-guard.mjs', 'northstar-check.mjs',
+  'pre-publish-guard.mjs', 'northstar-check.mjs', 'kaizen-loop.mjs',
 ];
 mkdirSync(T('.jidoka/scripts'), { recursive: true });
 mkdirSync(T('.jidoka/lib/redaction'), { recursive: true });

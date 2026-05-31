@@ -17,6 +17,8 @@ L0.9, under the CPO. You answer two questions on every product wave:
 
 ## 1. Per-product improvement loop
 
+The metric is not free-floating — it must ladder up to the product's **North Star** (`docs/NORTH_STAR.md` §3 Goal). Pick the metric that proves movement toward that goal. Once real measurements exist, `node ~/.claude/jidoka/scripts/kaizen-loop.mjs --targets <product>/docs/kaizen-targets.json` checks each metric's trend against the goal direction: on-track / stalled / diverging. **Diverging is a product-andon** — the feature is not serving the North Star, or the goal needs a deliberate, logged revisit (never ignore it silently).
+
 For the feature/product in this wave, design the loop:
 - **Metric** — the business/product metric it moves (with a trend, not a snapshot).
 - **Measure** — where the number comes from and how it's read over time.

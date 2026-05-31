@@ -14,3 +14,4 @@
 {"id":"pipeline-contract/self-test","cmd":"node scripts/pipeline-contract.mjs --self-test","assert":{"exit":0,"contains":["orchestrator graph is well-formed"]}}
 {"id":"llm-eval-score/self-test","cmd":"node scripts/llm-eval-score.mjs --self-test","assert":{"exit":0,"contains":["scoring correct"]}}
 {"id":"llm-eval-score/cr-run","cmd":"node scripts/llm-eval-score.mjs --golden docs/evals/constitutional-reviewer/golden-cases.jsonl --run docs/evals/constitutional-reviewer/run-2026-05-31.jsonl","assert":{"exit":0,"contains":["3/3 correct"]}}
+{"id":"kaizen-loop/self-test","cmd":"node scripts/kaizen-loop.mjs --self-test","assert":{"exit":0,"contains":["metric-vs-goal assessment correct"]}}

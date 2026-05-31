@@ -23,7 +23,7 @@ cp "$SRC/skills/dev-pipeline/SKILL.md" "$DEST/skills/dev-pipeline/"
 echo "  ✓ dev-pipeline skill"
 
 # 3. engine (from framework — the source of truth, with global ledger path)
-for f in meta-lib meta-remedies meta-audit meta-honesty meta-trend meta-premortem meta-log proof-gate pre-publish-guard memory-consolidate northstar-check; do
+for f in meta-lib meta-remedies meta-audit meta-honesty meta-trend meta-premortem meta-log proof-gate pre-publish-guard memory-consolidate northstar-check kaizen-loop; do
   [ -f "$FW/scripts/$f.mjs" ] && cp "$FW/scripts/$f.mjs" "$DEST/jidoka/scripts/"
 done
 [ -f "$FW/lib/redaction/redact-pii.mjs" ] && cp "$FW/lib/redaction/redact-pii.mjs" "$DEST/jidoka/lib/redaction/"
