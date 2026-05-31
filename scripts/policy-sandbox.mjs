@@ -17,14 +17,16 @@
 import { readFileSync, existsSync } from 'node:fs';
 const REGISTRY = 'docs/governance/agent-access-registry.json';
 
-// glob match: "x/**" = prefix x/, "**/*.test.ts" = suffix-ish, exact otherwise. No deps.
+// glob match: "x/**" = prefix x/, "**/*.test.ts" via split-on-**, exact otherwise. No deps.
 export function inScope(file, scopeStr) {
   if (!scopeStr) return null; // null write_scope = unscoped (registry flags this as I2 warn separately)
   return scopeStr.split(',').map(s => s.trim()).filter(Boolean).some(s => {
     if (s.endsWith('/**')) return file.startsWith(s.slice(0, -3) + '/') || file === s.slice(0, -3);
-    if (s.endsWith('**')) return file.startsWith(s.slice(0, -2));
+    if (s.endsWith('**') && !s.slice(0, -2).includes('*')) return file.startsWith(s.slice(0, -2));
     if (s.includes('*')) {
-      const re = new RegExp('^' + s.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\\\*\\\*/g, '.*').replace(/\\\*/g, '[^/]*') + '$');
+      // split on ** → ".*", escape each part's regex specials, single * → one path segment
+      const esc = t => t.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*');
+      const re = new RegExp('^' + s.split('**').map(esc).join('.*') + '$');
       return re.test(file);
     }
     return file === s;
