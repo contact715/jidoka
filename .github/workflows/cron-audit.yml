@@ -1,0 +1,23 @@
+# Weekly self-audit — the framework audits ITSELF on a schedule, not only on push.
+# This is the real cron the cron-audit mechanism was built for: GitHub-scheduled (not session-bound,
+# no token cost, versioned in the repo, travels with it). Runs cron-audit every Monday; the run
+# fails (and GitHub notifies) on any drift — eval regression, a new ghost, or a meta-audit regression.
+name: weekly-self-audit
+
+on:
+  schedule:
+    - cron: '17 9 * * 1' # Mondays 09:17 UTC (off-minute — avoids the fleet :00 spike)
+  workflow_dispatch: {}
+
+jobs:
+  self-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history: meta-audit reads the ledger, pre-publish-guard scans git log
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: weekly self-audit (eval / ghosts / regressions → cron-runs.jsonl, exit 1 on drift)
+        run: node scripts/cron-audit.mjs
