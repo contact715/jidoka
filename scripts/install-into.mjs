@@ -42,6 +42,7 @@ const CORE = [
   'meta-trend.mjs', 'meta-premortem.mjs', 'meta-log.mjs', 'proof-gate.mjs',
   'pre-publish-guard.mjs', 'northstar-check.mjs', 'kaizen-loop.mjs', 'charter-check.mjs',
   'spec-drift-check.mjs', 'execution-gate.mjs', 'agent-trace.mjs', 'code-map.mjs', 'approval-queue.mjs',
+  'parallel-guard.mjs',
 ];
 mkdirSync(T('.jidoka/scripts'), { recursive: true });
 mkdirSync(T('.jidoka/lib/redaction'), { recursive: true });
