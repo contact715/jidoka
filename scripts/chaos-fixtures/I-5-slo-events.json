@@ -1,0 +1,6 @@
+[
+  { "verdict": "REGRESSION_DETECTED", "event_type": "meta-audit", "wave": "chaos-w1", "agent": "meta-process-auditor", "offset_seconds_ago": 3600 },
+  { "verdict": "REGRESSION_DETECTED", "event_type": "meta-audit", "wave": "chaos-w2", "agent": "meta-process-auditor", "offset_seconds_ago": 7200 },
+  { "verdict": "REGRESSION_DETECTED", "event_type": "meta-audit", "wave": "chaos-w3", "agent": "meta-process-auditor", "offset_seconds_ago": 10800 },
+  { "verdict": "REGRESSION_DETECTED", "event_type": "meta-audit", "wave": "chaos-w4", "agent": "meta-process-auditor", "offset_seconds_ago": 14400 }
+]

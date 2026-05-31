@@ -1,0 +1,5 @@
+{
+  "_comment": "chaos-inject scenario I-3: a First-line caller dispatching to a Second-line callee with no override → check-cross-line-dispatch.mjs emits WARN (soft-trial).",
+  "callerAgent": "frontend-agent",
+  "calleeAgent": "Self-Improvement Reviewer"
+}

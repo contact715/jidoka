@@ -30,3 +30,4 @@ docs/audit-reports/
 docs/audits/cron-runs.jsonl
 docs/audits/approval-queue.jsonl
 docs/audits/decision-log.jsonl
+docs/audits/chaos-test-stream.jsonl

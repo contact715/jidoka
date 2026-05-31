@@ -31,6 +31,16 @@
       "event_filter": { "type": "injection_detected" },
       "budget_7d": 0,
       "agent": "security-scanner"
+    },
+    {
+      "id": "regression-budget",
+      "version": "1.0.0",
+      "name": "Meta-regression budget",
+      "rationale": "A gated mistake class recurring (REGRESSION_DETECTED) past a small budget means the engine is learning too slowly or a gate eroded — investigate the class, do not just re-log it. Exercised by chaos scenario I-5.",
+      "stream": "docs/audits/agent-events.jsonl",
+      "event_filter": { "verdict": "REGRESSION_DETECTED" },
+      "budget_7d": 3,
+      "agent": "meta-process-auditor"
     }
   ]
 }

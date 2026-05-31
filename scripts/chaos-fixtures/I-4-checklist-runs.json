@@ -1,0 +1,8 @@
+[
+  { "event_type": "checklist", "verdict": "BLOCK", "anti_pattern_slug": "partial-closure-via-documentation", "wave": "chaos-w1", "agent": "pfca-agent", "offset_seconds_ago": 600 },
+  { "event_type": "checklist", "verdict": "BLOCK", "anti_pattern_slug": "partial-closure-via-documentation", "wave": "chaos-w1", "agent": "pfca-agent", "offset_seconds_ago": 1200 },
+  { "event_type": "checklist", "verdict": "BLOCK", "anti_pattern_slug": "partial-closure-via-documentation", "wave": "chaos-w2", "agent": "pfca-agent", "offset_seconds_ago": 1800 },
+  { "event_type": "checklist", "verdict": "BLOCK", "anti_pattern_slug": "partial-closure-via-documentation", "wave": "chaos-w2", "agent": "pfca-agent", "offset_seconds_ago": 2400 },
+  { "event_type": "checklist", "verdict": "BLOCK", "anti_pattern_slug": "partial-closure-via-documentation", "wave": "chaos-w3", "agent": "pfca-agent", "offset_seconds_ago": 3000 },
+  { "event_type": "checklist", "verdict": "BLOCK", "anti_pattern_slug": "partial-closure-via-documentation", "wave": "chaos-w3", "agent": "pfca-agent", "offset_seconds_ago": 3600 }
+]

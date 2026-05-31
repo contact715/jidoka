@@ -30,4 +30,6 @@
 {"id":"execution-gate/self-test","cmd":"node scripts/execution-gate.mjs --self-test","assert":{"exit":0,"contains":["verify-command detection correct"]}}
 {"id":"code-map/self-test","cmd":"node scripts/code-map.mjs --self-test","assert":{"exit":0,"contains":["import/export graph correct"]}}
 {"id":"approval-queue/self-test","cmd":"node scripts/approval-queue.mjs --self-test","assert":{"exit":0,"contains":["readiness + decision logic correct"]}}
+{"id":"validate-dr-catalog","cmd":"node scripts/validate-dr-catalog.mjs","assert":{"exit":0,"contains":["0 violations"]}}
+{"id":"chaos-inject/5-scenarios","cmd":"node scripts/chaos-inject.mjs","assert":{"exit":0,"contains":["5/5 scenarios PASSED"]}}
 {"id":"runtime-feedback/self-test","cmd":"node scripts/runtime-feedback.mjs --self-test","assert":{"exit":0,"contains":["event routing correct"]}}

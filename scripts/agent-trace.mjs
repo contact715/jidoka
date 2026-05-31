@@ -35,8 +35,11 @@ export function summarize(traces) {
     .sort((x, y) => y.runs - x.runs);
 }
 
-export function totals(traces) {
-  return { dispatches: traces.length, tokens: traces.reduce((s, t) => s + (t.tokens || 0), 0), agents: new Set(traces.map(t => t.agent)).size };
+export function totals(traces, ratePerM = 5) {
+  const tokens = traces.reduce((s, t) => s + (t.tokens || 0), 0);
+  // est cost from REAL traced tokens × an explicit blended rate (override TOKEN_RATE_USD_PER_M).
+  // This is what lifts cost off guesses: the tokens are measured, only the rate is a parameter.
+  return { dispatches: traces.length, tokens, agents: new Set(traces.map(t => t.agent)).size, costUSD: Math.round((tokens / 1e6) * ratePerM * 100) / 100 };
 }
 
 function selfTest() {
@@ -54,6 +57,7 @@ function selfTest() {
     ['tallies outcome mix', by.judge.outcomes.PASS === 1 && by.judge.outcomes.FAIL === 1],
     ['sorts busiest agent first', s[0].agent === 'judge'],
     ['totals across all traces', tot.dispatches === 3 && tot.tokens === 350 && tot.agents === 2],
+    ['est cost from real tokens × rate', totals(tr, 1000).costUSD === 0.35],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
@@ -77,8 +81,9 @@ if (isMain) {
   }
   const traces = readJsonl(TRACES);
   if (!traces.length) { console.log(`agent-trace: no traces yet at ${TRACES}. Orchestrator --ingest after each dispatch.`); process.exit(0); }
-  const tot = totals(traces);
-  console.log(`agent-trace: ${tot.dispatches} dispatches, ${tot.agents} agents, ${tot.tokens} total tokens\n`);
+  const rate = Number(process.env.TOKEN_RATE_USD_PER_M || 5);
+  const tot = totals(traces, rate);
+  console.log(`agent-trace: ${tot.dispatches} dispatches, ${tot.agents} agents, ${tot.tokens} total tokens, ~$${tot.costUSD} est (@ $${rate}/M — real tokens, explicit rate)\n`);
   for (const a of summarize(traces)) {
     const mix = Object.entries(a.outcomes).map(([k, v]) => `${k}:${v}`).join(' ');
     console.log(`  ${a.agent.padEnd(24)} ${String(a.runs).padStart(3)} runs  ~${String(a.avgTokens).padStart(6)} tok  ~${String(a.avgMs).padStart(5)}ms  ${mix}`);
