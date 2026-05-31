@@ -27,6 +27,7 @@ export function trend(series) {
 
 // assess one target. `direction` is the DESIRED trend: 'down' to reduce a metric, 'up' to grow it.
 export function assessOne(t) {
+  if (!Array.isArray(t.series) || t.series.length === 0) return { metric: t.metric, status: 'no-data', trend: 'n/a', recommendation: "no measurements yet — the product's data-analyst must feed the series before this can be assessed (DORMANT)" };
   const tr = trend(t.series);
   const last = t.series.at(-1);
   const reached = t.direction === 'down' ? last <= t.target : last >= t.target;
@@ -50,6 +51,7 @@ function selfTest() {
     { metric: 'conversion', direction: 'up', target: 30, series: [20, 15, 10] },       // diverging
     { metric: 'response_time', direction: 'down', target: 1, series: [50, 50, 50] },   // stalled
     { metric: 'nps', direction: 'up', target: 50, series: [40, 48, 55] },              // achieved
+    { metric: 'unmeasured', direction: 'up', target: 10, series: [] },                 // no-data (DORMANT)
   ];
   const a = assess(targets);
   const by = Object.fromEntries(a.results.map(r => [r.metric, r.status]));
@@ -62,6 +64,7 @@ function selfTest() {
     ['metric moving AWAY from goal → diverging', by.conversion === 'diverging'],
     ['no movement → stalled', by.response_time === 'stalled'],
     ['target reached → achieved', by.nps === 'achieved'],
+    ['empty series → no-data (not a false stall)', by.unmeasured === 'no-data'],
     ['a diverging metric raises a product-andon', a.anyAndon === true],
   ];
   let fails = 0;
@@ -89,6 +92,9 @@ if (isMain) {
     console.log(`  ${icon} ${r.metric}: ${r.status} (trend ${r.trend}) → ${r.recommendation}`);
   }
   if (a.anyAndon) { console.error(`\n\x1b[31m✗ product-andon: ${a.diverging} metric(s) diverging from the North Star — revisit the feature or the goal (do not ignore).\x1b[0m`); process.exit(1); }
-  console.log('\n\x1b[32m✓ all metrics moving toward the North Star (or already there).\x1b[0m');
+  const noData = a.results.filter(r => r.status === 'no-data').length;
+  if (noData === a.results.length && noData > 0) { console.log('\n\x1b[33m○ no measurements yet for any metric (DORMANT) — the mechanism is ready; wire the product data to start assessing.\x1b[0m'); process.exit(0); }
+  if (noData) console.log(`\n\x1b[33m○ ${noData}/${a.results.length} metric(s) have no data yet (DORMANT).\x1b[0m`);
+  console.log('\x1b[32m✓ measured metrics are moving toward the North Star (or already there).\x1b[0m');
   process.exit(0);
 }
