@@ -8,3 +8,4 @@
 {"id":"budget-gate/self-test","cmd":"node scripts/budget-gate.mjs --self-test","assert":{"exit":0,"contains":["enforcement correct"]}}
 {"id":"budget-gate/over-budget","cmd":"node scripts/budget-gate.mjs --tier trivial --used '{\"tool_calls\":999}'","assert":{"exit":1,"contains":["BUDGET EXCEEDED"]}}
 {"id":"policy-sandbox/self-test","cmd":"node scripts/policy-sandbox.mjs --self-test","assert":{"exit":0,"contains":["enforcement correct"]}}
+{"id":"orchestration-planner/self-test","cmd":"node scripts/orchestration-planner.mjs --self-test","assert":{"exit":0,"contains":["composes correct graphs"]}}

@@ -1,0 +1,19 @@
+{
+  "_note": "Declarative rules the orchestration-planner composes the agent graph from. The TASK shape (type/risk/surfaces) picks which teams and gates run, instead of always running the full static pipeline. HONEST PROXY for Anthropic Dynamic Workflows: this composes from a FIXED agent set; it does not generate novel agents at runtime. Tune over time (Kaizen) as eval data shows which phases earn their cost.",
+  "always": {
+    "discovery": ["user-researcher", "product-strategist"],
+    "memory": ["skill-extractor", "data-analyst", "kaizen-officer"]
+  },
+  "by_risk": {
+    "trivial": "skip architects + product team; build → single reflexion gate → memory",
+    "normal": "full spec (architects + product), surface-based build, parallel gates",
+    "critical": "+ debate panel (prosecutor/defender/judge) + judge-panel + best-of-N"
+  },
+  "by_surface": {
+    "backend": ["backend-agent", "security-scanner (mandatory)"],
+    "frontend": ["frontend-agent", "design-system-architect", "ux-designer", "ux-writer", "a11y-auditor", "perf-profiler", "visual-qa"],
+    "data": ["data-engineer", "data-lead"],
+    "deploy": ["devops-lead", "release-engineer"]
+  },
+  "always_gates": ["reflexion-critic", "constitutional-reviewer", "budget-gate", "policy-sandbox"]
+}
