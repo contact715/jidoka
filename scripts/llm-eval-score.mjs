@@ -20,7 +20,7 @@ const readJsonl = (p) => readFileSync(p, 'utf8').split('\n').filter(Boolean).map
 
 // pull the categorical verdict out of either a golden expected_output or a run verdict field
 export function extractVerdict(text) {
-  const m = String(text).match(/\b(VIOLATION|BLOCK|REVISE|PASS|FAIL)\b/);
+  const m = String(text).match(/\b(VIOLATION|DEADLOCK|CONTESTED|BLOCK|REVISE|PASS|FAIL)\b/);
   return m ? m[1] : null;
 }
 
@@ -48,6 +48,7 @@ function selfTest() {
   const T = [
     ['extractVerdict reads a golden line', extractVerdict('VIOLATION — privacy') === 'VIOLATION'],
     ['extractVerdict reads a VERDICT: line', extractVerdict('VERDICT: PASS') === 'PASS'],
+    ['extractVerdict reads DEADLOCK (not BLOCK)', extractVerdict('DEADLOCK — tie') === 'DEADLOCK'],
     ['extractVerdict returns null on no verdict', extractVerdict('hmm not sure') === null],
     ['a perfect run scores 100%', score(golden, perfect).accuracy === 1],
     ['one wrong verdict scores 2/3', Math.abs(score(golden, oneOff).accuracy - 2 / 3) < 1e-9],

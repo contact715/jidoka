@@ -1,0 +1,3 @@
+{"case_id":"RC-PASS-01","verdict":"PASS","reason":"implements slugify exactly per AC with a passing test, contained scope, no side effects","agent":"reflexion-critic","date":"2026-05-31"}
+{"case_id":"RC-REVISE-01","verdict":"REVISE","reason":"omits punctuation stripping required by AC + missing test coverage; partial-but-fixable, Gate 1 fails","agent":"reflexion-critic","date":"2026-05-31"}
+{"case_id":"RC-BLOCK-01","verdict":"REVISE","reason":"DISAGREEMENT: agent judged the disk/network side-effects in a 'pure function' as fixable (REVISE); golden expected BLOCK as a fundamental spec contradiction. Calibration boundary, not a clear error.","agent":"reflexion-critic","date":"2026-05-31"}

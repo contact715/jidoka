@@ -1,0 +1,3 @@
+{"case_id":"DJ-PASS-01","verdict":"PASS","reason":"prosecution's race-condition claim had no file:line; defense refuted with specific lines proving synchronous single-threaded, no material concern","agent":"debate-judge","date":"2026-05-31"}
+{"case_id":"DJ-BLOCK-01","verdict":"BLOCK","reason":"prosecution cited the exact line logging full card numbers to plaintext; defense conceded without fix — unresolved security violation","agent":"debate-judge","date":"2026-05-31"}
+{"case_id":"DJ-DEADLOCK-01","verdict":"DEADLOCK","reason":"both sides equally evidenced on a spec-ambiguous architectural choice, neither conceded, no factual error to break the tie — escalate to human","agent":"debate-judge","date":"2026-05-31"}
