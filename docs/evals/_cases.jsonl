@@ -23,3 +23,5 @@
 {"id":"statusline-jidoka/self-test","cmd":"node scripts/statusline-jidoka.mjs --self-test","assert":{"exit":0,"contains":["render correct"]}}
 {"id":"cron-audit/self-test","cmd":"node scripts/cron-audit.mjs --self-test","assert":{"exit":0,"contains":["summary logic correct"]}}
 {"id":"prompt-evolution/self-test","cmd":"node scripts/prompt-evolution.mjs --self-test","assert":{"exit":0,"contains":["candidate + improvement guard correct"]}}
+{"id":"red-team/self-test","cmd":"node scripts/red-team.mjs --self-test","assert":{"exit":0,"contains":["attack classification correct"]}}
+{"id":"red-team/live-attacks","cmd":"node scripts/red-team.mjs","assert":{"exit":0,"contains":["all attacks defended"]}}
