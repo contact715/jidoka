@@ -43,6 +43,7 @@ Cite each pass/fail as: `AC-N: <one line — PASS or FAIL — evidence or gap>`.
 Run the following in sequence:
 1. `npx tsc --noEmit 2>&1 | head -40` — capture TypeScript errors
 2. `npx next lint --dir app --dir components 2>&1 | head -40` — capture ESLint errors
+3. **Execution proof (verification by execution)** — statics above prove the code is SHAPED right; only running it proves it WORKS. Run the project's real verify command: `node .jidoka/scripts/execution-gate.mjs --dir . --run` (it detects npm test / pytest / cargo test / e2e and runs it). A change with green tsc+lint but a failing or ABSENT test is "looks-right", not "works" — treat absent runtime proof as a REVISE (add the test), a failing run as BLOCK.
 
 Pass: zero new errors introduced by the wave (pre-existing errors from other files are acceptable if they were present before the wave started — note them but do not block on them).
 Fail: one or more new TS or lint errors traceable to files in the diff.
