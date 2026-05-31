@@ -15,6 +15,7 @@ const SRC = join(HOME, '.claude');
 const DEST = 'global-setup';
 mkdirSync(join(DEST, 'hooks'), { recursive: true });
 mkdirSync(join(DEST, 'skills', 'dev-pipeline'), { recursive: true });
+mkdirSync(join(DEST, 'commands'), { recursive: true });
 
 const FILES = [
   'CLAUDE.md',
@@ -22,6 +23,11 @@ const FILES = [
   'hooks/jidoka-feature-reminder.sh',
   'hooks/policy-enforce-hook.mjs',
   'skills/dev-pipeline/SKILL.md',
+  'statusline-jidoka.mjs',
+  'commands/jidoka-health.md',
+  'commands/jidoka-eval.md',
+  'commands/jidoka-audit.md',
+  'commands/jidoka-steward.md',
 ];
 
 let n = 0;

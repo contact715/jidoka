@@ -41,6 +41,7 @@ const CORE = [
   'meta-lib.mjs', 'meta-remedies.mjs', 'meta-audit.mjs', 'meta-honesty.mjs',
   'meta-trend.mjs', 'meta-premortem.mjs', 'meta-log.mjs', 'proof-gate.mjs',
   'pre-publish-guard.mjs', 'northstar-check.mjs', 'kaizen-loop.mjs', 'charter-check.mjs',
+  'spec-drift-check.mjs',
 ];
 mkdirSync(T('.jidoka/scripts'), { recursive: true });
 mkdirSync(T('.jidoka/lib/redaction'), { recursive: true });
@@ -81,6 +82,19 @@ mkdirSync(T('docs/audits'), { recursive: true });
 if (!existsSync(T('docs/audits/meta-mistakes.jsonl'))) writeFileSync(T('docs/audits/meta-mistakes.jsonl'), '');
 log('  ✓ seeded docs/audits/meta-mistakes.jsonl (empty ledger)');
 
+// ── 3a. Seed .sdd-config.json so the spec-drift gate has its soft/hard switch ──
+// Soft by default (warn, never blocks) — graduation to hardBlockEnabled is a human
+// decision after the trial (K8s admission-webhook warn→enforce pattern).
+if (!existsSync(T('.sdd-config.json'))) {
+  writeFileSync(T('.sdd-config.json'), JSON.stringify({
+    _comment: 'jidoka gate config. Flip driftDetection.hardBlockEnabled to true after a soft trial to block on spec→missing-file drift.',
+    driftDetection: { enabled: true, hardBlockEnabled: false, specPaths: ['docs'] },
+  }, null, 2) + '\n');
+  log('  ✓ seeded .sdd-config.json (spec-drift gate: soft/warn — set specPaths to your spec dirs, flip hardBlockEnabled after trial)');
+} else {
+  log('  • .sdd-config.json exists — left as is (add a driftDetection block if missing)');
+}
+
 // ── 3b. Federation: project-steward (guardian) + North Star/Charter templates ──
 mkdirSync(T('.claude/agents'), { recursive: true });
 if (!existsSync(T('.claude/agents/project-steward.md'))) copyFileSync(join(HERE, '.claude/agents/project-steward.md'), T('.claude/agents/project-steward.md'));
@@ -103,7 +117,8 @@ if (!isGit) {
   log('      node "$(git rev-parse --show-toplevel)/.jidoka/scripts/meta-audit.mjs"   || exit 1');
   log('    and to pre-push: node "$(git rev-parse --show-toplevel)/.jidoka/scripts/pre-publish-guard.mjs" || exit 1');
   log('    and (if docs/NORTH_STAR.md exists): node "$(git rev-parse --show-toplevel)/.jidoka/scripts/northstar-check.mjs" --doc docs/NORTH_STAR.md || exit 1');
-  log('    and (if docs/PROJECT_CHARTER.md exists): node "$(git rev-parse --show-toplevel)/.jidoka/scripts/charter-check.mjs" --doc docs/PROJECT_CHARTER.md || exit 1\x1b[0m');
+  log('    and (if docs/PROJECT_CHARTER.md exists): node "$(git rev-parse --show-toplevel)/.jidoka/scripts/charter-check.mjs" --doc docs/PROJECT_CHARTER.md || exit 1');
+  log('    and (spec-drift gate, soft until .sdd-config driftDetection.hardBlockEnabled=true): node "$(git rev-parse --show-toplevel)/.jidoka/scripts/spec-drift-check.mjs" --root "$(git rev-parse --show-toplevel)" || exit 1\x1b[0m');
 } else {
   mkdirSync(T('.githooks'), { recursive: true });
   const preCommit = `#!/bin/sh
@@ -111,6 +126,7 @@ if (!isGit) {
 ROOT="$(git rev-parse --show-toplevel)"
 node "$ROOT/.jidoka/scripts/meta-honesty.mjs" || exit 1
 node "$ROOT/.jidoka/scripts/meta-audit.mjs"   || exit 1
+node "$ROOT/.jidoka/scripts/spec-drift-check.mjs" --root "$ROOT" || exit 1
 exit 0
 `;
   const prePush = `#!/bin/sh

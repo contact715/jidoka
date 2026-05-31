@@ -20,3 +20,5 @@
 {"id":"llm-eval-score/debate-run","cmd":"node scripts/llm-eval-score.mjs --golden docs/evals/debate-judge/golden-cases.jsonl --run docs/evals/debate-judge/run-2026-05-31.jsonl","assert":{"exit":0,"contains":["3/3 correct"]}}
 {"id":"policy-enforce-hook/self-test","cmd":"node scripts/policy-enforce-hook.mjs --self-test","assert":{"exit":0,"contains":["protected-path enforcement correct"]}}
 {"id":"charter-check/self-test","cmd":"node scripts/charter-check.mjs --self-test","assert":{"exit":0,"contains":["integrity-charter validation correct"]}}
+{"id":"statusline-jidoka/self-test","cmd":"node scripts/statusline-jidoka.mjs --self-test","assert":{"exit":0,"contains":["render correct"]}}
+{"id":"cron-audit/self-test","cmd":"node scripts/cron-audit.mjs --self-test","assert":{"exit":0,"contains":["summary logic correct"]}}

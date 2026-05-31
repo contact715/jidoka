@@ -21,6 +21,11 @@ echo "  ✓ hooks → ~/.claude/hooks/"
 # wire policy-enforce-hook into PreToolUse (idempotent, preserves any existing hooks)
 node -e 'const fs=require("fs"),os=require("os");const p=os.homedir()+"/.claude/settings.json";let s={};try{s=JSON.parse(fs.readFileSync(p,"utf8"))}catch{}s.hooks=s.hooks||{};s.hooks.PreToolUse=s.hooks.PreToolUse||[];const c="node "+os.homedir()+"/.claude/hooks/policy-enforce-hook.mjs";if(!s.hooks.PreToolUse.some(e=>(e.hooks||[]).some(h=>(h.command||"").includes("policy-enforce-hook")))){s.hooks.PreToolUse.push({matcher:"Write|Edit|MultiEdit|NotebookEdit",hooks:[{type:"command",command:c,timeout:15}]});fs.writeFileSync(p,JSON.stringify(s,null,2)+"\n")}' 2>/dev/null && echo "  ✓ policy-enforce-hook wired into PreToolUse"
 
+# 1b. statusline + slash-commands (Claude-Code-native)
+cp "$SRC/statusline-jidoka.mjs" "$DEST/" 2>/dev/null || true
+mkdir -p "$DEST/commands"; cp "$SRC/commands/jidoka-"*.md "$DEST/commands/" 2>/dev/null || true
+node -e 'const fs=require("fs"),os=require("os");const p=os.homedir()+"/.claude/settings.json";let s={};try{s=JSON.parse(fs.readFileSync(p,"utf8"))}catch{}const c="node "+os.homedir()+"/.claude/statusline-jidoka.mjs";if(!s.statusLine||s.statusLine.command!==c){s.statusLine={type:"command",command:c,padding:0};fs.writeFileSync(p,JSON.stringify(s,null,2)+"\n")}' 2>/dev/null && echo "  ✓ statusline + slash-commands wired"
+
 # 2. dev-pipeline skill
 cp "$SRC/skills/dev-pipeline/SKILL.md" "$DEST/skills/dev-pipeline/"
 echo "  ✓ dev-pipeline skill"
