@@ -3,7 +3,7 @@
 Source of truth for mandatory session-start checks. CLAUDE.md references this file.
 Edit this file, not CLAUDE.md, to add or modify checks.
 
-Run all five checks in order before dispatching any wave. Skipping any one of them
+Run all six checks in order before dispatching any wave. Skipping any one of them
 is how stale state or unreviewed regressions reach production (wave-45b SI Reviewer
 finding, wave-150 enforcement).
 
@@ -85,3 +85,18 @@ anti-pattern applied at session level. Respond to surfaced concerns via:
 ```bash
 node scripts/surface-concerns.mjs --respond "<title>" <addressed|deferred|declined|disputed> [reason]
 ```
+
+---
+
+## Check 6 — Consolidated memory digest (frontier M6)
+
+```bash
+npm run memory:consolidate
+```
+
+Rebuilds `~/.claude/jidoka/memory-consolidated.md` from the cross-project mistake ledger:
+raw incidents (episodic) → per-class lessons ranked by recency-weighted frequency (semantic).
+Read the digest before dispatching. The 🔴 **Active** lessons are the mistakes most likely to
+recur right now; any lesson marked **ungated — still a live risk** is a class with no mechanism
+holding it yet — prefer building that gate over re-learning the lesson the hard way. Decayed
+lessons are folded to the bottom so old one-offs do not crowd out live patterns.
