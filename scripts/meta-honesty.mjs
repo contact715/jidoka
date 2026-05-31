@@ -26,6 +26,10 @@ import { loadLedger } from './meta-lib.mjs';
 
 const INFLATED = ['comprehensive', 'seamless', 'flawless', 'bulletproof', 'robust', 'exhaustive', 'perfectly', 'thoroughly', 'fully tested', 'production-ready', 'rock-solid'];
 const VAGUE_REAL = new Set(['fixed', 'done', 'ok', 'okay', 'resolved', 'works', 'good', 'n/a', 'na', 'same', 'nothing', 'none']);
+// red-team find 2026-05-31 (synonym-pile): a `real` that restates the claim ONLY via done/pass
+// synonyms adds zero information — still a tautology even with 2+ novel WORDS. Lexical novelty is
+// not semantic novelty. If every novel word is a "done/pass/complete" synonym, it does not contradict.
+const DONE_SYNONYMS = new Set(['done', 'finished', 'completed', 'complete', 'accomplished', 'confirmed', 'verified', 'passing', 'passed', 'pass', 'successfully', 'success', 'working', 'works', 'fixed', 'resolved', 'ready', 'shipped', 'deployed', 'delivered', 'implemented', 'tested', 'validated', 'correct', 'correctly']);
 const EXTERNAL = new Set(['user', 'reviewer', 'review', 'test', 'tests', 'hook', 'ci', 'human', 'qa', 'gate', 'auditor', 'lint']);
 const NEGATIVE_MARKERS = ['went wrong', 'missed', 'mistake', 'failed', 'failure', 'gap', 'should have', 'regression', 'bug', 'broke', 'wrong', 'didn\'t', 'did not', 'overlooked', 'forgot'];
 
@@ -37,8 +41,10 @@ function contradicts(claimed, real) {
   const r = String(real).trim().toLowerCase();
   if (r.length < 8 || VAGUE_REAL.has(r)) return false;
   const c = words(claimed), rw = words(real);
-  let novel = 0;
-  for (const w of rw) if (!c.has(w)) novel++;
+  let novel = 0, novelSynonyms = 0;
+  for (const w of rw) if (!c.has(w)) { novel++; if (DONE_SYNONYMS.has(w)) novelSynonyms++; }
+  // synonym-pile: every novel word is a done/pass synonym → restatement, not contra-evidence
+  if (novel > 0 && novel === novelSynonyms) return false;
   return novel >= 2;
 }
 
