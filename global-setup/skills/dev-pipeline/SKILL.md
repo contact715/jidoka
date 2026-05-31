@@ -75,9 +75,20 @@ the spec system is `HIERARCHICAL_SPEC_SYSTEM.md`, the mission/constitution are a
    задачи и распределяет: backend-agent (API / БД / серверная логика), frontend-agent (UI по
    дизайн-контракту + UX-потоку), data-engineer (инструментирует метрику + пайплайны). Порядок:
    контракт и модель данных первыми → бэкенд → фронт против РЕАЛЬНОГО контракта, не угаданного.
+   **Параллельная запись:** перед одновременным dispatch build-агентов прогони
+   `node <проект>/.jidoka/scripts/parallel-guard.mjs --agents '[{slug,write_scope}...]'` — если
+   write_scope пересекаются, запусти конфликтующих в git worktree (Agent `isolation:"worktree"`) или
+   серийно; непересекающиеся идут параллельно безопасно.
 
 5. **Гейты (параллельно).** reflexion-critic (соответствие спеке), constitutional-reviewer
-   (миссия), security-scanner, coverage / a11y / perf. На критичных — дебаты: prosecutor →
+   (миссия), security-scanner, coverage / a11y / perf. + **execution proof**:
+   `node <проект>/.jidoka/scripts/execution-gate.mjs --dir <проект> --run` — РЕАЛЬНО запусти
+   тесты/команду проекта и наблюдай, что фича работает (статика tsc/lint = «выглядит верно»,
+   прогон = «работает»). Нет теста → REVISE (добавь тест); прогон упал → BLOCK. Недоверенный или
+   сгенерированный код исполняй ИЗОЛИРОВАННО:
+   `node <проект>/.jidoka/scripts/sandbox-run.mjs --scope <build-dir> --cmd "<test/команда>"` —
+   kernel-sandbox (macOS sandbox-exec): запись только в scope, сеть запрещена, побег невозможен на
+   уровне ядра. На критичных — дебаты: prosecutor →
    defender → judge. best-of-N-judge если было несколько попыток.
 
 6. **Дебаг.** debug-agent на провалах тестов (авто-фикс если уверен и мелко, иначе эскалация).

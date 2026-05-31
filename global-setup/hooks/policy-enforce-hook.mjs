@@ -16,10 +16,13 @@
 
 import { readFileSync } from 'node:fs';
 
+// case-INSENSITIVE: a red-team probe found that on a case-insensitive filesystem (macOS/Windows)
+// "docs/constitution.md" is the SAME file as "docs/CONSTITUTION.md" but a case-sensitive regex let
+// it through. /i closes the regex-vs-filesystem casing gap.
 export const PROTECTED = [
-  /(^|\/)\.secrets/, /(^|\/)\.credentials/, /\.env(\.|$)/, /(^|\/)\.git\//,
-  /CONSTITUTION\.md$/, /MISSION\.md$/, /NORTH_STAR\.md$/,
-  /agent-access-registry\.json$/, /_baseline\.json$/, /meta-remedies\.mjs$/,
+  /(^|\/)\.secrets/i, /(^|\/)\.credentials/i, /\.env(\.|$)/i, /(^|\/)\.git\//i,
+  /CONSTITUTION\.md$/i, /MISSION\.md$/i, /NORTH_STAR\.md$/i,
+  /agent-access-registry\.json$/i, /_baseline\.json$/i, /meta-remedies\.mjs$/i,
 ];
 const WRITE_TOOLS = /^(Write|Edit|MultiEdit|NotebookEdit)$/;
 
@@ -39,6 +42,7 @@ function selfTest() {
     ['blocks writes inside .git', isBlocked('Edit', '/proj/.git/config') === true],
     ['allows a normal source write', isBlocked('Write', 'src/app/foo.ts') === false],
     ['does NOT block Read of a protected path', isBlocked('Read', 'docs/MISSION.md') === false],
+    ['blocks a case-variant of a protected path (red-team find)', isBlocked('Write', 'docs/constitution.md') === true && isBlocked('Edit', '.SECRETS.json') === true],
     ['allows writing a normal doc', isBlocked('Write', 'docs/specs/wave-x.md') === false],
   ];
   let fails = 0;
