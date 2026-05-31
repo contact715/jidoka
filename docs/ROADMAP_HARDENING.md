@@ -1,5 +1,5 @@
 ---
-status: Active
+status: Complete (R1-R4 shipped 2026-05-31)
 level: L1
 type: roadmap
 owner: platform
