@@ -28,6 +28,7 @@ export function trend(series) {
 // assess one target. `direction` is the DESIRED trend: 'down' to reduce a metric, 'up' to grow it.
 export function assessOne(t) {
   if (!Array.isArray(t.series) || t.series.length === 0) return { metric: t.metric, status: 'no-data', trend: 'n/a', recommendation: "no measurements yet — the product's data-analyst must feed the series before this can be assessed (DORMANT)" };
+  if (t.series.length === 1) return { metric: t.metric, status: 'baseline', trend: 'first reading', recommendation: `baseline recorded (${t.series[0]}) — feed a 2nd reading to assess the trend toward ${t.target}` };
   const tr = trend(t.series);
   const last = t.series.at(-1);
   const reached = t.direction === 'down' ? last <= t.target : last >= t.target;
@@ -52,6 +53,7 @@ function selfTest() {
     { metric: 'response_time', direction: 'down', target: 1, series: [50, 50, 50] },   // stalled
     { metric: 'nps', direction: 'up', target: 50, series: [40, 48, 55] },              // achieved
     { metric: 'unmeasured', direction: 'up', target: 10, series: [] },                 // no-data (DORMANT)
+    { metric: 'firstrun', direction: 'up', target: 100, series: [96] },                // baseline (1 reading)
   ];
   const a = assess(targets);
   const by = Object.fromEntries(a.results.map(r => [r.metric, r.status]));
@@ -65,6 +67,7 @@ function selfTest() {
     ['no movement → stalled', by.response_time === 'stalled'],
     ['target reached → achieved', by.nps === 'achieved'],
     ['empty series → no-data (not a false stall)', by.unmeasured === 'no-data'],
+    ['single reading → baseline (not a false stall)', by.firstrun === 'baseline'],
     ['a diverging metric raises a product-andon', a.anyAndon === true],
   ];
   let fails = 0;
