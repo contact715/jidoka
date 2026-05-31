@@ -26,12 +26,13 @@ cp "$SRC/skills/dev-pipeline/SKILL.md" "$DEST/skills/dev-pipeline/"
 echo "  ✓ dev-pipeline skill"
 
 # 3. engine (from framework — the source of truth, with global ledger path)
-for f in meta-lib meta-remedies meta-audit meta-honesty meta-trend meta-premortem meta-log proof-gate pre-publish-guard memory-consolidate northstar-check kaizen-loop; do
+for f in meta-lib meta-remedies meta-audit meta-honesty meta-trend meta-premortem meta-log proof-gate pre-publish-guard memory-consolidate northstar-check kaizen-loop charter-check; do
   [ -f "$FW/scripts/$f.mjs" ] && cp "$FW/scripts/$f.mjs" "$DEST/jidoka/scripts/"
 done
 [ -f "$FW/lib/redaction/redact-pii.mjs" ] && cp "$FW/lib/redaction/redact-pii.mjs" "$DEST/jidoka/lib/redaction/"
 # North Star template — the CPO uses it to create docs/NORTH_STAR.md in any project
 [ -f "$FW/docs/NORTH_STAR_TEMPLATE.md" ] && cp "$FW/docs/NORTH_STAR_TEMPLATE.md" "$DEST/jidoka/NORTH_STAR_TEMPLATE.md"
+[ -f "$FW/docs/PROJECT_CHARTER_TEMPLATE.md" ] && cp "$FW/docs/PROJECT_CHARTER_TEMPLATE.md" "$DEST/jidoka/PROJECT_CHARTER_TEMPLATE.md"
 # point meta-lib at the GLOBAL cross-project ledger
 perl -i -pe "s{'docs/audits/meta-mistakes.jsonl'}{require('node:os').homedir()+'/.claude/jidoka/meta-mistakes.jsonl'}g" "$DEST/jidoka/scripts/meta-lib.mjs" 2>/dev/null || true
 echo "  ✓ engine → ~/.claude/jidoka/scripts/"

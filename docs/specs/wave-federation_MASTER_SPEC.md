@@ -1,5 +1,5 @@
 ---
-status: Active
+status: Complete (F1-F5 shipped 2026-05-31)
 level: L1
 type: master-spec
 owner: platform
