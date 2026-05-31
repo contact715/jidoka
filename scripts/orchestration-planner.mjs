@@ -60,7 +60,7 @@ if (process.argv.includes('--self-test')) {
   const ta = agentsIn(trivial), ca = agentsIn(critical);
   const T = [
     ['trivial skips architects', !ta.has('chief-architect')],
-    ['trivial is minimal (≤3 phases)', trivial.phases.length <= 3],
+    ['trivial skips the spec phase', !trivial.phases.some(p => p.phase === 'spec')],
     ['critical runs full spec', ca.has('chief-architect') && ca.has('chief-product-officer')],
     ['critical backend → security-scanner', ca.has('security-scanner')],
     ['critical → debate + judge-panel', ca.has('debate-judge') && ca.has('judge-panel')],

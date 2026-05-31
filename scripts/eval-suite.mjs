@@ -66,6 +66,13 @@ for (const r of results) {
 }
 
 if (update) {
+  // Guard against the recurring mistake of baselining a FAILING suite (which silently locks
+  // in a regression). Refuse unless every case passes, or --force is explicit.
+  if (passed < cases.length && !process.argv.includes('--force')) {
+    console.log(`\n\x1b[31m✗ refusing to baseline a failing suite (${(rate * 100).toFixed(1)}%) — fix the case first, or pass --force if intended:\x1b[0m`);
+    for (const r of results) if (!r.pass) console.log(`    ✗ ${r.id}: ${r.fails.join(', ')}`);
+    process.exit(1);
+  }
   writeFileSync(BASELINE, JSON.stringify({ pass_rate: rate, passed, total: cases.length, updated: new Date().toISOString().slice(0, 10) }, null, 2) + '\n');
   console.log(`\n\x1b[36mbaseline updated → ${(rate * 100).toFixed(1)}%\x1b[0m`);
   process.exit(0);
