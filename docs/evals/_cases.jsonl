@@ -51,3 +51,4 @@
 {"id":"run-state/self-test","cmd":"node scripts/run-state.mjs --self-test","assert":{"exit":0,"contains":["journal init/advance/resume/render correct"]}}
 {"id":"check-commands/self-test","cmd":"node scripts/check-commands.mjs --self-test","assert":{"exit":0,"contains":["frontmatter + arg-hint + script-ref validation correct"]}}
 {"id":"check-commands/all-wellformed","cmd":"node scripts/check-commands.mjs","assert":{"exit":0,"contains":["jidoka commands well-formed"]}}
+{"id":"install-into/self-test","cmd":"node scripts/install-into.mjs --self-test","assert":{"exit":0,"contains":["profile resolution correct"]}}
