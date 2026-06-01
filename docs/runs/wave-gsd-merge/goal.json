@@ -6,6 +6,6 @@
     { "id": "C", "desc": "proportional install profiles", "evidence": { "cmdPasses": "node scripts/install-into.mjs --self-test" } },
     { "id": "D", "desc": "mutation testing of the engine", "evidence": { "cmdPasses": "node scripts/mutation-test.mjs --self-test" } },
     { "id": "E", "desc": "goal-backward verification", "evidence": { "cmdPasses": "node scripts/verify-goal-backward.mjs --self-test" } },
-    { "id": "F", "desc": "guided onboarding + English quickstart", "evidence": { "fileExists": "QUICKSTART.md" } }
+    { "id": "F", "desc": "guided onboarding + English quickstart", "evidence": { "fileContains": ["QUICKSTART.md", "/jidoka-new-project"] } }
   ]
 }

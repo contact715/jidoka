@@ -39,11 +39,11 @@
     },
     {
       "phase": "build",
-      "status": "running",
+      "status": "done",
       "agents": [
         "engineering-lead"
       ],
-      "note": "A: run-state mechanism + wiring"
+      "note": "borrows A-F shipped + proven"
     },
     {
       "phase": "gate",
@@ -100,8 +100,14 @@
       "phase": "build",
       "status": "running",
       "note": "A: run-state mechanism + wiring"
+    },
+    {
+      "at": "2026-06-01T20:27:14.258Z",
+      "phase": "build",
+      "status": "done",
+      "note": "borrows A-F shipped + proven"
     }
   ],
   "createdAt": "2026-06-01T19:54:20.333Z",
-  "updatedAt": "2026-06-01T19:54:20.435Z"
+  "updatedAt": "2026-06-01T20:27:14.258Z"
 }
