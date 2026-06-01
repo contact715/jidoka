@@ -1,0 +1,2 @@
+{"case_id":"A11Y-FAIL-01","verdict":"VIOLATION","reason":"img missing alt (axe image-alt, WCAG 1.1.1) + icon-button missing accessible name (button-name, 4.1.2), both critical","agent":"a11y-auditor","date":"2026-05-31"}
+{"case_id":"A11Y-PASS-01","verdict":"PASS","reason":"img has alt, icon-button has aria-label — WCAG 2.2 AA name/text-alt satisfied, no serious violation","agent":"a11y-auditor","date":"2026-05-31"}

@@ -1,0 +1,2 @@
+{"case_id":"PERF-FAIL-01","verdict":"FAIL","reason":"+120KB first-load on the route exceeds the +50KB per-route budget → BLOCK; lazy-load or replace","agent":"perf-profiler","date":"2026-05-31"}
+{"case_id":"PERF-PASS-01","verdict":"PASS","reason":"+6KB well under the +50KB per-route budget","agent":"perf-profiler","date":"2026-05-31"}

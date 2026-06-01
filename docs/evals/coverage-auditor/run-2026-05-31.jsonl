@@ -1,0 +1,2 @@
+{"case_id":"COV-FAIL-01","verdict":"FAIL","reason":"changed file coverage dropped 45% (85→40), far past the 5% block threshold → BLOCK; add tests","agent":"coverage-auditor","date":"2026-05-31"}
+{"case_id":"COV-PASS-01","verdict":"PASS","reason":"coverage held at 88%, no file dropped beyond 5%","agent":"coverage-auditor","date":"2026-05-31"}

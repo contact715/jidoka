@@ -18,3 +18,9 @@
 {"agent":"security-scanner","label":"SEC-SQLI-01","outcome":"FAIL","tokens":10987,"ms":3322,"ts":"2026-05-31"}
 {"agent":"security-scanner","label":"SEC-CLEAN-01","outcome":"PASS","tokens":10972,"ms":2695,"ts":"2026-05-31"}
 {"agent":"security-scanner","label":"SEC-SECRET-01","outcome":"FAIL","tokens":10976,"ms":2711,"ts":"2026-05-31"}
+{"agent":"a11y-auditor","label":"A11Y-FAIL","outcome":"VIOLATION","tokens":11647,"ms":2622,"ts":"2026-05-31"}
+{"agent":"a11y-auditor","label":"A11Y-PASS","outcome":"PASS","tokens":11611,"ms":2873,"ts":"2026-05-31"}
+{"agent":"perf-profiler","label":"PERF-FAIL","outcome":"FAIL","tokens":11549,"ms":2241,"ts":"2026-05-31"}
+{"agent":"perf-profiler","label":"PERF-PASS","outcome":"PASS","tokens":11560,"ms":2931,"ts":"2026-05-31"}
+{"agent":"coverage-auditor","label":"COV-FAIL","outcome":"FAIL","tokens":10631,"ms":3307,"ts":"2026-05-31"}
+{"agent":"coverage-auditor","label":"COV-PASS","outcome":"PASS","tokens":10591,"ms":2054,"ts":"2026-05-31"}
