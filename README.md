@@ -26,7 +26,7 @@
   AGENT_PLAYBOOK.md  главный плейбук агентства
   settings.local.json
 
-scripts/             142 скриптов-движка (127 .mjs + 15 .sh):
+scripts/             143 скриптов-движка (128 .mjs + 15 .sh):
                      andon-halt (stop-the-line), run-tla (формальная проверка),
                      compute-dora/slos/cost/carbon (observability),
                      detect-injection/drift/hallucinations (защита),
