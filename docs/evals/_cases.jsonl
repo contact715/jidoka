@@ -56,3 +56,4 @@
 {"id":"verify-goal-backward/self-test","cmd":"node scripts/verify-goal-backward.mjs --self-test","assert":{"exit":0,"contains":["goal-backward trace correct"]}}
 {"id":"debate-trigger/self-test","cmd":"node scripts/debate-trigger.mjs --self-test","assert":{"exit":0,"contains":["analytical/decision routing correct"]}}
 {"id":"property-test/self-test","cmd":"node scripts/property-test.mjs --self-test","assert":{"exit":0,"contains":["forAll + generators + deterministic counterexamples correct"]}}
+{"id":"plan-check/self-test","cmd":"node scripts/plan-check.mjs --self-test","assert":{"exit":0,"contains":["pre-execution plan dimensions correct"]}}
