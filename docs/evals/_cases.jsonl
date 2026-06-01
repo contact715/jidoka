@@ -58,3 +58,4 @@
 {"id":"property-test/self-test","cmd":"node scripts/property-test.mjs --self-test","assert":{"exit":0,"contains":["forAll + generators + deterministic counterexamples correct"]}}
 {"id":"plan-check/self-test","cmd":"node scripts/plan-check.mjs --self-test","assert":{"exit":0,"contains":["pre-execution plan dimensions correct"]}}
 {"id":"model-tier/self-test","cmd":"node scripts/model-tier.mjs --self-test","assert":{"exit":0,"contains":["role→model mapping correct"]}}
+{"id":"jidoka-cli/self-test","cmd":"node scripts/jidoka.mjs --self-test","assert":{"exit":0,"contains":["dispatch map correct (no ghost subcommand)"]}}
