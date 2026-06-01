@@ -27,6 +27,7 @@ export const GATES = [
   { id: 'semgrep-sast', layer: 'CI', mode: 'hard', token: 'semgrep' },
   { id: 'trufflehog-secrets', layer: 'CI', mode: 'hard', token: 'trufflehog' },
   { id: 'dependency-audit', layer: 'CI', mode: 'hard', token: 'dependency-audit' },
+  { id: 'mutation-test', layer: 'CI', mode: 'hard', token: 'mutation-test' },
   // PreToolUse — real-time, hard-block
   { id: 'policy-enforce-hook', layer: 'PreToolUse', mode: 'hard', token: null },
   { id: 'jidoka-guard', layer: 'PreToolUse', mode: 'hard', token: null },

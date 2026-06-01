@@ -1,0 +1,26 @@
+name: mutation
+# GSD borrow D: mutation testing of the engine. A self-test can be green while asserting nothing;
+# mutation testing flips one operator at a time and checks the file's own --self-test catches it.
+# Runs on PRs that touch the engine, plus manual dispatch. Threshold 50% (matches gsd-core's Stryker gate).
+on:
+  pull_request:
+    paths: ['scripts/**.mjs']
+  workflow_dispatch:
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: mutation-test self-test (proves the runner itself)
+        run: node scripts/mutation-test.mjs --self-test
+      - name: mutation score on engine (threshold 50%)
+        run: |
+          set -e
+          for f in coverage-gate budget-gate dependency-audit gate-graduation; do
+            echo "── scripts/$f.mjs ──"
+            node scripts/mutation-test.mjs --file "scripts/$f.mjs" --max 40 --threshold 0.5
+          done
