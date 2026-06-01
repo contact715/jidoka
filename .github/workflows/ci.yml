@@ -43,6 +43,8 @@ jobs:
         run: npm run check:structural
       - name: security pattern gate
         run: npm run check:security
+      - name: dependency-audit (supply-chain — block high/critical vulns)
+        run: node scripts/dependency-audit.mjs
       - name: pre-publish privacy guard (tree + history)
         run: node scripts/pre-publish-guard.mjs
 
