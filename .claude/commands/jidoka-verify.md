@@ -12,5 +12,8 @@ Verify wave $1.
 3. Execution proof, not just static checks: actually run the project's tests/command via
    `node scripts/execution-gate.mjs --run`. Untrusted or generated code runs isolated:
    `node scripts/sandbox-run.mjs --scope <build-dir> --cmd "<test>"` (kernel sandbox, no escape).
-4. Green → `node scripts/run-state.mjs --advance $1 --phase gate --status done`. Red →
+4. Goal-backward check: if `docs/runs/$1/goal.json` exists,
+   `node scripts/verify-goal-backward.mjs --goal docs/runs/$1/goal.json` traces the wave goal back to
+   shipped evidence and reports objectives NOT actually delivered (complements the forward AC→test map).
+5. Green → `node scripts/run-state.mjs --advance $1 --phase gate --status done`. Red →
    `--status failed --note "<what broke>"` and route to debug-agent before re-running.
