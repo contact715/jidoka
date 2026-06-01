@@ -36,6 +36,7 @@
 		"verify:goal": "node scripts/verify-goal-backward.mjs",
 		"property:test": "node scripts/property-test.mjs",
 		"plan:check": "node scripts/plan-check.mjs",
+		"model:tier": "node scripts/model-tier.mjs",
 		"check:design-drift": "bash scripts/design-drift-audit.sh",
 		"check:design-drift:ratchet": "bash scripts/design-drift-audit.sh --ratchet",
 		"check:design-drift:update-baseline": "bash scripts/design-drift-audit.sh --update-baseline",
