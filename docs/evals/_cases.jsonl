@@ -49,3 +49,5 @@
 {"id":"coverage-gate/self-test","cmd":"node scripts/coverage-gate.mjs --self-test","assert":{"exit":0,"contains":["ratchet logic correct"]}}
 {"id":"debate-engine/self-test","cmd":"node scripts/debate-engine.mjs --self-test","assert":{"exit":0,"contains":["round structure + verdict aggregation correct"]}}
 {"id":"run-state/self-test","cmd":"node scripts/run-state.mjs --self-test","assert":{"exit":0,"contains":["journal init/advance/resume/render correct"]}}
+{"id":"check-commands/self-test","cmd":"node scripts/check-commands.mjs --self-test","assert":{"exit":0,"contains":["frontmatter + arg-hint + script-ref validation correct"]}}
+{"id":"check-commands/all-wellformed","cmd":"node scripts/check-commands.mjs","assert":{"exit":0,"contains":["jidoka commands well-formed"]}}

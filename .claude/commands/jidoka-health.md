@@ -1,5 +1,6 @@
 ---
 description: Full jidoka health check — eval, engine self-tests, ghosts, measured judges, regressions
+allowed-tools: Read, Bash, Grep
 ---
 Run the jidoka health check and report concisely (do NOT fix anything — just report pass/fail).
 Use `scripts/` in the framework repo, or `.jidoka/scripts/` in an installed project.

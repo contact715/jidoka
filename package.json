@@ -31,6 +31,7 @@
 		"e2e:flows": "playwright test clients-flows",
 		"e2e:flows:ui": "playwright test clients-flows --ui",
 		"check:security": "bash scripts/check-security-patterns.sh",
+		"check:commands": "node scripts/check-commands.mjs",
 		"check:design-drift": "bash scripts/design-drift-audit.sh",
 		"check:design-drift:ratchet": "bash scripts/design-drift-audit.sh --ratchet",
 		"check:design-drift:update-baseline": "bash scripts/design-drift-audit.sh --update-baseline",

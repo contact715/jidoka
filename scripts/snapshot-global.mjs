@@ -28,6 +28,12 @@ const FILES = [
   'commands/jidoka-eval.md',
   'commands/jidoka-audit.md',
   'commands/jidoka-steward.md',
+  'commands/jidoka-new-project.md',
+  'commands/jidoka-plan.md',
+  'commands/jidoka-build.md',
+  'commands/jidoka-verify.md',
+  'commands/jidoka-resume.md',
+  'commands/jidoka-ship.md',
 ];
 
 let n = 0;
