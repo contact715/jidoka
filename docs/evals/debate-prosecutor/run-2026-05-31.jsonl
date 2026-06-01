@@ -1,0 +1,2 @@
+{"case_id":"PROS-FINDS-01","verdict":"FAIL","reason":"found the real SQL injection (string-concat of req.query.id), cited exploit + the parameterized fix","agent":"debate-prosecutor","date":"2026-05-31"}
+{"case_id":"PROS-CLEAN-01","verdict":"PASS","reason":"parameterized + tested, no real flaw — did NOT fabricate an accusation (precision held)","agent":"debate-prosecutor","date":"2026-05-31"}

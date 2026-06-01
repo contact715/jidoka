@@ -24,3 +24,7 @@
 {"agent":"perf-profiler","label":"PERF-PASS","outcome":"PASS","tokens":11560,"ms":2931,"ts":"2026-05-31"}
 {"agent":"coverage-auditor","label":"COV-FAIL","outcome":"FAIL","tokens":10631,"ms":3307,"ts":"2026-05-31"}
 {"agent":"coverage-auditor","label":"COV-PASS","outcome":"PASS","tokens":10591,"ms":2054,"ts":"2026-05-31"}
+{"agent":"debate-prosecutor","label":"PROS-FINDS","outcome":"FAIL","tokens":10673,"ms":2987,"ts":"2026-05-31"}
+{"agent":"debate-prosecutor","label":"PROS-CLEAN","outcome":"PASS","tokens":10612,"ms":2380,"ts":"2026-05-31"}
+{"agent":"debate-defender","label":"DEF-REFUTE","outcome":"PASS","tokens":15222,"ms":12842,"ts":"2026-05-31"}
+{"agent":"debate-defender","label":"DEF-CONCEDE","outcome":"PASS-miss","tokens":16229,"ms":15852,"ts":"2026-05-31"}

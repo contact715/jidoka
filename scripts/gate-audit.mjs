@@ -52,6 +52,8 @@ export const GATES = [
   { id: 'a11y-auditor', layer: 'LLM', mode: 'measured', token: null },
   { id: 'perf-profiler', layer: 'LLM', mode: 'measured', token: null },
   { id: 'coverage-auditor', layer: 'LLM', mode: 'measured', token: null },
+  { id: 'debate-prosecutor', layer: 'LLM', mode: 'measured', token: null },
+  { id: 'debate-defender', layer: 'LLM', mode: 'measured', token: null },
 ];
 
 // a CI gate is real only if its token appears in some workflow file

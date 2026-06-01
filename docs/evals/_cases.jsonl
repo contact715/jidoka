@@ -38,6 +38,8 @@
 {"id":"llm-eval-score/a11y-run","cmd":"node scripts/llm-eval-score.mjs --golden docs/evals/a11y-auditor/golden-cases.jsonl --run docs/evals/a11y-auditor/run-2026-05-31.jsonl","assert":{"exit":0,"contains":["2/2 correct"]}}
 {"id":"llm-eval-score/perf-run","cmd":"node scripts/llm-eval-score.mjs --golden docs/evals/perf-profiler/golden-cases.jsonl --run docs/evals/perf-profiler/run-2026-05-31.jsonl","assert":{"exit":0,"contains":["2/2 correct"]}}
 {"id":"llm-eval-score/coverage-run","cmd":"node scripts/llm-eval-score.mjs --golden docs/evals/coverage-auditor/golden-cases.jsonl --run docs/evals/coverage-auditor/run-2026-05-31.jsonl","assert":{"exit":0,"contains":["2/2 correct"]}}
+{"id":"llm-eval-score/prosecutor-run","cmd":"node scripts/llm-eval-score.mjs --golden docs/evals/debate-prosecutor/golden-cases.jsonl --run docs/evals/debate-prosecutor/run-2026-05-31.jsonl","assert":{"exit":0,"contains":["2/2 correct"]}}
+{"id":"llm-eval-score/defender-run","cmd":"node scripts/llm-eval-score.mjs --golden docs/evals/debate-defender/golden-cases.jsonl --run docs/evals/debate-defender/run-2026-05-31.jsonl","assert":{"exit":0,"contains":["1/2 correct"]}}
 {"id":"runtime-feedback/self-test","cmd":"node scripts/runtime-feedback.mjs --self-test","assert":{"exit":0,"contains":["event routing correct"]}}
 {"id":"sandbox-run/self-test","cmd":"node scripts/sandbox-run.mjs --self-test","assert":{"exit":0,"contains":["profile generation correct"]}}
 {"id":"gate-audit/self-test","cmd":"node scripts/gate-audit.mjs --self-test","assert":{"exit":0,"contains":["gate map + CI-ghost detection correct"]}}
