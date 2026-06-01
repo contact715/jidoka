@@ -37,3 +37,5 @@
 {"id":"llm-eval-score/security-run","cmd":"node scripts/llm-eval-score.mjs --golden docs/evals/security-scanner/golden-cases.jsonl --run docs/evals/security-scanner/run-2026-05-31.jsonl","assert":{"exit":0,"contains":["3/3 correct"]}}
 {"id":"runtime-feedback/self-test","cmd":"node scripts/runtime-feedback.mjs --self-test","assert":{"exit":0,"contains":["event routing correct"]}}
 {"id":"sandbox-run/self-test","cmd":"node scripts/sandbox-run.mjs --self-test","assert":{"exit":0,"contains":["profile generation correct"]}}
+{"id":"gate-audit/self-test","cmd":"node scripts/gate-audit.mjs --self-test","assert":{"exit":0,"contains":["gate map + CI-ghost detection correct"]}}
+{"id":"gate-audit/no-ghost-gates","cmd":"node scripts/gate-audit.mjs","assert":{"exit":0,"contains":["no ghost gate"]}}
