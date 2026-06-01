@@ -1,0 +1,107 @@
+{
+  "wave": "wave-gsd-merge",
+  "task": {
+    "type": "feature",
+    "risk": "critical",
+    "surfaces": []
+  },
+  "phases": [
+    {
+      "phase": "discovery",
+      "status": "done",
+      "agents": [
+        "user-researcher",
+        "product-strategist"
+      ],
+      "note": "GSD debate + borrow-list"
+    },
+    {
+      "phase": "spec",
+      "status": "done",
+      "agents": [
+        "chief-architect",
+        "micro-architect",
+        "macro-architect",
+        "surface-cartographer",
+        "chief-product-officer",
+        "business-process-architect",
+        "kaizen-officer"
+      ],
+      "note": "design A agreed"
+    },
+    {
+      "phase": "tests",
+      "status": "pending",
+      "agents": [
+        "test-engineer"
+      ],
+      "note": ""
+    },
+    {
+      "phase": "build",
+      "status": "running",
+      "agents": [
+        "engineering-lead"
+      ],
+      "note": "A: run-state mechanism + wiring"
+    },
+    {
+      "phase": "gate",
+      "status": "pending",
+      "agents": [
+        "reflexion-critic",
+        "constitutional-reviewer",
+        "coverage-auditor",
+        "budget-gate",
+        "policy-sandbox",
+        "debate-prosecutor",
+        "debate-defender",
+        "debate-judge",
+        "judge-panel",
+        "best-of-N-judge"
+      ],
+      "note": ""
+    },
+    {
+      "phase": "debug",
+      "status": "pending",
+      "agents": [
+        "debug-agent"
+      ],
+      "note": ""
+    },
+    {
+      "phase": "memory",
+      "status": "pending",
+      "agents": [
+        "skill-extractor",
+        "data-analyst",
+        "kaizen-officer"
+      ],
+      "note": ""
+    }
+  ],
+  "current": "tests",
+  "events": [
+    {
+      "at": "2026-06-01T19:54:20.372Z",
+      "phase": "discovery",
+      "status": "done",
+      "note": "GSD debate + borrow-list"
+    },
+    {
+      "at": "2026-06-01T19:54:20.404Z",
+      "phase": "spec",
+      "status": "done",
+      "note": "design A agreed"
+    },
+    {
+      "at": "2026-06-01T19:54:20.435Z",
+      "phase": "build",
+      "status": "running",
+      "note": "A: run-state mechanism + wiring"
+    }
+  ],
+  "createdAt": "2026-06-01T19:54:20.333Z",
+  "updatedAt": "2026-06-01T19:54:20.435Z"
+}

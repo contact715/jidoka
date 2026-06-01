@@ -85,6 +85,18 @@ If a human-required escalation was triggered but resolved without BLOCK, pipelin
 
 ---
 
+## Resumable run-state (survives a context reset)
+
+A wave's position is journaled to `docs/runs/<wave>/{state.json,STATE.md}` by `scripts/run-state.mjs`, so a build interrupted mid-wave resumes from disk instead of from the user re-typing the request (the GSD `STATE.md` pattern in our idiom). Phases come from `orchestration-planner.plan()`, the single definition of the graph, so this tracks position, not a second truth; the `mcp__memory` graph stays the learning store.
+
+- At wave start: `node scripts/run-state.mjs --init <wave> --task '{"risk":..,"surfaces":[..]}'`
+- After each phase: `node scripts/run-state.mjs --advance <wave> --phase <name> --status done|failed [--note ..]`
+- On a fresh session (after a context reset), first run `node scripts/run-state.mjs --resume`. It reports which phases are done and which to dispatch next.
+
+Boundary: `--resume` reports position plus the next step, it does not auto-execute the continuation (the orchestrator reads it and proceeds). Resumes to a phase boundary, not mid-phase. The journal is accurate only insofar as the orchestrator calls `--advance` (the dev-pipeline skill mandates these calls). In a product the script lives at `<project>/.jidoka/scripts/run-state.mjs` (delivered by install-into).
+
+---
+
 ## Known limitations
 
 - **pre-merge fires on local `git merge` only.** The `.githooks/pre-merge-commit` hook fires when running `git merge` locally. It does NOT fire when merging a pull request via the GitHub UI. Teams using GitHub's merge button bypass this gate. To enforce quality gates on GitHub merges, configure branch protection rules with required status checks in GitHub Actions CI.

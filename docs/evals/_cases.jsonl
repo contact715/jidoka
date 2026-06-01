@@ -48,3 +48,4 @@
 {"id":"dependency-audit/self-test","cmd":"node scripts/dependency-audit.mjs --self-test","assert":{"exit":0,"contains":["vulnerability assessment correct"]}}
 {"id":"coverage-gate/self-test","cmd":"node scripts/coverage-gate.mjs --self-test","assert":{"exit":0,"contains":["ratchet logic correct"]}}
 {"id":"debate-engine/self-test","cmd":"node scripts/debate-engine.mjs --self-test","assert":{"exit":0,"contains":["round structure + verdict aggregation correct"]}}
+{"id":"run-state/self-test","cmd":"node scripts/run-state.mjs --self-test","assert":{"exit":0,"contains":["journal init/advance/resume/render correct"]}}

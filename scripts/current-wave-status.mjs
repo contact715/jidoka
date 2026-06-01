@@ -19,6 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { latestWave as latestRunWave, loadState, nextStep } from './run-state.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -67,6 +68,18 @@ try {
   driftSummary = `heights ${baseline.raw_control_heights} · text-px ${baseline.raw_text_px} · tinted-files ${baseline.tinted_surface_files}`;
 } catch { /* leave default */ }
 
+// ── Current run position (forward journal from run-state — single source, not git-log) ─
+let runPositionBlock = '';
+try {
+  const w = latestRunWave(ROOT);
+  if (w) {
+    const st = loadState(ROOT, w);
+    const mark = { done: '[x]', running: '[>]', failed: '[!]', pending: '[ ]' };
+    const checklist = st.phases.map((p) => `- ${mark[p.status]} ${p.phase} — ${p.status}`).join('\n');
+    runPositionBlock = `\n## Current run position\n\n> Forward journal \`docs/runs/${w}/state.json\` (written by \`run-state.mjs\` as the orchestrator advances). Survives a context reset.\n\n**${w}** · ${nextStep(st).message}\n\n${checklist}\n`;
+  }
+} catch { /* run-state optional — never break the post-commit hook */ }
+
 // ── Build markdown ─────────────────────────────────────────────────
 const content = `# Current Wave Status
 
@@ -80,7 +93,7 @@ const content = `# Current Wave Status
 - **Audit backlog**: ${open} open · ${escalated} escalated
 - **Outcomes**: ${outcomesSummary}
 - **Design drift baseline**: ${driftSummary}
-
+${runPositionBlock}
 ## Last 5 commits
 
 \`\`\`
