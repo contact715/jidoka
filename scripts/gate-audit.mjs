@@ -38,6 +38,7 @@ export const GATES = [
   // product pre-push — enforced in the target product (via install-into), hard
   { id: 'northstar-check', layer: 'product', mode: 'hard', token: null },
   { id: 'charter-check', layer: 'product', mode: 'hard', token: null },
+  { id: 'coverage-gate', layer: 'product', mode: 'hard', token: null },
   // soft-trial — warn until graduated (gate-graduation proposes the flip)
   { id: 'spec-drift', layer: 'product', mode: 'soft', token: null },
   { id: 'detect-injection', layer: 'runtime', mode: 'soft', token: null },

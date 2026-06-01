@@ -44,3 +44,4 @@
 {"id":"gate-audit/no-ghost-gates","cmd":"node scripts/gate-audit.mjs","assert":{"exit":0,"contains":["no ghost gate"]}}
 {"id":"gate-graduation/self-test","cmd":"node scripts/gate-graduation.mjs --self-test","assert":{"exit":0,"contains":["readiness logic correct"]}}
 {"id":"dependency-audit/self-test","cmd":"node scripts/dependency-audit.mjs --self-test","assert":{"exit":0,"contains":["vulnerability assessment correct"]}}
+{"id":"coverage-gate/self-test","cmd":"node scripts/coverage-gate.mjs --self-test","assert":{"exit":0,"contains":["ratchet logic correct"]}}
