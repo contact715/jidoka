@@ -34,6 +34,7 @@ const FILES = [
   'commands/jidoka-verify.md',
   'commands/jidoka-resume.md',
   'commands/jidoka-ship.md',
+  'commands/jidoka-debate.md',
 ];
 
 let n = 0;

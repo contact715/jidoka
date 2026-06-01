@@ -67,11 +67,20 @@ export function runMutants(file, { max = 60, testCmd } = {}) {
   const regionEnd = guard === -1 ? src.length : guard;
   const mutants = mutate(src).filter(m => m.index < regionEnd).slice(0, max);
   const tmp = mkdtempSync(join(tmpdir(), 'jidoka-mut-'));
-  // copy the target's direct relative-.mjs imports so the mutated copy resolves them (else it would
-  // fail on import and every mutant would falsely count as "killed").
+  // copy the target's relative-.mjs imports TRANSITIVELY (BFS) so the mutated copy resolves them — a
+  // one-level copy breaks on deps-of-deps (e.g. run-state → planner → debate-trigger) and every mutant
+  // would then falsely count as "killed" on the import error.
   const srcDir = dirname(file);
-  for (const dep of src.matchAll(/from '\.\/([\w-]+\.mjs)'/g)) {
-    if (existsSync(join(srcDir, dep[1]))) copyFileSync(join(srcDir, dep[1]), join(tmp, dep[1]));
+  const copied = new Set();
+  const queue = [file];
+  while (queue.length) {
+    const curSrc = readFileSync(queue.shift(), 'utf8');
+    for (const m of curSrc.matchAll(/from '\.\/([\w-]+\.mjs)'/g)) {
+      if (copied.has(m[1]) || !existsSync(join(srcDir, m[1]))) continue;
+      copyFileSync(join(srcDir, m[1]), join(tmp, m[1]));
+      copied.add(m[1]);
+      queue.push(join(srcDir, m[1]));
+    }
   }
   // realpath the temp dir: macOS tmpdir() is symlinked (/var → /private/var); without this,
   // `process.argv[1] === fileURLToPath(import.meta.url)` (the isMain guard) is FALSE in the copy, so

@@ -34,11 +34,14 @@ export const KERNEL = [
   'meta-lib.mjs', 'meta-remedies.mjs', 'meta-audit.mjs', 'meta-honesty.mjs', 'meta-trend.mjs',
   'meta-premortem.mjs', 'meta-log.mjs', 'proof-gate.mjs', 'pre-publish-guard.mjs',
   'sandbox-run.mjs', 'run-state.mjs',
+  // run-state derives phases from the planner, which routes debate via debate-trigger — both must be
+  // in the kernel so even --profile=core is import-closed (no run-state without its planner).
+  'orchestration-planner.mjs', 'debate-trigger.mjs',
 ];
 const COMMON = [ // standard adds the everyday gates
   'northstar-check.mjs', 'charter-check.mjs', 'kaizen-loop.mjs', 'spec-drift-check.mjs',
   'execution-gate.mjs', 'coverage-gate.mjs', 'dependency-audit.mjs', 'gate-audit.mjs',
-  'parallel-guard.mjs', 'orchestration-planner.mjs',
+  'parallel-guard.mjs',
 ];
 const HEAVY = [ // full adds the deeper adversarial / analysis tools
   'gate-graduation.mjs', 'debate-engine.mjs', 'agent-trace.mjs', 'code-map.mjs', 'approval-queue.mjs',
@@ -59,6 +62,20 @@ function profileSelfTest() {
   ok('KERNEL present in EVERY profile (moat protected)', ['core', 'standard', 'full'].every(p => KERNEL.every(k => resolveProfile(p).includes(k))));
   ok('full == CORE (full install drops nothing)', resolveProfile('full').length === CORE.length);
   ok('every profile script exists on disk', ['core', 'standard', 'full'].every(p => resolveProfile(p).every(s => existsSync(join(HERE, 'scripts', s)))));
+  // import-closure: a profile must contain the relative deps of every script it ships, or the install
+  // breaks on a missing import. (This is the check that the run-state→planner gap in wave-1 lacked.)
+  const closure = (prof) => {
+    const set = new Set(resolveProfile(prof));
+    for (const f of set) {
+      for (const m of readFileSync(join(HERE, 'scripts', f), 'utf8').matchAll(/from '\.\/([\w-]+\.mjs)'/g)) {
+        if (!set.has(m[1])) return { ok: false, f, missing: m[1] };
+      }
+    }
+    return { ok: true };
+  };
+  ok('core profile is import-closed', closure('core').ok);
+  ok('standard profile is import-closed', closure('standard').ok);
+  ok('full profile is import-closed', closure('full').ok);
   ok('unknown profile throws', (() => { try { resolveProfile('nope'); return false; } catch { return true; } })());
   if (fails.length) { console.log(`\n\x1b[31minstall-into profile self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ install-into: profile resolution correct (kernel always shipped, full == CORE)\x1b[0m');

@@ -54,3 +54,4 @@
 {"id":"install-into/self-test","cmd":"node scripts/install-into.mjs --self-test","assert":{"exit":0,"contains":["profile resolution correct"]}}
 {"id":"mutation-test/self-test","cmd":"node scripts/mutation-test.mjs --self-test","assert":{"exit":0,"contains":["mutation + parse-filter + score discrimination correct"]}}
 {"id":"verify-goal-backward/self-test","cmd":"node scripts/verify-goal-backward.mjs --self-test","assert":{"exit":0,"contains":["goal-backward trace correct"]}}
+{"id":"debate-trigger/self-test","cmd":"node scripts/debate-trigger.mjs --self-test","assert":{"exit":0,"contains":["analytical/decision routing correct"]}}

@@ -15,6 +15,8 @@
 //   node scripts/orchestration-planner.mjs --self-test
 //   node scripts/orchestration-planner.mjs --task '{"type":"feature","risk":"critical","surfaces":["backend","frontend"]}'
 
+import { shouldDebate } from './debate-trigger.mjs';
+
 export function plan(task = {}) {
   const { risk = 'normal', surfaces = [] } = task;
   const has = (s) => surfaces.includes(s);
@@ -43,7 +45,11 @@ export function plan(task = {}) {
   const gates = ['reflexion-critic', 'constitutional-reviewer', 'coverage-auditor', 'budget-gate', 'policy-sandbox'];
   if (has('backend')) gates.push('security-scanner');
   if (has('frontend')) gates.push('a11y-auditor', 'perf-profiler', 'visual-qa');
-  if (risk === 'critical') gates.push('debate-prosecutor', 'debate-defender', 'debate-judge', 'judge-panel', 'best-of-N-judge');
+  // adversarial debate fires whenever the task warrants it (critical risk OR an analytical/comparison/
+  // decision task), not only on critical code — debate-trigger is the single router.
+  const dbt = shouldDebate(task);
+  if (dbt.debate && dbt.mode === 'full') gates.push('debate-prosecutor', 'debate-defender', 'debate-judge');
+  if (risk === 'critical') gates.push('judge-panel', 'best-of-N-judge');
   phases.push({ phase: 'gate', parallel: true, agents: gates });
   phases.push({ phase: 'debug', agents: ['debug-agent'] });
 
