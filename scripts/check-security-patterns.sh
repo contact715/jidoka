@@ -75,7 +75,7 @@ if command -v semgrep >/dev/null 2>&1; then
   fi
 else
   # SURFACED SKIP — not a silent vacuous pass.
-  echo "SKIP: semgrep not in PATH — SAST not run locally. CI gate (security-gate.yml) handles this via returntocorp/semgrep-action."
+  echo "SKIP: semgrep not in PATH — SAST not run locally. The CI gate .github/workflows/security-gate.yml runs semgrep (OWASP/ts/react/secrets) + trufflehog on every push/PR, so SAST is enforced there."
 fi
 
 if [ "$EXIT" -eq 0 ]; then

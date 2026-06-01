@@ -1,0 +1,45 @@
+# Security gate — real SAST (semgrep) + secret scan (trufflehog) on every push/PR.
+#
+# WHY THIS EXISTS: check-security-patterns.sh runs grep-pattern checks and surfaces a SKIP for
+# semgrep when the binary is absent locally, pointing here ("CI gate security-gate.yml handles it").
+# Until this file existed that reference was a ghost — SAST ran nowhere. Now it is real: semgrep
+# (OSS rulesets, no token needed) + trufflehog run in CI and fail the build on findings.
+name: security-gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  semgrep-sast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: install semgrep
+        run: pip install semgrep
+      - name: semgrep SAST (OWASP + typescript + react + secrets)
+        # OSS registry rulesets, no SEMGREP_APP_TOKEN required. --error fails the build on findings.
+        run: |
+          semgrep scan \
+            --config p/owasp-top-ten --config p/typescript --config p/react --config p/secrets \
+            --exclude node_modules --exclude .next --error --quiet || {
+              echo "::error::semgrep found high/critical findings — fix before merge.";
+              exit 1;
+            }
+
+  trufflehog-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history: scan every commit for leaked secrets
+      - name: trufflehog secret scan (verified only)
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          extra_args: --only-verified --fail
