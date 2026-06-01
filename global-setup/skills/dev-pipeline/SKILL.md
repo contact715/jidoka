@@ -27,6 +27,23 @@ the spec system is `HIERARCHICAL_SPEC_SYSTEM.md`, the mission/constitution are a
 > архитекторов; critical backend → + дебаты + security; нет frontend → без a11y/visual-qa). Не гоняй
 > полный поток на тривиальной правке — пусть планировщик соберёт минимальный граф.
 
+> **Resumable run-state (журнал прогона на диске, переживает сброс контекста).** Скрипт: в продукте
+> `<проект>/.jidoka/scripts/run-state.mjs`, в самом фреймворке `scripts/run-state.mjs`. В начале
+> нетривиальной волны заведи журнал: `run-state.mjs --init <wave-id> --task '{"risk":"..","surfaces":[..]}'`
+> (фазы берутся из того же `plan()`, что и граф выше: единый источник, не вторая правда). После КАЖДОЙ
+> фазы двигай: `run-state.mjs --advance <wave-id> --phase <discovery|spec|tests|build|gate|debug|memory>
+> --status done|failed [--note ".."]`. В НАЧАЛЕ каждой сессии (особенно после сброса контекста) ПЕРВЫМ
+> делом `run-state.mjs --resume`: он скажет, какие фазы сделаны и какую диспатчить следующей. Это позиция
+> прогона, не память (durable-уроки остаются в mcp__memory).
+
+> **Adversarial debate / AI-war (системный рефлекс, не только для кода).** На аналитических,
+> сравнительных и решающих вопросах прогони роутер: `scripts/debate-trigger.mjs --task '{"prompt":"<вопрос>"}'`
+> (в продукте `.jidoka/scripts/`). Если он говорит debate (full), ПРЕЖДЕ чем дать ответ, прогони
+> состязание: две независимые стороны на реальных данных (prosecutor против defender) затем судья,
+> запись через `scripts/debate-engine.mjs`. Если panel (N вариантов) — judge-panel / best-of-N.
+> «Сравни X и Y», «стоит ли Z», «оцени/проанализируй» — ровно те случаи, где один прогон без оппонента
+> ненадёжен (этот GSD-vs-jidoka разбор так и делался). Механические правки дебаты не получают.
+
 0. **North Star — общая цель и философия продукта (САМЫМ ПЕРВЫМ).** До бизнес-вопросов конкретной
    фичи проверь: есть ли у продукта `docs/NORTH_STAR.md`? Нет → CPO заполняет его из
    `docs/NORTH_STAR_TEMPLATE.md` (или глобального `~/.claude/jidoka/NORTH_STAR_TEMPLATE.md`), задавая вопросы о бизнес-цели (зачем продукт существует, цель на

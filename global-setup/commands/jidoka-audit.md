@@ -1,5 +1,6 @@
 ---
 description: Meta-mistake audit + ghost detector — recurrence, regressions, declaration-over-implementation
+allowed-tools: Read, Bash
 ---
 Run the jidoka integrity audits and report honestly:
 1. `node scripts/instantiation-audit.mjs` — ghost mechanisms (declared but not real). Must be 0.

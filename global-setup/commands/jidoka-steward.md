@@ -1,5 +1,6 @@
 ---
 description: Project federation status — North Star, Integrity Charter, and the steward's defense readiness
+allowed-tools: Read, Bash
 ---
 Report the federation/integrity status of the CURRENT project (the one in cwd, not the framework):
 1. North Star: `node ~/.claude/jidoka/scripts/northstar-check.mjs --doc docs/NORTH_STAR.md` (exists + complete?).
