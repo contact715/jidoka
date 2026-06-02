@@ -76,6 +76,9 @@ function selfTest() {
   const rev = (a) => [...a].reverse();
   ok('invariant: reverse(reverse(a)) === a', forAll(gens.array(gens.int(0, 9)), (a) => JSON.stringify(rev(rev(a))) === JSON.stringify(a), { runs: 300 }).ok === true);
 
+  // mutation-hardening: pin the < 0.5 threshold in gens.bool with a controlled rng (so < cannot flip to >=)
+  ok('gens.bool pins the <0.5 threshold (rng<0.5 → true, rng≥0.5 → false)', gens.bool()(() => 0.3) === true && gens.bool()(() => 0.7) === false);
+
   if (fails.length) { console.log(`\n\x1b[31mproperty-test self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ property-test: forAll + generators + deterministic counterexamples correct\x1b[0m');
   process.exit(0);

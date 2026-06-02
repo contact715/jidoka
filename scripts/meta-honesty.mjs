@@ -19,7 +19,10 @@
 // Three signal indicators, each with a direction that means "honest":
 //   external-catch ratio ↑   contra-evidence ratio ↑   inflated-claim rate ↓
 //
-// Usage: node scripts/meta-honesty.mjs      (META_LEDGER overrides the ledger path)
+// FULL & self-tested. The logic (contradicts / classifyRow / auditRows / verdictOf) is pure and unit-
+// tested via --self-test; the CLI reads the ledger and prints. (Body wrapped in isMain — it used to run
+// on import, the cli-side-effect-on-import smell.) Usage: node scripts/meta-honesty.mjs [--self-test]
+//   (META_LEDGER overrides the ledger path)
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { loadLedger } from './meta-lib.mjs';
@@ -33,11 +36,11 @@ const DONE_SYNONYMS = new Set(['done', 'finished', 'completed', 'complete', 'acc
 const EXTERNAL = new Set(['user', 'reviewer', 'review', 'test', 'tests', 'hook', 'ci', 'human', 'qa', 'gate', 'auditor', 'lint']);
 const NEGATIVE_MARKERS = ['went wrong', 'missed', 'mistake', 'failed', 'failure', 'gap', 'should have', 'regression', 'bug', 'broke', 'wrong', 'didn\'t', 'did not', 'overlooked', 'forgot'];
 
-const words = s => new Set(String(s).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 3));
+export const words = s => new Set(String(s).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 3));
 
 // A real mistake's `real` must say something the `claim` did not. If it introduces
 // fewer than 2 novel content words, it's restating the claim — a tautology, not a finding.
-function contradicts(claimed, real) {
+export function contradicts(claimed, real) {
   const r = String(real).trim().toLowerCase();
   if (r.length < 8 || VAGUE_REAL.has(r)) return false;
   const c = words(claimed), rw = words(real);
@@ -48,65 +51,123 @@ function contradicts(claimed, real) {
   return novel >= 2;
 }
 
-const rows = loadLedger();
-if (rows.length === 0) { console.log('meta-honesty: ledger empty — no signal to audit.'); process.exit(0); }
-
-let selfConfirming = 0, inflated = 0, selfReported = 0;
-console.log(`meta-honesty: auditing signal quality of ${rows.length} ledger entry(ies)\n`);
-
-for (const r of rows) {
-  if (!contradicts(r.claimed, r.real)) {
-    selfConfirming++;
-    console.log(`\x1b[31m🔴 self-confirming (garbage-in): ${r.date} [${r.class}]\x1b[0m`);
-    console.log(`     claimed: "${r.claimed}"`);
-    console.log(`     real:    "${r.real}"  → real does not contradict the claim; this is not a logged mistake.\n`);
-  }
-  const hit = INFLATED.find(w => String(r.claimed).toLowerCase().includes(w));
-  if (hit) {
-    inflated++;
-    console.log(`\x1b[33m🟡 inflated claim: ${r.date} [${r.class}] — "${hit}" asserts confidence without a proof artifact.\x1b[0m`);
-  }
+// per-entry honesty flags (pure): the three signals for one ledger row
+export function classifyRow(r) {
   const by = String(r.caught_by || '').toLowerCase();
-  if (!by || !EXTERNAL.has(by)) {
-    selfReported++;
-    console.log(`\x1b[33m🟡 self-reported: ${r.date} [${r.class}] — caught_by="${r.caught_by || '∅'}" (no external falsification).\x1b[0m`);
-  }
+  return {
+    selfConfirming: !contradicts(r.claimed, r.real),
+    inflated: INFLATED.find(w => String(r.claimed).toLowerCase().includes(w)) || null,
+    selfReported: !by || !EXTERNAL.has(by),
+  };
 }
 
-// ---- optional retro honesty ----
-let retroFlags = 0, retroTotal = 0;
-if (existsSync('docs/retros')) {
-  const files = readdirSync('docs/retros').filter(f => f.endsWith('.md') && !f.startsWith('_'));
-  for (const f of files) {
-    retroTotal++;
-    const text = readFileSync(`docs/retros/${f}`, 'utf8').toLowerCase();
-    if (!NEGATIVE_MARKERS.some(m => text.includes(m))) {
-      retroFlags++;
-      console.log(`\x1b[33m🟡 sycophantic retro: docs/retros/${f} — zero honest-negative markers (no miss/gap/mistake/regression).\x1b[0m`);
+// aggregate signal indicators over the whole ledger (pure)
+export function auditRows(rows) {
+  let selfConfirming = 0, inflated = 0, selfReported = 0;
+  for (const r of rows) {
+    const c = classifyRow(r);
+    if (c.selfConfirming) selfConfirming++;
+    if (c.inflated) inflated++;
+    if (c.selfReported) selfReported++;
+  }
+  const n = rows.length || 1;
+  return {
+    selfConfirming, inflated, selfReported,
+    externalRatio: Math.round((100 * (rows.length - selfReported)) / n),
+    contraRatio: Math.round((100 * (rows.length - selfConfirming)) / n),
+    inflatedRate: Math.round((100 * inflated) / n),
+  };
+}
+
+// the verdict thresholds (pure): garbage-in blocks; weak signal warns; else trustworthy
+export function verdictOf({ selfConfirming, externalRatio, inflatedRate }) {
+  if (selfConfirming > 0) return 'COMPROMISED';
+  if (externalRatio < 50 || inflatedRate > 30) return 'WEAK-SIGNAL';
+  return 'TRUSTWORTHY';
+}
+
+function selfTest() {
+  const fails = [];
+  const ok = (n, c) => { if (!c) fails.push(n); console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };
+
+  // contradicts — the core garbage-in guard
+  ok('contradicts: 2+ novel content words → true', contradicts('private data cleaned', 'git history still leaked home paths and a personal name') === true);
+  ok('contradicts: vague real ("done") → false', contradicts('the feature is done', 'done') === false);
+  ok('contradicts: short real (<8 chars) → false', contradicts('all tests pass', 'yep ok') === false);
+  ok('contradicts: synonym-pile (all novel words are done-synonyms) → false', contradicts('all tests pass', 'all tests passing verified confirmed successfully') === false);
+  ok('contradicts: only 1 novel content word → false', contradicts('the gate is wired and working', 'the gate is wired') === false);
+  // words — content-word tokenizer (keeps >3-char words)
+  ok('words: keeps >3-char words, drops ≤3-char', words('the cat ran faster').has('faster') && !words('the cat').has('cat'));
+  // classifyRow — per-entry flags
+  ok('classifyRow: externally-caught, contradicting entry is clean', (() => { const c = classifyRow({ claimed: 'data cleaned ready', real: 'git history still leaked home paths and name', caught_by: 'user' }); return c.selfConfirming === false && c.selfReported === false; })());
+  ok('classifyRow: self-caught tautology flags both', (() => { const c = classifyRow({ claimed: 'done', real: 'done', caught_by: 'self' }); return c.selfConfirming === true && c.selfReported === true; })());
+  ok('classifyRow: booster word flags inflated', classifyRow({ claimed: 'comprehensive coverage added', real: 'only one path was covered actually', caught_by: 'user' }).inflated === 'comprehensive');
+  // auditRows — aggregation
+  ok('auditRows: ratios computed', (() => { const a = auditRows([{ claimed: 'x done', real: 'real reason it broke in prod clearly', caught_by: 'user' }]); return a.externalRatio === 100 && a.contraRatio === 100; })());
+  // verdictOf — the three thresholds + strict boundaries
+  ok('verdictOf: any self-confirming → COMPROMISED', verdictOf({ selfConfirming: 1, externalRatio: 100, inflatedRate: 0 }) === 'COMPROMISED');
+  ok('verdictOf: external <50 → WEAK-SIGNAL', verdictOf({ selfConfirming: 0, externalRatio: 40, inflatedRate: 0 }) === 'WEAK-SIGNAL');
+  ok('verdictOf: inflated >30 → WEAK-SIGNAL', verdictOf({ selfConfirming: 0, externalRatio: 100, inflatedRate: 40 }) === 'WEAK-SIGNAL');
+  ok('verdictOf: clean → TRUSTWORTHY', verdictOf({ selfConfirming: 0, externalRatio: 80, inflatedRate: 10 }) === 'TRUSTWORTHY');
+  ok('verdictOf: exactly 50% external is NOT weak (strict <)', verdictOf({ selfConfirming: 0, externalRatio: 50, inflatedRate: 0 }) === 'TRUSTWORTHY');
+  ok('verdictOf: exactly 30% inflated is NOT weak (strict >)', verdictOf({ selfConfirming: 0, externalRatio: 100, inflatedRate: 30 }) === 'TRUSTWORTHY');
+
+  ok('auditRows: ratio denominator is the row count (2 rows, 1 external → 50%)', auditRows([{ claimed: 'a done', real: 'real reason it broke in prod clearly', caught_by: 'user' }, { claimed: 'b done', real: 'another distinct failure cause found here', caught_by: 'self' }]).externalRatio === 50);
+
+  if (fails.length) { console.log(`\n\x1b[31mmeta-honesty self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
+  console.log('\n\x1b[32m✓ meta-honesty: contradicts + classify + verdict logic correct\x1b[0m');
+  process.exit(0);
+}
+
+const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
+if (isMain) {
+  if (process.argv.includes('--self-test')) selfTest();
+
+  const rows = loadLedger();
+  if (rows.length === 0) { console.log('meta-honesty: ledger empty — no signal to audit.'); process.exit(0); }
+
+  console.log(`meta-honesty: auditing signal quality of ${rows.length} ledger entry(ies)\n`);
+  for (const r of rows) {
+    const c = classifyRow(r);
+    if (c.selfConfirming) {
+      console.log(`\x1b[31m🔴 self-confirming (garbage-in): ${r.date} [${r.class}]\x1b[0m`);
+      console.log(`     claimed: "${r.claimed}"`);
+      console.log(`     real:    "${r.real}"  → real does not contradict the claim; this is not a logged mistake.\n`);
+    }
+    if (c.inflated) console.log(`\x1b[33m🟡 inflated claim: ${r.date} [${r.class}] — "${c.inflated}" asserts confidence without a proof artifact.\x1b[0m`);
+    if (c.selfReported) console.log(`\x1b[33m🟡 self-reported: ${r.date} [${r.class}] — caught_by="${r.caught_by || '∅'}" (no external falsification).\x1b[0m`);
+  }
+
+  // ---- optional retro honesty ----
+  let retroFlags = 0, retroTotal = 0;
+  if (existsSync('docs/retros')) {
+    const files = readdirSync('docs/retros').filter(f => f.endsWith('.md') && !f.startsWith('_'));
+    for (const f of files) {
+      retroTotal++;
+      const text = readFileSync(`docs/retros/${f}`, 'utf8').toLowerCase();
+      if (!NEGATIVE_MARKERS.some(m => text.includes(m))) {
+        retroFlags++;
+        console.log(`\x1b[33m🟡 sycophantic retro: docs/retros/${f} — zero honest-negative markers (no miss/gap/mistake/regression).\x1b[0m`);
+      }
     }
   }
+
+  // ---- indicators ----
+  const ind = auditRows(rows);
+  console.log('\n\x1b[1m  signal indicators\x1b[0m');
+  console.log(`    external-catch ratio ... ${ind.externalRatio}% (${rows.length - ind.selfReported}/${rows.length} caught externally, not self)   want ↑`);
+  console.log(`    contra-evidence ratio .. ${ind.contraRatio}% (${rows.length - ind.selfConfirming}/${rows.length} entries whose real contradicts the claim)   want ↑`);
+  console.log(`    inflated-claim rate .... ${ind.inflatedRate}% (${ind.inflated}/${rows.length} claims use unverifiable booster words)   want ↓`);
+  if (retroTotal) console.log(`    retro honesty .......... ${retroTotal - retroFlags}/${retroTotal} retros carry an honest negative`);
+
+  // ---- verdict ----
+  const verdict = verdictOf(ind);
+  const [why, color] = verdict === 'COMPROMISED'
+    ? [`${ind.selfConfirming} self-confirming entry(ies) poison the ledger — remove or rewrite them before the engine learns from flattery`, 31]
+    : verdict === 'WEAK-SIGNAL'
+      ? ['too much self-assessment or booster language — get an external check to falsify the claim', 33]
+      : ['misses contradict their claims and are mostly externally caught', 32];
+  console.log(`\n\x1b[${color}m  verdict: ${verdict}\x1b[0m — ${why}`);
+
+  process.exit(ind.selfConfirming > 0 ? 1 : 0); // block only on garbage-in; weak-signal warns
 }
-
-// ---- indicators ----
-const externalRatio = Math.round((100 * (rows.length - selfReported)) / rows.length);
-const contraRatio = Math.round((100 * (rows.length - selfConfirming)) / rows.length);
-const inflatedRate = Math.round((100 * inflated) / rows.length);
-
-console.log('\n\x1b[1m  signal indicators\x1b[0m');
-console.log(`    external-catch ratio ... ${externalRatio}% (${rows.length - selfReported}/${rows.length} caught externally, not self)   want ↑`);
-console.log(`    contra-evidence ratio .. ${contraRatio}% (${rows.length - selfConfirming}/${rows.length} entries whose real contradicts the claim)   want ↑`);
-console.log(`    inflated-claim rate .... ${inflatedRate}% (${inflated}/${rows.length} claims use unverifiable booster words)   want ↓`);
-if (retroTotal) console.log(`    retro honesty .......... ${retroTotal - retroFlags}/${retroTotal} retros carry an honest negative`);
-
-// ---- verdict ----
-let verdict, why, color;
-if (selfConfirming > 0) {
-  [verdict, why, color] = ['COMPROMISED', `${selfConfirming} self-confirming entry(ies) poison the ledger — remove or rewrite them before the engine learns from flattery`, 31];
-} else if (externalRatio < 50 || inflatedRate > 30) {
-  [verdict, why, color] = ['WEAK-SIGNAL', 'too much self-assessment or booster language — get an external check to falsify the claim', 33];
-} else {
-  [verdict, why, color] = ['TRUSTWORTHY', 'misses contradict their claims and are mostly externally caught', 32];
-}
-console.log(`\n\x1b[${color}m  verdict: ${verdict}\x1b[0m — ${why}`);
-
-process.exit(selfConfirming > 0 ? 1 : 0); // block only on garbage-in; weak-signal warns

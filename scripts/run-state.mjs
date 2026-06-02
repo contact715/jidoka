@@ -161,6 +161,15 @@ function selfTest() {
     ok('IO: latestWave picks most-recently-updated', latestWave(tmp) === 'wave-newer');
   } finally { rmSync(tmp, { recursive: true, force: true }); }
 
+  // mutation-hardening: pin the three operator branches that survived — note preservation (note || p.note),
+  // the agents-join fallback (agents.join || '(no agents)'), and the 'running' verb (status === 'running').
+  const nn = advanceState(advanceState(initState('wv-mh', { risk: 'normal', surfaces: ['backend'] }), 'discovery', 'done', 'first note'), 'discovery', 'done', '');
+  ok('advance: re-advancing with empty note keeps the prior note (note || p.note)', nn.phases.find(p => p.phase === 'discovery').note === 'first note');
+  ok("nextStep: a 'running' phase message says 'in progress' (status === 'running')", /in progress/.test(nextStep(advanceState(initState('wv-r', { risk: 'normal', surfaces: ['backend'] }), 'discovery', 'running')).message));
+  const bs = (() => { let x = initState('wv-a', { risk: 'normal', surfaces: ['backend'] }); for (const p of x.phases) { if (p.phase === 'build') break; x = advanceState(x, p.phase, 'done'); } return x; })();
+  const bp = bs.phases.find(p => p.phase === 'build');
+  ok('nextStep: message names the agents, not "(no agents)" (agents.join || fallback)', bp.agents.length > 0 && !/\(no agents\)/.test(nextStep(bs).message));
+
   if (fails.length) { console.log(`\n\x1b[31mrun-state self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ run-state: journal init/advance/resume/render correct\x1b[0m');
   process.exit(0);

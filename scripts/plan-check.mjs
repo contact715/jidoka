@@ -62,6 +62,12 @@ function selfTest() {
 
   ok('goal dimension added when a goal is given', checkPlan(composePlan({ risk: 'normal', surfaces: ['backend'] }), { goal: { objectives: [{ id: 'A' }] } }).dimensions.some((d) => /goal has objectives/.test(d.name)));
 
+  // mutation-hardening: the goal dimension is `build && gate` — pin it with a plan that has build but
+  // NO gate, so the && cannot silently become || (which would pass a goal plan that can't be verified).
+  const buildNoGate = { task: { risk: 'normal' }, phases: [{ phase: 'build', agents: ['x'] }, { phase: 'memory', agents: ['m'] }] };
+  const goalDim = checkPlan(buildNoGate, { goal: { objectives: [{ id: 'A' }] } }).dimensions.find((d) => /goal has objectives/.test(d.name));
+  ok('goal dimension FAILS when plan has build but no gate (&& not ||)', !!goalDim && goalDim.ok === false);
+
   if (fails.length) { console.log(`\n\x1b[31mplan-check self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ plan-check: pre-execution plan dimensions correct\x1b[0m');
   process.exit(0);

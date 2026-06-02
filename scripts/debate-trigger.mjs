@@ -62,6 +62,14 @@ function selfTest() {
   ok('mechanical "fix typo in README" → none', shouldDebate({ prompt: 'fix a typo in the README' }).debate === false);
   ok('mechanical "add a field to the form" → none', shouldDebate({ prompt: 'add an email field to the signup form' }).debate === false);
   ok('single option is not a panel', shouldDebate({ prompt: 'do x', options: ['only-one'] }).debate === false);
+  // mutation-hardening: pin the debate FLAG (not just mode) on every positive branch, and the
+  // title/type signal paths (the `|| ''` defaults), so any operator flip in shouldDebate is caught.
+  ok('panel branch sets debate=true (not just mode)', shouldDebate({ options: ['a', 'b'] }).debate === true);
+  ok('critical branch sets debate=true', shouldDebate({ risk: 'critical' }).debate === true);
+  ok('DEBATE_TYPE branch sets debate=true', shouldDebate({ type: 'comparison' }).debate === true);
+  ok('signal in TITLE alone → debate (title default path)', shouldDebate({ title: 'compare these two vendors' }).debate === true);
+  ok('signal in free-text TYPE alone → debate (type default path)', shouldDebate({ type: 'compare the options' }).debate === true);
+  ok('explicit debate:false with no signal → debate=false + mode none', shouldDebate({ debate: false }).debate === false && shouldDebate({ debate: false }).mode === 'none');
 
   if (fails.length) { console.log(`\n\x1b[31mdebate-trigger self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ debate-trigger: analytical/decision routing correct\x1b[0m');

@@ -35,20 +35,52 @@ const OPS = [
 
 const mk = (src, index, from, to) => ({ index, from, to, line: src.slice(0, index).split('\n').length, mutated: src.slice(0, index) + to + src.slice(index + from.length) });
 
-// pure: every single-point mutant of src (one operator flip each), in source order, capped at max
+// mark every character that is NOT executable code — inside a string literal ('...', "...", `...`)
+// OR inside a comment (// line, /* block */). Operators/booleans there are EQUIVALENT mutants (flipping
+// a reason message or a comment changes no behaviour), so counting them as survivors is noise. Comments
+// MUST be handled: an apostrophe in a comment ("architect's") would otherwise open a phantom string and
+// mask real code after it. A four-state forward scan (code/str/line/block); \-escapes handled in strings.
+// Boundary: does not special-case regex literals — fine here as no regex in the engine contains a quote.
+export function stringMask(src) {
+  const mask = new Uint8Array(src.length);
+  let state = 'code', q = null;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i], n = src[i + 1];
+    if (state === 'code') {
+      if (c === '/' && n === '/') { state = 'line'; mask[i] = 1; }
+      else if (c === '/' && n === '*') { state = 'block'; mask[i] = 1; }
+      else if (c === '"' || c === "'" || c === '`') { state = 'str'; q = c; mask[i] = 1; }
+    } else if (state === 'str') {
+      mask[i] = 1;
+      if (c === '\\') { if (i + 1 < src.length) mask[i + 1] = 1; i++; }
+      else if (c === q) { state = 'code'; q = null; }
+    } else if (state === 'line') {
+      mask[i] = 1;
+      if (c === '\n') state = 'code';
+    } else if (state === 'block') {
+      mask[i] = 1;
+      if (c === '*' && n === '/') { mask[i + 1] = 1; i++; state = 'code'; }
+    }
+  }
+  return mask;
+}
+
+// pure: every single-point mutant of src (one operator flip each), in source order, capped at max.
+// Mutations inside string literals are skipped (equivalent-mutant noise).
 export function mutate(src, max = Infinity) {
   const mutants = [];
+  const mask = stringMask(src);
   for (const op of OPS) {
     if (op.word) {
       for (const m of src.matchAll(new RegExp(`\\b${op.from}\\b`, 'g'))) {
+        if (mask[m.index]) continue;
         mutants.push(mk(src, m.index, op.from, op.to));
         if (mutants.length >= max) return mutants;
       }
     } else {
       let i = src.indexOf(op.from);
       while (i !== -1) {
-        mutants.push(mk(src, i, op.from, op.to));
-        if (mutants.length >= max) return mutants;
+        if (!mask[i]) { mutants.push(mk(src, i, op.from, op.to)); if (mutants.length >= max) return mutants; }
         i = src.indexOf(op.from, i + op.from.length);
       }
     }
@@ -60,10 +92,11 @@ export const scoreOf = ({ killed, survived }) => (killed + survived ? killed / (
 
 export function runMutants(file, { max = 60, testCmd } = {}) {
   const src = readFileSync(file, 'utf8');
-  // Only mutate the LIBRARY region (above the `const isMain` / import.meta CLI guard). The CLI block
-  // is glue that --self-test never executes, so mutating it yields un-killable mutants that unfairly
-  // depress the score. Stated boundary; the score reflects the tested logic, not the I/O wrapper.
-  const guard = src.search(/\n(const isMain|if \(import\.meta|if \(process\.argv\[1\])/);
+  // Only mutate the LIBRARY region (above `function selfTest(` and the `const isMain` / import.meta CLI
+  // guard). The selfTest body is the TEST itself (mutating its own assertions yields un-killable mutants)
+  // and the CLI block is glue --self-test never executes; counting either unfairly depresses the score.
+  // Stated boundary: the score reflects the exported LOGIC's test gaps, not the test harness or I/O wrapper.
+  const guard = src.search(/\n(function selfTest\b|const isMain|if \(import\.meta|if \(process\.argv\[1\])/);
   const regionEnd = guard === -1 ? src.length : guard;
   const mutants = mutate(src).filter(m => m.index < regionEnd).slice(0, max);
   const tmp = mkdtempSync(join(tmpdir(), 'jidoka-mut-'));
@@ -112,6 +145,10 @@ function selfTest() {
   ok('mutate flips && to ||', ms.some(m => m.from === '&&' && m.to === '||'));
   ok('mutate flips true to false', ms.some(m => m.from === 'true' && m.to === 'false'));
   ok('mutate respects max', mutate('a === b === c === d', 2).length === 2);
+  const strMut = mutate("const s = 'true === false'; const c = a && b;");
+  ok('skips operators/booleans inside string literals (equivalent-mutant noise)', strMut.length === 1 && strMut[0].from === '&&');
+  const cmtMut = mutate("// don't mutate: a && b\nlet z = c === d;");
+  ok('comment (with apostrophe) does not mask the code after it', cmtMut.some(m => m.from === '===') && !cmtMut.some(m => m.from === '&&'));
   ok('mutant carries a line number', ms.every(m => m.line >= 1));
   ok('score = killed/(killed+survived)', scoreOf({ killed: 3, survived: 1 }) === 0.75);
   ok('score null when no valid mutants', scoreOf({ killed: 0, survived: 0 }) === null);
