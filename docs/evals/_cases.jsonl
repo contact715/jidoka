@@ -83,3 +83,4 @@
 {"id":"prod-harvest/self-test","cmd":"node scripts/prod-harvest.mjs --self-test","assert":{"exit":0,"contains":["incident → benchmark task conversion correct"]}}
 {"id":"skill-coverage/self-test","cmd":"node scripts/skill-coverage.mjs --self-test","assert":{"exit":0,"contains":["superpowers coverage audit correct"]}}
 {"id":"cost-ledger/self-test","cmd":"node scripts/cost-ledger.mjs --self-test","assert":{"exit":0,"contains":["daily-limit ledger + amplification guard correct"]}}
+{"id":"footprint-audit/self-test","cmd":"node scripts/footprint-audit.mjs --self-test","assert":{"exit":0,"contains":["dead-install + redundancy detection correct"]}}

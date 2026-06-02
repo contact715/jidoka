@@ -23,6 +23,7 @@ import { copyFileSync, mkdirSync, existsSync, readFileSync, writeFileSync, appen
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
+import { detectNativeFramework, nativeSignals, auditInstall } from './footprint-audit.mjs';
 
 const HERE = dirname(dirname(fileURLToPath(import.meta.url))); // framework root
 
@@ -109,6 +110,19 @@ const log = m => console.log(m);
 const isGit = (() => { try { execSync('git rev-parse --is-inside-work-tree', { cwd: target, stdio: 'ignore' }); return true; } catch { return false; } })();
 
 log(`\n\x1b[1minstall-into:\x1b[0m ${target}  (git: ${isGit ? 'yes' : 'NO'}, frontend: ${isFrontend})\n`);
+
+// ── 0. Pre-install survey (necessity check) ──────────────────────────────────
+// Before copying ANYTHING, ask the question that was missing when this whole thing was built: does the
+// target ALREADY have its own equivalent framework? If yes, a blind full install just duplicates it
+// (the Mosco incident: 51 scripts copied next to Mosco's own native framework, 45 went dead). Warn and
+// recommend the minimal profile — do not silently full-install over an existing framework.
+const preNative = detectNativeFramework(nativeSignals(target));
+if (preNative.hasOwn && profile !== 'core') {
+  log(`  \x1b[33m⚠ target already has its own framework\x1b[0m (${preNative.signals.join(', ')}).`);
+  log(`    A '${profile}' install will copy gates this target likely already runs → dead duplication.`);
+  log(`    Recommended: --profile=core (kernel only), or install ONLY the specific gates it lacks and wire them.`);
+  log(`    Proceeding with '${profile}' as requested — the post-install footprint audit below will show what went dead.\n`);
+}
 
 // ── 1. Copy the portable core (proportional: --profile=core|standard|full) ────
 // Self-learning engine + secret guard. NOT instantiation-audit (framework-self-specific).
@@ -223,7 +237,8 @@ exit 0
 
 // ── 5. Wire npm scripts if package.json exists ───────────────────────────────
 if (existsSync(T('package.json'))) {
-  const pkg = JSON.parse(readFileSync(T('package.json'), 'utf8'));
+  const pkgRaw = readFileSync(T('package.json'), 'utf8');
+  const pkg = JSON.parse(pkgRaw);
   pkg.scripts ||= {};
   const add = {
     'jidoka:audit': 'node .jidoka/scripts/meta-audit.mjs',
@@ -235,8 +250,18 @@ if (existsSync(T('package.json'))) {
   };
   let added = 0;
   for (const [k, v] of Object.entries(add)) if (!pkg.scripts[k]) { pkg.scripts[k] = v; added++; }
-  writeFileSync(T('package.json'), JSON.stringify(pkg, null, 2) + '\n');
-  log(`  ✓ wired ${added} npm script(s): npm run jidoka:audit / honesty / trend / log / premortem / guard`);
+  if (added) {
+    // PRESERVE the target's existing indentation (tab vs N spaces) instead of forcing 2-space. Forcing
+    // it reformats the whole file → a 300-line whitespace diff on a shared file (the real noise hit on
+    // the Mosco install, fixed by hand). Detect the first indented line; reuse its indent. Only rewrite
+    // when something was actually added, so a re-run is a true no-op (idempotent, zero churn).
+    const m = pkgRaw.match(/\n([\t ]+)\S/);
+    const indent = m ? (m[1].includes('\t') ? '\t' : m[1].length) : 2;
+    writeFileSync(T('package.json'), JSON.stringify(pkg, null, indent) + (pkgRaw.endsWith('\n') ? '\n' : ''));
+    log(`  ✓ wired ${added} npm script(s) (indent preserved): npm run jidoka:audit / honesty / trend / log / premortem / guard`);
+  } else {
+    log('  ✓ npm scripts already wired (jidoka:*) — package.json untouched (idempotent)');
+  }
 } else {
   log('  • no package.json → run engines directly: node .jidoka/scripts/meta-audit.mjs');
 }
@@ -246,4 +271,18 @@ log(`\n\x1b[32m✓ jidoka core installed into ${target}\x1b[0m`);
 log('  Next: log a mistake → `node .jidoka/scripts/meta-log.mjs <class> "<claimed>" "<real>" <caught_by>`');
 log('        then `node .jidoka/scripts/meta-audit.mjs` to see the closed loop.');
 if (isFrontend) log('  Frontend: structural gate not auto-installed (needs a baseline) — port scripts/check-structural.sh manually if wanted.');
+
+// ── 7. Footprint audit (self-policing) — did this install land on something LIVE? ─────────────
+// The mirror of instantiation-audit, for the install direction. An installed file with no caller is
+// dead-on-arrival; if the target already has its own framework, this whole install is duplication.
+// This is the gate that would have caught Mosco (45 dead of 51) AT INSTALL TIME instead of months later.
+const fp = auditInstall(target);
+log(`\n\x1b[1m▌ footprint audit\x1b[0m — ${fp.wired.length}/${fp.installed.length} installed scripts reach a live trigger (hook/CI/npm)`);
+if (fp.verdict.level === 'OK') {
+  log('  \x1b[32m✓ no dead duplication — installed gates are reachable\x1b[0m');
+} else {
+  log(`  \x1b[33m▌ ${fp.verdict.level}\x1b[0m — ${fp.verdict.msg}`);
+  log(`  \x1b[33m${fp.dead.length} script(s) have no caller in this target (${Math.round(fp.deadRatio * 100)}% dead-on-arrival).\x1b[0m`);
+  log(`  Re-audit anytime: node ${join(HERE, 'scripts', 'footprint-audit.mjs')} --target ${target}`);
+}
 process.exit(0);
