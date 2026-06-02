@@ -65,6 +65,8 @@
 		"trace:reqs": "node scripts/req-trace.mjs",
 		"gate:e2e": "node scripts/e2e-run-gate.mjs",
 		"harvest:prod": "node scripts/prod-harvest.mjs",
+		"skill:coverage": "node scripts/skill-coverage.mjs",
+		"skill:select": "node scripts/skill-selector.mjs",
 		"check:design-drift": "bash scripts/design-drift-audit.sh",
 		"check:design-drift:ratchet": "bash scripts/design-drift-audit.sh --ratchet",
 		"check:design-drift:update-baseline": "bash scripts/design-drift-audit.sh --update-baseline",

@@ -21,6 +21,16 @@ import { planN } from './adaptive-verify.mjs';
 // post-wave frontier evals the memory phase runs: outcome benchmark, trajectory score, judge calibration
 const POST_WAVE_EVAL = ['agent-benchmark', 'trajectory-score', 'judge-calibration'];
 
+// the superpowers process-skill each phase MUST load (all installed; skill-coverage keeps it honest).
+// This bakes the discipline into the phase — brainstorm before discovery, find root cause before
+// debug-fixes, verify before the gate calls it done.
+const PHASE_SKILLS = {
+  discovery: ['brainstorming'], spec: ['writing-plans'], tests: ['test-driven-development'],
+  build: ['test-driven-development'], gate: ['verification-before-completion'],
+  debug: ['systematic-debugging'], memory: ['finishing-a-development-branch'],
+};
+const attachSkills = (phases) => phases.map((p) => ({ ...p, skills: PHASE_SKILLS[p.phase] || [] }));
+
 export function plan(task = {}) {
   const { risk = 'normal', surfaces = [] } = task;
   const has = (s) => surfaces.includes(s);
@@ -31,7 +41,7 @@ export function plan(task = {}) {
     phases.push({ phase: 'build', agents: [has('backend') ? 'backend-agent' : 'frontend-agent'] });
     phases.push({ phase: 'gate', agents: ['reflexion-critic', 'budget-gate', 'policy-sandbox'], verifyN: planN(task) });
     phases.push({ phase: 'memory', agents: ['skill-extractor'] });
-    return { task, phases, postWaveEval: POST_WAVE_EVAL, note: 'trivial → minimal graph (architects skipped)' };
+    return { task, phases: attachSkills(phases), postWaveEval: POST_WAVE_EVAL, note: 'trivial → minimal graph (architects skipped)' };
   }
 
   const spec = ['chief-architect', 'micro-architect', 'macro-architect', 'surface-cartographer',
@@ -59,7 +69,7 @@ export function plan(task = {}) {
 
   if (has('deploy') || task.deploy) phases.push({ phase: 'launch', agents: ['devops-lead', 'release-engineer'] });
   phases.push({ phase: 'memory', agents: ['skill-extractor', 'data-analyst', 'kaizen-officer'] });
-  return { task, phases, postWaveEval: POST_WAVE_EVAL };
+  return { task, phases: attachSkills(phases), postWaveEval: POST_WAVE_EVAL };
 }
 
 const agentsIn = (g) => new Set(g.phases.flatMap(p => p.agents));
@@ -83,6 +93,9 @@ if (process.argv.includes('--self-test')) {
     ['gate carries adaptive verifyN (critical ≥ 3)', (critical.phases.find(p => p.phase === 'gate')?.verifyN ?? 0) >= 3],
     ['trivial gate verifyN === 1 (no wasted verification compute)', trivial.phases.find(p => p.phase === 'gate')?.verifyN === 1],
     ['plan lists post-wave frontier evals (benchmark/trajectory/calibration)', Array.isArray(critical.postWaveEval) && critical.postWaveEval.includes('agent-benchmark')],
+    ['debug phase mandates the systematic-debugging superpower', critical.phases.find(p => p.phase === 'debug')?.skills?.includes('systematic-debugging')],
+    ['spec phase mandates writing-plans', critical.phases.find(p => p.phase === 'spec')?.skills?.includes('writing-plans')],
+    ['gate phase mandates verification-before-completion', critical.phases.find(p => p.phase === 'gate')?.skills?.includes('verification-before-completion')],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
@@ -96,7 +109,7 @@ const task = JSON.parse(arg('--task') || '{"type":"feature","risk":"normal","sur
 const g = plan(task);
 if (process.argv.includes('--json')) { console.log(JSON.stringify(g)); process.exit(0); }
 console.log(`orchestration plan for ${JSON.stringify(task)}:`);
-g.phases.forEach((p, i) => console.log(`  ${i + 1}. ${p.phase}${p.parallel ? ' (parallel)' : ''}${p.verifyN ? ` [verifyN=${p.verifyN}]` : ''}: ${p.agents.join(', ')}`));
+g.phases.forEach((p, i) => console.log(`  ${i + 1}. ${p.phase}${p.parallel ? ' (parallel)' : ''}${p.verifyN ? ` [verifyN=${p.verifyN}]` : ''}: ${p.agents.join(', ')}${p.skills?.length ? `  ·  skill: ${p.skills.join(', ')}` : ''}`));
 if (g.postWaveEval) console.log(`  post-wave eval: ${g.postWaveEval.join(', ')}`);
 if (g.note) console.log(`  note: ${g.note}`);
 console.log(`  total: ${g.phases.length} phases, ${agentsIn(g).size} distinct agents`);

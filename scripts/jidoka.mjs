@@ -63,6 +63,8 @@ export const CMDS = {
   'req-trace': { s: 'req-trace.mjs', help: 'verify requirement→spec→AC→test→code→deploy traceability' },
   'e2e-gate': { s: 'e2e-run-gate.mjs', help: 'score E2E flow results and gate on failures' },
   harvest: { s: 'prod-harvest.mjs', help: 'convert a prod incident into a benchmark regression case' },
+  'skill-coverage': { s: 'skill-coverage.mjs', help: 'audit superpowers skill-library coverage' },
+  'skill-select': { s: 'skill-selector.mjs', help: 'mandate the right superpowers skill for a task signal' },
 };
 
 export function resolve(cmd) {

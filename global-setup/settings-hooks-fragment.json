@@ -30,6 +30,11 @@
             "type": "command",
             "command": "$HOME/.claude/hooks/jidoka-feature-reminder.sh",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node $HOME/claude-code-dev-framework/scripts/skill-selector.mjs --hook",
+            "timeout": 10
           }
         ]
       }
