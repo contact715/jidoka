@@ -63,3 +63,7 @@
 {"id":"dead-code/self-test","cmd":"node scripts/dead-code.mjs --self-test","assert":{"exit":0,"contains":["orphan detection correct"]}}
 {"id":"type-coverage/self-test","cmd":"node scripts/type-coverage.mjs --self-test","assert":{"exit":0,"contains":["type-escape density assessment correct"]}}
 {"id":"contract-check/self-test","cmd":"node scripts/contract-check.mjs --self-test","assert":{"exit":0,"contains":["fe↔be contract matching correct"]}}
+{"id":"agent-benchmark/self-test","cmd":"node scripts/agent-benchmark.mjs --self-test","assert":{"exit":0,"contains":["resolution scoring + verifier-runner correct"]}}
+{"id":"trajectory-score/self-test","cmd":"node scripts/trajectory-score.mjs --self-test","assert":{"exit":0,"contains":["path scoring correct"]}}
+{"id":"judge-calibration/self-test","cmd":"node scripts/judge-calibration.mjs --self-test","assert":{"exit":0,"contains":["agreement + drift detection correct"]}}
+{"id":"adaptive-verify/self-test","cmd":"node scripts/adaptive-verify.mjs --self-test","assert":{"exit":0,"contains":["N-scaling + rubric selection correct"]}}

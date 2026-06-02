@@ -45,6 +45,10 @@ export const CMDS = {
   deadcode: { s: 'dead-code.mjs', help: 'find orphaned (unreferenced) engine scripts' },
   types: { s: 'type-coverage.mjs', help: 'TS type-escape density gate (any/@ts-ignore)' },
   contract: { s: 'contract-check.mjs', help: 'fe↔be API contract gate' },
+  bench: { s: 'agent-benchmark.mjs', help: 'agent task-resolution benchmark (outcome-based)' },
+  trajectory: { s: 'trajectory-score.mjs', help: 'score an agent trajectory (path, not just outcome)' },
+  calibration: { s: 'judge-calibration.mjs', help: 'judge agreement + drift calibration' },
+  adaptive: { s: 'adaptive-verify.mjs', help: 'adaptive test-time verification (scale N by risk)' },
 };
 
 export function resolve(cmd) {

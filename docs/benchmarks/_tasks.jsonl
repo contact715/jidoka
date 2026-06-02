@@ -1,0 +1,5 @@
+{"id":"meta-honesty-honest","prompt":"The honesty gate must self-test green (contradicts/classify/verdict logic correct).","verify":{"cmd":"node scripts/meta-honesty.mjs --self-test","contains":["correct"]}}
+{"id":"runstate-resumes","prompt":"The run-journal must init, advance, and resume a wave correctly.","verify":{"cmd":"node scripts/run-state.mjs --self-test","contains":["correct"]}}
+{"id":"sandbox-kernel-block","prompt":"The kernel sandbox must block an out-of-scope write.","verify":{"cmd":"node scripts/sandbox-run.mjs --self-test","contains":["correct"]}}
+{"id":"no-ghost-gates","prompt":"Every declared CI-layer gate must be present in a workflow (no ghost gate).","verify":{"cmd":"node scripts/gate-audit.mjs","contains":["no ghost gate"]}}
+{"id":"debate-trigger-routes","prompt":"A comparison/decision question must route to an adversarial debate; a mechanical task must not.","verify":{"cmd":"node scripts/debate-trigger.mjs --self-test","contains":["routing correct"]}}
