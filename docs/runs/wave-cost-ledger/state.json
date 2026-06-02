@@ -1,0 +1,87 @@
+{
+  "wave": "wave-cost-ledger",
+  "task": {
+    "type": "feature",
+    "risk": "normal",
+    "surfaces": [
+      "backend"
+    ]
+  },
+  "phases": [
+    {
+      "phase": "discovery",
+      "status": "pending",
+      "agents": [
+        "user-researcher",
+        "product-strategist"
+      ],
+      "note": ""
+    },
+    {
+      "phase": "spec",
+      "status": "pending",
+      "agents": [
+        "chief-architect",
+        "micro-architect",
+        "macro-architect",
+        "surface-cartographer",
+        "chief-product-officer",
+        "business-process-architect",
+        "kaizen-officer"
+      ],
+      "note": ""
+    },
+    {
+      "phase": "tests",
+      "status": "pending",
+      "agents": [
+        "test-engineer"
+      ],
+      "note": ""
+    },
+    {
+      "phase": "build",
+      "status": "pending",
+      "agents": [
+        "engineering-lead",
+        "backend-agent"
+      ],
+      "note": ""
+    },
+    {
+      "phase": "gate",
+      "status": "pending",
+      "agents": [
+        "reflexion-critic",
+        "constitutional-reviewer",
+        "coverage-auditor",
+        "budget-gate",
+        "policy-sandbox",
+        "security-scanner"
+      ],
+      "note": ""
+    },
+    {
+      "phase": "debug",
+      "status": "pending",
+      "agents": [
+        "debug-agent"
+      ],
+      "note": ""
+    },
+    {
+      "phase": "memory",
+      "status": "pending",
+      "agents": [
+        "skill-extractor",
+        "data-analyst",
+        "kaizen-officer"
+      ],
+      "note": ""
+    }
+  ],
+  "current": "discovery",
+  "events": [],
+  "createdAt": "2026-06-02T15:47:48.375Z",
+  "updatedAt": "2026-06-02T15:47:48.375Z"
+}

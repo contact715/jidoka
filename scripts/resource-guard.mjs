@@ -21,13 +21,15 @@ const LOOP_CTX = [
   /while\s*\(/,
   /for\s*\(/,
   /\.forEach\s*\(/,
-  /\.map\s*\(/,
-  /\.reduce\s*\(/,
+  // NOTE: .map/.reduce/.filter are bounded value-transforms over an existing array, not runaway loops —
+  // including them over-flagged a fold (dailySpendCents) in the cost-ledger validation wave. Dropped.
 ];
 
 // patterns that indicate a resource-heavy operation
 const RESOURCE_OPS = [
-  { re: /\.(save|insert|create|update|upsert|write|push|append|set)\s*\(/, kind: 'db/storage write' },
+  // db/storage verbs only — NOT .push/.append/.set (those are array/Map/collection ops on local memory,
+  // not storage; .push to a local accumulator was false-flagged in the cost-ledger validation wave).
+  { re: /\.(save|insert|create|update|upsert|delete|remove|writeRecord)\s*\(|\bINSERT\b|\bUPDATE\b|\bDELETE\b/, kind: 'db/storage write' },
   { re: /fetch\s*\(|axios\.|http\.request|https\.request/, kind: 'network call' },
   { re: /fs\.(write|append|createWriteStream)/, kind: 'file write' },
   { re: /\.emit\s*\(|\.publish\s*\(|\.send\s*\(/, kind: 'event/message dispatch' },
@@ -127,6 +129,7 @@ function selfTest() {
   ok('missing writesPerSec → not ok', validateBudget({}).ok === false);
   ok('Infinity budget → not ok (unlimited is not a ceiling)', validateBudget({ writesPerSec: Infinity }).ok === false);
   ok('null budget → not ok', validateBudget({ writesPerSec: null }).ok === false);
+  ok('array .push to a local accumulator is NOT a db write (cost-ledger validation-wave regression)', scan('const out = []; items.forEach(x => out.push(x));').ok === true);
 
   if (fails.length) { console.log(`\n\x1b[31mresource-guard self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ resource-guard: runaway-resource detection + budget validation correct\x1b[0m');

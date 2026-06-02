@@ -48,6 +48,7 @@ export const GATES = [
   { id: 'load-test-gate', layer: 'product', mode: 'hard', token: null },
   { id: 'canary-gate', layer: 'product', mode: 'hard', token: null },
   { id: 'e2e-run-gate', layer: 'product', mode: 'hard', token: null },
+  { id: 'cost-ledger', layer: 'product', mode: 'hard', token: null },
   // soft-trial — warn until graduated (gate-graduation proposes the flip)
   { id: 'spec-drift', layer: 'product', mode: 'soft', token: null },
   { id: 'detect-injection', layer: 'runtime', mode: 'soft', token: null },

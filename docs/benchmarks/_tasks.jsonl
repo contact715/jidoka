@@ -3,3 +3,4 @@
 {"id":"sandbox-kernel-block","prompt":"The kernel sandbox must block an out-of-scope write.","verify":{"cmd":"node scripts/sandbox-run.mjs --self-test","contains":["correct"]}}
 {"id":"no-ghost-gates","prompt":"Every declared CI-layer gate must be present in a workflow (no ghost gate).","verify":{"cmd":"node scripts/gate-audit.mjs","contains":["no ghost gate"]}}
 {"id":"debate-trigger-routes","prompt":"A comparison/decision question must route to an adversarial debate; a mechanical task must not.","verify":{"cmd":"node scripts/debate-trigger.mjs --self-test","contains":["routing correct"]}}
+{"id":"cost-ledger-daily-limit","prompt":"The cost-ledger must total daily spend in integer cents, alert at 80%, block at 100%, and flag a whole-batch retry that re-bills succeeded items.","verify":{"cmd":"node scripts/cost-ledger.mjs --self-test","contains":["amplification guard correct"]}}

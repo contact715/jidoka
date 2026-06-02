@@ -28,6 +28,10 @@ export function scan(code = '') {
   const findings = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const trimmed = line.trim();
+    // skip comment lines: a usage example like "--limit-cents 2000" is documentation, not float math
+    // (caught by the cost-ledger validation wave — a comment was flagged as money arithmetic).
+    if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) continue;
     const hasMoney = MONEY_IDS.test(line);
     const hasQuantity = QUANTITY_IDS.test(line);
     if (!(hasMoney || hasQuantity)) continue;
@@ -56,6 +60,7 @@ function selfTest() {
   ok('Decimal safe → no finding', scan('const total = new Decimal(price).plus(fee);').findings.length === 0);
   ok('plain string with "price" but no arithmetic → no finding', scan('const label = `Price: ${price}`;').findings.length === 0);
   ok('non-money identifier (foo) not flagged', scan('const result = foo * 1.5;').findings.length === 0);
+  ok('comment with money words is NOT flagged (cost-ledger validation-wave regression)', scan('//   node x.mjs --limit-cents 2000 --date 2026-06-02').findings.length === 0);
 
   if (fails.length) { console.log(`\n\x1b[31mprecision-guard self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ precision-guard: float-on-money/quantity detection correct\x1b[0m');

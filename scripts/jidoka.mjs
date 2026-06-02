@@ -65,6 +65,7 @@ export const CMDS = {
   harvest: { s: 'prod-harvest.mjs', help: 'convert a prod incident into a benchmark regression case' },
   'skill-coverage': { s: 'skill-coverage.mjs', help: 'audit superpowers skill-library coverage' },
   'skill-select': { s: 'skill-selector.mjs', help: 'mandate the right superpowers skill for a task signal' },
+  'cost-ledger': { s: 'cost-ledger.mjs', help: 'running token-cost ledger + daily-limit alert + amplification guard' },
 };
 
 export function resolve(cmd) {
