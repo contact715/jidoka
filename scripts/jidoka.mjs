@@ -42,6 +42,9 @@ export const CMDS = {
   resume: { s: 'run-state.mjs', prepend: ['--resume'], help: 'resume a wave from its on-disk journal' },
   'run-state': { s: 'run-state.mjs', help: 'wave run-journal (init/advance/resume)' },
   guard: { s: 'pre-publish-guard.mjs', help: 'secret/PII pre-publish guard' },
+  deadcode: { s: 'dead-code.mjs', help: 'find orphaned (unreferenced) engine scripts' },
+  types: { s: 'type-coverage.mjs', help: 'TS type-escape density gate (any/@ts-ignore)' },
+  contract: { s: 'contract-check.mjs', help: 'fe↔be API contract gate' },
 };
 
 export function resolve(cmd) {

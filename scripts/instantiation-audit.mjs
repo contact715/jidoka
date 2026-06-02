@@ -124,10 +124,13 @@ console.log(`  \x1b[2m(Class 3 checks a curated manifest of ${MANIFEST.length} c
 // ── Class 4 — broken imports (a script imports a relative module not on disk) ──
 console.log('\n\x1b[1m▌ Class 4 — broken imports (script imports a module not on disk)\x1b[0m');
 let c4 = 0;
-const importLines = (() => { try { return execSync(`git grep -noE "from '[^']+\\.mjs'" -- scripts ${SELF} 2>/dev/null || true`, { encoding: 'utf8' }).split('\n').filter(Boolean); } catch { return []; } })();
+// Match only REAL import/export statements (the line, after indentation, starts with import|export) —
+// NOT a `from '...mjs'` that sits inside a comment (`//`) or a string literal. This scan bit a fixture
+// and a doc-comment that merely mentioned an import; the anchor removes that false-ghost class.
+const importLines = (() => { try { return execSync(`git grep -noE "^[[:space:]]*(import|export)[^']*from '[^']+\\.mjs'" -- scripts ${SELF} 2>/dev/null || true`, { encoding: 'utf8' }).split('\n').filter(Boolean); } catch { return []; } })();
 const seenImports = new Set();
 for (const line of importLines) {
-  const m = line.match(/^(scripts\/[^:]+):\d+:from '([^']+\.mjs)'$/);
+  const m = line.match(/^(scripts\/[^:]+):\d+:.*\bfrom '([^']+\.mjs)'$/);
   if (!m) continue;
   const [, srcFile, imp] = m;
   if (!imp.startsWith('.')) continue; // only relative imports resolve to a file on disk
