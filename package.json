@@ -51,6 +51,7 @@
 		"trajectory:score": "node scripts/trajectory-score.mjs",
 		"judge:calibrate": "node scripts/judge-calibration.mjs",
 		"verify:adaptive": "node scripts/adaptive-verify.mjs",
+		"frontier:eval": "node scripts/frontier-eval.mjs",
 		"check:design-drift": "bash scripts/design-drift-audit.sh",
 		"check:design-drift:ratchet": "bash scripts/design-drift-audit.sh --ratchet",
 		"check:design-drift:update-baseline": "bash scripts/design-drift-audit.sh --update-baseline",

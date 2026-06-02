@@ -49,6 +49,7 @@ export const CMDS = {
   trajectory: { s: 'trajectory-score.mjs', help: 'score an agent trajectory (path, not just outcome)' },
   calibration: { s: 'judge-calibration.mjs', help: 'judge agreement + drift calibration' },
   adaptive: { s: 'adaptive-verify.mjs', help: 'adaptive test-time verification (scale N by risk)' },
+  'frontier-eval': { s: 'frontier-eval.mjs', help: 'run post-wave frontier evals (benchmark+trajectory+calibration)' },
 };
 
 export function resolve(cmd) {

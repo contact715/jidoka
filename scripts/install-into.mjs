@@ -36,7 +36,7 @@ export const KERNEL = [
   'sandbox-run.mjs', 'run-state.mjs',
   // run-state derives phases from the planner, which routes debate via debate-trigger — both must be
   // in the kernel so even --profile=core is import-closed (no run-state without its planner).
-  'orchestration-planner.mjs', 'debate-trigger.mjs',
+  'orchestration-planner.mjs', 'debate-trigger.mjs', 'adaptive-verify.mjs',
 ];
 const COMMON = [ // standard adds the everyday gates
   'northstar-check.mjs', 'charter-check.mjs', 'kaizen-loop.mjs', 'spec-drift-check.mjs',

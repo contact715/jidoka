@@ -44,6 +44,13 @@ the spec system is `HIERARCHICAL_SPEC_SYSTEM.md`, the mission/constitution are a
 > «Сравни X и Y», «стоит ли Z», «оцени/проанализируй» — ровно те случаи, где один прогон без оппонента
 > ненадёжен (этот GSD-vs-jidoka разбор так и делался). Механические правки дебаты не получают.
 
+> **Frontier eval (вживлено в фазы, outcome-оценка агентов).** На фазе gate число best-of-N сэмплов
+> бери из плана: поле `verifyN` (adaptive-verify масштабирует под risk×hardness, critical ≥3), и сверяй
+> судей через `judge-calibration` (agreement + дрейф). На фазе memory прогони
+> `node scripts/frontier-eval.mjs` — agent-benchmark (resolution-rate на held-out задачах, всегда) +
+> trajectory-score (оценка пути по trace волны) + judge-calibration (по вердиктам). Так «решает ли агент
+> реальную задачу» меряется каждую волну, а не лежит рядом.
+
 0. **North Star — общая цель и философия продукта (САМЫМ ПЕРВЫМ).** До бизнес-вопросов конкретной
    фичи проверь: есть ли у продукта `docs/NORTH_STAR.md`? Нет → CPO заполняет его из
    `docs/NORTH_STAR_TEMPLATE.md` (или глобального `~/.claude/jidoka/NORTH_STAR_TEMPLATE.md`), задавая вопросы о бизнес-цели (зачем продукт существует, цель на

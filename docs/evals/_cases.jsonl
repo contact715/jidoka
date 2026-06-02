@@ -67,3 +67,4 @@
 {"id":"trajectory-score/self-test","cmd":"node scripts/trajectory-score.mjs --self-test","assert":{"exit":0,"contains":["path scoring correct"]}}
 {"id":"judge-calibration/self-test","cmd":"node scripts/judge-calibration.mjs --self-test","assert":{"exit":0,"contains":["agreement + drift detection correct"]}}
 {"id":"adaptive-verify/self-test","cmd":"node scripts/adaptive-verify.mjs --self-test","assert":{"exit":0,"contains":["N-scaling + rubric selection correct"]}}
+{"id":"frontier-eval/self-test","cmd":"node scripts/frontier-eval.mjs --self-test","assert":{"exit":0,"contains":["post-wave eval planning correct"]}}
