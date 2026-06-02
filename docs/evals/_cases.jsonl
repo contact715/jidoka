@@ -68,3 +68,8 @@
 {"id":"judge-calibration/self-test","cmd":"node scripts/judge-calibration.mjs --self-test","assert":{"exit":0,"contains":["agreement + drift detection correct"]}}
 {"id":"adaptive-verify/self-test","cmd":"node scripts/adaptive-verify.mjs --self-test","assert":{"exit":0,"contains":["N-scaling + rubric selection correct"]}}
 {"id":"frontier-eval/self-test","cmd":"node scripts/frontier-eval.mjs --self-test","assert":{"exit":0,"contains":["post-wave eval planning correct"]}}
+{"id":"spec-size-check/self-test","cmd":"node scripts/spec-size-check.mjs --self-test","assert":{"exit":0,"contains":["size estimation + decomposition gate correct"]}}
+{"id":"model-router/self-test","cmd":"node scripts/model-router.mjs --self-test","assert":{"exit":0,"contains":["provider+model routing correct"]}}
+{"id":"skill-selector/self-test","cmd":"node scripts/skill-selector.mjs --self-test","assert":{"exit":0,"contains":["mandatory-skill routing correct"]}}
+{"id":"spec-tldr/self-test","cmd":"node scripts/spec-tldr.mjs --self-test","assert":{"exit":0,"contains":["structural spec summary correct"]}}
+{"id":"trend-scan/self-test","cmd":"node scripts/trend-scan.mjs --self-test","assert":{"exit":0,"contains":["candidate dedup + recency ranking correct"]}}

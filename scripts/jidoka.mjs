@@ -50,6 +50,11 @@ export const CMDS = {
   calibration: { s: 'judge-calibration.mjs', help: 'judge agreement + drift calibration' },
   adaptive: { s: 'adaptive-verify.mjs', help: 'adaptive test-time verification (scale N by risk)' },
   'frontier-eval': { s: 'frontier-eval.mjs', help: 'run post-wave frontier evals (benchmark+trajectory+calibration)' },
+  'spec-size': { s: 'spec-size-check.mjs', help: 'block a too-big spec (decompose before build)' },
+  'model-route': { s: 'model-router.mjs', help: 'route agent calls to provider+model (Claude API / local)' },
+  skills: { s: 'skill-selector.mjs', help: 'mandate the right skill for a task signal' },
+  tldr: { s: 'spec-tldr.mjs', help: 'plain-language TL;DR of a spec for human approval' },
+  trends: { s: 'trend-scan.mjs', help: 'rank external borrow-candidates for self-improvement' },
 };
 
 export function resolve(cmd) {

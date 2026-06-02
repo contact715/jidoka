@@ -65,6 +65,10 @@ When all three briefs are present, your master spec must explicitly:
 
 Every master spec lives at `docs/specs/{wave-id}_MASTER_SPEC.md`. Target: under 1000 words, structured markdown, no fluff.
 
+Two gates on the spec itself, before you mark it ready:
+- **Build-sized (the #1 failure cause is an oversized spec).** Keep it buildable in ONE wave: ≤8 objectives, ≤20 acceptance criteria, ≤3 surfaces. If it is larger, SPLIT it into ordered sub-specs and dispatch them in sequence. `node scripts/spec-size-check.mjs --spec <file>` flags an over-sized spec and blocks the build until you decompose.
+- **Plain-language TL;DR for human approval.** End every spec with a `## TL;DR` section: 3-5 plain bullets (no jargon) stating the goal and what ships, so the human approves the gist without reading the full document. `node scripts/spec-tldr.mjs --spec <file>` extracts the structural skeleton; you write the human gloss on top.
+
 ```markdown
 # {Wave ID} Master Spec — {Feature Name}
 
