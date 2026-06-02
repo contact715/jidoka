@@ -73,3 +73,11 @@
 {"id":"skill-selector/self-test","cmd":"node scripts/skill-selector.mjs --self-test","assert":{"exit":0,"contains":["mandatory-skill routing correct"]}}
 {"id":"spec-tldr/self-test","cmd":"node scripts/spec-tldr.mjs --self-test","assert":{"exit":0,"contains":["structural spec summary correct"]}}
 {"id":"trend-scan/self-test","cmd":"node scripts/trend-scan.mjs --self-test","assert":{"exit":0,"contains":["candidate dedup + recency ranking correct"]}}
+{"id":"resource-guard/self-test","cmd":"node scripts/resource-guard.mjs --self-test","assert":{"exit":0,"contains":["runaway-resource detection + budget validation correct"]}}
+{"id":"load-test-gate/self-test","cmd":"node scripts/load-test-gate.mjs --self-test","assert":{"exit":0,"contains":["latency/error/throughput assessment correct"]}}
+{"id":"canary-gate/self-test","cmd":"node scripts/canary-gate.mjs --self-test","assert":{"exit":0,"contains":["promote/hold/rollback decision correct"]}}
+{"id":"precision-guard/self-test","cmd":"node scripts/precision-guard.mjs --self-test","assert":{"exit":0,"contains":["float-on-money/quantity detection correct"]}}
+{"id":"cross-layer-dup/self-test","cmd":"node scripts/cross-layer-dup.mjs --self-test","assert":{"exit":0,"contains":["fingerprint dedup across BE/FE layers correct"]}}
+{"id":"req-trace/self-test","cmd":"node scripts/req-trace.mjs --self-test","assert":{"exit":0,"contains":["requirement traceability chain correct"]}}
+{"id":"e2e-run-gate/self-test","cmd":"node scripts/e2e-run-gate.mjs --self-test","assert":{"exit":0,"contains":["E2E flow scoring correct"]}}
+{"id":"prod-harvest/self-test","cmd":"node scripts/prod-harvest.mjs --self-test","assert":{"exit":0,"contains":["incident → benchmark task conversion correct"]}}

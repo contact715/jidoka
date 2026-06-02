@@ -55,6 +55,14 @@ export const CMDS = {
   skills: { s: 'skill-selector.mjs', help: 'mandate the right skill for a task signal' },
   tldr: { s: 'spec-tldr.mjs', help: 'plain-language TL;DR of a spec for human approval' },
   trends: { s: 'trend-scan.mjs', help: 'rank external borrow-candidates for self-improvement' },
+  'resource-guard': { s: 'resource-guard.mjs', help: 'flag runaway writes/network in loops/intervals' },
+  'load-gate': { s: 'load-test-gate.mjs', help: 'assert latency/error/throughput SLOs on load results' },
+  canary: { s: 'canary-gate.mjs', help: 'promote/hold/rollback a canary by metric regression' },
+  'precision-guard': { s: 'precision-guard.mjs', help: 'flag float arithmetic on money/quantity identifiers' },
+  'cross-dup': { s: 'cross-layer-dup.mjs', help: 'detect duplicated logic between BE and FE layers' },
+  'req-trace': { s: 'req-trace.mjs', help: 'verify requirement→spec→AC→test→code→deploy traceability' },
+  'e2e-gate': { s: 'e2e-run-gate.mjs', help: 'score E2E flow results and gate on failures' },
+  harvest: { s: 'prod-harvest.mjs', help: 'convert a prod incident into a benchmark regression case' },
 };
 
 export function resolve(cmd) {

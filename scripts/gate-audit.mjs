@@ -40,6 +40,14 @@ export const GATES = [
   { id: 'northstar-check', layer: 'product', mode: 'hard', token: null },
   { id: 'charter-check', layer: 'product', mode: 'hard', token: null },
   { id: 'coverage-gate', layer: 'product', mode: 'hard', token: null },
+  // runtime-coverage gates (built from real prod incidents) — enforced in the target product's CI
+  { id: 'resource-guard', layer: 'product', mode: 'hard', token: null },
+  { id: 'precision-guard', layer: 'product', mode: 'hard', token: null },
+  { id: 'cross-layer-dup', layer: 'product', mode: 'hard', token: null },
+  { id: 'req-trace', layer: 'product', mode: 'hard', token: null },
+  { id: 'load-test-gate', layer: 'product', mode: 'hard', token: null },
+  { id: 'canary-gate', layer: 'product', mode: 'hard', token: null },
+  { id: 'e2e-run-gate', layer: 'product', mode: 'hard', token: null },
   // soft-trial — warn until graduated (gate-graduation proposes the flip)
   { id: 'spec-drift', layer: 'product', mode: 'soft', token: null },
   { id: 'detect-injection', layer: 'runtime', mode: 'soft', token: null },
