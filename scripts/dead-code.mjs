@@ -30,22 +30,25 @@ function gather(root) {
   const dir = join(root, 'scripts');
   const scripts = readdirSync(dir).filter((f) => f.endsWith('.mjs'));
   const fileTexts = Object.fromEntries(scripts.map((s) => [s, readFileSync(join(dir, s), 'utf8')]));
-  const sources = [
-    join(root, 'package.json'),
-    join(root, 'docs', 'evals', '_cases.jsonl'),
-    join(root, 'scripts', 'jidoka.mjs'),
-  ];
-  let externalText = sources.filter(existsSync).map((p) => readFileSync(p, 'utf8')).join('\n');
-  for (const sub of [['.github', 'workflows'], ['.claude', 'skills'], ['.claude', 'agents'], ['docs']]) {
+  // explicit reference sources: npm scripts, the eval suite, the CLI, the runtime config, and the
+  // top-level + scripts READMEs (a script documented or configured here is wired, not dead).
+  const sources = ['package.json', '.sdd-config.json', 'README.md', 'CLAUDE.md',
+    'docs/evals/_cases.jsonl', 'scripts/README.md', 'scripts/jidoka.mjs'];
+  let externalText = sources.map((p) => join(root, p)).filter(existsSync).map((p) => readFileSync(p, 'utf8')).join('\n');
+  // walked dirs: workflows, skills, agents, docs, AND git hooks (.husky — extensionless hook files).
+  for (const sub of [['.github', 'workflows'], ['.claude', 'skills'], ['.claude', 'agents'], ['docs'], ['.husky']]) {
     const d = join(root, ...sub);
     if (!existsSync(d)) continue;
+    const husky = sub[0] === '.husky';
     const walk = (dir) => readdirSync(dir, { withFileTypes: true }).forEach((e) => {
       const p = join(dir, e.name);
       if (e.isDirectory()) walk(p);
-      else if (/\.(ya?ml|md|json|sh)$/.test(e.name)) externalText += '\n' + readFileSync(p, 'utf8');
+      else if (husky || /\.(ya?ml|md|json|sh|cjs)$/.test(e.name)) externalText += '\n' + readFileSync(p, 'utf8');
     });
     try { walk(d); } catch { /* ignore */ }
   }
+  // shell helpers/hooks in scripts/ can invoke a .mjs too
+  for (const f of readdirSync(dir)) if (f.endsWith('.sh')) externalText += '\n' + readFileSync(join(dir, f), 'utf8');
   return { scripts, fileTexts, externalText };
 }
 
