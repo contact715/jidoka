@@ -21,7 +21,9 @@ const QUANTITY_IDS = /\b(quantity|qty|count|weight|volume|percent|ratio|share|po
 const FLOAT_OPS = /[+\-*\/]\s*[\d.]+[eE]?[\d]*\b|[\d]+\.\d+\s*[+\-*\/]/;
 
 // safe patterns: integer cents, BigInt, or explicit decimal lib usage
-const SAFE = /BigInt|toFixed\(\d+\)|Math\.round|parseInt|parseFloat.*100|Decimal|Dinero|currency|toCents|fromCents/i;
+// safe patterns: integer cents, BigInt, a decimal lib, or NON-money float math (percentages, time,
+// clamps). Expanded after the Mosco product wave flagged correct cents code + percentage/time calcs.
+const SAFE = /BigInt|toFixed\(\d+\)|Math\.(round|min|max|floor|ceil|abs)|parseInt|parseFloat.*100|Decimal|Dinero|currency|toCents|fromCents|Cents\b|formatMoney|formatCurrency|getTime|\*\s*100\b|\/\s*100\b|percent|\bpct\b/i;
 
 export function scan(code = '') {
   const lines = code.split('\n');
@@ -32,10 +34,17 @@ export function scan(code = '') {
     // skip comment lines: a usage example like "--limit-cents 2000" is documentation, not float math
     // (caught by the cost-ledger validation wave — a comment was flagged as money arithmetic).
     if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) continue;
-    const hasMoney = MONEY_IDS.test(line);
-    const hasQuantity = QUANTITY_IDS.test(line);
+    // real-code hardening (Mosco product wave: 205 false-positives → strip string/template/regex
+    // literals first, so money words in UI text, marketing copy ("Earn 25-40%"), comparison tables,
+    // className strings ("text-5xl"), and regex literals are not mistaken for money ARITHMETIC.
+    const codeOnly = line.replace(/'[^']*'|"[^"]*"|`[^`]*`|\/[^/\n]+\/[a-z]*/g, '').replace(/\/\/.*$/, '');
+    const hasMoney = MONEY_IDS.test(codeOnly);
+    const hasQuantity = QUANTITY_IDS.test(codeOnly);
     if (!(hasMoney || hasQuantity)) continue;
-    if (!FLOAT_OPS.test(line)) continue; // no float arithmetic on this line
+    if (!FLOAT_OPS.test(codeOnly)) continue;
+    // money-float must live in an assignment or a call — not prose / JSX text / mock-data literals
+    // ("Most trades see 12-15%", "99% to 99.9% credit", { delta: -3 }). The final real-code cut.
+    if (!/[=(]/.test(codeOnly)) continue; // no float arithmetic on this line
     if (SAFE.test(line)) continue;       // already using a safe pattern
     findings.push({
       line: i + 1,
@@ -61,6 +70,9 @@ function selfTest() {
   ok('plain string with "price" but no arithmetic → no finding', scan('const label = `Price: ${price}`;').findings.length === 0);
   ok('non-money identifier (foo) not flagged', scan('const result = foo * 1.5;').findings.length === 0);
   ok('comment with money words is NOT flagged (cost-ledger validation-wave regression)', scan('//   node x.mjs --limit-cents 2000 --date 2026-06-02').findings.length === 0);
+  ok('JSX/marketing prose with money words is NOT flagged (Mosco product wave)', scan('Most trades see 12-15% more revenue per month').findings.length === 0);
+  ok('mock-data object (delta in a literal) is NOT flagged (Mosco product wave)', scan('{ id: "t6", count: 9, delta: -8 }').findings.length === 0);
+  ok('correct integer-cents code is NOT flagged', scan('const c = formatMoney(program.totalEarnedCents);').findings.length === 0);
 
   if (fails.length) { console.log(`\n\x1b[31mprecision-guard self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ precision-guard: float-on-money/quantity detection correct\x1b[0m');

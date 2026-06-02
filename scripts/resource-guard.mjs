@@ -29,7 +29,10 @@ const LOOP_CTX = [
 const RESOURCE_OPS = [
   // db/storage verbs only — NOT .push/.append/.set (those are array/Map/collection ops on local memory,
   // not storage; .push to a local accumulator was false-flagged in the cost-ledger validation wave).
-  { re: /\.(save|insert|create|update|upsert|delete|remove|writeRecord)\s*\(|\bINSERT\b|\bUPDATE\b|\bDELETE\b/, kind: 'db/storage write' },
+  // db/storage verbs that do NOT collide with Set/Map/array methods. Mosco product wave showed
+  // bare .delete/.create/.update flag Set.delete/Map.delete/factory.create — dropped them; keep the
+  // unambiguous repo/db verbs + SQL DML. (.save/.insert/.upsert/.persist + prisma-style + INSERT/UPDATE).
+  { re: /\.(save|insert|upsert|persist)\s*\(|\b(prisma|db|repo|repository)\b[\w.]*\.(create|update|delete)\s*\(|\bINSERT\s+INTO\b|\bUPDATE\s+\w+\s+SET\b|\bDELETE\s+FROM\b/, kind: 'db/storage write' },
   { re: /fetch\s*\(|axios\.|http\.request|https\.request/, kind: 'network call' },
   { re: /fs\.(write|append|createWriteStream)/, kind: 'file write' },
   { re: /\.emit\s*\(|\.publish\s*\(|\.send\s*\(/, kind: 'event/message dispatch' },
@@ -37,7 +40,11 @@ const RESOURCE_OPS = [
 
 // guard phrases that indicate the developer thought about throttling
 const GUARDS = [
-  /throttle|debounce|batch|limit|maxPer|rateLimit|queue|semaphore|break|clearInterval|return\s+if/i,
+  // an explicit multi-second interval delay (e.g. setInterval(fn, 30_000)) IS the throttle — a 30s poll
+  // is not a runaway (Mosco product wave flagged a sane 30s ETA poll). 4+ digit / underscore-thousands delay.
+  // an interval delay of >=5 SECONDS is a throttle (a 30s poll is fine); but 1000-4999ms (1-5s) is
+  // still risky and NOT a guard — 1000ms is exactly the candidate's "1 write/sec" runaway.
+  /throttle|debounce|batch|limit|maxPer|rateLimit|queue|semaphore|break|clearInterval|return\s+if|,\s*([5-9]\d{3}|\d{5,}|[5-9]_\d{3}|\d{2,}_\d{3})\s*\)/i,
 ];
 
 export function scan(code = '') {
@@ -60,7 +67,7 @@ export function scan(code = '') {
       for (const op of RESOURCE_OPS) {
         if (op.re.test(line)) {
           // check the surrounding 10-line window for a guard
-          const window = lines.slice(Math.max(0, i - 5), i + 5).join('\n');
+          const window = lines.slice(Math.max(0, i - 8), i + 14).join('\n'); // wide enough to see a multi-line interval body's delay
           const guarded = GUARDS.some((g) => g.test(window));
           if (!guarded) {
             findings.push({
@@ -130,6 +137,9 @@ function selfTest() {
   ok('Infinity budget → not ok (unlimited is not a ceiling)', validateBudget({ writesPerSec: Infinity }).ok === false);
   ok('null budget → not ok', validateBudget({ writesPerSec: null }).ok === false);
   ok('array .push to a local accumulator is NOT a db write (cost-ledger validation-wave regression)', scan('const out = []; items.forEach(x => out.push(x));').ok === true);
+  ok('a 30s poll is NOT flagged — the interval delay IS the throttle (Mosco product wave)', scan('sub.id = setInterval(async () => {\n  const r = await fetch(u);\n  cb(r);\n}, 30_000);').ok === true);
+  ok('a 1s db-write poll IS flagged (1 write/sec runaway)', scan('setInterval(() => { repo.save(x); }, 1000)').ok === false);
+  ok('Set/Map .delete is NOT a db write (Mosco product wave)', scan('for (const x of xs) { seen.delete(x); }').ok === true);
 
   if (fails.length) { console.log(`\n\x1b[31mresource-guard self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ resource-guard: runaway-resource detection + budget validation correct\x1b[0m');

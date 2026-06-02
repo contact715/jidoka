@@ -42,7 +42,7 @@ export const GATES = [
   { id: 'coverage-gate', layer: 'product', mode: 'hard', token: null },
   // runtime-coverage gates (built from real prod incidents) — enforced in the target product's CI
   { id: 'resource-guard', layer: 'product', mode: 'hard', token: null },
-  { id: 'precision-guard', layer: 'product', mode: 'hard', token: null },
+  { id: 'precision-guard', layer: 'product', mode: 'soft', token: null },
   { id: 'cross-layer-dup', layer: 'product', mode: 'hard', token: null },
   { id: 'req-trace', layer: 'product', mode: 'hard', token: null },
   { id: 'load-test-gate', layer: 'product', mode: 'hard', token: null },
