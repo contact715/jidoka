@@ -17,6 +17,10 @@
 
 import { shouldDebate } from './debate-trigger.mjs';
 import { planN } from './adaptive-verify.mjs';
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 // post-wave frontier evals the memory phase runs: outcome benchmark, trajectory score, judge calibration
 const POST_WAVE_EVAL = ['agent-benchmark', 'trajectory-score', 'judge-calibration'];
@@ -29,7 +33,17 @@ const PHASE_SKILLS = {
   build: ['test-driven-development'], gate: ['verification-before-completion'],
   debug: ['systematic-debugging'], memory: ['finishing-a-development-branch'],
 };
-const attachSkills = (phases) => phases.map((p) => ({ ...p, skills: PHASE_SKILLS[p.phase] || [] }));
+// the gates/checks each phase runs — the graph itself is now the per-phase coverage map, not CI/prose.
+// Every gate maps to a real scripts/<name>.mjs (the self-test enforces 0 ghosts in this map).
+const PHASE_GATES = {
+  spec: ['spec-size-check', 'plan-check'],
+  build: ['resource-guard', 'precision-guard', 'cross-layer-dup'],
+  gate: ['contract-check', 'dead-code', 'type-coverage', 'mutation-test', 'property-test', 'dependency-audit', 'coverage-gate', 'load-test-gate', 'e2e-run-gate'],
+  debug: ['verify-goal-backward'],
+  launch: ['canary-gate'],
+  memory: ['req-trace', 'prod-harvest'],
+};
+const enrichPhases = (phases) => phases.map((p) => ({ ...p, skills: PHASE_SKILLS[p.phase] || [], gates: PHASE_GATES[p.phase] || [] }));
 
 export function plan(task = {}) {
   const { risk = 'normal', surfaces = [] } = task;
@@ -41,7 +55,7 @@ export function plan(task = {}) {
     phases.push({ phase: 'build', agents: [has('backend') ? 'backend-agent' : 'frontend-agent'] });
     phases.push({ phase: 'gate', agents: ['reflexion-critic', 'budget-gate', 'policy-sandbox'], verifyN: planN(task) });
     phases.push({ phase: 'memory', agents: ['skill-extractor'] });
-    return { task, phases: attachSkills(phases), postWaveEval: POST_WAVE_EVAL, note: 'trivial → minimal graph (architects skipped)' };
+    return { task, phases: enrichPhases(phases), postWaveEval: POST_WAVE_EVAL, note: 'trivial → minimal graph (architects skipped)' };
   }
 
   const spec = ['chief-architect', 'micro-architect', 'macro-architect', 'surface-cartographer',
@@ -69,7 +83,7 @@ export function plan(task = {}) {
 
   if (has('deploy') || task.deploy) phases.push({ phase: 'launch', agents: ['devops-lead', 'release-engineer'] });
   phases.push({ phase: 'memory', agents: ['skill-extractor', 'data-analyst', 'kaizen-officer'] });
-  return { task, phases: attachSkills(phases), postWaveEval: POST_WAVE_EVAL };
+  return { task, phases: enrichPhases(phases), postWaveEval: POST_WAVE_EVAL };
 }
 
 const agentsIn = (g) => new Set(g.phases.flatMap(p => p.agents));
@@ -96,6 +110,11 @@ if (process.argv.includes('--self-test')) {
     ['debug phase mandates the systematic-debugging superpower', critical.phases.find(p => p.phase === 'debug')?.skills?.includes('systematic-debugging')],
     ['spec phase mandates writing-plans', critical.phases.find(p => p.phase === 'spec')?.skills?.includes('writing-plans')],
     ['gate phase mandates verification-before-completion', critical.phases.find(p => p.phase === 'gate')?.skills?.includes('verification-before-completion')],
+    ['build phase carries static gates (resource-guard/precision/cross-layer)', critical.phases.find(p => p.phase === 'build')?.gates?.includes('resource-guard')],
+    ['gate phase carries the verification battery (load-test + e2e)', (() => { const g = critical.phases.find(p => p.phase === 'gate')?.gates || []; return g.includes('load-test-gate') && g.includes('e2e-run-gate'); })()],
+    ['launch phase carries canary-gate', plan({ risk: 'critical', surfaces: ['backend'], deploy: true }).phases.find(p => p.phase === 'launch')?.gates?.includes('canary-gate')],
+    ['memory phase carries req-trace + prod-harvest', (() => { const g = critical.phases.find(p => p.phase === 'memory')?.gates || []; return g.includes('req-trace') && g.includes('prod-harvest'); })()],
+    ['ANTI-GHOST: every phase-gate maps to a real script', Object.values(PHASE_GATES).flat().every(g => existsSync(join(HERE, `${g}.mjs`)))],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
@@ -109,7 +128,10 @@ const task = JSON.parse(arg('--task') || '{"type":"feature","risk":"normal","sur
 const g = plan(task);
 if (process.argv.includes('--json')) { console.log(JSON.stringify(g)); process.exit(0); }
 console.log(`orchestration plan for ${JSON.stringify(task)}:`);
-g.phases.forEach((p, i) => console.log(`  ${i + 1}. ${p.phase}${p.parallel ? ' (parallel)' : ''}${p.verifyN ? ` [verifyN=${p.verifyN}]` : ''}: ${p.agents.join(', ')}${p.skills?.length ? `  ·  skill: ${p.skills.join(', ')}` : ''}`));
+g.phases.forEach((p, i) => {
+  console.log(`  ${i + 1}. ${p.phase}${p.parallel ? ' (parallel)' : ''}${p.verifyN ? ` [verifyN=${p.verifyN}]` : ''}: ${p.agents.join(', ')}${p.skills?.length ? `  ·  skill: ${p.skills.join(', ')}` : ''}`);
+  if (p.gates?.length) console.log(`       gates: ${p.gates.join(', ')}`);
+});
 if (g.postWaveEval) console.log(`  post-wave eval: ${g.postWaveEval.join(', ')}`);
 if (g.note) console.log(`  note: ${g.note}`);
 console.log(`  total: ${g.phases.length} phases, ${agentsIn(g).size} distinct agents`);
