@@ -16,12 +16,16 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 
-// trend of a numeric series: 'up' | 'down' | 'flat' (5% tolerance band → flat)
+// trend of a numeric series: 'up' | 'down' | 'flat' (1% noise band → flat).
+// The band was 5%, which was a BUG: it swallowed real progress on near-target metrics — a test
+// pass-rate of 96→99 toward 100 (3% of magnitude) read as "stalled". Real Mosco data surfaced it
+// (2026-06-02); the synthetic self-test only used low-baseline series so it never hit the case.
+// 1% filters measurement jitter, not progress.
 export function trend(series) {
   if (!Array.isArray(series) || series.length < 2) return 'flat';
   const first = series[0], last = series[series.length - 1];
   const scale = Math.max(Math.abs(first), 1);
-  if (Math.abs(last - first) / scale < 0.05) return 'flat';
+  if (Math.abs(last - first) / scale < 0.01) return 'flat';
   return last - first > 0 ? 'up' : 'down';
 }
 
@@ -54,6 +58,7 @@ function selfTest() {
     { metric: 'nps', direction: 'up', target: 50, series: [40, 48, 55] },              // achieved
     { metric: 'unmeasured', direction: 'up', target: 10, series: [] },                 // no-data (DORMANT)
     { metric: 'firstrun', direction: 'up', target: 100, series: [96] },                // baseline (1 reading)
+    { metric: 'pass_rate', direction: 'up', target: 100, series: [96, 99] },           // on-track — near-target progress (real Mosco data; 5%-band bug read this as stalled)
   ];
   const a = assess(targets);
   const by = Object.fromEntries(a.results.map(r => [r.metric, r.status]));
@@ -68,6 +73,7 @@ function selfTest() {
     ['target reached → achieved', by.nps === 'achieved'],
     ['empty series → no-data (not a false stall)', by.unmeasured === 'no-data'],
     ['single reading → baseline (not a false stall)', by.firstrun === 'baseline'],
+    ['near-target progress 96→99 toward 100 → on-track, NOT a false stall (5%-band bug)', by.pass_rate === 'on-track'],
     ['a diverging metric raises a product-andon', a.anyAndon === true],
   ];
   let fails = 0;
