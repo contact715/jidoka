@@ -48,6 +48,12 @@ const COMMON = [ // standard adds the everyday gates
   'cross-layer-dup.mjs', 'dead-code.mjs', 'type-coverage.mjs', 'contract-check.mjs',
   'cost-ledger.mjs', 'model-tier.mjs', 'model-router.mjs', 'skill-coverage.mjs',
   'skill-selector.mjs', 'trend-scan.mjs', 'spec-tldr.mjs',
+  // the rest of orchestration-planner's PHASE_GATES battery (gate/launch/debug/memory phases). The planner
+  // lives in KERNEL and NAMES these; standard+ must ship them or a real wave references a script that
+  // isn't there. Caught on the real Mosco full install: planner --self-test failed anti-ghost because
+  // these 8 weren't copied. All are leaf scripts (no relative imports) → closure stays green.
+  'mutation-test.mjs', 'property-test.mjs', 'load-test-gate.mjs', 'e2e-run-gate.mjs',
+  'verify-goal-backward.mjs', 'canary-gate.mjs', 'req-trace.mjs', 'prod-harvest.mjs',
 ];
 const HEAVY = [ // full adds the deeper adversarial / analysis tools
   'gate-graduation.mjs', 'debate-engine.mjs', 'agent-trace.mjs', 'code-map.mjs', 'approval-queue.mjs',

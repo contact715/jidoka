@@ -43,6 +43,19 @@ const PHASE_GATES = {
   launch: ['canary-gate'],
   memory: ['req-trace', 'prod-harvest'],
 };
+// Canonical gate basenames the planner may reference — maintained INDEPENDENTLY of PHASE_GATES so a
+// fat-fingered entry there (e.g. 'resource-gaurd') fails the typo check. The framework ships a real
+// scripts/<name>.mjs for each; install-into's standard+full profiles copy them into a product's
+// .jidoka/scripts/. A 'core' (kernel-only) install ships the planner-brain but defers this battery to
+// the standard profile — so the anti-ghost self-test is profile-honest (see selfTest below): the typo
+// check is hard everywhere; physical presence is hard only in the framework and informational in a
+// partial install (the upgrade hint).
+export const KNOWN_GATES = [
+  'spec-size-check', 'plan-check', 'resource-guard', 'precision-guard', 'cross-layer-dup',
+  'contract-check', 'dead-code', 'type-coverage', 'mutation-test', 'property-test',
+  'dependency-audit', 'coverage-gate', 'load-test-gate', 'e2e-run-gate', 'verify-goal-backward',
+  'canary-gate', 'req-trace', 'prod-harvest',
+];
 const enrichPhases = (phases) => phases.map((p) => ({ ...p, skills: PHASE_SKILLS[p.phase] || [], gates: PHASE_GATES[p.phase] || [] }));
 
 export function plan(task = {}) {
@@ -94,6 +107,10 @@ if (process.argv.includes('--self-test')) {
   const trivial = plan({ risk: 'trivial', surfaces: ['frontend'] });
   const critical = plan({ risk: 'critical', surfaces: ['backend', 'frontend'] });
   const ta = agentsIn(trivial), ca = agentsIn(critical);
+  // framework-detector: install-into.mjs sits beside the planner ONLY in the framework repo, never in a
+  // copied .jidoka/ — so physical-presence rigor stays hard at home, profile-honest in an install.
+  const IS_FRAMEWORK = existsSync(join(HERE, 'install-into.mjs'));
+  const missingHere = KNOWN_GATES.filter(g => !existsSync(join(HERE, `${g}.mjs`)));
   const T = [
     ['trivial skips architects', !ta.has('chief-architect')],
     ['trivial skips the spec phase', !trivial.phases.some(p => p.phase === 'spec')],
@@ -114,10 +131,14 @@ if (process.argv.includes('--self-test')) {
     ['gate phase carries the verification battery (load-test + e2e)', (() => { const g = critical.phases.find(p => p.phase === 'gate')?.gates || []; return g.includes('load-test-gate') && g.includes('e2e-run-gate'); })()],
     ['launch phase carries canary-gate', plan({ risk: 'critical', surfaces: ['backend'], deploy: true }).phases.find(p => p.phase === 'launch')?.gates?.includes('canary-gate')],
     ['memory phase carries req-trace + prod-harvest', (() => { const g = critical.phases.find(p => p.phase === 'memory')?.gates || []; return g.includes('req-trace') && g.includes('prod-harvest'); })()],
-    ['ANTI-GHOST: every phase-gate maps to a real script', Object.values(PHASE_GATES).flat().every(g => existsSync(join(HERE, `${g}.mjs`)))],
+    ['ANTI-GHOST (typo): every phase-gate is a canonical KNOWN_GATES name', Object.values(PHASE_GATES).flat().every(g => KNOWN_GATES.includes(g))],
+    ['ANTI-GHOST (framework): every known gate has a real script here', !IS_FRAMEWORK || missingHere.length === 0],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
+  // profile-honest: in a partial (core) install some gates are deferred to the standard profile — that
+  // is the upgrade hint, not a failure. In the framework missingHere is empty so this never prints.
+  if (!IS_FRAMEWORK && missingHere.length) console.log(`  \x1b[33mℹ\x1b[0m ${missingHere.length} gate(s) deferred to a higher profile (install --profile=standard to add): ${missingHere.join(', ')}`);
   if (fails) { console.log('\n\x1b[31morchestration-planner self-test FAILED\x1b[0m'); process.exit(1); }
   console.log('\n\x1b[32m✓ orchestration-planner composes correct graphs per task\x1b[0m');
   process.exit(0);
