@@ -42,6 +42,12 @@ const COMMON = [ // standard adds the everyday gates
   'northstar-check.mjs', 'charter-check.mjs', 'kaizen-loop.mjs', 'spec-drift-check.mjs',
   'execution-gate.mjs', 'coverage-gate.mjs', 'dependency-audit.mjs', 'gate-audit.mjs',
   'parallel-guard.mjs',
+  // product-grade gates built this session (precision-guard + resource-guard battle-tested on Mosco).
+  // deps are closed: plan-check→orchestration-planner (KERNEL), model-router→model-tier, skill-selector→skill-coverage.
+  'spec-size-check.mjs', 'plan-check.mjs', 'resource-guard.mjs', 'precision-guard.mjs',
+  'cross-layer-dup.mjs', 'dead-code.mjs', 'type-coverage.mjs', 'contract-check.mjs',
+  'cost-ledger.mjs', 'model-tier.mjs', 'model-router.mjs', 'skill-coverage.mjs',
+  'skill-selector.mjs', 'trend-scan.mjs', 'spec-tldr.mjs',
 ];
 const HEAVY = [ // full adds the deeper adversarial / analysis tools
   'gate-graduation.mjs', 'debate-engine.mjs', 'agent-trace.mjs', 'code-map.mjs', 'approval-queue.mjs',
