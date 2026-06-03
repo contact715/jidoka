@@ -66,9 +66,16 @@ export const GATES = [
   { id: 'debate-defender', layer: 'LLM', mode: 'measured', token: null },
 ];
 
-// a CI gate is real only if its token appears in some workflow file
+// a CI gate is "present" if its token appears in a workflow; selfTestOnly flags when its ONLY
+// appearance is a --self-test invocation — the gate's LOGIC is CI-verified, but it does NOT enforce on
+// the repo's real code. Present-but-self-test-only is surfaced (🟡), not failed — honest, not a ghost.
 export function verifyCI(gates, workflowText) {
-  return gates.filter(g => g.layer === 'CI').map(g => ({ id: g.id, present: !g.token || workflowText.includes(g.token) }));
+  const lines = String(workflowText).split('\n');
+  return gates.filter(g => g.layer === 'CI').map(g => {
+    if (!g.token) return { id: g.id, present: true, selfTestOnly: false };
+    const hits = lines.filter(l => l.includes(g.token));
+    return { id: g.id, present: hits.length > 0, selfTestOnly: hits.length > 0 && hits.every(l => l.includes('--self-test')) };
+  });
 }
 
 function workflowsText(root = process.cwd()) {
@@ -78,15 +85,18 @@ function workflowsText(root = process.cwd()) {
 }
 
 function selfTest() {
-  const wf = '...\n  run: npm run eval\n  run: node scripts/meta-audit.mjs\n  uses: trufflesecurity/trufflehog\n  run: semgrep scan';
-  const v = verifyCI([{ id: 'eval-suite', layer: 'CI', token: 'npm run eval' }, { id: 'semgrep-sast', layer: 'CI', token: 'semgrep' }, { id: 'ghost-gate', layer: 'CI', token: 'does-not-exist-xyz' }], wf);
+  const wf = '...\n  run: npm run eval\n  run: node scripts/meta-audit.mjs\n  run: node scripts/execution-gate.mjs --self-test\n  uses: trufflesecurity/trufflehog\n  run: semgrep scan';
+  const v = verifyCI([{ id: 'eval-suite', layer: 'CI', token: 'npm run eval' }, { id: 'semgrep-sast', layer: 'CI', token: 'semgrep' }, { id: 'ghost-gate', layer: 'CI', token: 'does-not-exist-xyz' }, { id: 'exec-st', layer: 'CI', token: 'execution-gate.mjs' }], wf);
   const by = Object.fromEntries(v.map(x => [x.id, x.present]));
+  const stOnly = Object.fromEntries(v.map(x => [x.id, x.selfTestOnly]));
   const T = [
     ['GATES registry is non-trivial', GATES.length >= 20],
     ['every gate has a layer + mode', GATES.every(g => g.layer && g.mode)],
     ['a present CI gate verifies true', by['eval-suite'] === true],
     ['a token-matched CI gate (semgrep) verifies true', by['semgrep-sast'] === true],
     ['a GHOST CI gate (token absent) is caught', by['ghost-gate'] === false],
+    ['a --self-test-only CI gate is flagged selfTestOnly (over-credit made visible)', stOnly['exec-st'] === true],
+    ['a real-run CI gate is NOT flagged selfTestOnly', stOnly['eval-suite'] === false],
     ['layers cover CI/runtime/product/LLM/PreToolUse', new Set(GATES.map(g => g.layer)).size >= 5],
     ['soft gates are explicitly marked', GATES.some(g => g.mode === 'soft')],
   ];
@@ -109,12 +119,15 @@ if (isMain) {
   for (const [layer, gs] of Object.entries(byLayer)) {
     console.log(`  ${layer}:`);
     for (const g of gs) {
-      const mark = g.layer === 'CI' ? (ci.find(c => c.id === g.id)?.present ? '🟢' : '🔴 GHOST') : (g.mode === 'soft' ? '🟡 soft' : g.mode === 'measured' ? '📊' : '🟢');
+      const c = ci.find(c => c.id === g.id);
+      const mark = g.layer === 'CI' ? (!c?.present ? '🔴 GHOST' : c.selfTestOnly ? '🟡 self-test-only' : '🟢') : (g.mode === 'soft' ? '🟡 soft' : g.mode === 'measured' ? '📊' : '🟢');
       console.log(`    ${mark} ${g.id} (${g.mode})`);
     }
   }
   const soft = GATES.filter(g => g.mode === 'soft').length;
   console.log(`\n  ${GATES.length} gates · ${GATES.filter(g => g.layer === 'CI').length} in CI · ${soft} soft-trial · ${GATES.filter(g => g.mode === 'measured').length} measured-LLM`);
+  const selfTestOnly = ci.filter(c => c.selfTestOnly);
+  if (selfTestOnly.length) console.log(`  \x1b[33mℹ ${selfTestOnly.length} CI gate(s) run ONLY as --self-test in CI (logic verified, NOT enforcing on repo code): ${selfTestOnly.map(g => g.id).join(', ')}\x1b[0m`);
   if (ghosts.length) { console.error(`\n\x1b[31m✗ ${ghosts.length} CI gate(s) declared but absent from workflows: ${ghosts.map(g => g.id).join(', ')}\x1b[0m`); process.exit(1); }
   console.log('  \x1b[32m✓ every CI-layer gate is present in a workflow (no ghost gate).\x1b[0m');
   process.exit(0);

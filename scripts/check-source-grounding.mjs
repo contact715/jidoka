@@ -183,7 +183,7 @@ function readAgentGroundingConfig(agentName) {
 // ── Verdict computation ────────────────────────────────────────────────────
 
 /**
- * @typedef {'grounding_pass' | 'hallucination_detected'} GroundingVerdict
+ * @typedef {'grounding_pass' | 'hallucination_detected' | 'grounding_unverifiable'} GroundingVerdict
  */
 
 /**
@@ -241,15 +241,22 @@ function computeVerdict(agentOutput, citation_schema, sourceRegistry) {
     };
   }
 
-  // A5/A6: resolve each chunk_id against the source registry
+  // A5/A6: resolve each chunk_id against the source registry.
+  // If the registry is empty/unseeded we CANNOT verify — return an honest "unverifiable" verdict
+  // instead of silently claiming all citations resolved (that let a FABRICATED chunk_id pass as
+  // grounding_pass). Non-blocking (the caller blocks only on hallucination_detected), but truthful.
+  if (sourceRegistry.size === 0) {
+    return {
+      verdict: 'grounding_unverifiable',
+      citation_count,
+      unresolved_count: 0,
+      unresolved_chunk_ids: [],
+      reason: `source registry empty/unseeded — ${citation_count} citation(s) NOT verified (gate inactive until docs/knowledge/source-registry.jsonl is seeded)`,
+    };
+  }
   const unresolvedIds = [];
   for (const citation of citations) {
-    const chunkId = citation.chunk_id;
-    // If registry is empty (not yet populated), treat all chunk_ids as resolved
-    // to avoid false positives in dev environments with no registry.
-    if (sourceRegistry.size > 0 && !sourceRegistry.has(chunkId)) {
-      unresolvedIds.push(chunkId);
-    }
+    if (!sourceRegistry.has(citation.chunk_id)) unresolvedIds.push(citation.chunk_id);
   }
 
   if (unresolvedIds.length > 0) {
