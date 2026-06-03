@@ -172,7 +172,8 @@ export function summarizeProduction(dora) {
 export function summarizeActivity(traces) {
   return tail(traces || [], 8).reverse().map((t) => ({
     agent: t.agent || t.actor || t.agentId || t.actor_agent || '—',
-    action: t.action || t.event || t.verdict || t.gate || t.kind || 'activity',
+    action: t.outcome || t.action || t.event || t.verdict || t.gate || t.kind || 'activity',
+    label: t.label || null,
     ts: t.ts || t.timestamp || null,
   }));
 }
@@ -281,6 +282,7 @@ function selfTest() {
   ok('production counts only deploys', summarizeProduction([{ type: 'deploy' }, { type: 'other' }]).deployCount === 1);
   ok('missing data degrades gracefully', summarizePipeline({}).stageCount === 0 && summarizeTasks({}).length === 0);
   ok('activity tape maps recent traces (newest first)', summarizeActivity([{ agent: 'a', action: 'x' }, { agent: 'b', action: 'y' }])[0].agent === 'b');
+  ok('activity surfaces the real outcome (VIOLATION/PASS), not a generic "activity"', summarizeActivity([{ agent: 'a', outcome: 'VIOLATION', label: 'CR-01' }])[0].action === 'VIOLATION');
   ok('lessons group by class, recurrence-sorted', summarizeLessons([{ class: 'c' }, { class: 'c' }, { class: 'd' }])[0].count === 2);
   if (f) { console.log(`\n\x1b[31mcollectors self-test FAILED (${f})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ collectors: pure summarizers correct\x1b[0m'); process.exit(0);

@@ -5,83 +5,92 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>jidoka dashboard</title>
 <style>
-  :root { --bg:#0f1115; --card:#171a21; --border:#262b36; --text:#e6e9ef; --muted:#8b93a5;
-          --green:#34d399; --amber:#fbbf24; --red:#f87171; }
+  :root { --bg:#0d0f13; --bg2:#13161c; --card:#171a21; --card2:#1c2029; --border:#262b36; --border2:#313845;
+          --text:#e7eaf0; --muted:#8b93a5; --muted2:#5b6373; --green:#34d399; --amber:#fbbf24; --red:#f87171; --blue:#7dd3fc;
+          --green-bg:rgba(52,211,153,.13); --amber-bg:rgba(251,191,36,.14); --red-bg:rgba(248,113,113,.14); --blue-bg:rgba(125,211,252,.1);
+          --shadow:0 1px 3px rgba(0,0,0,.35); --radius:14px; }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 -apple-system,system-ui,Segoe UI,sans-serif; }
-  header { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
-  h1 { font-size:15px; margin:0; }
-  #projects { display:flex; gap:8px; flex-wrap:wrap; }
-  .tab { padding:4px 12px; border:1px solid var(--border); border-radius:8px; cursor:pointer; color:var(--muted); font-size:13px; }
-  .tab.active { color:var(--text); border-color:var(--amber); background:rgba(251,191,36,.1); }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.55 -apple-system,system-ui,'Segoe UI',sans-serif; -webkit-font-smoothing:antialiased; }
+  header { padding:13px 22px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:14px; flex-wrap:wrap; background:var(--bg2); position:sticky; top:0; z-index:10; }
+  h1 { font-size:15px; margin:0; font-weight:650; letter-spacing:-.01em; }
+  #projects { display:flex; gap:7px; flex-wrap:wrap; }
+  .tab { padding:5px 13px; border:1px solid var(--border); border-radius:8px; cursor:pointer; color:var(--muted); font-size:13px; transition:all .15s; }
+  .tab:hover { color:var(--text); border-color:var(--border2); }
+  .tab.active { color:#15171c; border-color:var(--amber); background:var(--amber); font-weight:600; }
   .live { font-size:11px; color:var(--muted); }
   .live.on { color:var(--green); }
-  button { background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
-  main { padding:20px; display:grid; gap:16px; grid-template-columns:1fr 1fr; max-width:1100px; }
-  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; min-width:0; }
-  .card h2 { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 12px; }
-  .funnel { display:flex; flex-direction:column; gap:4px; }
-  .stage { padding:6px 10px; border-radius:6px; background:rgba(255,255,255,.03); font-size:12px; }
-  .badge { display:inline-block; padding:3px 10px; border-radius:6px; font-size:12px; font-weight:700; }
-  .badge.green { color:var(--green); background:rgba(52,211,153,.12); }
-  .badge.amber { color:var(--amber); background:rgba(251,191,36,.12); }
-  .badge.red { color:var(--red); background:rgba(248,113,113,.12); }
+  button { background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 13px; cursor:pointer; font-size:13px; transition:all .15s; }
+  button:hover { border-color:var(--border2); background:var(--card2); }
+  main { padding:20px 22px; display:grid; gap:14px; grid-template-columns:repeat(3,1fr); max-width:1280px; margin:0 auto; }
+  .full { grid-column:1/-1; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:17px; min-width:0; box-shadow:var(--shadow); }
+  .card h2 { font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin:0 0 13px; font-weight:600; }
+  .badge { display:inline-block; padding:4px 11px; border-radius:7px; font-size:12px; font-weight:700; letter-spacing:.02em; }
+  .badge.green { color:var(--green); background:var(--green-bg); }
+  .badge.amber { color:var(--amber); background:var(--amber-bg); }
+  .badge.red { color:var(--red); background:var(--red-bg); }
   .badge.unknown { color:var(--muted); background:rgba(139,147,165,.12); }
-  .meta { font-size:12px; color:var(--muted); }
-  .task { display:flex; gap:10px; padding:7px 0 7px 8px; border-bottom:1px solid var(--border); font-size:13px; }
-  .task .src { font-size:10px; text-transform:uppercase; color:var(--muted); min-width:104px; }
+  .meta { font-size:12px; color:var(--muted); margin:4px 0; }
+  .task { display:flex; gap:10px; padding:8px 0 8px 9px; border-bottom:1px solid var(--border); font-size:13px; align-items:baseline; }
+  .task:last-child { border-bottom:0; }
+  .task .src { font-size:9.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted2); min-width:106px; flex-shrink:0; }
   .p-critical { border-left:3px solid var(--red); }
   .p-high { border-left:3px solid var(--amber); }
-  .p-medium { border-left:3px solid var(--muted); }
-  .empty { color:var(--muted); font-size:13px; }
-  .banner { grid-column:1/-1; padding:10px 14px; border-radius:10px; background:rgba(248,113,113,.12); color:var(--red); font-weight:600; }
-  .notice { margin:20px; padding:18px 20px; border-radius:12px; background:rgba(251,191,36,.1); border:1px solid rgba(251,191,36,.3); color:var(--text); line-height:1.7; max-width:640px; }
+  .p-medium { border-left:3px solid var(--muted2); }
+  .p-low { border-left:3px solid var(--border2); }
+  .empty { color:var(--muted2); font-size:13px; }
+  .banner { grid-column:1/-1; padding:11px 16px; border-radius:12px; background:var(--red-bg); border:1px solid rgba(248,113,113,.3); color:var(--red); font-weight:600; }
+  .notice { margin:34px auto; padding:20px 22px; border-radius:14px; background:var(--amber-bg); border:1px solid rgba(251,191,36,.3); color:var(--text); line-height:1.7; max-width:640px; }
   .notice code { background:rgba(255,255,255,.08); padding:2px 7px; border-radius:5px; font-size:13px; }
   .notice b { color:var(--amber); }
   .wave-head { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; align-items:center; }
-  .tag { font-size:11px; padding:2px 9px; border-radius:20px; background:rgba(255,255,255,.06); color:var(--muted); white-space:nowrap; }
-  .tag.live-tag { color:var(--green); background:rgba(52,211,153,.12); }
-  .tag.cur-tag { color:var(--amber); background:rgba(251,191,36,.16); }
-  .tag.halt-tag { color:var(--red); background:rgba(248,113,113,.14); }
+  .tag { font-size:11px; padding:2px 10px; border-radius:20px; background:rgba(255,255,255,.06); color:var(--muted); white-space:nowrap; }
+  .tag.live-tag { color:var(--green); background:var(--green-bg); }
+  .tag.cur-tag { color:var(--amber); background:var(--amber-bg); font-weight:600; }
+  .tag.halt-tag { color:var(--red); background:var(--red-bg); }
   .pipeline { display:flex; flex-direction:column; }
-  .flow { color:var(--border); margin-left:14px; font-size:14px; line-height:1; height:13px; }
-  .stage { display:flex; gap:12px; align-items:flex-start; padding:11px 12px; border:1px solid var(--border); border-radius:10px; background:rgba(255,255,255,.02); }
-  .stage.cur { border-color:var(--amber); background:rgba(251,191,36,.06); }
-  .st-ico { width:22px; height:22px; min-width:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; margin-top:1px; }
-  .st-done .st-ico { background:rgba(52,211,153,.16); color:var(--green); }
-  .st-running .st-ico { background:rgba(251,191,36,.16); color:var(--amber); animation:pulse 1.4s ease-in-out infinite; }
-  .st-failed .st-ico { background:rgba(248,113,113,.16); color:var(--red); }
-  .st-pending .st-ico, .st-idle .st-ico { background:rgba(139,147,165,.12); color:var(--muted); }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .flow { color:var(--border2); margin-left:15px; font-size:14px; line-height:1; height:12px; }
+  .stage { display:flex; gap:13px; align-items:flex-start; padding:12px 13px; border:1px solid var(--border); border-radius:11px; background:var(--bg2); transition:border-color .15s; }
+  .stage.cur { border-color:var(--amber); background:var(--amber-bg); }
+  .st-ico { width:24px; height:24px; min-width:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; margin-top:1px; }
+  .st-done .st-ico { background:var(--green-bg); color:var(--green); }
+  .st-running .st-ico { background:var(--amber-bg); color:var(--amber); animation:pulse 1.5s ease-in-out infinite; }
+  .st-failed .st-ico { background:var(--red-bg); color:var(--red); }
+  .st-pending .st-ico, .st-idle .st-ico { background:rgba(139,147,165,.1); color:var(--muted2); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
   .st-main { flex:1; min-width:0; }
-  .st-top { display:flex; gap:6px; align-items:center; flex-wrap:wrap; font-size:13px; }
-  .chips { display:flex; gap:5px; flex-wrap:wrap; margin-top:7px; }
-  .chip { font-size:11px; padding:2px 8px; border-radius:6px; background:rgba(255,255,255,.05); color:var(--text); }
-  .chip.oc-violation, .chip.oc-fail, .chip.oc-block, .chip.oc-revise { background:rgba(248,113,113,.14); color:var(--red); }
-  .chip.oc-pass, .chip.oc-approve, .chip.oc-done { background:rgba(52,211,153,.14); color:var(--green); }
-  .gates { display:flex; gap:4px; flex-wrap:wrap; margin-top:7px; }
-  .gate { font-size:10px; padding:1px 6px; border-radius:4px; background:rgba(96,165,250,.1); color:#93c5fd; font-family:ui-monospace,Menlo,monospace; }
-  .st-note { font-size:12px; color:var(--muted); margin-top:6px; font-style:italic; }
-  .st-stat { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); min-width:54px; text-align:right; margin-top:3px; }
+  .st-top { display:flex; gap:7px; align-items:center; flex-wrap:wrap; font-size:13.5px; }
+  .st-top b { font-weight:600; }
+  .chips { display:flex; gap:5px; flex-wrap:wrap; margin-top:8px; }
+  .chip { font-size:11px; padding:3px 9px; border-radius:7px; background:rgba(255,255,255,.05); color:var(--text); }
+  .chip.oc-violation, .chip.oc-fail, .chip.oc-block, .chip.oc-revise, .chip.oc-deadlock, .chip.oc-halted { background:var(--red-bg); color:var(--red); }
+  .chip.oc-pass, .chip.oc-approve, .chip.oc-done { background:var(--green-bg); color:var(--green); }
+  .gates { display:flex; gap:5px; flex-wrap:wrap; margin-top:8px; }
+  .gate { font-size:10px; padding:2px 7px; border-radius:5px; background:var(--blue-bg); color:var(--blue); font-family:ui-monospace,Menlo,monospace; }
+  .st-note { font-size:12px; color:var(--muted); margin-top:7px; font-style:italic; }
+  .st-stat { font-size:9.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted2); min-width:54px; text-align:right; margin-top:4px; font-weight:600; }
   /* horizontal pipeline board — stage columns left→right, wave cards inside */
-  .board { display:flex; gap:10px; overflow-x:auto; padding-bottom:8px; -webkit-overflow-scrolling:touch; }
-  .col { flex:0 0 160px; min-width:160px; background:rgba(255,255,255,.02); border:1px solid var(--border); border-radius:10px; display:flex; flex-direction:column; }
-  .col-h { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding:9px 10px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:6px; }
-  .col-n { background:rgba(251,191,36,.16); color:var(--amber); border-radius:10px; padding:0 7px; font-size:11px; font-weight:700; }
-  .col-body { padding:8px; display:flex; flex-direction:column; gap:8px; min-height:56px; }
-  .col-empty { color:var(--border); text-align:center; padding:12px 0; font-size:18px; }
-  .wcard { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:9px; cursor:pointer; transition:border-color .15s; }
-  .wcard:hover { border-color:var(--muted); }
-  .wcard.sel { border-color:var(--amber); background:rgba(251,191,36,.07); }
-  .wcard-top { font-size:12px; font-weight:600; word-break:break-word; }
-  .wcard-meta { display:flex; gap:4px; margin:6px 0; flex-wrap:wrap; }
-  .rb { font-size:10px; padding:1px 6px; border-radius:5px; background:rgba(255,255,255,.06); color:var(--muted); }
-  .rb-crit { background:rgba(248,113,113,.16); color:var(--red); }
-  .rb-live { background:rgba(52,211,153,.14); color:var(--green); }
-  .bar { height:5px; border-radius:3px; background:rgba(255,255,255,.08); overflow:hidden; }
-  .bar span { display:block; height:100%; background:var(--green); }
-  .wcard-pct { font-size:10px; color:var(--muted); margin-top:5px; }
-  @media (max-width:920px) { main { grid-template-columns:1fr; padding:14px; gap:12px; } .col { flex-basis:144px; min-width:144px; } }
+  .board { display:flex; gap:11px; overflow-x:auto; padding-bottom:10px; align-items:stretch; -webkit-overflow-scrolling:touch; }
+  .col { flex:0 0 166px; min-width:166px; background:var(--bg2); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; }
+  .col.has-wave { border-color:var(--border2); }
+  .col-h { font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding:10px 11px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:6px; }
+  .col-n { background:var(--amber-bg); color:var(--amber); border-radius:10px; padding:0 7px; font-size:11px; font-weight:700; margin-left:auto; }
+  .col-body { padding:9px; display:flex; flex-direction:column; gap:9px; flex:1; min-height:38px; }
+  .col-empty { color:var(--border2); text-align:center; padding:13px 0; font-size:15px; opacity:.5; }
+  .wcard { background:var(--card2); border:1px solid var(--border2); border-left:3px solid var(--border2); border-radius:8px; padding:8px 9px; cursor:pointer; transition:all .15s; }
+  .wcard:hover { border-color:var(--muted2); transform:translateY(-1px); box-shadow:var(--shadow); }
+  .wcard.sel { border-color:var(--amber); background:var(--amber-bg); }
+  .wcard.crit { border-left-color:var(--red); }
+  .wcard.live { border-left-color:var(--green); }
+  .wcard.done { padding:6px 9px; border-left-color:var(--green); }
+  .wcard.done .wcard-name { font-weight:500; color:var(--muted); }
+  .wcard-hd { display:flex; justify-content:space-between; gap:7px; align-items:baseline; }
+  .wcard-name { font-size:11.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+  .wcard-p { font-size:10px; color:var(--muted); flex-shrink:0; }
+  .bar { height:5px; border-radius:3px; background:rgba(255,255,255,.07); overflow:hidden; margin-top:7px; }
+  .bar span { display:block; height:100%; border-radius:3px; background:linear-gradient(90deg,#34d399,#5eead4); transition:width .4s ease; }
+  @media (max-width:980px) { main { grid-template-columns:1fr 1fr; } }
+  @media (max-width:720px) { main { grid-template-columns:1fr; padding:14px; gap:12px; } .col { flex-basis:150px; min-width:150px; } }
   @media (max-width:560px) { header { padding:10px 14px; gap:8px; } h1 { font-size:14px; } .stage { flex-wrap:wrap; } }
 </style>
 </head>
@@ -156,15 +165,14 @@ function stageHtml(s) {
 function boardHtml(d) {
   const cols = (d.board && d.board.columns) || [];
   return '<div class="board">' + cols.map((c) => `
-    <div class="col">
+    <div class="col${c.waves.length ? ' has-wave' : ''}">
       <div class="col-h">${esc(c.label)}${c.waves.length ? `<span class="col-n">${c.waves.length}</span>` : ''}</div>
       <div class="col-body">
-        ${c.waves.length ? c.waves.map((w) => `
-          <div class="wcard${w.wave === selectedWave ? ' sel' : ''}" onclick="selectWave('${esc(w.wave)}')">
-            <div class="wcard-top">${esc(w.wave)}</div>
-            <div class="wcard-meta"><span class="rb${w.risk === 'critical' ? ' rb-crit' : ''}">${esc(w.risk)}</span>${w.live ? '<span class="rb rb-live">live</span>' : ''}</div>
+        ${c.waves.length ? c.waves.map((w) => w.progress >= 100
+          ? `<div class="wcard done${w.wave === selectedWave ? ' sel' : ''}" onclick="selectWave('${esc(w.wave)}')" title="${esc(w.wave)} · shipped 100%"><span class="wcard-name">✓ ${esc(w.wave)}</span></div>`
+          : `<div class="wcard${w.wave === selectedWave ? ' sel' : ''}${w.risk === 'critical' ? ' crit' : w.live ? ' live' : ''}" onclick="selectWave('${esc(w.wave)}')" title="${esc(w.wave)} · ${esc(w.risk)}${w.live ? ' · live' : ''} · ${w.progress}% фаз done">
+            <div class="wcard-hd"><span class="wcard-name">${esc(w.wave)}</span><span class="wcard-p">${w.progress}%</span></div>
             <div class="bar"><span style="width:${w.progress}%"></span></div>
-            <div class="wcard-pct">${w.progress}% фаз done</div>
           </div>`).join('') : '<div class="col-empty">—</div>'}
       </div>
     </div>`).join('') + '</div>';
@@ -199,12 +207,12 @@ function paint(d) {
     : '<span class="empty">всё чисто</span>';
   document.getElementById('main').innerHTML = `
     ${banner}
-    <div class="card" style="grid-column:1/-1">
+    <div class="card full">
       <h2>Pipeline · ${esc((d.pipeline && d.pipeline.branch) || '')} · ${(d.board && d.board.waveCount) || 0} волн(ы) в потоке</h2>
       ${boardHtml(d)}
       ${hint}
     </div>
-    <div class="card" style="grid-column:1/-1">
+    <div class="card full">
       <h2>Детали волны&nbsp;&nbsp;<span style="text-transform:none;letter-spacing:0">${detailTags}</span></h2>
       <div class="pipeline">${detailBody}</div>
     </div>
@@ -212,23 +220,23 @@ function paint(d) {
       <h2>Health</h2>
       <span class="badge ${h.level}">${h.level.toUpperCase()}</span>
       <p class="meta">eval ${h.evalPct ?? '—'}% · recent fails ${h.recentFails} · ${h.halt ? 'HALTED' : 'running'}</p>
-      <h2 style="margin-top:18px">Production pipeline</h2>
+      <h2 style="margin-top:18px">Production</h2>
       <p class="meta">${d.production.deployCount} deploy event(s)</p>
       <p class="meta">updated ${new Date(d.collectedAt).toLocaleTimeString()}</p>
     </div>
     <div class="card">
-      <h2>Что висит · ${d.tasks.length}</h2>
-      ${tasks}
-    </div>
-    <div class="card">
       <h2>Лента действий агентов</h2>
-      ${(d.activity || []).length ? d.activity.map((a) => '<div class="task"><span class="src">' + esc(a.agent) + '</span><span>' + esc(a.action) + '</span></div>').join('') : '<span class="empty">тихо</span>'}
+      ${(d.activity || []).length ? d.activity.map((a) => '<div class="task"><span class="src">' + esc(a.agent) + '</span><span class="chip' + (a.action ? ' oc-' + esc(String(a.action).toLowerCase()) : '') + '">' + esc(a.action) + '</span>' + (a.label ? '<span class="meta" style="margin-left:auto">' + esc(a.label) + '</span>' : '') + '</div>').join('') : '<span class="empty">тихо</span>'}
     </div>
     <div class="card">
       <h2>Уроки мета-леджера · рецидив</h2>
       ${(d.lessons || []).length ? d.lessons.map((l) => '<div class="task"><span class="src">' + l.count + '×</span><span>' + esc(l.class) + '</span></div>').join('') : '<span class="empty">нет</span>'}
     </div>
-    <div class="card" style="grid-column:1/-1">
+    <div class="card full">
+      <h2>Что висит · ${d.tasks.length}</h2>
+      ${tasks}
+    </div>
+    <div class="card full">
       <h2>Timeline · последние волны</h2>
       ${(d.timeline || []).length ? d.timeline.map((t) => '<div class="task"><span class="src">' + esc(t.hash) + '</span><span>' + esc(t.subject) + '</span><span class="meta" style="margin-left:auto">' + esc(t.when) + '</span></div>').join('') : '<span class="empty">нет коммитов</span>'}
     </div>`;
