@@ -10,6 +10,14 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { execSync } from 'node:child_process';
 
+// The canonical pipeline graph lives in orchestration-planner.plan() — the single source of truth for
+// the phase graph. The dashboard renders that REAL graph (phases · agents · gates) overlaid with the
+// live run-state cursor, not a hand-rolled funnel. Degrade gracefully if the planner is unreachable
+// (e.g. a partial install): phases then come from the run-state journal alone, without gate enrichment.
+let plan = null;
+try { ({ plan } = await import('../orchestration-planner.mjs')); } catch { /* planner absent — pipeline still renders from run-state */ }
+const safePlan = (task) => { try { return plan ? plan(task || { type: 'feature', risk: 'normal', surfaces: ['frontend', 'backend'] }) : null; } catch { return null; } };
+
 // ── safe readers ───────────────────────────────────────────────────────────
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
 const readJsonl = (p) => {
@@ -50,9 +58,51 @@ export function discoverProjects(home = homedir(), frameworkRoot = null) {
 }
 
 // ── pure summarizers (testable without fs) ──────────────────────────────────
-export function summarizePipeline(raci, halt, branch) {
-  const stages = (raci?.activities || []).map((a) => ({ id: a.id, label: a.label }));
-  return { stages, halted: Boolean(halt), branch: branch || null, stageCount: stages.length };
+const PHASE_LABEL = {
+  discovery: 'Discovery', spec: 'Spec', tests: 'Tests', build: 'Build',
+  gate: 'Quality gates', debug: 'Debug', launch: 'Launch', memory: 'Memory · Kaizen',
+};
+
+// The REAL pipeline: the canonical phase graph (plan()) overlaid with the live run-state position
+// (docs/runs/<wave>/state.json) and real agent outcomes (agent-traces). No hand-rolled funnel.
+//   runState  — the live wave journal (phases with status, current cursor) or null
+//   planGraph — plan(task): each phase enriched with gates[]/skills[]/parallel/verifyN
+//   traces    — agent-traces rows; latest outcome per agent overlays onto the agent chip
+export function summarizePipeline({ runState = null, planGraph = null, halt = false, branch = null, traces = [] } = {}) {
+  const agentOutcome = {};
+  for (const t of traces) { const a = t.agent || t.actor; const o = t.outcome || t.verdict; if (a && o) agentOutcome[a] = o; }
+
+  const enrich = {};
+  for (const p of planGraph?.phases || []) enrich[p.phase] = { gates: p.gates || [], parallel: !!p.parallel, verifyN: p.verifyN || null };
+
+  // Live phases from the run-state journal; otherwise the canonical graph with every phase 'idle'.
+  const base = runState?.phases?.length
+    ? runState.phases
+    : (planGraph?.phases || []).map((p) => ({ phase: p.phase, status: 'idle', agents: p.agents || [], note: '' }));
+
+  const stages = base.map((p) => ({
+    phase: p.phase,
+    label: PHASE_LABEL[p.phase] || p.phase,
+    status: p.status || 'idle',
+    current: Boolean(runState && runState.current === p.phase),
+    agents: (p.agents || []).map((a) => ({ name: a, outcome: agentOutcome[a] || null })),
+    gates: enrich[p.phase]?.gates || [],
+    parallel: enrich[p.phase]?.parallel || false,
+    verifyN: enrich[p.phase]?.verifyN || null,
+    note: p.note || '',
+  }));
+
+  const done = stages.filter((s) => s.status === 'done').length;
+  return {
+    stages, stageCount: stages.length,
+    wave: runState?.wave || null,
+    task: runState?.task || planGraph?.task || null,
+    current: runState?.current || null,
+    live: Boolean(runState),
+    progress: stages.length ? Math.round((done / stages.length) * 100) : 0,
+    halted: Boolean(halt), branch: branch || null,
+    updatedAt: runState?.updatedAt || null,
+  };
 }
 
 export function summarizeTasks({ metaMistakes = [], gateTrips = [], approvals = [], crossLine = [], reflexionQueue = 0, halt = false }) {
@@ -117,7 +167,6 @@ export function summarizeLessons(metaMistakes) {
 
 // ── fs gather (impure) ──────────────────────────────────────────────────────
 export function collectProject(projectPath) {
-  const raci = readJson(resolve(projectPath, 'docs/governance/raci.json'));
   const halt = ['docs/audits/andon-halt.json', 'docs/audits/halt-state.json', '.sdd-halt-state.json']
     .some((p) => resolve(projectPath, p));
   let branch = null;
@@ -145,8 +194,26 @@ export function collectProject(projectPath) {
       .map((l) => { const [hash, subject, when] = l.split('|'); return { hash, subject, when }; });
   } catch { /* not git */ }
 
+  // live wave position — the most recently updated run-state journal is the REAL pipeline cursor.
+  let runState = null;
+  const runsDir = resolve(projectPath, 'docs/runs');
+  if (runsDir) {
+    try {
+      const states = readdirSync(runsDir, { withFileTypes: true })
+        .filter((d) => d.isDirectory())
+        .map((d) => readJson(join(runsDir, d.name, 'state.json')))
+        .filter(Boolean);
+      // prefer the most-recently-updated wave that actually MOVED (has events or a non-pending phase)
+      // over one merely initialised; fall back to the most recent overall.
+      const moved = states.filter((s) => (s.events?.length) || (s.phases || []).some((p) => p.status && p.status !== 'pending'));
+      const pool = moved.length ? moved : states;
+      runState = pool.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))[0] || null;
+    } catch { /* no runs */ }
+  }
+  const planGraph = safePlan(runState?.task);
+
   return {
-    pipeline: summarizePipeline(raci, halt, branch),
+    pipeline: summarizePipeline({ runState, planGraph, halt, branch, traces }),
     tasks: summarizeTasks({ metaMistakes, gateTrips, approvals, crossLine, reflexionQueue, halt }),
     health: summarizeHealth(baseline, halt, gateTrips),
     production: summarizeProduction(dora),
@@ -161,14 +228,19 @@ export function collectProject(projectPath) {
 function selfTest() {
   let f = 0;
   const ok = (n, c) => { if (!c) f++; console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };
-  ok('pipeline stages derived from raci', summarizePipeline({ activities: [{ id: 'dor', label: 'DoR' }, { id: 'impl', label: 'Impl' }] }, false, 'main').stageCount === 2);
+  const pg = { phases: [{ phase: 'gate', agents: ['reflexion-critic'], gates: ['coverage-gate'], parallel: true, verifyN: 3 }] };
+  const rs = { wave: 'w-1', task: {}, current: 'gate', updatedAt: '2026-06-02', phases: [{ phase: 'gate', status: 'running', agents: ['reflexion-critic'], note: 'n' }] };
+  ok('pipeline overlays run-state status + gates on canonical phases', (() => { const s = summarizePipeline({ runState: rs, planGraph: pg }); return s.stages[0].status === 'running' && s.stages[0].current && s.stages[0].gates.includes('coverage-gate') && s.live === true; })());
+  ok('pipeline falls back to canonical graph (idle) with no run-state', (() => { const s = summarizePipeline({ planGraph: pg }); return s.stages[0].status === 'idle' && s.live === false; })());
+  ok('pipeline overlays real agent outcomes from traces', summarizePipeline({ runState: rs, planGraph: pg, traces: [{ agent: 'reflexion-critic', outcome: 'PASS' }] }).stages[0].agents[0].outcome === 'PASS');
+  ok('pipeline progress = % phases done', summarizePipeline({ runState: { phases: [{ phase: 'a', status: 'done' }, { phase: 'b', status: 'pending' }] } }).progress === 50);
   ok('halt → red health', summarizeHealth({ pass_rate: 1 }, true, []).level === 'red');
   ok('100% eval + no fails → green', summarizeHealth({ pass_rate: 1 }, false, []).level === 'green');
   ok('eval present but failing → amber', summarizeHealth({ pass_rate: 0.9 }, false, [{ verdict: 'FAIL' }]).level === 'amber');
   ok('halt task is critical and first', summarizeTasks({ halt: true, metaMistakes: [{ class: 'x', real: 'y' }] })[0].priority === 'critical');
   ok('tasks priority-sorted', summarizeTasks({ approvals: [{ summary: 'a' }], gateTrips: [{ verdict: 'FAIL', gate: 'g' }] })[0].priority === 'high');
   ok('production counts only deploys', summarizeProduction([{ type: 'deploy' }, { type: 'other' }]).deployCount === 1);
-  ok('missing data degrades gracefully', summarizePipeline(null, false, null).stageCount === 0 && summarizeTasks({}).length === 0);
+  ok('missing data degrades gracefully', summarizePipeline({}).stageCount === 0 && summarizeTasks({}).length === 0);
   ok('activity tape maps recent traces (newest first)', summarizeActivity([{ agent: 'a', action: 'x' }, { agent: 'b', action: 'y' }])[0].agent === 'b');
   ok('lessons group by class, recurrence-sorted', summarizeLessons([{ class: 'c' }, { class: 'c' }, { class: 'd' }])[0].count === 2);
   if (f) { console.log(`\n\x1b[31mcollectors self-test FAILED (${f})\x1b[0m`); process.exit(1); }

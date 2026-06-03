@@ -38,6 +38,31 @@
   .notice { margin:20px; padding:18px 20px; border-radius:12px; background:rgba(251,191,36,.1); border:1px solid rgba(251,191,36,.3); color:var(--text); line-height:1.7; max-width:640px; }
   .notice code { background:rgba(255,255,255,.08); padding:2px 7px; border-radius:5px; font-size:13px; }
   .notice b { color:var(--amber); }
+  .wave-head { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; align-items:center; }
+  .tag { font-size:11px; padding:2px 9px; border-radius:20px; background:rgba(255,255,255,.06); color:var(--muted); white-space:nowrap; }
+  .tag.live-tag { color:var(--green); background:rgba(52,211,153,.12); }
+  .tag.cur-tag { color:var(--amber); background:rgba(251,191,36,.16); }
+  .tag.halt-tag { color:var(--red); background:rgba(248,113,113,.14); }
+  .pipeline { display:flex; flex-direction:column; }
+  .flow { color:var(--border); margin-left:14px; font-size:14px; line-height:1; height:13px; }
+  .stage { display:flex; gap:12px; align-items:flex-start; padding:11px 12px; border:1px solid var(--border); border-radius:10px; background:rgba(255,255,255,.02); }
+  .stage.cur { border-color:var(--amber); background:rgba(251,191,36,.06); }
+  .st-ico { width:22px; height:22px; min-width:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; margin-top:1px; }
+  .st-done .st-ico { background:rgba(52,211,153,.16); color:var(--green); }
+  .st-running .st-ico { background:rgba(251,191,36,.16); color:var(--amber); animation:pulse 1.4s ease-in-out infinite; }
+  .st-failed .st-ico { background:rgba(248,113,113,.16); color:var(--red); }
+  .st-pending .st-ico, .st-idle .st-ico { background:rgba(139,147,165,.12); color:var(--muted); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .st-main { flex:1; min-width:0; }
+  .st-top { display:flex; gap:6px; align-items:center; flex-wrap:wrap; font-size:13px; }
+  .chips { display:flex; gap:5px; flex-wrap:wrap; margin-top:7px; }
+  .chip { font-size:11px; padding:2px 8px; border-radius:6px; background:rgba(255,255,255,.05); color:var(--text); }
+  .chip.oc-violation, .chip.oc-fail, .chip.oc-block, .chip.oc-revise { background:rgba(248,113,113,.14); color:var(--red); }
+  .chip.oc-pass, .chip.oc-approve, .chip.oc-done { background:rgba(52,211,153,.14); color:var(--green); }
+  .gates { display:flex; gap:4px; flex-wrap:wrap; margin-top:7px; }
+  .gate { font-size:10px; padding:1px 6px; border-radius:4px; background:rgba(96,165,250,.1); color:#93c5fd; font-family:ui-monospace,Menlo,monospace; }
+  .st-note { font-size:12px; color:var(--muted); margin-top:6px; font-style:italic; }
+  .st-stat { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); min-width:54px; text-align:right; margin-top:3px; }
 </style>
 </head>
 <body>
@@ -98,17 +123,38 @@ async function render() {
   catch { notice(SERVER_HINT); return; }
   const h = d.health;
   const banner = h.halt ? '<div class="banner">🔴 ANDON — pipeline halted, resume required</div>' : '';
-  const stages = d.pipeline.stages.length
-    ? d.pipeline.stages.map((s) => '<div class="stage">' + esc(s.label) + '</div>').join('')
-    : '<span class="empty">нет RACI-этапов</span>';
+  const P = d.pipeline;
+  const ICON = { done: '✓', running: '▸', failed: '✗', pending: '○', idle: '◦' };
+  const stageHtml = (s) => `
+    <div class="stage st-${s.status}${s.current ? ' cur' : ''}">
+      <div class="st-ico">${ICON[s.status] || '○'}</div>
+      <div class="st-main">
+        <div class="st-top"><b>${esc(s.label)}</b>${s.parallel ? '<span class="tag">∥ parallel</span>' : ''}${s.verifyN ? `<span class="tag">verify ×${s.verifyN}</span>` : ''}${s.current ? '<span class="tag cur-tag">● волна здесь</span>' : ''}</div>
+        ${s.agents.length ? `<div class="chips">${s.agents.map((a) => `<span class="chip${a.outcome ? ' oc-' + esc(String(a.outcome).toLowerCase()) : ''}">${esc(a.name)}${a.outcome ? ' · ' + esc(a.outcome) : ''}</span>`).join('')}</div>` : ''}
+        ${s.gates.length ? `<div class="gates">${s.gates.map((g) => `<span class="gate">${esc(g)}</span>`).join('')}</div>` : ''}
+        ${s.note ? `<div class="st-note">“${esc(s.note)}”</div>` : ''}
+      </div>
+      <div class="st-stat">${esc(s.status)}</div>
+    </div>`;
+  const pipeBody = P.stages.length
+    ? P.stages.map(stageHtml).join('<div class="flow">│</div>')
+    : '<span class="empty">нет графа пайплана (планировщик недоступен и нет run-state)</span>';
+  const waveTags = [
+    P.wave ? `<span class="tag">волна: ${esc(P.wave)}</span>` : '',
+    P.task ? `<span class="tag">${esc(P.task.risk || 'normal')}${(P.task.surfaces || []).length ? ' · ' + esc((P.task.surfaces || []).join('+')) : ''}</span>` : '',
+    `<span class="tag ${P.live ? 'live-tag' : ''}">${P.live ? '● live wave' : 'canonical graph'}</span>`,
+    `<span class="tag">${P.progress}% phases done</span>`,
+    P.halted ? '<span class="tag halt-tag">🔴 ANDON halted</span>' : '',
+  ].filter(Boolean).join('');
   const tasks = d.tasks.length
     ? d.tasks.map((t) => '<div class="task p-' + t.priority + '"><span class="src">' + esc(t.source) + '</span><span>' + esc(t.text) + '</span></div>').join('')
     : '<span class="empty">всё чисто</span>';
   document.getElementById('main').innerHTML = `
     ${banner}
-    <div class="card">
-      <h2>Dev-pipeline · ${esc(d.pipeline.branch || '')}</h2>
-      <div class="funnel">${stages}</div>
+    <div class="card" style="grid-column:1/-1">
+      <h2>Dev-pipeline · ${esc(P.branch || '')}</h2>
+      <div class="wave-head">${waveTags}</div>
+      <div class="pipeline">${pipeBody}</div>
     </div>
     <div class="card">
       <h2>Health</h2>
