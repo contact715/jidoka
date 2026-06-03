@@ -10,16 +10,16 @@
   "phases": [
     {
       "phase": "discovery",
-      "status": "pending",
+      "status": "done",
       "agents": [
         "user-researcher",
         "product-strategist"
       ],
-      "note": ""
+      "note": "docs/runs/wave-cost-ledger/discovery.md (triple-spend incident)"
     },
     {
       "phase": "spec",
-      "status": "pending",
+      "status": "done",
       "agents": [
         "chief-architect",
         "micro-architect",
@@ -29,28 +29,28 @@
         "business-process-architect",
         "kaizen-officer"
       ],
-      "note": ""
+      "note": "wave-cost-ledger_MASTER_SPEC.md, 5 ACs approved"
     },
     {
       "phase": "tests",
-      "status": "pending",
+      "status": "done",
       "agents": [
         "test-engineer"
       ],
-      "note": ""
+      "note": "cost-ledger --self-test 11/11 green"
     },
     {
       "phase": "build",
-      "status": "pending",
+      "status": "done",
       "agents": [
         "engineering-lead",
         "backend-agent"
       ],
-      "note": ""
+      "note": "cost-ledger.mjs shipped + wired, node --check ok"
     },
     {
       "phase": "gate",
-      "status": "pending",
+      "status": "done",
       "agents": [
         "reflexion-critic",
         "constitutional-reviewer",
@@ -59,29 +59,72 @@
         "policy-sandbox",
         "security-scanner"
       ],
-      "note": ""
+      "note": "precision-guard + resource-guard regressions green; eval 84 to 85"
     },
     {
       "phase": "debug",
-      "status": "pending",
+      "status": "done",
       "agents": [
         "debug-agent"
       ],
-      "note": ""
+      "note": "2 gate false-positives fixed + locked as regression cases"
     },
     {
       "phase": "memory",
-      "status": "pending",
+      "status": "done",
       "agents": [
         "skill-extractor",
         "data-analyst",
         "kaizen-officer"
       ],
-      "note": ""
+      "note": "retro: docs/retros/wave-cost-ledger.md"
     }
   ],
-  "current": "discovery",
-  "events": [],
+  "current": null,
+  "events": [
+    {
+      "at": "2026-06-03T05:27:57.373Z",
+      "phase": "discovery",
+      "status": "done",
+      "note": "docs/runs/wave-cost-ledger/discovery.md (triple-spend incident)"
+    },
+    {
+      "at": "2026-06-03T05:27:57.422Z",
+      "phase": "spec",
+      "status": "done",
+      "note": "wave-cost-ledger_MASTER_SPEC.md, 5 ACs approved"
+    },
+    {
+      "at": "2026-06-03T05:27:57.467Z",
+      "phase": "tests",
+      "status": "done",
+      "note": "cost-ledger --self-test 11/11 green"
+    },
+    {
+      "at": "2026-06-03T05:27:57.516Z",
+      "phase": "build",
+      "status": "done",
+      "note": "cost-ledger.mjs shipped + wired, node --check ok"
+    },
+    {
+      "at": "2026-06-03T05:27:57.563Z",
+      "phase": "gate",
+      "status": "done",
+      "note": "precision-guard + resource-guard regressions green; eval 84 to 85"
+    },
+    {
+      "at": "2026-06-03T05:27:57.605Z",
+      "phase": "debug",
+      "status": "done",
+      "note": "2 gate false-positives fixed + locked as regression cases"
+    },
+    {
+      "at": "2026-06-03T05:27:57.646Z",
+      "phase": "memory",
+      "status": "done",
+      "note": "retro: docs/retros/wave-cost-ledger.md"
+    }
+  ],
   "createdAt": "2026-06-02T15:47:48.375Z",
-  "updatedAt": "2026-06-02T15:47:48.375Z"
+  "updatedAt": "2026-06-03T05:27:57.646Z"
 }

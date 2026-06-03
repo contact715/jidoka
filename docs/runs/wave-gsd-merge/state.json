@@ -31,11 +31,11 @@
     },
     {
       "phase": "tests",
-      "status": "pending",
+      "status": "done",
       "agents": [
         "test-engineer"
       ],
-      "note": ""
+      "note": "12/12 self-tests green (run-state, spec-size-check, model-router, skill-selector, spec-tldr, trend-scan, mutation-test, verify-goal-backward)"
     },
     {
       "phase": "build",
@@ -47,7 +47,7 @@
     },
     {
       "phase": "gate",
-      "status": "pending",
+      "status": "done",
       "agents": [
         "reflexion-critic",
         "constitutional-reviewer",
@@ -60,28 +60,28 @@
         "judge-panel",
         "best-of-N-judge"
       ],
-      "note": ""
+      "note": "verify-goal-backward: all A-F traced; instantiation-audit 0 ghosts; planner/gate-audit/proof-gate green"
     },
     {
       "phase": "debug",
-      "status": "pending",
+      "status": "done",
       "agents": [
         "debug-agent"
       ],
-      "note": ""
+      "note": "0 failures across tests+gate"
     },
     {
       "phase": "memory",
-      "status": "pending",
+      "status": "done",
       "agents": [
         "skill-extractor",
         "data-analyst",
         "kaizen-officer"
       ],
-      "note": ""
+      "note": "retro: docs/retros/wave-gsd-merge.md"
     }
   ],
-  "current": "tests",
+  "current": null,
   "events": [
     {
       "at": "2026-06-01T19:54:20.372Z",
@@ -106,8 +106,32 @@
       "phase": "build",
       "status": "done",
       "note": "borrows A-F shipped + proven"
+    },
+    {
+      "at": "2026-06-03T05:27:57.192Z",
+      "phase": "tests",
+      "status": "done",
+      "note": "12/12 self-tests green (run-state, spec-size-check, model-router, skill-selector, spec-tldr, trend-scan, mutation-test, verify-goal-backward)"
+    },
+    {
+      "at": "2026-06-03T05:27:57.238Z",
+      "phase": "gate",
+      "status": "done",
+      "note": "verify-goal-backward: all A-F traced; instantiation-audit 0 ghosts; planner/gate-audit/proof-gate green"
+    },
+    {
+      "at": "2026-06-03T05:27:57.284Z",
+      "phase": "debug",
+      "status": "done",
+      "note": "0 failures across tests+gate"
+    },
+    {
+      "at": "2026-06-03T05:27:57.328Z",
+      "phase": "memory",
+      "status": "done",
+      "note": "retro: docs/retros/wave-gsd-merge.md"
     }
   ],
   "createdAt": "2026-06-01T19:54:20.333Z",
-  "updatedAt": "2026-06-01T20:27:14.258Z"
+  "updatedAt": "2026-06-03T05:27:57.328Z"
 }
