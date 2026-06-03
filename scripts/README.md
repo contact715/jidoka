@@ -57,10 +57,6 @@ bash scripts/check-security-patterns.sh
 
 Or via npm script: `npm run check:security`.
 
-## generate-vertical-images.mjs
-
-One-off generator for vertical asset images. See file header for usage.
-
 ## Meta-Mistake Engine (`meta-*`)
 
 A self-improving system that turns recurring PROCESS mistakes into enforced gates,

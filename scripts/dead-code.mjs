@@ -35,15 +35,15 @@ function gather(root) {
   const sources = ['package.json', '.sdd-config.json', 'README.md', 'CLAUDE.md',
     'docs/evals/_cases.jsonl', 'scripts/README.md', 'scripts/jidoka.mjs'];
   let externalText = sources.map((p) => join(root, p)).filter(existsSync).map((p) => readFileSync(p, 'utf8')).join('\n');
-  // walked dirs: workflows, skills, agents, docs, AND git hooks (.husky — extensionless hook files).
-  for (const sub of [['.github', 'workflows'], ['.claude', 'skills'], ['.claude', 'agents'], ['docs'], ['.husky']]) {
+  // walked dirs: workflows, skills, agents, docs, AND git hooks (.husky/.githooks — extensionless hook files).
+  for (const sub of [['.github', 'workflows'], ['.claude', 'skills'], ['.claude', 'agents'], ['docs'], ['.husky'], ['.githooks']]) {
     const d = join(root, ...sub);
     if (!existsSync(d)) continue;
-    const husky = sub[0] === '.husky';
+    const hooks = sub[0] === '.husky' || sub[0] === '.githooks';
     const walk = (dir) => readdirSync(dir, { withFileTypes: true }).forEach((e) => {
       const p = join(dir, e.name);
       if (e.isDirectory()) walk(p);
-      else if (husky || /\.(ya?ml|md|json|sh|cjs)$/.test(e.name)) externalText += '\n' + readFileSync(p, 'utf8');
+      else if (hooks || /\.(ya?ml|md|json|sh|cjs)$/.test(e.name)) externalText += '\n' + readFileSync(p, 'utf8');
     });
     try { walk(d); } catch { /* ignore */ }
   }

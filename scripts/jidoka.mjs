@@ -24,6 +24,8 @@ export const CMDS = {
   audit: { s: 'meta-audit.mjs', help: 'recurrence / regression / ungated mistake classes' },
   honesty: { s: 'meta-honesty.mjs', help: 'audit the honesty of the learning signal itself' },
   trend: { s: 'meta-trend.mjs', help: 'learning trend over time (incidents, fitness, coverage)' },
+  decay: { s: 'meta-decay.mjs', help: 'which gates may relax (mature) vs must stay hard' },
+  generalize: { s: 'meta-generalize.mjs', help: 'lesson families: reuse a gate for a variant class' },
   eval: { s: 'eval-suite.mjs', help: 'deterministic eval suite vs baseline' },
   ghosts: { s: 'instantiation-audit.mjs', help: 'anti-ghost: every declared mechanism is real' },
   gates: { s: 'gate-audit.mjs', help: 'map of all gates by layer + CI-ghost detection' },
