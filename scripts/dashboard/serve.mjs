@@ -9,7 +9,7 @@ import { exec } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, watch } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { homedir } from 'node:os';
+import { homedir, networkInterfaces } from 'node:os';
 import { discoverProjects, collectProject } from './collectors.mjs';
 import { snapshotMarkdown } from './gdoc-export.mjs';
 
@@ -86,6 +86,9 @@ server.listen(PORT, () => {
   const watched = watchProjects();
   const target = `http://localhost:${PORT}`;
   console.log(`\n  🦞 jidoka dashboard → ${target}`);
+  // LAN address so the board opens on an iPad / phone on the same Wi-Fi (server binds all interfaces).
+  const lan = Object.values(networkInterfaces()).flat().find((i) => i && i.family === 'IPv4' && !i.internal);
+  if (lan) console.log(`  📱 iPad / телефон (та же Wi-Fi): http://${lan.address}:${PORT}`);
   console.log(`  ${projects().length} projects · ${watched} live watchers · Ctrl-C to stop\n`);
   // Auto-open the browser so the dashboard is never just a URL in a log (opt out: JIDOKA_DASHBOARD_NO_OPEN=1).
   if (!process.env.JIDOKA_DASHBOARD_NO_OPEN) {

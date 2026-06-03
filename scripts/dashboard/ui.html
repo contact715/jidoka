@@ -18,7 +18,7 @@
   .live.on { color:var(--green); }
   button { background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
   main { padding:20px; display:grid; gap:16px; grid-template-columns:1fr 1fr; max-width:1100px; }
-  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; min-width:0; }
   .card h2 { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 12px; }
   .funnel { display:flex; flex-direction:column; gap:4px; }
   .stage { padding:6px 10px; border-radius:6px; background:rgba(255,255,255,.03); font-size:12px; }
@@ -63,6 +63,26 @@
   .gate { font-size:10px; padding:1px 6px; border-radius:4px; background:rgba(96,165,250,.1); color:#93c5fd; font-family:ui-monospace,Menlo,monospace; }
   .st-note { font-size:12px; color:var(--muted); margin-top:6px; font-style:italic; }
   .st-stat { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); min-width:54px; text-align:right; margin-top:3px; }
+  /* horizontal pipeline board — stage columns left→right, wave cards inside */
+  .board { display:flex; gap:10px; overflow-x:auto; padding-bottom:8px; -webkit-overflow-scrolling:touch; }
+  .col { flex:0 0 160px; min-width:160px; background:rgba(255,255,255,.02); border:1px solid var(--border); border-radius:10px; display:flex; flex-direction:column; }
+  .col-h { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding:9px 10px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:6px; }
+  .col-n { background:rgba(251,191,36,.16); color:var(--amber); border-radius:10px; padding:0 7px; font-size:11px; font-weight:700; }
+  .col-body { padding:8px; display:flex; flex-direction:column; gap:8px; min-height:56px; }
+  .col-empty { color:var(--border); text-align:center; padding:12px 0; font-size:18px; }
+  .wcard { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:9px; cursor:pointer; transition:border-color .15s; }
+  .wcard:hover { border-color:var(--muted); }
+  .wcard.sel { border-color:var(--amber); background:rgba(251,191,36,.07); }
+  .wcard-top { font-size:12px; font-weight:600; word-break:break-word; }
+  .wcard-meta { display:flex; gap:4px; margin:6px 0; flex-wrap:wrap; }
+  .rb { font-size:10px; padding:1px 6px; border-radius:5px; background:rgba(255,255,255,.06); color:var(--muted); }
+  .rb-crit { background:rgba(248,113,113,.16); color:var(--red); }
+  .rb-live { background:rgba(52,211,153,.14); color:var(--green); }
+  .bar { height:5px; border-radius:3px; background:rgba(255,255,255,.08); overflow:hidden; }
+  .bar span { display:block; height:100%; background:var(--green); }
+  .wcard-pct { font-size:10px; color:var(--muted); margin-top:5px; }
+  @media (max-width:920px) { main { grid-template-columns:1fr; padding:14px; gap:12px; } .col { flex-basis:144px; min-width:144px; } }
+  @media (max-width:560px) { header { padding:10px 14px; gap:8px; } h1 { font-size:14px; } .stage { flex-wrap:wrap; } }
 </style>
 </head>
 <body>
@@ -75,7 +95,7 @@
 <main id="main"><p class="empty" style="padding:20px">Загрузка…</p></main>
 
 <script>
-let current = null, es = null;
+let current = null, es = null, selectedWave = null, lastData = null;
 
 function notice(html) { document.getElementById('main').innerHTML = '<div class="notice">' + html + '</div>'; }
 const SERVER_HINT = '⚠ <b>Дашборд не подключён к серверу.</b><br>Запусти <code>npm run dashboard</code> в папке jidoka, затем открой <b>http://localhost:7717</b>.<br><span style="color:var(--muted)">Сам файл <code>ui.html</code> (preview / file://) не работает — данные берутся у сервера.</span>';
@@ -104,7 +124,7 @@ async function loadProjects() {
 }
 
 function select(name) {
-  current = name;
+  current = name; selectedWave = null;
   loadProjects();
   render();
   if (es) es.close();
@@ -116,16 +136,10 @@ function select(name) {
 
 function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
 
-async function render() {
-  if (!current) return;
-  let d;
-  try { d = await api('/api/data?project=' + encodeURIComponent(current)); }
-  catch { notice(SERVER_HINT); return; }
-  const h = d.health;
-  const banner = h.halt ? '<div class="banner">🔴 ANDON — pipeline halted, resume required</div>' : '';
-  const P = d.pipeline;
-  const ICON = { done: '✓', running: '▸', failed: '✗', pending: '○', idle: '◦' };
-  const stageHtml = (s) => `
+const ICON = { done: '✓', running: '▸', failed: '✗', pending: '○', idle: '◦' };
+
+function stageHtml(s) {
+  return `
     <div class="stage st-${s.status}${s.current ? ' cur' : ''}">
       <div class="st-ico">${ICON[s.status] || '○'}</div>
       <div class="st-main">
@@ -136,25 +150,63 @@ async function render() {
       </div>
       <div class="st-stat">${esc(s.status)}</div>
     </div>`;
-  const pipeBody = P.stages.length
-    ? P.stages.map(stageHtml).join('<div class="flow">│</div>')
-    : '<span class="empty">нет графа пайплана (планировщик недоступен и нет run-state)</span>';
-  const waveTags = [
-    P.wave ? `<span class="tag">волна: ${esc(P.wave)}</span>` : '',
-    P.task ? `<span class="tag">${esc(P.task.risk || 'normal')}${(P.task.surfaces || []).length ? ' · ' + esc((P.task.surfaces || []).join('+')) : ''}</span>` : '',
-    `<span class="tag ${P.live ? 'live-tag' : ''}">${P.live ? '● live wave' : 'canonical graph'}</span>`,
-    `<span class="tag">${P.progress}% phases done</span>`,
-    P.halted ? '<span class="tag halt-tag">🔴 ANDON halted</span>' : '',
+}
+
+// the horizontal pipeline board: stage columns left→right, wave cards placed by current phase
+function boardHtml(d) {
+  const cols = (d.board && d.board.columns) || [];
+  return '<div class="board">' + cols.map((c) => `
+    <div class="col">
+      <div class="col-h">${esc(c.label)}${c.waves.length ? `<span class="col-n">${c.waves.length}</span>` : ''}</div>
+      <div class="col-body">
+        ${c.waves.length ? c.waves.map((w) => `
+          <div class="wcard${w.wave === selectedWave ? ' sel' : ''}" onclick="selectWave('${esc(w.wave)}')">
+            <div class="wcard-top">${esc(w.wave)}</div>
+            <div class="wcard-meta"><span class="rb${w.risk === 'critical' ? ' rb-crit' : ''}">${esc(w.risk)}</span>${w.live ? '<span class="rb rb-live">live</span>' : ''}</div>
+            <div class="bar"><span style="width:${w.progress}%"></span></div>
+            <div class="wcard-pct">${w.progress}% фаз done</div>
+          </div>`).join('') : '<div class="col-empty">—</div>'}
+      </div>
+    </div>`).join('') + '</div>';
+}
+
+function selectWave(name) { selectedWave = name; if (lastData) paint(lastData); }
+
+async function render() {
+  if (!current) return;
+  let d;
+  try { d = await api('/api/data?project=' + encodeURIComponent(current)); }
+  catch { notice(SERVER_HINT); return; }
+  lastData = d;
+  if (!selectedWave || !(d.waves || []).some((w) => w.wave === selectedWave)) selectedWave = (d.pipeline && d.pipeline.wave) || (d.waves && d.waves[0] && d.waves[0].wave) || null;
+  paint(d);
+}
+
+function paint(d) {
+  const h = d.health;
+  const banner = h.halt ? '<div class="banner">🔴 ANDON — pipeline halted, resume required</div>' : '';
+  const sel = (d.waves || []).find((w) => w.wave === selectedWave) || d.pipeline;
+  const detailTags = [
+    sel.wave ? `<span class="tag">${esc(sel.wave)}</span>` : '<span class="tag">канонический граф</span>',
+    sel.task ? `<span class="tag">${esc(sel.task.risk || 'normal')}${(sel.task.surfaces || []).length ? ' · ' + esc((sel.task.surfaces || []).join('+')) : ''}</span>` : '',
+    `<span class="tag ${sel.live ? 'live-tag' : ''}">${sel.live ? '● live' : 'canonical'}</span>`,
+    `<span class="tag">${sel.progress}% phases done</span>`,
   ].filter(Boolean).join('');
+  const detailBody = sel.stages.length ? sel.stages.map(stageHtml).join('<div class="flow">│</div>') : '<span class="empty">нет стадий</span>';
+  const hint = (d.board && d.board.waveCount) ? '' : '<p class="meta" style="margin:8px 2px 0">Нет журналируемых волн в этом проекте — карточки появятся, когда волна пишет run-state. Колонки = канонические стадии пайплана.</p>';
   const tasks = d.tasks.length
     ? d.tasks.map((t) => '<div class="task p-' + t.priority + '"><span class="src">' + esc(t.source) + '</span><span>' + esc(t.text) + '</span></div>').join('')
     : '<span class="empty">всё чисто</span>';
   document.getElementById('main').innerHTML = `
     ${banner}
     <div class="card" style="grid-column:1/-1">
-      <h2>Dev-pipeline · ${esc(P.branch || '')}</h2>
-      <div class="wave-head">${waveTags}</div>
-      <div class="pipeline">${pipeBody}</div>
+      <h2>Pipeline · ${esc((d.pipeline && d.pipeline.branch) || '')} · ${(d.board && d.board.waveCount) || 0} волн(ы) в потоке</h2>
+      ${boardHtml(d)}
+      ${hint}
+    </div>
+    <div class="card" style="grid-column:1/-1">
+      <h2>Детали волны&nbsp;&nbsp;<span style="text-transform:none;letter-spacing:0">${detailTags}</span></h2>
+      <div class="pipeline">${detailBody}</div>
     </div>
     <div class="card">
       <h2>Health</h2>
@@ -164,7 +216,7 @@ async function render() {
       <p class="meta">${d.production.deployCount} deploy event(s)</p>
       <p class="meta">updated ${new Date(d.collectedAt).toLocaleTimeString()}</p>
     </div>
-    <div class="card" style="grid-column:1/-1">
+    <div class="card">
       <h2>Что висит · ${d.tasks.length}</h2>
       ${tasks}
     </div>

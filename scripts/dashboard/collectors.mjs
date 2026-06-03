@@ -105,6 +105,27 @@ export function summarizePipeline({ runState = null, planGraph = null, halt = fa
   };
 }
 
+// The pipeline BOARD: every wave placed left-to-right into a stage column by its CURRENT phase —
+// "what's on spec, what's on tests, what's on build" at a glance (Kanban-style flow). Columns are the
+// canonical stages, always shown so the whole pipeline reads left→right; a completed wave (no current)
+// lands in 'Shipped'. Each card carries the wave id, progress %, risk, and live flag.
+export function summarizeBoard(waves = []) {
+  const place = (w) => w.current || 'done';
+  const labels = { ...PHASE_LABEL, done: 'Shipped' };
+  const core = ['discovery', 'spec', 'tests', 'build', 'gate', 'debug', 'memory'];
+  const order = ['discovery', 'spec', 'tests', 'build', 'gate', 'debug', 'launch', 'memory', 'done'];
+  const used = new Set(waves.map(place));
+  const cols = order.filter((p) => core.includes(p) || used.has(p));
+  const columns = cols.map((p) => ({
+    phase: p,
+    label: labels[p] || p,
+    waves: waves
+      .filter((w) => place(w) === p)
+      .map((w) => ({ wave: w.wave, progress: w.progress, risk: w.task?.risk || 'normal', live: w.live })),
+  }));
+  return { columns, waveCount: waves.length };
+}
+
 export function summarizeTasks({ metaMistakes = [], gateTrips = [], approvals = [], crossLine = [], reflexionQueue = 0, halt = false }) {
   const tasks = [];
   if (halt) tasks.push({ source: 'andon', priority: 'critical', text: 'pipeline HALTED — resume required' });
@@ -194,26 +215,29 @@ export function collectProject(projectPath) {
       .map((l) => { const [hash, subject, when] = l.split('|'); return { hash, subject, when }; });
   } catch { /* not git */ }
 
-  // live wave position — the most recently updated run-state journal is the REAL pipeline cursor.
-  let runState = null;
+  // every wave journal — the board places them left→right by current phase; the detail view drills
+  // into one wave's phases. The most-recently-MOVED wave is the default selection.
+  let allStates = [];
   const runsDir = resolve(projectPath, 'docs/runs');
   if (runsDir) {
     try {
-      const states = readdirSync(runsDir, { withFileTypes: true })
+      allStates = readdirSync(runsDir, { withFileTypes: true })
         .filter((d) => d.isDirectory())
         .map((d) => readJson(join(runsDir, d.name, 'state.json')))
         .filter(Boolean);
-      // prefer the most-recently-updated wave that actually MOVED (has events or a non-pending phase)
-      // over one merely initialised; fall back to the most recent overall.
-      const moved = states.filter((s) => (s.events?.length) || (s.phases || []).some((p) => p.status && p.status !== 'pending'));
-      const pool = moved.length ? moved : states;
-      runState = pool.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))[0] || null;
     } catch { /* no runs */ }
   }
-  const planGraph = safePlan(runState?.task);
+  const moved = allStates.filter((s) => (s.events?.length) || (s.phases || []).some((p) => p.status && p.status !== 'pending'));
+  const primary = (moved.length ? moved : allStates).sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))[0] || null;
+  const waves = allStates
+    .map((rs) => summarizePipeline({ runState: rs, planGraph: safePlan(rs.task), halt, branch, traces }))
+    .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  const board = summarizeBoard(waves);
 
   return {
-    pipeline: summarizePipeline({ runState, planGraph, halt, branch, traces }),
+    pipeline: summarizePipeline({ runState: primary, planGraph: safePlan(primary?.task), halt, branch, traces }),
+    board,
+    waves,
     tasks: summarizeTasks({ metaMistakes, gateTrips, approvals, crossLine, reflexionQueue, halt }),
     health: summarizeHealth(baseline, halt, gateTrips),
     production: summarizeProduction(dora),
@@ -234,6 +258,15 @@ function selfTest() {
   ok('pipeline falls back to canonical graph (idle) with no run-state', (() => { const s = summarizePipeline({ planGraph: pg }); return s.stages[0].status === 'idle' && s.live === false; })());
   ok('pipeline overlays real agent outcomes from traces', summarizePipeline({ runState: rs, planGraph: pg, traces: [{ agent: 'reflexion-critic', outcome: 'PASS' }] }).stages[0].agents[0].outcome === 'PASS');
   ok('pipeline progress = % phases done', summarizePipeline({ runState: { phases: [{ phase: 'a', status: 'done' }, { phase: 'b', status: 'pending' }] } }).progress === 50);
+  const bd = summarizeBoard([
+    { wave: 'a', current: 'spec', progress: 20, task: { risk: 'critical' }, live: true },
+    { wave: 'b', current: 'tests', progress: 40, task: {}, live: true },
+    { wave: 'c', current: null, progress: 100, task: {}, live: true },
+  ]);
+  ok('board places waves into stage columns by current phase', bd.columns.find((c) => c.phase === 'spec').waves[0].wave === 'a' && bd.columns.find((c) => c.phase === 'tests').waves[0].wave === 'b');
+  ok('board sends a completed wave (no current) to Shipped', bd.columns.find((c) => c.phase === 'done').waves[0].wave === 'c');
+  ok('board always shows the core stages even when empty', ['discovery', 'build', 'gate', 'memory'].every((p) => bd.columns.some((c) => c.phase === p)));
+  ok('board counts all waves', bd.waveCount === 3);
   ok('halt → red health', summarizeHealth({ pass_rate: 1 }, true, []).level === 'red');
   ok('100% eval + no fails → green', summarizeHealth({ pass_rate: 1 }, false, []).level === 'green');
   ok('eval present but failing → amber', summarizeHealth({ pass_rate: 0.9 }, false, [{ verdict: 'FAIL' }]).level === 'amber');
