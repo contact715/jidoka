@@ -5,9 +5,10 @@
 {"title":"Реальный пайплан — канонический граф + live run-state + исходы агентов","status":"done","priority":"high","commit":"e96aef6"}
 {"title":"Горизонтальная Kanban-доска + адаптив под iPad + LAN-адрес","status":"done","priority":"high","commit":"605834e"}
 {"title":"Сверка журналов 2 волн с реальностью + 2 ретро + discovery (оба 100%)","status":"done","priority":"high","commit":"0535c7a"}
-{"title":"Заджурналить эту сессию как wave-dashboard + session backlog на дашборд","status":"done","priority":"medium","session":"2026-06-02 dashboard"}
-{"title":"Построить гейты под 2 recurring-класса (self-test-blindspot 3x, reward-hacking 2x) — движок сам просит","status":"open","priority":"high","note":"meta-audit пишет это на каждом пуше"}
-{"title":"Широкий dig по фреймворку: declaration-over-implementation / TODO / stub / dormant — найти и закрыть с пруфом","status":"open","priority":"medium","note":"пользователь: 'если покапать много что можно найти'"}
+{"title":"Заджурналить эту сессию как wave-dashboard + session backlog на дашборд","status":"done","priority":"medium","commit":"a9ebf34"}
+{"title":"Гейт self-test-blindspot: selftest-reality.mjs построен+проверен (7/7, 61 скрипт 0 blindspot); reward-hacking = reuse meta-honesty","status":"done","priority":"high","commit":"3841c62"}
+{"title":"Dig по фреймворку: найден+закрыт 1 ghost (README 171->172 drift), instantiation-audit 0 ghosts; create-tool TODO = шаблон (не баг), 59 dormant честные","status":"done","priority":"medium"}
+{"title":"РЕГИСТРАЦИЯ 2 гейтов в meta-remedies.mjs (L0, human-only) — вставить блок из docs/audits/PENDING_REMEDIES_REGISTRATION.md, потом meta-audit зелёный","status":"open","priority":"high","note":"единственное, что закрывает петлю по обоим классам; механизмы уже готовы"}
 {"title":"GDoc реальный экспорт снапшота дашборда","status":"blocked","priority":"low","note":"нужен Google Docs MCP коннектор (не подключён)"}
 {"title":"Мерж ветки feat/engine-methodology-and-dashboard в main","status":"open","priority":"medium","note":"твоё решение — не пушу в main без разрешения"}
 {"title":"LinkedIn MCP — ты спрашивал; готового коннектора не нашёл, решить нужен ли","status":"open","priority":"low","note":"можно поставить через mcp-installer если есть сервер"}
