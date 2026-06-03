@@ -1,0 +1,130 @@
+{
+  "wave": "wave-meta-gates",
+  "task": {
+    "type": "feature",
+    "risk": "normal",
+    "surfaces": [
+      "backend"
+    ]
+  },
+  "phases": [
+    {
+      "phase": "discovery",
+      "status": "done",
+      "agents": [
+        "user-researcher",
+        "product-strategist"
+      ],
+      "note": "reward-hacking already gated by meta-honesty DONE_SYNONYMS (reuse); self-test-blindspot needs new selftest-reality gate"
+    },
+    {
+      "phase": "spec",
+      "status": "done",
+      "agents": [
+        "chief-architect",
+        "micro-architect",
+        "macro-architect",
+        "surface-cartographer",
+        "chief-product-officer",
+        "business-process-architect",
+        "kaizen-officer"
+      ],
+      "note": "design: selftest-reality runs --self-test, flags exit-0-no-assertion; register both in meta-remedies"
+    },
+    {
+      "phase": "tests",
+      "status": "done",
+      "agents": [
+        "test-engineer"
+      ],
+      "note": "selftest-reality self-test 7/7; meta-honesty self-test covers synonym-pile (reward-hacking incident, line 97)"
+    },
+    {
+      "phase": "build",
+      "status": "done",
+      "agents": [
+        "engineering-lead",
+        "backend-agent"
+      ],
+      "note": "selftest-reality.mjs built + wired (npm gate:selftest); full scan 61 scripts, 0 blindspots, 3.7s"
+    },
+    {
+      "phase": "gate",
+      "status": "running",
+      "agents": [
+        "reflexion-critic",
+        "constitutional-reviewer",
+        "coverage-auditor",
+        "budget-gate",
+        "policy-sandbox",
+        "security-scanner"
+      ],
+      "note": "mechanisms proven; registration in meta-remedies.mjs is human-only L0 (block respected, not bypassed) — awaiting paste"
+    },
+    {
+      "phase": "debug",
+      "status": "pending",
+      "agents": [
+        "debug-agent"
+      ],
+      "note": ""
+    },
+    {
+      "phase": "memory",
+      "status": "pending",
+      "agents": [
+        "skill-extractor",
+        "data-analyst",
+        "kaizen-officer"
+      ],
+      "note": ""
+    }
+  ],
+  "current": "gate",
+  "events": [
+    {
+      "at": "2026-06-03T18:12:48.986Z",
+      "phase": "discovery",
+      "status": "running",
+      "note": "surveying meta-system: how is ungated-class computed, where are gates registered"
+    },
+    {
+      "at": "2026-06-03T18:15:14.702Z",
+      "phase": "discovery",
+      "status": "done",
+      "note": "reward-hacking already gated by meta-honesty DONE_SYNONYMS (reuse); self-test-blindspot needs new selftest-reality gate"
+    },
+    {
+      "at": "2026-06-03T18:15:14.752Z",
+      "phase": "spec",
+      "status": "done",
+      "note": "design: selftest-reality runs --self-test, flags exit-0-no-assertion; register both in meta-remedies"
+    },
+    {
+      "at": "2026-06-03T18:15:14.799Z",
+      "phase": "build",
+      "status": "running",
+      "note": "writing selftest-reality.mjs + registering remedies"
+    },
+    {
+      "at": "2026-06-03T19:29:27.897Z",
+      "phase": "build",
+      "status": "done",
+      "note": "selftest-reality.mjs built + wired (npm gate:selftest); full scan 61 scripts, 0 blindspots, 3.7s"
+    },
+    {
+      "at": "2026-06-03T19:29:27.942Z",
+      "phase": "tests",
+      "status": "done",
+      "note": "selftest-reality self-test 7/7; meta-honesty self-test covers synonym-pile (reward-hacking incident, line 97)"
+    },
+    {
+      "at": "2026-06-03T19:29:27.984Z",
+      "phase": "gate",
+      "status": "running",
+      "note": "mechanisms proven; registration in meta-remedies.mjs is human-only L0 (block respected, not bypassed) — awaiting paste"
+    }
+  ],
+  "createdAt": "2026-06-03T18:12:48.949Z",
+  "updatedAt": "2026-06-03T19:29:27.984Z"
+}
