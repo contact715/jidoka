@@ -28,7 +28,7 @@ export function route(task = {}, { usageRatio = 0, privacy = false, allowLocal =
   const apiModel = modelForAgent(task.role || 'backend-agent', tier);
 
   // privacy-sensitive work must stay in-house → local, but never a TOY model for high-reasoning roles
-  if (privacy) return { provider: 'local', model: cls === 'high' ? LOCAL.capable : LOCAL.capable, reason: 'privacy-sensitive → local model (data stays in-house)' };
+  if (privacy) return { provider: 'local', model: cls === 'low' ? LOCAL.light : LOCAL.capable, reason: 'privacy-sensitive → local model (data stays in-house)' };
   // usage budget exhausted → local fallback (legit cost control, not a subscription-limit dodge)
   if (usageRatio >= 1) return { provider: 'local', model: cls === 'low' ? LOCAL.light : LOCAL.capable, reason: 'usage budget exhausted → local fallback' };
   // local explicitly allowed + a mechanical task → cheap local
@@ -48,6 +48,7 @@ function selfTest() {
   ok('allowLocal + mechanical role → cheap local light', route({ role: 'statusline' }, { allowLocal: true }).model === LOCAL.light);
   ok('allowLocal + HIGH role → NOT the light local (judgement not cheaped out)', route({ role: 'debate-judge' }, { allowLocal: true }).model !== LOCAL.light);
   ok('privacy + HIGH role → capable local, not light', route({ role: 'chief-architect' }, { privacy: true }).model === LOCAL.capable);
+  ok('privacy + mechanical role → light local, not the expensive capable (closes the dead-ternary blindspot)', route({ role: 'statusline' }, { privacy: true }).model === LOCAL.light);
   ok('reason is always explained', typeof route({ role: 'backend-agent' }).reason === 'string' && route({ role: 'backend-agent' }).reason.length > 0);
   // inherits the model-tier invariant on the API path: a judge is never haiku
   ok('judge on API path is never haiku (inherits model-tier floor)', route({ role: 'debate-judge', tier: 'budget' }).model !== 'haiku');

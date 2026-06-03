@@ -39,7 +39,9 @@ done
 [ -f "$FW/docs/NORTH_STAR_TEMPLATE.md" ] && cp "$FW/docs/NORTH_STAR_TEMPLATE.md" "$DEST/jidoka/NORTH_STAR_TEMPLATE.md"
 [ -f "$FW/docs/PROJECT_CHARTER_TEMPLATE.md" ] && cp "$FW/docs/PROJECT_CHARTER_TEMPLATE.md" "$DEST/jidoka/PROJECT_CHARTER_TEMPLATE.md"
 # point meta-lib at the GLOBAL cross-project ledger
-perl -i -pe "s{'docs/audits/meta-mistakes.jsonl'}{require('node:os').homedir()+'/.claude/jidoka/meta-mistakes.jsonl'}g" "$DEST/jidoka/scripts/meta-lib.mjs" 2>/dev/null || true
+perl -i -pe "s{'docs/audits/meta-mistakes.jsonl'}{(process.env.HOME||'')+'/.claude/jidoka/meta-mistakes.jsonl'}g" "$DEST/jidoka/scripts/meta-lib.mjs" 2>/dev/null || true
+# rewrite remedy mechanism paths to the installed location so meta-audit's broken-gate check resolves them (parity with install-into.mjs)
+perl -i -pe "s{'scripts/}{'$DEST/jidoka/scripts/}g" "$DEST/jidoka/scripts/meta-remedies.mjs" 2>/dev/null || true
 echo "  ✓ engine → ~/.claude/jidoka/scripts/"
 
 # 3a. dashboard (framework-level multi-project viewer — npm run dashboard)

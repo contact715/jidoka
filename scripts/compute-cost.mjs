@@ -94,6 +94,10 @@ function readConfig() {
  * @returns {CostBudgetDefs}
  */
 function loadDefs() {
+  if (!fs.existsSync(COST_BUDGET_PATH)) {
+    console.log(`⊘ DORMANT — ${COST_BUDGET_PATH} not seeded yet; cost computation inactive, not failed. Seed the cost budget to activate.`);
+    process.exit(0);
+  }
   const raw = JSON.parse(fs.readFileSync(COST_BUDGET_PATH, 'utf8'));
   return raw;
 }
