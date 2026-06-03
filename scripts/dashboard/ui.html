@@ -104,6 +104,18 @@ async function render() {
     <div class="card" style="grid-column:1/-1">
       <h2>Что висит · ${d.tasks.length}</h2>
       ${tasks}
+    </div>
+    <div class="card">
+      <h2>Лента действий агентов</h2>
+      ${(d.activity || []).length ? d.activity.map((a) => '<div class="task"><span class="src">' + esc(a.agent) + '</span><span>' + esc(a.action) + '</span></div>').join('') : '<span class="empty">тихо</span>'}
+    </div>
+    <div class="card">
+      <h2>Уроки мета-леджера · рецидив</h2>
+      ${(d.lessons || []).length ? d.lessons.map((l) => '<div class="task"><span class="src">' + l.count + '×</span><span>' + esc(l.class) + '</span></div>').join('') : '<span class="empty">нет</span>'}
+    </div>
+    <div class="card" style="grid-column:1/-1">
+      <h2>Timeline · последние волны</h2>
+      ${(d.timeline || []).length ? d.timeline.map((t) => '<div class="task"><span class="src">' + esc(t.hash) + '</span><span>' + esc(t.subject) + '</span><span class="meta" style="margin-left:auto">' + esc(t.when) + '</span></div>').join('') : '<span class="empty">нет коммитов</span>'}
     </div>`;
 }
 

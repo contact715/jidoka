@@ -93,6 +93,28 @@ export function summarizeProduction(dora) {
   return { deployCount: deploys.length, lastDeploy: deploys.length ? tail(deploys, 1)[0] : null, events: tail(events, 5) };
 }
 
+// Killer feature: live agent-activity tape — what the agents most recently did.
+export function summarizeActivity(traces) {
+  return tail(traces || [], 8).reverse().map((t) => ({
+    agent: t.agent || t.actor || t.agentId || t.actor_agent || '—',
+    action: t.action || t.event || t.verdict || t.gate || t.kind || 'activity',
+    ts: t.ts || t.timestamp || null,
+  }));
+}
+
+// Killer feature: meta-ledger active lessons grouped by class (recurrence risk surfaced).
+export function summarizeLessons(metaMistakes) {
+  const byClass = {};
+  for (const m of metaMistakes || []) {
+    const c = m.class || 'lesson';
+    byClass[c] = (byClass[c] || 0) + 1;
+  }
+  return Object.entries(byClass)
+    .map(([cls, count]) => ({ class: cls, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6);
+}
+
 // ── fs gather (impure) ──────────────────────────────────────────────────────
 export function collectProject(projectPath) {
   const raci = readJson(resolve(projectPath, 'docs/governance/raci.json'));
@@ -111,11 +133,26 @@ export function collectProject(projectPath) {
   const rq = resolve(projectPath, '.claude/reflexion-queue');
   if (rq) { try { reflexionQueue = readdirSync(rq).filter((f) => f.endsWith('.md')).length; } catch { /* */ } }
 
+  // killer features: agent-activity tape (traces + decisions) + wave timeline (git log)
+  const traces = [
+    ...readJsonl(resolve(projectPath, 'docs/audits/agent-traces.jsonl')),
+    ...readJsonl(resolve(projectPath, 'docs/audits/decision-log.jsonl')),
+  ];
+  let timeline = [];
+  try {
+    timeline = execSync("git log -8 --format='%h|%s|%cr'", { cwd: projectPath, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+      .split('\n').filter(Boolean)
+      .map((l) => { const [hash, subject, when] = l.split('|'); return { hash, subject, when }; });
+  } catch { /* not git */ }
+
   return {
     pipeline: summarizePipeline(raci, halt, branch),
     tasks: summarizeTasks({ metaMistakes, gateTrips, approvals, crossLine, reflexionQueue, halt }),
     health: summarizeHealth(baseline, halt, gateTrips),
     production: summarizeProduction(dora),
+    activity: summarizeActivity(traces),
+    lessons: summarizeLessons(metaMistakes),
+    timeline,
     collectedAt: null, // stamped by the server (Date.now() banned in pure-render context)
   };
 }
@@ -132,6 +169,8 @@ function selfTest() {
   ok('tasks priority-sorted', summarizeTasks({ approvals: [{ summary: 'a' }], gateTrips: [{ verdict: 'FAIL', gate: 'g' }] })[0].priority === 'high');
   ok('production counts only deploys', summarizeProduction([{ type: 'deploy' }, { type: 'other' }]).deployCount === 1);
   ok('missing data degrades gracefully', summarizePipeline(null, false, null).stageCount === 0 && summarizeTasks({}).length === 0);
+  ok('activity tape maps recent traces (newest first)', summarizeActivity([{ agent: 'a', action: 'x' }, { agent: 'b', action: 'y' }])[0].agent === 'b');
+  ok('lessons group by class, recurrence-sorted', summarizeLessons([{ class: 'c' }, { class: 'c' }, { class: 'd' }])[0].count === 2);
   if (f) { console.log(`\n\x1b[31mcollectors self-test FAILED (${f})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ collectors: pure summarizers correct\x1b[0m'); process.exit(0);
 }
