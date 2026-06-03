@@ -35,6 +35,9 @@
   .p-medium { border-left:3px solid var(--muted); }
   .empty { color:var(--muted); font-size:13px; }
   .banner { grid-column:1/-1; padding:10px 14px; border-radius:10px; background:rgba(248,113,113,.12); color:var(--red); font-weight:600; }
+  .notice { margin:20px; padding:18px 20px; border-radius:12px; background:rgba(251,191,36,.1); border:1px solid rgba(251,191,36,.3); color:var(--text); line-height:1.7; max-width:640px; }
+  .notice code { background:rgba(255,255,255,.08); padding:2px 7px; border-radius:5px; font-size:13px; }
+  .notice b { color:var(--amber); }
 </style>
 </head>
 <body>
@@ -49,8 +52,20 @@
 <script>
 let current = null, es = null;
 
+function notice(html) { document.getElementById('main').innerHTML = '<div class="notice">' + html + '</div>'; }
+const SERVER_HINT = '⚠ <b>Дашборд не подключён к серверу.</b><br>Запусти <code>npm run dashboard</code> в папке jidoka, затем открой <b>http://localhost:7717</b>.<br><span style="color:var(--muted)">Сам файл <code>ui.html</code> (preview / file://) не работает — данные берутся у сервера.</span>';
+
+async function api(path) {
+  const r = await fetch(path);
+  if (!r.ok) throw new Error(path + ' → HTTP ' + r.status);
+  return r.json();
+}
+
 async function loadProjects() {
-  const ps = await (await fetch('/api/projects')).json();
+  let ps;
+  try { ps = await api('/api/projects'); }
+  catch { notice(SERVER_HINT); return; }
+  if (!ps.length) { notice('Проекты не найдены. Дашборд ищет <code>~/*/.jidoka</code> и <code>docs/governance/raci.json</code>.'); return; }
   const el = document.getElementById('projects');
   el.innerHTML = '';
   ps.forEach((p) => {
@@ -78,7 +93,9 @@ function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<'
 
 async function render() {
   if (!current) return;
-  const d = await (await fetch('/api/data?project=' + encodeURIComponent(current))).json();
+  let d;
+  try { d = await api('/api/data?project=' + encodeURIComponent(current)); }
+  catch { notice(SERVER_HINT); return; }
   const h = d.health;
   const banner = h.halt ? '<div class="banner">🔴 ANDON — pipeline halted, resume required</div>' : '';
   const stages = d.pipeline.stages.length
@@ -124,7 +141,8 @@ async function exportGdoc() {
   alert(r.message || ('snapshot: ' + r.path));
 }
 
-loadProjects();
+if (location.protocol === 'file:') notice(SERVER_HINT);
+else loadProjects();
 </script>
 </body>
 </html>

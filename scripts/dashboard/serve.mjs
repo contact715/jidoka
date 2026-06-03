@@ -5,6 +5,7 @@
 // Usage: node scripts/dashboard/serve.mjs            (port 7717, or JIDOKA_DASHBOARD_PORT)
 
 import { createServer } from 'node:http';
+import { exec } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, watch } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -83,6 +84,12 @@ function watchProjects() {
 
 server.listen(PORT, () => {
   const watched = watchProjects();
-  console.log(`\n  🦞 jidoka dashboard → http://localhost:${PORT}`);
+  const target = `http://localhost:${PORT}`;
+  console.log(`\n  🦞 jidoka dashboard → ${target}`);
   console.log(`  ${projects().length} projects · ${watched} live watchers · Ctrl-C to stop\n`);
+  // Auto-open the browser so the dashboard is never just a URL in a log (opt out: JIDOKA_DASHBOARD_NO_OPEN=1).
+  if (!process.env.JIDOKA_DASHBOARD_NO_OPEN) {
+    const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start ""' : 'xdg-open';
+    exec(`${opener} ${target}`, () => { /* best-effort; headless/no-DISPLAY is fine */ });
+  }
 });
