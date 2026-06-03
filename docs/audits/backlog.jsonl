@@ -7,9 +7,9 @@
 {"title":"Сверка журналов 2 волн с реальностью + 2 ретро + discovery (оба 100%)","status":"done","priority":"high","commit":"0535c7a"}
 {"title":"Заджурналить эту сессию как wave-dashboard + session backlog на дашборд","status":"done","priority":"medium","commit":"a9ebf34"}
 {"title":"Гейт self-test-blindspot: selftest-reality.mjs построен+проверен (7/7, 61 скрипт 0 blindspot); reward-hacking = reuse meta-honesty","status":"done","priority":"high","commit":"3841c62"}
-{"title":"Dig по фреймворку: найден+закрыт 1 ghost (README 171->172 drift), instantiation-audit 0 ghosts; create-tool TODO = шаблон (не баг), 59 dormant честные","status":"done","priority":"medium"}
-{"title":"РЕГИСТРАЦИЯ 2 гейтов в meta-remedies.mjs (L0, human-only) — вставить блок из docs/audits/PENDING_REMEDIES_REGISTRATION.md, потом meta-audit зелёный","status":"open","priority":"high","note":"единственное, что закрывает петлю по обоим классам; механизмы уже готовы"}
-{"title":"GDoc реальный экспорт снапшота дашборда","status":"blocked","priority":"low","note":"нужен Google Docs MCP коннектор (не подключён)"}
-{"title":"Мерж ветки feat/engine-methodology-and-dashboard в main","status":"open","priority":"medium","note":"твоё решение — не пушу в main без разрешения"}
-{"title":"LinkedIn MCP — ты спрашивал; готового коннектора не нашёл, решить нужен ли","status":"open","priority":"low","note":"можно поставить через mcp-installer если есть сервер"}
-{"title":"projectx-app forcing-functions: оставить или откатить (рекомендую оставить)","status":"open","priority":"low","note":"твоё решение"}
+{"title":"Dig по фреймворку: найден+закрыт 1 ghost (README 171->172), instantiation-audit 0 ghosts; create-tool TODO = шаблон, 59 dormant честные","status":"done","priority":"medium","commit":"5fb9873"}
+{"title":"Мерж ветки feat/engine-methodology-and-dashboard в main (fast-forward 9 коммитов)","status":"done","priority":"medium","commit":"015099a"}
+{"title":"LinkedIn MCP — проверен реестр: коннектора не существует, ставить нечего","status":"done","priority":"low"}
+{"title":"projectx-app forcing-functions — решено: оставить (другой repo, Target-Scope; работают, projectx-tailored)","status":"done","priority":"low"}
+{"title":"РЕГИСТРАЦИЯ 2 гейтов в meta-remedies.mjs (L0, human-only) — вставить блок из docs/audits/PENDING_REMEDIES_REGISTRATION.md, потом meta-audit зелёный","status":"open","priority":"high","note":"единственное исполнимое незакрытое — твоя 1 вставка; механизмы готовы"}
+{"title":"GDoc реальный экспорт — проверено: Google Docs MCP не существует в реестре; dashboard-сервер (node) не может звать MCP. Снапшот на диск = доступный деливерабл","status":"blocked","priority":"low","note":"нужен Google API + creds в сервере, вне scope"}
