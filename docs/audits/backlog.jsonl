@@ -6,10 +6,13 @@
 {"title":"Горизонтальная Kanban-доска + адаптив под iPad + LAN-адрес","status":"done","priority":"high","commit":"605834e"}
 {"title":"Сверка журналов 2 волн с реальностью + 2 ретро + discovery (оба 100%)","status":"done","priority":"high","commit":"0535c7a"}
 {"title":"Заджурналить эту сессию как wave-dashboard + session backlog на дашборд","status":"done","priority":"medium","commit":"a9ebf34"}
-{"title":"Гейт self-test-blindspot: selftest-reality.mjs построен+проверен (7/7, 61 скрипт 0 blindspot); reward-hacking = reuse meta-honesty","status":"done","priority":"high","commit":"3841c62"}
-{"title":"Dig по фреймворку: найден+закрыт 1 ghost (README 171->172), instantiation-audit 0 ghosts; create-tool TODO = шаблон, 59 dormant честные","status":"done","priority":"medium","commit":"5fb9873"}
-{"title":"Мерж ветки feat/engine-methodology-and-dashboard в main (fast-forward 9 коммитов)","status":"done","priority":"medium","commit":"015099a"}
-{"title":"LinkedIn MCP — проверен реестр: коннектора не существует, ставить нечего","status":"done","priority":"low"}
-{"title":"projectx-app forcing-functions — решено: оставить (другой repo, Target-Scope; работают, projectx-tailored)","status":"done","priority":"low"}
-{"title":"РЕГИСТРАЦИЯ 2 гейтов в meta-remedies.mjs (L0, human-only) — вставить блок из docs/audits/PENDING_REMEDIES_REGISTRATION.md, потом meta-audit зелёный","status":"open","priority":"high","note":"единственное исполнимое незакрытое — твоя 1 вставка; механизмы готовы"}
-{"title":"GDoc реальный экспорт — проверено: Google Docs MCP не существует в реестре; dashboard-сервер (node) не может звать MCP. Снапшот на диск = доступный деливерабл","status":"blocked","priority":"low","note":"нужен Google API + creds в сервере, вне scope"}
+{"title":"Гейт self-test-blindspot: selftest-reality.mjs построен+проверен; reward-hacking = reuse meta-honesty","status":"done","priority":"high","commit":"3841c62"}
+{"title":"Dig (инструментный): найден+закрыт 1 ghost (README 171->172), instantiation-audit 0 ghosts","status":"done","priority":"medium","commit":"5fb9873"}
+{"title":"Мерж ветки в main (fast-forward 9 коммитов)","status":"done","priority":"medium","commit":"015099a"}
+{"title":"LinkedIn MCP проверен (нет коннектора); projectx решено оставить; GDoc проверено-заблокировано","status":"done","priority":"low","commit":"6185911"}
+{"title":"Глубокий построчный аудит (4 агента по доменам): 9 дефектов найдено; 6 починено с пруфом (install-global CRITICAL+HIGH ESM/path, compute-cost DORMANT-guard, model-router мёртвый тернарник, detect-injection dead import, resource-guard no-op, audit-meta-process fail-closed)","status":"done","priority":"high","commit":"0aca612+"}
+{"title":"РЕГИСТРАЦИЯ 2 гейтов в meta-remedies.mjs (L0, human-only) — вставить блок из docs/audits/PENDING_REMEDIES_REGISTRATION.md","status":"open","priority":"high","note":"единственное исполнимое — твоя вставка; механизмы готовы"}
+{"title":"gate-audit verifyCI засчитывает --self-test-only CI как hard gate; честный фикс делает gate-audit красным и вскрывает что execution-gate/mutation-test не CI-enforced — нужно решение (wire в CI или переклассифицировать)","status":"open","priority":"medium","note":"deep-audit finding A3; не правил вслепую — каскадит"}
+{"title":"verify-gate + spec-first-gate не подключены ни к одному хуку; wiring в framework pre-push спорно (template нечего билдить) vs делается в install-into для продукта — нужно решение","status":"open","priority":"medium","note":"deep-audit finding A2"}
+{"title":"check-source-grounding: пустой реестр = auto-pass на фейк-цитату; гейт DORMANT (enabled:false) — чинить когда source-registry.jsonl засеян","status":"open","priority":"low","note":"deep-audit finding A1"}
+{"title":"GDoc реальный экспорт — Google Docs MCP не существует; node-сервер не зовёт MCP. Снапшот на диск = деливерабл","status":"blocked","priority":"low"}

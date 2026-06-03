@@ -272,6 +272,7 @@ function main() {
 try {
   main();
 } catch (e) {
-  log(`WARN: unhandled exception — ${/** @type {Error} */ (e).message ?? String(e)}`);
-  process.exit(0);
+  // fail-closed: a crash in the auditor must not read as PASS (andon — stop the line).
+  log(`FAIL: unhandled exception — ${/** @type {Error} */ (e).message ?? String(e)}`);
+  process.exit(1);
 }

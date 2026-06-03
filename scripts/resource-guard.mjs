@@ -83,7 +83,6 @@ export function scan(code = '') {
     }
 
     // rough close-brace tracking (imprecise but catches most cases)
-    if (/{/.test(line)) inLoopDepth = Math.max(0, inLoopDepth);
     if (/}/.test(line) && inLoopDepth > 0) inLoopDepth--;
   }
 
