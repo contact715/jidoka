@@ -1,0 +1,138 @@
+{
+  "wave": "wave-dashboard",
+  "task": {
+    "type": "feature",
+    "risk": "normal",
+    "surfaces": [
+      "frontend",
+      "backend"
+    ]
+  },
+  "phases": [
+    {
+      "phase": "discovery",
+      "status": "done",
+      "agents": [
+        "user-researcher",
+        "product-strategist"
+      ],
+      "note": "diagnosed 'только Загрузка' (no-server) + studied pipeline canon (AUTONOMOUS_PIPELINE, orchestration-planner)"
+    },
+    {
+      "phase": "spec",
+      "status": "done",
+      "agents": [
+        "chief-architect",
+        "micro-architect",
+        "macro-architect",
+        "surface-cartographer",
+        "chief-product-officer",
+        "business-process-architect",
+        "kaizen-officer",
+        "design-system-architect",
+        "ux-designer",
+        "ux-writer"
+      ],
+      "note": "Kanban board design: stage columns + wave cards by current phase + drill-down"
+    },
+    {
+      "phase": "tests",
+      "status": "done",
+      "agents": [
+        "test-engineer"
+      ],
+      "note": "collectors self-test 18/18 green (pipeline, board, backlog)"
+    },
+    {
+      "phase": "build",
+      "status": "done",
+      "agents": [
+        "engineering-lead",
+        "backend-agent",
+        "frontend-agent"
+      ],
+      "note": "serve.mjs + collectors.mjs + ui.html shipped; commits b97cd4c, e96aef6, 605834e"
+    },
+    {
+      "phase": "gate",
+      "status": "done",
+      "agents": [
+        "reflexion-critic",
+        "constitutional-reviewer",
+        "coverage-auditor",
+        "budget-gate",
+        "policy-sandbox",
+        "security-scanner",
+        "a11y-auditor",
+        "perf-profiler",
+        "visual-qa"
+      ],
+      "note": "playwright e2e verified desktop + iPad 820px; framework gates green; instantiation-audit 0 ghosts"
+    },
+    {
+      "phase": "debug",
+      "status": "done",
+      "agents": [
+        "debug-agent"
+      ],
+      "note": "fixed 3 bugs: git-log shell-pipe, iPad min-width blow-out, zsh var word-split"
+    },
+    {
+      "phase": "memory",
+      "status": "done",
+      "agents": [
+        "skill-extractor",
+        "data-analyst",
+        "kaizen-officer"
+      ],
+      "note": "retro docs/retros/wave-dashboard.md + docs/audits/backlog.jsonl"
+    }
+  ],
+  "current": null,
+  "events": [
+    {
+      "at": "2026-06-03T18:03:39.954Z",
+      "phase": "discovery",
+      "status": "done",
+      "note": "diagnosed 'только Загрузка' (no-server) + studied pipeline canon (AUTONOMOUS_PIPELINE, orchestration-planner)"
+    },
+    {
+      "at": "2026-06-03T18:03:39.997Z",
+      "phase": "spec",
+      "status": "done",
+      "note": "Kanban board design: stage columns + wave cards by current phase + drill-down"
+    },
+    {
+      "at": "2026-06-03T18:03:40.040Z",
+      "phase": "tests",
+      "status": "done",
+      "note": "collectors self-test 18/18 green (pipeline, board, backlog)"
+    },
+    {
+      "at": "2026-06-03T18:03:40.082Z",
+      "phase": "build",
+      "status": "done",
+      "note": "serve.mjs + collectors.mjs + ui.html shipped; commits b97cd4c, e96aef6, 605834e"
+    },
+    {
+      "at": "2026-06-03T18:03:40.126Z",
+      "phase": "gate",
+      "status": "done",
+      "note": "playwright e2e verified desktop + iPad 820px; framework gates green; instantiation-audit 0 ghosts"
+    },
+    {
+      "at": "2026-06-03T18:03:40.173Z",
+      "phase": "debug",
+      "status": "done",
+      "note": "fixed 3 bugs: git-log shell-pipe, iPad min-width blow-out, zsh var word-split"
+    },
+    {
+      "at": "2026-06-03T18:03:40.226Z",
+      "phase": "memory",
+      "status": "done",
+      "note": "retro docs/retros/wave-dashboard.md + docs/audits/backlog.jsonl"
+    }
+  ],
+  "createdAt": "2026-06-03T18:03:39.906Z",
+  "updatedAt": "2026-06-03T18:03:40.226Z"
+}

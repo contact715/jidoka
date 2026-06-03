@@ -126,9 +126,13 @@ export function summarizeBoard(waves = []) {
   return { columns, waveCount: waves.length };
 }
 
-export function summarizeTasks({ metaMistakes = [], gateTrips = [], approvals = [], crossLine = [], reflexionQueue = 0, halt = false }) {
+export function summarizeTasks({ metaMistakes = [], gateTrips = [], approvals = [], crossLine = [], reflexionQueue = 0, halt = false, backlog = [] }) {
   const tasks = [];
   if (halt) tasks.push({ source: 'andon', priority: 'critical', text: 'pipeline HALTED — resume required' });
+  // explicit session follow-ups — what we said we'd do but haven't (status open|blocked, never done).
+  for (const b of backlog.filter((x) => (x.status || 'open') !== 'done')) {
+    tasks.push({ source: 'backlog', priority: b.priority || 'high', text: `${(b.status || 'open') === 'blocked' ? '⛔ ' : ''}${b.title || ''}`.slice(0, 140) });
+  }
   for (const m of tail(metaMistakes, 5)) {
     tasks.push({ source: 'meta-ledger', priority: 'high', text: `${m.class || 'lesson'}: ${m.real || m.claimed || ''}`.slice(0, 120) });
   }
@@ -197,6 +201,7 @@ export function collectProject(projectPath) {
   const gateTrips = readJsonl(resolve(projectPath, 'docs/audits/gate-trips.jsonl'));
   const approvals = readJsonl(resolve(projectPath, 'docs/audits/approval-queue.jsonl'));
   const crossLine = readJsonl(resolve(projectPath, 'docs/audits/cross-line-verdicts.jsonl'));
+  const backlog = readJsonl(resolve(projectPath, 'docs/audits/backlog.jsonl'));
   const dora = readJsonl(resolve(projectPath, 'docs/audits/dora-events.jsonl'));
   const baseline = readJson(resolve(projectPath, 'docs/evals/_baseline.json'));
   let reflexionQueue = 0;
@@ -238,7 +243,7 @@ export function collectProject(projectPath) {
     pipeline: summarizePipeline({ runState: primary, planGraph: safePlan(primary?.task), halt, branch, traces }),
     board,
     waves,
-    tasks: summarizeTasks({ metaMistakes, gateTrips, approvals, crossLine, reflexionQueue, halt }),
+    tasks: summarizeTasks({ metaMistakes, gateTrips, approvals, crossLine, reflexionQueue, halt, backlog }),
     health: summarizeHealth(baseline, halt, gateTrips),
     production: summarizeProduction(dora),
     activity: summarizeActivity(traces),
@@ -272,6 +277,7 @@ function selfTest() {
   ok('eval present but failing → amber', summarizeHealth({ pass_rate: 0.9 }, false, [{ verdict: 'FAIL' }]).level === 'amber');
   ok('halt task is critical and first', summarizeTasks({ halt: true, metaMistakes: [{ class: 'x', real: 'y' }] })[0].priority === 'critical');
   ok('tasks priority-sorted', summarizeTasks({ approvals: [{ summary: 'a' }], gateTrips: [{ verdict: 'FAIL', gate: 'g' }] })[0].priority === 'high');
+  ok('backlog: open follow-ups surface, done ones are hidden', (() => { const t = summarizeTasks({ backlog: [{ title: 'do X', status: 'open' }, { title: 'did Y', status: 'done' }] }); const b = t.filter((x) => x.source === 'backlog'); return b.length === 1 && b[0].text === 'do X'; })());
   ok('production counts only deploys', summarizeProduction([{ type: 'deploy' }, { type: 'other' }]).deployCount === 1);
   ok('missing data degrades gracefully', summarizePipeline({}).stageCount === 0 && summarizeTasks({}).length === 0);
   ok('activity tape maps recent traces (newest first)', summarizeActivity([{ agent: 'a', action: 'x' }, { agent: 'b', action: 'y' }])[0].agent === 'b');
