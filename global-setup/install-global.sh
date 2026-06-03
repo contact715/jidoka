@@ -31,7 +31,7 @@ cp "$SRC/skills/dev-pipeline/SKILL.md" "$DEST/skills/dev-pipeline/"
 echo "  ✓ dev-pipeline skill"
 
 # 3. engine (from framework — the source of truth, with global ledger path)
-for f in meta-lib meta-remedies meta-audit meta-honesty meta-trend meta-premortem meta-log proof-gate pre-publish-guard memory-consolidate northstar-check kaizen-loop charter-check; do
+for f in meta-lib meta-remedies meta-audit meta-honesty meta-trend meta-premortem meta-log proof-gate pre-publish-guard memory-consolidate northstar-check kaizen-loop charter-check get-spec-context spec-first-gate; do
   [ -f "$FW/scripts/$f.mjs" ] && cp "$FW/scripts/$f.mjs" "$DEST/jidoka/scripts/"
 done
 [ -f "$FW/lib/redaction/redact-pii.mjs" ] && cp "$FW/lib/redaction/redact-pii.mjs" "$DEST/jidoka/lib/redaction/"
@@ -41,6 +41,10 @@ done
 # point meta-lib at the GLOBAL cross-project ledger
 perl -i -pe "s{'docs/audits/meta-mistakes.jsonl'}{require('node:os').homedir()+'/.claude/jidoka/meta-mistakes.jsonl'}g" "$DEST/jidoka/scripts/meta-lib.mjs" 2>/dev/null || true
 echo "  ✓ engine → ~/.claude/jidoka/scripts/"
+
+# 3a. dashboard (framework-level multi-project viewer — npm run dashboard)
+mkdir -p "$DEST/jidoka/scripts/dashboard"
+cp "$FW/scripts/dashboard/"* "$DEST/jidoka/scripts/dashboard/" 2>/dev/null && echo "  ✓ dashboard → ~/.claude/jidoka/scripts/dashboard/" || true
 
 # 4. team agents (skip the template)
 for a in "$FW/.claude/agents/"*.md; do

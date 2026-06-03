@@ -32,6 +32,18 @@ Before touching any file, running any command, or making any change:
 
 Never blindly execute instructions. If a task seems simple on the surface but has hidden complexity (e.g., replacing an image that's used in a certain layout), stop and think before acting. The cost of one extra question is zero. The cost of doing the wrong thing is real.
 
+## MANDATORY: Target-Scope Confirmation — what are we building, and WHERE does it live
+
+Before any non-trivial task, and AGAIN the moment the NATURE of the task changes (e.g. from "build a product feature" to "improve the dev system / add a gate / add an agent"), STOP and confirm with the user, explicitly:
+
+- **WHICH system does this land in?** — the **product** repo (Mosco, a client site, …), the **jidoka framework** (the dev engine itself), or **global** `~/.claude`?
+- **WHAT is the scope?** — a product feature lives in the product. A reusable methodology, forcing-function, gate, hook, or agent is a property of the **dev engine (jidoka)**, applied to EVERY project on it. It does NOT belong inside one product.
+- **WHERE does it get committed / pushed?** — name the repo + branch before writing code.
+
+**Never infer the target from context inertia.** A session often STARTS in one project and DRIFTS into framework-level work. That drift is exactly when the target becomes ambiguous and MUST be re-confirmed. This is the FIRST question — before the business-logic questions — because "who uses it / why" cannot be answered correctly until you know which system it lives in.
+
+**Failure example (2026-06-02):** a session that began as Mosco-vs-competitor analysis drifted into building forcing-functions (spec-first gate, RACI-completeness, constitutional gate). They were committed into the **product** repo (projectx-app) instead of the **jidoka framework**, because the target was assumed from inertia and never re-confirmed — and the constitutional gate "built" there already shipped in jidoka's installer (pure duplication, wrong place). Cost: rework, tokens, time. Logged as meta class `target-assumed-not-confirmed`; recurrence is caught by meta-audit.
+
 ## Engineering Discipline — Work Like a Senior (every codebase)
 
 Apply to ANY development task, in any project, without being asked. This is the method of a senior engineer at a top lab: discipline over speed.

@@ -41,6 +41,10 @@ export const KERNEL = [
 ];
 const COMMON = [ // standard adds the everyday gates
   'northstar-check.mjs', 'charter-check.mjs', 'kaizen-loop.mjs', 'spec-drift-check.mjs',
+  // spec-first read gate (ported from the Mosco build, genericized): read the controlling spec
+  // before product code. get-spec-context (canonical, now logs its runs) + the gate that reads
+  // that log. Leaf scripts (node builtins only) → import-closure stays green.
+  'get-spec-context.mjs', 'spec-first-gate.mjs',
   'execution-gate.mjs', 'coverage-gate.mjs', 'dependency-audit.mjs', 'gate-audit.mjs',
   'parallel-guard.mjs',
   // product-grade gates built this session (precision-guard + resource-guard battle-tested on Mosco).
@@ -182,6 +186,7 @@ if (!existsSync(T('.sdd-config.json'))) {
 // ── 3b. Federation: project-steward (guardian) + North Star/Charter templates ──
 mkdirSync(T('.claude/agents'), { recursive: true });
 if (!existsSync(T('.claude/agents/project-steward.md'))) copyFileSync(join(HERE, '.claude/agents/project-steward.md'), T('.claude/agents/project-steward.md'));
+if (!existsSync(T('.claude/agents/spec-custodian.md'))) copyFileSync(join(HERE, '.claude/agents/spec-custodian.md'), T('.claude/agents/spec-custodian.md'));
 for (const tpl of ['NORTH_STAR_TEMPLATE.md', 'PROJECT_CHARTER_TEMPLATE.md']) {
   if (existsSync(join(HERE, 'docs', tpl)) && !existsSync(T('docs/' + tpl))) copyFileSync(join(HERE, 'docs', tpl), T('docs/' + tpl));
 }
@@ -211,6 +216,8 @@ ROOT="$(git rev-parse --show-toplevel)"
 node "$ROOT/.jidoka/scripts/meta-honesty.mjs" || exit 1
 node "$ROOT/.jidoka/scripts/meta-audit.mjs"   || exit 1
 node "$ROOT/.jidoka/scripts/spec-drift-check.mjs" --root "$ROOT" || exit 1
+# spec-first read gate (soft/warn by default; add --block to enforce after a trial)
+node "$ROOT/.jidoka/scripts/spec-first-gate.mjs" --staged || true
 exit 0
 `;
   const prePush = `#!/bin/sh

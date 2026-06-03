@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>jidoka dashboard</title>
+<style>
+  :root { --bg:#0f1115; --card:#171a21; --border:#262b36; --text:#e6e9ef; --muted:#8b93a5;
+          --green:#34d399; --amber:#fbbf24; --red:#f87171; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 -apple-system,system-ui,Segoe UI,sans-serif; }
+  header { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  h1 { font-size:15px; margin:0; }
+  #projects { display:flex; gap:8px; flex-wrap:wrap; }
+  .tab { padding:4px 12px; border:1px solid var(--border); border-radius:8px; cursor:pointer; color:var(--muted); font-size:13px; }
+  .tab.active { color:var(--text); border-color:var(--amber); background:rgba(251,191,36,.1); }
+  .live { font-size:11px; color:var(--muted); }
+  .live.on { color:var(--green); }
+  button { background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:6px 12px; cursor:pointer; font-size:13px; }
+  main { padding:20px; display:grid; gap:16px; grid-template-columns:1fr 1fr; max-width:1100px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; }
+  .card h2 { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 12px; }
+  .funnel { display:flex; flex-direction:column; gap:4px; }
+  .stage { padding:6px 10px; border-radius:6px; background:rgba(255,255,255,.03); font-size:12px; }
+  .badge { display:inline-block; padding:3px 10px; border-radius:6px; font-size:12px; font-weight:700; }
+  .badge.green { color:var(--green); background:rgba(52,211,153,.12); }
+  .badge.amber { color:var(--amber); background:rgba(251,191,36,.12); }
+  .badge.red { color:var(--red); background:rgba(248,113,113,.12); }
+  .badge.unknown { color:var(--muted); background:rgba(139,147,165,.12); }
+  .meta { font-size:12px; color:var(--muted); }
+  .task { display:flex; gap:10px; padding:7px 0 7px 8px; border-bottom:1px solid var(--border); font-size:13px; }
+  .task .src { font-size:10px; text-transform:uppercase; color:var(--muted); min-width:104px; }
+  .p-critical { border-left:3px solid var(--red); }
+  .p-high { border-left:3px solid var(--amber); }
+  .p-medium { border-left:3px solid var(--muted); }
+  .empty { color:var(--muted); font-size:13px; }
+  .banner { grid-column:1/-1; padding:10px 14px; border-radius:10px; background:rgba(248,113,113,.12); color:var(--red); font-weight:600; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🦞 jidoka dashboard</h1>
+  <div id="projects"></div>
+  <span class="live" id="live">○ idle</span>
+  <button onclick="exportGdoc()" style="margin-left:auto">Export → GDoc</button>
+</header>
+<main id="main"><p class="empty" style="padding:20px">Загрузка…</p></main>
+
+<script>
+let current = null, es = null;
+
+async function loadProjects() {
+  const ps = await (await fetch('/api/projects')).json();
+  const el = document.getElementById('projects');
+  el.innerHTML = '';
+  ps.forEach((p) => {
+    const t = document.createElement('div');
+    t.className = 'tab' + (p.name === current ? ' active' : '');
+    t.textContent = p.name + (p.kind === 'framework' ? ' ⚙' : '');
+    t.onclick = () => select(p.name);
+    el.appendChild(t);
+  });
+  if (!current && ps.length) select(ps[0].name);
+}
+
+function select(name) {
+  current = name;
+  loadProjects();
+  render();
+  if (es) es.close();
+  es = new EventSource('/api/stream?project=' + encodeURIComponent(name));
+  es.onopen = () => { const l = document.getElementById('live'); l.textContent = '● live'; l.className = 'live on'; };
+  es.addEventListener('update', render);
+  es.onerror = () => { const l = document.getElementById('live'); l.textContent = '○ reconnecting'; l.className = 'live'; };
+}
+
+function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+
+async function render() {
+  if (!current) return;
+  const d = await (await fetch('/api/data?project=' + encodeURIComponent(current))).json();
+  const h = d.health;
+  const banner = h.halt ? '<div class="banner">🔴 ANDON — pipeline halted, resume required</div>' : '';
+  const stages = d.pipeline.stages.length
+    ? d.pipeline.stages.map((s) => '<div class="stage">' + esc(s.label) + '</div>').join('')
+    : '<span class="empty">нет RACI-этапов</span>';
+  const tasks = d.tasks.length
+    ? d.tasks.map((t) => '<div class="task p-' + t.priority + '"><span class="src">' + esc(t.source) + '</span><span>' + esc(t.text) + '</span></div>').join('')
+    : '<span class="empty">всё чисто</span>';
+  document.getElementById('main').innerHTML = `
+    ${banner}
+    <div class="card">
+      <h2>Dev-pipeline · ${esc(d.pipeline.branch || '')}</h2>
+      <div class="funnel">${stages}</div>
+    </div>
+    <div class="card">
+      <h2>Health</h2>
+      <span class="badge ${h.level}">${h.level.toUpperCase()}</span>
+      <p class="meta">eval ${h.evalPct ?? '—'}% · recent fails ${h.recentFails} · ${h.halt ? 'HALTED' : 'running'}</p>
+      <h2 style="margin-top:18px">Production pipeline</h2>
+      <p class="meta">${d.production.deployCount} deploy event(s)</p>
+      <p class="meta">updated ${new Date(d.collectedAt).toLocaleTimeString()}</p>
+    </div>
+    <div class="card" style="grid-column:1/-1">
+      <h2>Что висит · ${d.tasks.length}</h2>
+      ${tasks}
+    </div>`;
+}
+
+async function exportGdoc() {
+  const r = await (await fetch('/api/export?project=' + encodeURIComponent(current))).json();
+  alert(r.message || ('snapshot: ' + r.path));
+}
+
+loadProjects();
+</script>
+</body>
+</html>

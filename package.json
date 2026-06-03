@@ -5,6 +5,8 @@
 	"scripts": {
 		"meta:audit": "node scripts/meta-audit.mjs",
 		"meta:log": "node scripts/meta-log.mjs",
+		"dashboard": "node scripts/dashboard/serve.mjs",
+		"dashboard:check": "node scripts/dashboard/collectors.mjs --self-test && node scripts/dashboard/gdoc-export.mjs --self-test",
 		"proof": "node scripts/proof-gate.mjs",
 		"snapshot:global": "node scripts/snapshot-global.mjs",
 		"dev": "next dev --webpack",

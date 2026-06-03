@@ -240,6 +240,28 @@ function formatJson(feature, matchedSpec, ancestry) {
   );
 }
 
+// ── Run trace (forcing-function audit; mirrors reuse-scan's reuse-scans.jsonl) ──
+// A behavioral gate is only real if it leaves a verifiable trace (anti-pattern
+// #2 partial-closure-via-documentation). check-spec-first.mjs reads this log to
+// confirm the Spec-First Read Gate was passed before product code was touched.
+function logRun(feature, found, matchedRelPath, ancestryDepth) {
+  try {
+    fs.mkdirSync(path.join(ROOT, 'docs/audits'), { recursive: true });
+    fs.appendFileSync(
+      path.join(ROOT, 'docs/audits/spec-context-runs.jsonl'),
+      JSON.stringify({
+        ts: new Date().toISOString(),
+        feature,
+        found,
+        matched: matchedRelPath,
+        ancestryDepth,
+      }) + '\n',
+    );
+  } catch {
+    /* best-effort: never block the lookup on a log failure */
+  }
+}
+
 // ── Main ───────────────────────────────────────────────────────────────
 function main() {
   if (!featureName) {
@@ -263,6 +285,7 @@ function main() {
   const matches = allSpecs.filter((s) => matchesFeature(s, featureName));
 
   if (matches.length === 0) {
+    logRun(featureName, false, null, 0);
     process.stderr.write(`[not found] no spec matches "${featureName}"\n`);
     process.exit(0);
   }
@@ -272,6 +295,8 @@ function main() {
 
   // Walk ancestry upward
   const ancestry = walkAncestry(matchedSpec, allSpecsByRelPath);
+
+  logRun(featureName, true, matchedSpec.relPath, ancestry.length);
 
   if (format === 'json') {
     process.stdout.write(formatJson(featureName, matchedSpec, ancestry) + '\n');

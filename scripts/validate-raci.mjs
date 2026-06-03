@@ -238,6 +238,30 @@ function main() {
     }
   }
 
+  // ── R7 — Completeness: every roster agent must appear in >=1 RACI/DACI row ──
+  // Ported from the Mosco build, genericized. Closes the "new agent assigned to no row is
+  // not auto-detected" gap. Config-gated: WARN by default (soft trial), promote to a hard
+  // VIOLATION via .sdd-config.json raciCompleteness.hardBlockEnabled once the roster is
+  // backfilled into RACI (a fresh framework may have many agents not yet placed).
+  let r7Hard = false;
+  try {
+    r7Hard = JSON.parse(fs.readFileSync(path.join(ROOT, '.sdd-config.json'), 'utf8'))?.raciCompleteness?.hardBlockEnabled === true;
+  } catch { /* default soft */ }
+  const assignedRosterNames = new Set();
+  for (const slug of allSlugs) {
+    if (typeof slug !== 'string' || slug.startsWith('human:')) continue;
+    const lower = slug.toLowerCase();
+    const resolved =
+      slugMap.get(lower) || slugMap.get(lower.replace(/\s+/g, '-')) || slugMap.get(lower.replace(/[\s\-]/g, ''));
+    if (resolved) assignedRosterNames.add(resolved);
+  }
+  for (const rosterName of rosterNames) {
+    if (!assignedRosterNames.has(rosterName)) {
+      const msg = `roster agent "${rosterName}" is assigned to no RACI activity or DACI decision (unplaced in the process)`;
+      (r7Hard ? violations : warnings).push(`${r7Hard ? 'VIOLATION' : 'WARN'} [R7/completeness]: ${msg}`);
+    }
+  }
+
   // ── R1, R2, R3, R6 — Activities invariants ────────────────────────────
   for (const activity of (raci.activities || [])) {
     const id = activity.id || '(unnamed)';
