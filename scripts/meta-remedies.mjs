@@ -1,3 +1,13 @@
+// PROPOSED meta-remedies.mjs — registers the two ungated recurring classes (reward-hacking,
+// self-test-blindspot) that meta-audit keeps flagging. meta-remedies.mjs is L0 (the gate registry);
+// policy-enforce-hook refuses agent writes to it by design, so this proposal is applied by a HUMAN:
+//
+//     cp docs/proposals/meta-remedies.proposed.mjs scripts/meta-remedies.mjs
+//     node scripts/meta-audit.mjs    # both classes now read "gated & holding", not "ungated recurring"
+//     node scripts/eval-suite.mjs    # expect green
+//
+// (Only the two new blocks — 'reward-hacking' and 'self-test-blindspot' — differ from the live file.)
+
 // Single source of truth for the meta-mistake gate registry.
 //
 // Consumed by every engine in the family:
@@ -47,6 +57,35 @@ export const REMEDIES = {
       advise: 'scan the full git history (scripts/pre-publish-guard.mjs), not just the working tree',
     },
     gate: 'Cleanup/security claims must scan full history, not current state. Mechanism scans git log -p.',
+  },
+  'reward-hacking': {
+    since: '2026-05-31',
+    mechanism: 'scripts/meta-honesty.mjs',
+    family: ['synonym-pile', 'booster-words', 'self-confirming-retro', 'eval-gaming'],
+    premortem: {
+      risk: /\b(flawless|perfect(ly)?|bulletproof|comprehensive|robust|seamless|world[- ]class|state[- ]of[- ]the[- ]art|100%|all \w+ (pass(ed|ing)?|verified|confirmed|successful))\b/i,
+      clears: /\b(external|red[- ]?team|falsif|counterexample|caught_by|independent (check|review|judge)|adversarial)\b/i,
+      advise: 'get an EXTERNAL/adversarial check that could falsify the claim; more pass-synonyms is lexical novelty, not semantic evidence',
+    },
+    gate:
+      'A retro/claim must not GAME the reward signal. Done/pass-synonym restatements, booster-word piles, ' +
+      'and self-confirming entries are caught by meta-honesty (synonym-pile + booster detection + external-catch ' +
+      'ratio); red-team continuously attacks this class. Lexical novelty is not semantic novelty.',
+  },
+  'self-test-blindspot': {
+    since: '2026-06-02',
+    mechanism: 'scripts/mutation-test.mjs',
+    family: ['threshold-untested', 'boundary-case-missed', 'near-target-untested', 'happy-path-only'],
+    premortem: {
+      risk: /\b(self-test|unit test|self-tested|passes|green|tested|covered|all cases)\b/i,
+      clears: /\b(boundary|near-target|edge case|property|forAll|mutation|random input|min\b|max\b|threshold)\b/i,
+      advise: 'test BOUNDARY/near-target cases, not just convenient ones; back the self-test with mutation-test (kills un-asserted code) + property-test (random inputs surface threshold bugs)',
+    },
+    gate:
+      'A self-test must cover boundary and near-target cases, not only convenient ones (a kaizen trend at 96→99 ' +
+      'toward 100; a metric exactly at its threshold). Back every self-test with mutation-test (scripts/mutation-test.mjs, ' +
+      'kills code no assertion catches) and property-test (scripts/property-test.mjs, random inputs find the threshold ' +
+      'bug the hand-picked cases miss). Real data surfacing a self-test gap = this class.',
   },
   'scope-narrowed-silently': {
     since: '2026-05-29',
