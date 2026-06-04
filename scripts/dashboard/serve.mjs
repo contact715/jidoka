@@ -17,7 +17,10 @@ import { snapshotMarkdown, snapshotHtml } from './gdoc-export.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FRAMEWORK = dirname(dirname(HERE)); // scripts/dashboard → framework root
 const HOME = homedir();
-const PORT = Number(process.env.JIDOKA_DASHBOARD_PORT) || 7717;
+// Honor the standard PORT env var (the Claude preview harness assigns a free port this way), then our
+// own JIDOKA_DASHBOARD_PORT, else the default. An explicit port is respected strictly (no fallback).
+const EXPLICIT_PORT = process.env.PORT || process.env.JIDOKA_DASHBOARD_PORT;
+const PORT = Number(EXPLICIT_PORT) || 7717;
 // Optional HTTP basic-auth: set JIDOKA_DASHBOARD_AUTH="user:pass" to require it on EVERY request
 // (used when the board is exposed via a public tunnel). Unset = no auth (local default — unchanged).
 const AUTH = process.env.JIDOKA_DASHBOARD_AUTH || '';
@@ -112,7 +115,7 @@ if (process.argv.includes('--emit-html')) {
 // one instead of crashing on EADDRINUSE — so `npm run dashboard` always comes up.
 let boundPort = PORT;
 server.on('error', (e) => {
-  if (e.code === 'EADDRINUSE' && boundPort < PORT + 12) {
+  if (e.code === 'EADDRINUSE' && !EXPLICIT_PORT && boundPort < PORT + 12) {
     console.log(`  ⚠ port ${boundPort} busy — trying ${boundPort + 1}…`);
     boundPort += 1;
     setTimeout(() => server.listen(boundPort), 120);
@@ -130,7 +133,8 @@ server.listen(boundPort, () => {
   if (lan) console.log(`  📱 iPad / телефон (та же Wi-Fi): http://${lan.address}:${boundPort}`);
   console.log(`  ${projects().length} projects · ${watched} live watchers · Ctrl-C to stop\n`);
   // Auto-open the browser so the dashboard is never just a URL in a log (opt out: JIDOKA_DASHBOARD_NO_OPEN=1).
-  if (!process.env.JIDOKA_DASHBOARD_NO_OPEN) {
+  // Skip under the preview harness (PORT set) — it renders the page itself, no extra browser window.
+  if (!process.env.JIDOKA_DASHBOARD_NO_OPEN && !process.env.PORT) {
     const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start ""' : 'xdg-open';
     exec(`${opener} ${target}`, () => { /* best-effort; headless/no-DISPLAY is fine */ });
   }
