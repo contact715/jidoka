@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>jidoka dashboard</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>%F0%9F%A6%9E</text></svg>" />
 <style>
   :root { --bg:#0d0f13; --bg2:#13161c; --card:#171a21; --card2:#1c2029; --border:#262b36; --border2:#313845;
           --text:#e7eaf0; --muted:#8b93a5; --muted2:#5b6373; --green:#34d399; --amber:#fbbf24; --red:#f87171; --blue:#7dd3fc;
@@ -89,6 +90,27 @@
   .wcard-p { font-size:10px; color:var(--muted); flex-shrink:0; }
   .bar { height:5px; border-radius:3px; background:rgba(255,255,255,.07); overflow:hidden; margin-top:7px; }
   .bar span { display:block; height:100%; border-radius:3px; background:linear-gradient(90deg,#34d399,#5eead4); transition:width .4s ease; }
+  /* — creative flourishes — */
+  .andon { width:13px; height:13px; border-radius:50%; display:inline-block; background:var(--muted2); }
+  .andon.green { background:var(--green); box-shadow:0 0 8px var(--green); animation:breathe 2.6s ease-in-out infinite; }
+  .andon.amber { background:var(--amber); box-shadow:0 0 9px var(--amber); animation:breathe 1.6s ease-in-out infinite; }
+  .andon.red { background:var(--red); box-shadow:0 0 12px var(--red); animation:breathe .9s ease-in-out infinite; }
+  @keyframes breathe { 0%,100%{ transform:scale(1); opacity:1 } 50%{ transform:scale(1.22); opacity:.7 } }
+  .kpis { display:flex; gap:12px; flex-wrap:wrap; }
+  .kpi { flex:1; min-width:128px; background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:14px 16px; display:flex; align-items:center; gap:13px; transition:border-color .15s; }
+  .kpi:hover { border-color:var(--border2); }
+  .kpi-ring { width:46px; height:46px; flex-shrink:0; }
+  .kpi-big { font-size:23px; font-weight:700; letter-spacing:-.02em; line-height:1; }
+  .kpi-lbl { font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin-top:5px; }
+  .kpi-ico { font-size:21px; width:30px; text-align:center; }
+  .lesson { display:flex; align-items:center; gap:11px; padding:7px 0; border-bottom:1px solid var(--border); }
+  .lesson:last-child { border-bottom:0; }
+  .lesson-name { font-size:12px; min-width:170px; flex-shrink:0; }
+  .lesson-bar { flex:1; height:7px; border-radius:4px; background:rgba(255,255,255,.06); overflow:hidden; }
+  .lesson-bar span { display:block; height:100%; border-radius:4px; transition:width .5s ease; }
+  .lesson-n { font-size:11px; color:var(--muted); min-width:24px; text-align:right; font-weight:700; }
+  .stage.cur { animation:curglow 2.8s ease-in-out infinite; }
+  @keyframes curglow { 0%,100%{ box-shadow:0 0 0 1px rgba(251,191,36,.25) } 50%{ box-shadow:0 0 18px rgba(251,191,36,.3), 0 0 0 1px rgba(251,191,36,.55) } }
   @media (max-width:980px) { main { grid-template-columns:1fr 1fr; } }
   @media (max-width:720px) { main { grid-template-columns:1fr; padding:14px; gap:12px; } .col { flex-basis:150px; min-width:150px; } }
   @media (max-width:560px) { header { padding:10px 14px; gap:8px; } h1 { font-size:14px; } .stage { flex-wrap:wrap; } }
@@ -98,6 +120,7 @@
 <header>
   <h1>🦞 jidoka dashboard</h1>
   <div id="projects"></div>
+  <span class="andon" id="andon" title="health"></span>
   <span class="live" id="live">○ idle</span>
   <button onclick="exportGdoc()" style="margin-left:auto">Export → GDoc</button>
 </header>
@@ -144,6 +167,12 @@ function select(name) {
 }
 
 function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+
+function ringSvg(pct) {
+  const r = 18, c = 2 * Math.PI * r, off = c * (1 - Math.max(0, Math.min(100, pct)) / 100);
+  const col = pct >= 80 ? '#34d399' : pct >= 40 ? '#fbbf24' : '#7dd3fc';
+  return `<svg class="kpi-ring" viewBox="0 0 46 46"><circle cx="23" cy="23" r="${r}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="5"/><circle cx="23" cy="23" r="${r}" fill="none" stroke="${col}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}" transform="rotate(-90 23 23)"/></svg>`;
+}
 
 const ICON = { done: '✓', running: '▸', failed: '✗', pending: '○', idle: '◦' };
 
@@ -193,6 +222,21 @@ async function render() {
 function paint(d) {
   const h = d.health;
   const banner = h.halt ? '<div class="banner">🔴 ANDON — pipeline halted, resume required</div>' : '';
+  const waves = d.waves || [];
+  const inflight = waves.filter((w) => w.progress < 100).length;
+  const avg = waves.length ? Math.round(waves.reduce((s, w) => s + w.progress, 0) / waves.length) : 0;
+  const acts = d.activity || [];
+  const passes = acts.filter((a) => /pass|approve|done/i.test(a.action || '')).length;
+  const fails = acts.filter((a) => /fail|violation|block|revise|deadlock/i.test(a.action || '')).length;
+  const topL = (d.lessons || [])[0];
+  const kpiStrip = `<div class="card full"><div class="kpis">
+    <div class="kpi"><span class="kpi-ico">🌊</span><div><div class="kpi-big">${inflight}</div><div class="kpi-lbl">волн в полёте</div></div></div>
+    <div class="kpi">${ringSvg(avg)}<div><div class="kpi-big">${avg}%</div><div class="kpi-lbl">средний прогресс</div></div></div>
+    <div class="kpi"><span class="andon ${h.halt ? 'red' : h.level}"></span><div><div class="kpi-big">${esc(h.level.toUpperCase())}</div><div class="kpi-lbl">health · eval ${h.evalPct ?? '—'}%</div></div></div>
+    <div class="kpi"><span class="kpi-ico">🛡️</span><div><div class="kpi-big">${passes}</div><div class="kpi-lbl">гейтов pass · ${fails} fail</div></div></div>
+    <div class="kpi"><span class="kpi-ico">📋</span><div><div class="kpi-big">${d.tasks.length}</div><div class="kpi-lbl">что висит</div></div></div>
+    ${topL ? `<div class="kpi"><span class="kpi-ico">↻</span><div><div class="kpi-big">${topL.count}×</div><div class="kpi-lbl">${esc(String(topL.class).slice(0, 16))}</div></div></div>` : ''}
+  </div></div>`;
   const sel = (d.waves || []).find((w) => w.wave === selectedWave) || d.pipeline;
   const detailTags = [
     sel.wave ? `<span class="tag">${esc(sel.wave)}</span>` : '<span class="tag">канонический граф</span>',
@@ -207,6 +251,7 @@ function paint(d) {
     : '<span class="empty">всё чисто</span>';
   document.getElementById('main').innerHTML = `
     ${banner}
+    ${kpiStrip}
     <div class="card full">
       <h2>Pipeline · ${esc((d.pipeline && d.pipeline.branch) || '')} · ${(d.board && d.board.waveCount) || 0} волн(ы) в потоке</h2>
       ${boardHtml(d)}
@@ -230,7 +275,7 @@ function paint(d) {
     </div>
     <div class="card">
       <h2>Уроки мета-леджера · рецидив</h2>
-      ${(d.lessons || []).length ? d.lessons.map((l) => '<div class="task"><span class="src">' + l.count + '×</span><span>' + esc(l.class) + '</span></div>').join('') : '<span class="empty">нет</span>'}
+      ${(() => { const ls = d.lessons || []; if (!ls.length) return '<span class="empty">нет</span>'; const mx = Math.max(...ls.map((l) => l.count)); return ls.map((l) => { const w = Math.round(l.count / mx * 100); const col = l.count >= 3 ? 'var(--red)' : l.count >= 2 ? 'var(--amber)' : 'var(--blue)'; return '<div class="lesson"><span class="lesson-name">' + esc(l.class) + '</span><div class="lesson-bar"><span style="width:' + w + '%;background:' + col + '"></span></div><span class="lesson-n">' + l.count + '×</span></div>'; }).join(''); })()}
     </div>
     <div class="card full">
       <h2>Что висит · ${d.tasks.length}</h2>
@@ -240,6 +285,8 @@ function paint(d) {
       <h2>Timeline · последние волны</h2>
       ${(d.timeline || []).length ? d.timeline.map((t) => '<div class="task"><span class="src">' + esc(t.hash) + '</span><span>' + esc(t.subject) + '</span><span class="meta" style="margin-left:auto">' + esc(t.when) + '</span></div>').join('') : '<span class="empty">нет коммитов</span>'}
     </div>`;
+  const al = document.getElementById('andon');
+  if (al) { al.className = 'andon ' + (h.halt ? 'red' : h.level); al.title = 'health: ' + (h.halt ? 'HALTED' : String(h.level).toUpperCase()); }
 }
 
 async function exportGdoc() {
