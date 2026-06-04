@@ -3,7 +3,14 @@
 #   - reflexion trigger: queues adversarial review when a diff is large (size-gated inside)
 #   - surface-concerns: proactive surfacing on wave-boundary / L-effort commits
 # Both run detached; their output goes to gitignored *-queue/ paths.
+#
+# PILE-UP GUARD: only launch each background job if a previous instance isn't still running.
+# Without this, a hung job would accumulate one extra detached node process per commit.
 ROOT="$(git rev-parse --show-toplevel)"
-sh "$ROOT/scripts/auto-reflexion-trigger.sh" >/dev/null 2>&1 &
-node "$ROOT/scripts/surface-concerns.mjs" >/dev/null 2>&1 &
+if ! pgrep -f 'auto-reflexion-trigger.sh' >/dev/null 2>&1; then
+  sh "$ROOT/scripts/auto-reflexion-trigger.sh" >/dev/null 2>&1 &
+fi
+if ! pgrep -f 'surface-concerns.mjs' >/dev/null 2>&1; then
+  node "$ROOT/scripts/surface-concerns.mjs" >/dev/null 2>&1 &
+fi
 exit 0

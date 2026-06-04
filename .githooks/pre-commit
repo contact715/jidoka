@@ -3,7 +3,26 @@
 #   1. meta-honesty: BLOCKS if the mistake ledger has self-confirming (garbage-in) entries.
 #   2. instantiation-audit --warn: surfaces declaration-over-implementation ghosts (informational).
 # Activated by: git config core.hooksPath .githooks
+#
+# QUIET-ON-SUCCESS: on a clean commit this prints ONE summary line per gate. The full report
+# (the long advisory output) is shown ONLY when a gate actually BLOCKS. Run the scripts directly
+# for the full report any time: `node scripts/meta-honesty.mjs`.
 ROOT="$(git rev-parse --show-toplevel)"
-node "$ROOT/scripts/meta-honesty.mjs" || exit 1
-node "$ROOT/scripts/instantiation-audit.mjs" --warn || true
+
+out=$(node "$ROOT/scripts/meta-honesty.mjs" 2>&1); rc=$?
+if [ $rc -ne 0 ]; then
+  echo "$out"
+  echo "✗ pre-commit BLOCKED by meta-honesty (ledger signal failed — see report above)."
+  exit 1
+fi
+echo "✓ pre-commit · meta-honesty: ledger signal OK"
+
+# instantiation-audit is informational — stay silent unless it actually finds ghosts.
+out=$(node "$ROOT/scripts/instantiation-audit.mjs" --warn 2>&1)
+if echo "$out" | grep -qE 'ghosts: [1-9]'; then
+  echo "$out"
+  echo "↑ instantiation-audit: ghost(s) flagged (informational, not blocking)."
+else
+  echo "✓ pre-commit · instantiation-audit: no ghosts"
+fi
 exit 0

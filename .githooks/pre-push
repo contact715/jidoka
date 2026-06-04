@@ -3,7 +3,25 @@
 #   1. pre-publish-guard: BLOCKS the push if private data is in tree or history.
 #   2. meta-audit: surfaces recurring process mistakes (informational, non-blocking).
 # Activated by: git config core.hooksPath .githooks
+#
+# QUIET-ON-SUCCESS: a clean push prints ONE line per gate; the full report shows ONLY when a gate
+# blocks (pre-publish-guard) or flags a regression (meta-audit). Full report any time:
+# `node scripts/pre-publish-guard.mjs` / `node scripts/meta-audit.mjs`.
 ROOT="$(git rev-parse --show-toplevel)"
-node "$ROOT/scripts/pre-publish-guard.mjs" || exit 1
-node "$ROOT/scripts/meta-audit.mjs" || echo "↑ meta-audit: recurring class(es) flagged (informational, not blocking)"
+
+out=$(node "$ROOT/scripts/pre-publish-guard.mjs" 2>&1); rc=$?
+if [ $rc -ne 0 ]; then
+  echo "$out"
+  echo "✗ pre-push BLOCKED by pre-publish-guard (secrets/PII in tree or history — see above)."
+  exit 1
+fi
+echo "✓ pre-push · pre-publish-guard: no secrets/PII"
+
+out=$(node "$ROOT/scripts/meta-audit.mjs" 2>&1); rc=$?
+if [ $rc -ne 0 ]; then
+  echo "$out"
+  echo "↑ meta-audit: recurring class(es) flagged (informational, not blocking)."
+else
+  echo "✓ pre-push · meta-audit: no ungated recurrences"
+fi
 exit 0
