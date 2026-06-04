@@ -10,13 +10,23 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, watch } from 'node:
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir, networkInterfaces } from 'node:os';
+import { timingSafeEqual } from 'node:crypto';
 import { discoverProjects, collectProject } from './collectors.mjs';
-import { snapshotMarkdown } from './gdoc-export.mjs';
+import { snapshotMarkdown, snapshotHtml } from './gdoc-export.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FRAMEWORK = dirname(dirname(HERE)); // scripts/dashboard → framework root
 const HOME = homedir();
 const PORT = Number(process.env.JIDOKA_DASHBOARD_PORT) || 7717;
+// Optional HTTP basic-auth: set JIDOKA_DASHBOARD_AUTH="user:pass" to require it on EVERY request
+// (used when the board is exposed via a public tunnel). Unset = no auth (local default — unchanged).
+const AUTH = process.env.JIDOKA_DASHBOARD_AUTH || '';
+const AUTH_WANT = AUTH ? Buffer.from('Basic ' + Buffer.from(AUTH).toString('base64')) : null;
+function authOk(req) {
+  if (!AUTH_WANT) return true;
+  const got = Buffer.from(req.headers.authorization || '');
+  return got.length === AUTH_WANT.length && timingSafeEqual(got, AUTH_WANT);
+}
 
 const projects = () => discoverProjects(HOME, FRAMEWORK);
 const byName = (name) => projects().find((p) => p.name === name);
@@ -25,6 +35,10 @@ const json = (res, obj) => { res.writeHead(200, { 'content-type': 'application/j
 const sseClients = new Set();
 
 const server = createServer((req, res) => {
+  if (!authOk(req)) {
+    res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="jidoka dashboard"' });
+    return res.end('auth required');
+  }
   const url = new URL(req.url, `http://localhost:${PORT}`);
 
   if (url.pathname === '/') {
@@ -82,13 +96,38 @@ function watchProjects() {
   return n;
 }
 
-server.listen(PORT, () => {
+// CLI: `--emit-html [project]` prints the GDoc-ready HTML snapshot to stdout (for the Claude/cron
+// MCP push into a real Google Doc), then exits without starting the server. Default: the framework.
+if (process.argv.includes('--emit-html')) {
+  const arg = process.argv[process.argv.indexOf('--emit-html') + 1];
+  const list = projects();
+  const p = (arg && !arg.startsWith('--')) ? byName(arg) : (list.find((x) => x.kind === 'framework') || list[0]);
+  if (!p) { console.error('emit-html: no project found'); process.exit(1); }
+  const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+  process.stdout.write(snapshotHtml(p, collectProject(p.path), stamp));
+  process.exit(0);
+}
+
+// Auto-fallback: if the default port is taken (a stray server, another app), step to the next free
+// one instead of crashing on EADDRINUSE — so `npm run dashboard` always comes up.
+let boundPort = PORT;
+server.on('error', (e) => {
+  if (e.code === 'EADDRINUSE' && boundPort < PORT + 12) {
+    console.log(`  ⚠ port ${boundPort} busy — trying ${boundPort + 1}…`);
+    boundPort += 1;
+    setTimeout(() => server.listen(boundPort), 120);
+  } else {
+    console.error(`  dashboard could not start: ${e.message}`);
+    process.exit(1);
+  }
+});
+server.listen(boundPort, () => {
   const watched = watchProjects();
-  const target = `http://localhost:${PORT}`;
+  const target = `http://localhost:${boundPort}`;
   console.log(`\n  🦞 jidoka dashboard → ${target}`);
   // LAN address so the board opens on an iPad / phone on the same Wi-Fi (server binds all interfaces).
   const lan = Object.values(networkInterfaces()).flat().find((i) => i && i.family === 'IPv4' && !i.internal);
-  if (lan) console.log(`  📱 iPad / телефон (та же Wi-Fi): http://${lan.address}:${PORT}`);
+  if (lan) console.log(`  📱 iPad / телефон (та же Wi-Fi): http://${lan.address}:${boundPort}`);
   console.log(`  ${projects().length} projects · ${watched} live watchers · Ctrl-C to stop\n`);
   // Auto-open the browser so the dashboard is never just a URL in a log (opt out: JIDOKA_DASHBOARD_NO_OPEN=1).
   if (!process.env.JIDOKA_DASHBOARD_NO_OPEN) {
