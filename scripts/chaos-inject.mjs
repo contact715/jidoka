@@ -416,9 +416,13 @@ function scenarioI3() {
     },
     'WARN',
     () => {
-      // Restore production streams to pre-scenario content
-      if (savedVerdicts !== null) restoreStream(verdictsPath, savedVerdicts);
-      if (savedAgentEvents !== null) restoreStream(agentEventsPath, savedAgentEvents);
+      // Restore UNCONDITIONALLY. restoreStream(path, null) REMOVES a stream that was absent
+      // pre-scenario — that is the cleanup for the record check-cross-line-dispatch writes. The old
+      // `if (saved !== null)` guard SKIPPED restore in a clean checkout (stream absent → saved=null),
+      // leaking the created cross-line-verdicts.jsonl → post-flight saw 0->1 and FAILED. This only
+      // bit a fresh checkout (CI), which is why it passed locally where the stream already existed.
+      restoreStream(verdictsPath, savedVerdicts);
+      restoreStream(agentEventsPath, savedAgentEvents);
     }
   );
 }
