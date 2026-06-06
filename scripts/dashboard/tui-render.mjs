@@ -80,7 +80,7 @@ function boardLinear(waves, cols, opts = {}) {
   return [...lines, hline(cols)];
 }
 
-function boardKanban(waves, cols, frozen, selectedWave = null) {
+function boardKanban(waves, cols, frozen, selectedWave = null, costs = {}) {
   const buckets = Object.fromEntries(COL_ORDER.map((p) => [p, []]));
   for (const w of waves) { const ph = w.current || 'done'; (buckets[ph] ?? buckets['done']).push(w); }
   const shown = COL_ORDER.filter((p) => CORE.has(p) || buckets[p]?.length > 0);
@@ -89,15 +89,16 @@ function boardKanban(waves, cols, frozen, selectedWave = null) {
   const maxR = Math.max(1, ...shown.map((p) => buckets[p].length));
   for (let r = 0; r < maxR; r++) {
     lines.push(shown.map((ph) => { const w = buckets[ph][r]; if (!w) return ' '.repeat(cw); const s = frozen ? 'idle' : (w.status || 'pending'); const seld = selectedWave != null && w.wave === selectedWave; const nm = pad((w.wave || '—').slice(0, cw - 3), cw - 2); return `${frozen ? D : cstat(s)}${frozen ? SYM.idle : ssym(s)}${R} ${seld ? `\x1b[7m${nm}\x1b[27m` : nm}`; }).join(' '));
-    if (shown.some((p) => buckets[p][r])) lines.push(shown.map((ph) => { const w = buckets[ph][r]; return pad(w ? `  ${String(w.progress ?? 0).padStart(3)}% ${bar(w.progress ?? 0, 4)}` : '', cw); }).join(' '));
+    if (shown.some((p) => buckets[p][r])) lines.push(shown.map((ph) => { const w = buckets[ph][r]; if (!w) return ' '.repeat(cw); const c = costs[w.wave]; const money = c?.usd != null && cw >= 18 ? ` ${D}≈$${c.usd.toFixed(2)}${R}` : ''; return pad(`  ${String(w.progress ?? 0).padStart(3)}% ${bar(w.progress ?? 0, 4)}${money}`, cw); }).join(' '));
   }
   return [...lines, hline(cols)];
 }
 
 export function renderBoard(waves, cols, opts = {}) {
   if (!waves?.length) return [sec('ДОСКА', cols), ''];
-  // selection / cost columns need the row layout — prefer linear whenever the panel is interactive
-  return (cols < 100 || opts.interactive) ? boardLinear(waves, cols, opts) : boardKanban(waves, cols, opts.frozen || false, opts.selectedWave);
+  // wide screen = the KANBAN (columns, the «завод» view) with the selected card inverted;
+  // narrow screen = linear rows with the ▶ cursor. Both honour selection + costs.
+  return cols < 100 ? boardLinear(waves, cols, opts) : boardKanban(waves, cols, opts.frozen || false, opts.selectedWave, opts.costs || {});
 }
 
 export function renderTerminals(waves, cols) {
@@ -270,15 +271,23 @@ async function selfTest() {
   const iw = [mw({ wave: 'wave-one' }), mw({ wave: 'wave-two' })];
   const isnap = ms({ waves: iw, costs: { 'wave-two': { durMin: 95, usd: 12.34 } } });
   const il = renderFrame(isnap, AT, 120, { sel: 1 });
-  ok('AC-9: selected wave marked ▶', il.some((l) => l.includes('▶') && l.includes('wave-two')));
-  ok('AC-9: unselected wave not marked', !il.some((l) => l.includes('▶') && l.includes('wave-one')));
-  ok('AC-9: cost tail ≈$ on its wave row', il.some((l) => l.includes('wave-two') && l.includes('≈$12.34') && l.includes('⏱')));
+  const nl = renderFrame(isnap, AT, 96, { sel: 1 });
+  ok('AC-9: selected wave marked ▶ (narrow/linear)', nl.some((l) => l.includes('▶') && l.includes('wave-two')));
+  ok('AC-9: unselected wave not marked', !nl.some((l) => l.includes('▶') && l.includes('wave-one')));
+  ok('AC-9: linear cost tail ≈$ on its wave row (narrow)', renderFrame(isnap, AT, 96, { sel: 1 }).some((l) => l.includes('wave-two') && l.includes('≈$12.34') && l.includes('⏱')));
   ok('AC-9: interactive footer lists control keys', il.some((l) => l.includes('СТОП') && l.includes('деньги')));
   ok('AC-9: ui=null keeps legacy footer', renderFrame(ms(), AT, 120).some((l) => l.includes('← → проект')));
-  ok('AC-9: interactive board is linear even when wide', !il.some((l) => l.includes('ПОИСК') && l.includes('СПЕК') && l.includes('ГОТОВО')));
-  ok('AC-9: selection clamps beyond bounds', renderFrame(isnap, AT, 120, { sel: 99 }).some((l) => l.includes('▶')));
+  // REGRESSION (user report 2026-06-06 «где весь функционал?»): forcing the linear list in
+  // interactive mode killed the kanban — the wide screen must show COLUMNS again
+  ok('AC-9: interactive wide board is the KANBAN', il.some((l) => l.includes('ПОИСК') && l.includes('СПЕК')));
+  ok('AC-9: selected wave highlighted on its kanban card', il.some((l) => l.includes('\x1b[7m') && strip(l).includes('wave-two')));
+  ok('AC-9: kanban card carries ≈cost when columns are wide enough', renderFrame(isnap, AT, 160, { sel: 1 }).some((l) => l.includes('≈$12.34')));
+  ok('AC-9: tight kanban omits the cost, layout intact', !il.some((l) => l.includes('≈$')));
+  const narrow = renderFrame(isnap, AT, 90, { sel: 1 });
+  ok('AC-9: narrow interactive board stays linear with ▶', narrow.some((l) => l.includes('▶')) && !narrow.some((l) => l.includes('ПОИСК') && l.includes('СПЕК')));
+  ok('AC-9: selection clamps beyond bounds', renderFrame(isnap, AT, 96, { sel: 99 }).some((l) => l.includes('▶')));
   // BUG-1: the frame must honour selId (wave identity), not just the row number
-  const bySel = renderFrame(isnap, AT, 120, { sel: 0, selId: 'wave-two' });
+  const bySel = renderFrame(isnap, AT, 96, { sel: 0, selId: 'wave-two' });
   ok('bug-1: frame marks the wave by selId over the row index', bySel.some((l) => l.includes('▶') && l.includes('wave-two')));
   // BUG-2: a wave at the launch phase must have its own kanban column, not fall into Shipped
   const lw = mw({ wave: 'wave-l', current: 'launch' });
