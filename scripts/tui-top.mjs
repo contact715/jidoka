@@ -88,12 +88,21 @@ function buildRepaintBuffer(lines) {
   return '\x1b[H' + lines.map((l) => l + '\x1b[K').join('\n') + '\n\x1b[J';
 }
 
+// ── heartbeat: visible liveness + honest data age (pure, testable) ──
+// `◐ live · данные менялись 12с назад` — the spinner proves the loop is alive even when
+// nothing changes; the age says when the SNAPSHOT last actually differed.
+const SPIN = ['◐', '◓', '◑', '◒'];
+export function heartbeatLine(tick, secSinceChange) {
+  const age = secSinceChange == null ? '' : secSinceChange < 3 ? ' · данные изменились только что' : ` · данные менялись ${secSinceChange}с назад`;
+  return `  ${SPIN[tick % SPIN.length]} live${age}`;
+}
+
 // ── live run ─────────────────────────────────────────────────────────
 function runLive(p) {
   if (!process.stdout.isTTY) { runFlat(p); return; }
-  const ms = parseInt(process.env.JIDOKA_TOP_INTERVAL || '', 10) || 2000;
+  const ms = parseInt(process.env.JIDOKA_TOP_INTERVAL || '', 10) || 1000;
   process.stdout.write('\x1b[?1049h\x1b[?25l'); _inAltScreen = true;
-  let done = false;
+  let done = false; let tick = 0; let prevSnapJson = ''; let lastChange = Date.now();
   const quit = () => { if (done) return; done = true; closeWatchers(); restore(); process.exit(0); };
   const draw = () => {
     try {
@@ -101,8 +110,12 @@ function runLive(p) {
       const at = new Date().toISOString();
       const snap = collectProject(p);
       snap.sessions = collectSessions();
+      const sj = JSON.stringify(snap);
+      if (sj !== prevSnapJson) { if (prevSnapJson) lastChange = Date.now(); prevSnapJson = sj; }
       const cols = process.stdout.columns || 80;
-      process.stdout.write(buildRepaintBuffer(renderFrame(snap, at, cols)));
+      const lines = renderFrame(snap, at, cols);
+      lines.push(heartbeatLine(tick++, Math.round((Date.now() - lastChange) / 1000)));
+      process.stdout.write(buildRepaintBuffer(lines));
     } catch (e) { restore(); process.stderr.write('tui-top draw error: ' + (e?.message || e) + '\n'); process.exit(1); }
   };
   process.on('SIGTERM', quit); process.on('SIGINT', quit);
@@ -118,15 +131,20 @@ function runLive(p) {
     process.stdin.setEncoding('utf8'); process.stdin.on('data', onKey); process.stdin.resume();
   }
 
-  // fs.watch debounce: changes in session-env or docs/runs → immediate redraw
+  // fs.watch debounce: any change in the data sources → redraw within 300ms (true realtime,
+  // the 1s poll is just the safety net). recursive=true: macOS delivers events from wave
+  // subdirs (docs/runs/<wave>/state.json) only with a recursive watcher.
   const watchers = [];
   let debounceTimer = null;
   const schedDraw = () => { if (debounceTimer) clearTimeout(debounceTimer); debounceTimer = setTimeout(draw, 300); };
-  function tryWatch(dir) {
-    try { const w = watch(dir, { persistent: false, recursive: false }, schedDraw); watchers.push(w); } catch { /* dir missing or unsupported */ }
+  function tryWatch(dir, recursive = false) {
+    try { const w = watch(dir, { persistent: false, recursive }, schedDraw); watchers.push(w); } catch { /* dir missing or unsupported */ }
   }
-  tryWatch(SESSION_DIR);
-  tryWatch(join(p, 'docs', 'runs'));
+  tryWatch(SESSION_DIR);                              // пульт миссии сессий
+  tryWatch(join(p, 'docs', 'runs'), true);            // прогресс волн (state.json в подпапках)
+  tryWatch(join(p, 'docs', 'audits'));                // лента активности, бэклог, halt
+  tryWatch(join(p, 'docs', 'evals'));                 // eval baseline (здоровье)
+  tryWatch(join(homedir(), '.claude', 'todos'));      // прогресс планов задач
   function closeWatchers() { for (const w of watchers) { try { w.close(); } catch { /* */ } } if (debounceTimer) clearTimeout(debounceTimer); }
 }
 
@@ -162,6 +180,11 @@ async function selfTest() {
     ok('Kaizen: valid JSON with ts+project', rec && !!rec.ts && !!rec.project);
     ok('Kaizen: wavesInFlight + stuckCount', rec && rec.wavesInFlight != null && rec.stuckCount != null);
   } finally { rmSync(tmp, { recursive: true, force: true }); }
+  // AC-heartbeat: visible liveness line — spinner rotates, age honest
+  ok('AC-heartbeat: spinner rotates', heartbeatLine(0, 10) !== heartbeatLine(1, 10) && heartbeatLine(0, 10) === heartbeatLine(4, 10));
+  ok('AC-heartbeat: fresh change → «только что»', heartbeatLine(0, 1).includes('только что'));
+  ok('AC-heartbeat: old change → seconds ago', heartbeatLine(0, 42).includes('42с назад'));
+  ok('AC-heartbeat: null age → bare live', heartbeatLine(2, null) === `  ${SPIN[2]} live`);
   // AC-crash: restore() emits \x1b[?1049l when _inAltScreen=true (crash-path coverage)
   { const captured = []; const origWrite = process.stdout.write.bind(process.stdout);
     process.stdout.write = (...a) => { captured.push(a[0]); return true; };
