@@ -200,6 +200,10 @@ function run() {
       files = execSync('git diff --cached --name-only', { cwd: root, encoding: 'utf8' })
         .split('\n').filter((f) => f.endsWith('.md'))
         .filter((f) => cfg.scanRoots.some((r) => f.startsWith(r + '/')))
+        // excludeDirs must apply in --staged mode too (real-world catch 2026-06-06:
+        // full scan skipped briefs/ as scaffolding, staged mode validated them and
+        // blocked a commit that merely had brief files swept into the index)
+        .filter((f) => !f.split('/').some((seg) => (cfg.excludeDirs ?? ['briefs']).includes(seg) || seg.startsWith('_')))
         .filter((f) => { const b = f.split('/').pop(); return !b.startsWith('_') && b !== 'README.md'; })
         .map((f) => resolve(root, f)).filter(existsSync);
     } catch { files = []; }
