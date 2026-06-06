@@ -191,6 +191,54 @@ export function summarizeLessons(metaMistakes) {
     .slice(0, 6);
 }
 
+// ── native-framework fallback: waves from the project's OWN metrics dashboard ──
+// Projects with their own pipeline (projectx: no .jidoka, no run-state journals) keep a
+// per-wave table in docs/metrics/_DASHBOARD.md (| Wave | Date | Total tokens | … | Status |).
+// Rule 12 (validate against the target's REALITY): the panel adapts to that table instead
+// of showing an empty board until the project adopts jidoka journals.
+export function parseApproxTokens(s) {
+  const m = String(s || '').match(/([\d.]+)\s*([KM])/i);
+  if (!m) return null;
+  return Math.round(parseFloat(m[1]) * (m[2].toUpperCase() === 'M' ? 1e6 : 1e3));
+}
+
+export function wavesFromMetricsDashboard(md, cap = 30) {
+  const lines = String(md || '').split('\n');
+  // anchor on THE wave table header — the file may contain other tables (Elite/Value rows etc.)
+  const hi = lines.findIndex((l) => l.includes('|') && /\bWave\b/.test(l) && /Total tokens/i.test(l) && /Status/i.test(l));
+  if (hi === -1) return [];
+  const cols = lines[hi].split('|').map((c) => c.trim().toLowerCase());
+  const ix = { wave: cols.indexOf('wave'), date: cols.indexOf('date'), tokens: cols.indexOf('total tokens'), wall: cols.findIndex((c) => c.startsWith('wall')), status: cols.indexOf('status') };
+  const rows = []; const seen = new Set();
+  for (let i = hi + 1; i < lines.length; i++) {
+    const l = lines[i].trim();
+    if (!l.startsWith('|')) continue; // prose/comments between appended rows don't end the table
+    const c = l.split('|').map((s) => s.trim());
+    if (/^wave$/i.test(c[1] || '')) break; // a NEW table header (e.g. the carbon table) — stop here
+    const id = c[ix.wave];
+    if (!id || !/^wave[-\s]?\w/i.test(id) || seen.has(id)) continue; // separator / duplicates
+    seen.add(id);
+    const status = (c[ix.status] || '').toLowerCase();
+    const done = status.startsWith('shipped');
+    // best-effort stage from the status text; unknown live work lands on 'build'
+    const current = done ? null : /spec/.test(status) ? 'spec' : /test/.test(status) ? 'tests' : /gate|review/.test(status) ? 'gate' : 'build';
+    rows.push({
+      wave: id, task: {}, current, live: false, status: done ? 'done' : 'running',
+      progress: done ? 100 : 0, updatedAt: c[ix.date] || null, stages: [],
+      tokensApprox: ix.tokens !== -1 ? parseApproxTokens(c[ix.tokens]) : null,
+      wallMinApprox: (() => { const m = String(c[ix.wall] || '').match(/([\d.]+)/); return m ? parseFloat(m[1]) : null; })(),
+      source: 'metrics-dashboard', _row: i,
+    });
+  }
+  // newest first: by date, then by physical row order (aggregator appends)
+  rows.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')) || b._row - a._row);
+  for (const r of rows) delete r._row;
+  // live work ALWAYS surfaces — the cap trims only finished history
+  const running = rows.filter((r) => r.status !== 'done');
+  const done = rows.filter((r) => r.status === 'done');
+  return [...running, ...done].slice(0, Math.max(cap, running.length));
+}
+
 // ── fs gather (impure) ──────────────────────────────────────────────────────
 export function collectProject(projectPath) {
   const halt = ['docs/audits/andon-halt.json', 'docs/audits/halt-state.json', '.sdd-halt-state.json']
@@ -235,9 +283,14 @@ export function collectProject(projectPath) {
   }
   const moved = allStates.filter((s) => (s.events?.length) || (s.phases || []).some((p) => p.status && p.status !== 'pending'));
   const primary = (moved.length ? moved : allStates).sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))[0] || null;
-  const waves = allStates
+  let waves = allStates
     .map((rs) => summarizePipeline({ runState: rs, planGraph: safePlan(rs.task), halt, branch, traces }))
     .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+  // no run-state journals → fall back to the project's native metrics dashboard (projectx-style)
+  if (!waves.length) {
+    const mdPath = resolve(projectPath, 'docs/metrics/_DASHBOARD.md');
+    if (mdPath) { try { waves = wavesFromMetricsDashboard(readFileSync(mdPath, 'utf8')); } catch { /* unreadable */ } }
+  }
   const board = summarizeBoard(waves);
 
   return {
@@ -281,6 +334,33 @@ function selfTest() {
   ok('backlog: open follow-ups surface, done ones are hidden', (() => { const t = summarizeTasks({ backlog: [{ title: 'do X', status: 'open' }, { title: 'did Y', status: 'done' }] }); const b = t.filter((x) => x.source === 'backlog'); return b.length === 1 && b[0].text === 'do X'; })());
   ok('production counts only deploys', summarizeProduction([{ type: 'deploy' }, { type: 'other' }]).deployCount === 1);
   ok('missing data degrades gracefully', summarizePipeline({}).stageCount === 0 && summarizeTasks({}).length === 0);
+  // native metrics-dashboard fallback (projectx-style)
+  const MD = [
+    '# Metrics Dashboard', '',
+    '| Wave | Date | Total tokens | Cache hit rate | Agent count | Wall-clock | Status | Budget % |',
+    '|---|---|---|---|---|---|---|---|',
+    '| wave-20 | 2026-05-23 | ~580K | n/a | 8 | ~25 min | Shipped | ~58% |',
+    '| wave-99 | 2026-05-28 | ~1.2M | n/a | 4 | ~55 min | In progress. perf optimization | ~80% |',
+    '| wave-98 | 2026-05-27 | n/a | n/a | 1 | ~5 min | Spec checkpoint | ~1% |',
+    '<!-- aggregator appends below -->',
+    '| wave-100 | 2026-05-29 | ~10K | n/a | 0 | ~2 min | Shipped | ~1% |',  // after a comment — SAME table
+    '', '| Tier | Score |', '|---|---|', '| Elite | 9 |',  // a DIFFERENT table — must be ignored
+    '| Wave | Tokens | CO2 |', '|---|---|---|', '| wave-20 | 580K | 1.2 |',  // SECOND wave table (other columns) — must be ignored
+  ].join('\n');
+  const mw2 = wavesFromMetricsDashboard(MD);
+  ok('metrics-md: parses only the wave table (noise tables ignored)', mw2.length === 4 && !mw2.some((w) => w.wave === 'Elite'));
+  ok('metrics-md: rows after a comment line still belong to the table', mw2.some((w) => w.wave === 'wave-100'));
+  ok('metrics-md: a second wave table does not duplicate/override rows', mw2.filter((w) => w.wave === 'wave-20').length === 1 && mw2.find((w) => w.wave === 'wave-20').updatedAt === '2026-05-23');
+  ok('metrics-md: Shipped → done 100%', mw2.find((w) => w.wave === 'wave-20').status === 'done' && mw2.find((w) => w.wave === 'wave-20').progress === 100);
+  ok('metrics-md: In progress → running on build', mw2.find((w) => w.wave === 'wave-99').status === 'running' && mw2.find((w) => w.wave === 'wave-99').current === 'build');
+  ok('metrics-md: Spec checkpoint → current spec', mw2.find((w) => w.wave === 'wave-98').current === 'spec');
+  ok('metrics-md: running waves first, then newest done', mw2[0].wave === 'wave-99' && mw2[1].wave === 'wave-98' && mw2[2].wave === 'wave-100');
+  ok('metrics-md: cap never hides live work', wavesFromMetricsDashboard(MD, 1).some((w) => w.wave === 'wave-99'));
+  ok('metrics-md: ~580K → 580000, ~1.2M → 1200000, n/a → null', parseApproxTokens('~580K') === 580000 && parseApproxTokens('~1.2M') === 1200000 && parseApproxTokens('n/a') === null);
+  ok('metrics-md: wall-clock minutes parsed', mw2.find((w) => w.wave === 'wave-20').wallMinApprox === 25);
+  ok('metrics-md: cap respected', wavesFromMetricsDashboard(MD, 2).length === 2);
+  ok('metrics-md: garbage input → []', wavesFromMetricsDashboard('no tables here').length === 0 && wavesFromMetricsDashboard(null).length === 0);
+  ok('metrics-md: board places shipped in done column', summarizeBoard(mw2).columns.find((c) => c.phase === 'done').waves.some((w) => w.wave === 'wave-20'));
   ok('activity tape maps recent traces (newest first)', summarizeActivity([{ agent: 'a', action: 'x' }, { agent: 'b', action: 'y' }])[0].agent === 'b');
   ok('activity surfaces the real outcome (VIOLATION/PASS), not a generic "activity"', summarizeActivity([{ agent: 'a', outcome: 'VIOLATION', label: 'CR-01' }])[0].action === 'VIOLATION');
   ok('lessons group by class, recurrence-sorted', summarizeLessons([{ class: 'c' }, { class: 'c' }, { class: 'd' }])[0].count === 2);

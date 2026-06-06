@@ -61,8 +61,22 @@ function boardKey(ui, key, ctx) {
   }
   if (key === 'l') return { ui: { ...u, mode: 'log', logScroll: 0 }, effects: [{ type: 'loadLog' }] };
   if (key === '$' || key === 'm') return { ui: { ...u, mode: 'cost' }, effects: [{ type: 'loadCost' }] };
+  if (key === '?' || key === 'h') return { ui: { ...u, mode: 'help' }, effects: [] };
   return { ui, effects: [] };
 }
+
+// the full operator legend, in plain language — opened with ? right inside the panel
+export const HELP_LINES = [
+  '↑↓     выбрать волну на доске (выбранная помечена ▶)',
+  'Enter  продолжить выбранную волну — откроется вкладка терминала с готовой командой',
+  'n      новая волна: напиши задачу, Enter — откроется терминал с запуском',
+  's      снять СТОП: панель спросит причину (попадёт в журнал) и снимет остановку',
+  'g      перезапустить упавший этап выбранной волны',
+  'p      пропустить застрявший этап (с пометкой, кто и что пропустил)',
+  'l      живой лог: последние реплики агента, не выходя из панели',
+  '$      деньги и время: сколько волна шла, сколько токенов съела, во что ≈обходится',
+  'r      обновить · q выход · Esc закрыть это окно',
+];
 
 function confirmKey(ui, key) {
   const c = ui.confirm;
@@ -107,7 +121,7 @@ function viewKey(ui, key) {
 export function reduce(ui, key, ctx = {}) {
   if (ui.mode === 'confirm') return confirmKey(ui, key);
   if (ui.mode === 'input') return inputKey(ui, key);
-  if (ui.mode === 'log' || ui.mode === 'cost') return viewKey(ui, key);
+  if (ui.mode === 'log' || ui.mode === 'cost' || ui.mode === 'help') return viewKey(ui, key);
   return boardKey(ui, key, ctx);
 }
 
@@ -130,6 +144,7 @@ export function renderOverlay(ui, cols) {
     const page = all.slice(Math.max(0, all.length - 14 - ui.logScroll), Math.max(14, all.length - ui.logScroll));
     lines.push(...box('ЖИВОЙ ЛОГ (последние реплики · ↑↓ листать · Esc назад)', page.length ? page : ['(пусто)'], cols, D));
   }
+  if (ui.mode === 'help') lines.push(...box('ПОМОЩЬ — что умеет панель', HELP_LINES, cols, G));
   if (ui.mode === 'cost') {
     const rows = (ui.cost || []).map((c) => `${(c.wave || '—').slice(0, 26).padEnd(28)}${String(c.durMin != null ? fmtDur(c.durMin) : '—').padStart(8)}${String(c.tokens != null ? fmtTok(c.tokens) : '—').padStart(10)}${String(c.usd != null ? '≈$' + c.usd.toFixed(2) : '—').padStart(9)}`);
     lines.push(...box('ДЕНЬГИ И ВРЕМЯ (≈ оценка по транскриптам · Esc назад)',
@@ -209,6 +224,15 @@ function selfTest() {
   ok('overlay: cost row renders ≈$', oc.some((l) => l.includes('≈$3.21') && l.includes('1ч 15м') && l.includes('1.5M')));
   ok('overlay: msg line renders', renderOverlay({ ...initialUi(), msg: 'hi' }, 80)[0].includes('hi'));
   ok('overlay: board+no msg → empty', renderOverlay(initialUi(), 80).length === 0);
+
+  // help: ? opens the in-panel legend, Esc closes, full wording present
+  let hp = reduce(initialUi(), '?', ctx);
+  ok('help: ? opens help mode', hp.ui.mode === 'help' && hp.effects.length === 0);
+  const hov = renderOverlay(hp.ui, 120);
+  ok('help: overlay titled ПОМОЩЬ', hov.some((l) => l.includes('ПОМОЩЬ')));
+  ok('help: legend covers all controls', ['снять СТОП', 'живой лог', 'деньги и время', 'новая волна', 'перезапустить', 'пропустить'].every((t) => hov.some((l) => l.includes(t))));
+  hp = reduce(hp.ui, '\x1b', ctx);
+  ok('help: Esc returns to board', hp.ui.mode === 'board');
 
   // AC-10 purity: no fs/Date.now/process.stdout above selfTest
   const src = SRC_FOR_PURITY;

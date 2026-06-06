@@ -133,8 +133,8 @@ export function renderActivity(activity, cols) {
 export function renderFooter(cols, controls = false) {
   if (!controls) return [hline(cols), `  ${cols >= 100 ? 'q выход · r обновить · ← → проект' : 'q · r · ←→'}`];
   return [hline(cols), cols >= 110
-    ? `  ↑↓ выбор · Enter продолжить волну · n новая · s снять СТОП · g перезапуск этапа · p пропустить · l лог · $ деньги · q выход`
-    : `  ↑↓ · Enter волна · n нов · s СТОП · g перезапуск · p пропуск · l лог · $ деньги · q`];
+    ? `  ↑↓ выбор · Enter продолжить волну · n новая · s снять СТОП · g перезапуск этапа · p пропустить · l лог · $ деньги · ? помощь · q выход`
+    : `  ↑↓ · Enter волна · n нов · s СТОП · g перезапуск · p пропуск · l лог · $ деньги · ? · q`];
 }
 
 export function renderEmpty(snapshot, cols) {
