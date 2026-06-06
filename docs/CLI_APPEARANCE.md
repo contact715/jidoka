@@ -93,9 +93,32 @@ fastMode `#ffd866`, error `#ff7a93`.
 | ccusage | отчёты по тратам в $ за день/неделю/месяц | `npx ccusage daily` (или `monthly`, `session`) |
 | ccboard 0.22.0 (brew, tap FlorianBruniaux/tap) | панель управления: расходы, прогноз, мониторинг хуков | `ccboard` в терминале (TUI), `ccboard setup` для веба |
 | Claude-Code-Agent-Monitor | веб-дашборд агентов и сессий, доска задач | `cd ~/Tools/Claude-Code-Agent-Monitor && npm start` → http://localhost:4820 |
+| claude-squad 1.0.18 (brew, 2026-06-05) | параллельные Claude-агенты, каждый в своём worktree+tmux | `claude-squad` в репо проекта |
+| zellij 0.43.1 (уже стоял; раскладка jidoka добавлена 2026-06-05) | все сессии в одном окне: вкладка ПАНЕЛЬ (jidoka top) + вкладки claude | `zellij --layout jidoka` (`~/.config/zellij/layouts/jidoka.kdl`) |
+| GitHub MCP (официальный, user-scope, 2026-06-05) | Claude сам открывает PR, читает issues, видит CI | требует разовой авторизации: `/mcp` → github → войти |
+| Serena MCP (oraios/serena, user-scope, 2026-06-05) | семантическое зрение кода: навигация по функциям/символам вместо текстового поиска | подключён всегда (`uvx --from git+… serena start-mcp-server --context ide-assistant`) |
 
 Хуки Agent Monitor добавлены РЯДОМ с нашими (8 событий, fire-and-forget, максимум 2.5 сек,
 молчат когда панель выключена). Проверка целостности наших хуков выполнена после установки.
+
+GitHub-ресёрч 2026-06-05 (3 брифа: `claude-code-dev-framework/docs/specs/briefs/github-research_*.md`):
+11 приёмов-усилений записаны в `docs/audits/backlog.jsonl` (судья без position-bias, память
+с validity window, PreCompact-бэкап, failures.jsonl и др.). Правило установки: по одному,
+через 2 недели проверка реального использования, неиспользуемое — сносим.
+
+## Автопилот и мелочи интерфейса (2026-06-05 вечер)
+
+| Что | Как устроено |
+|---|---|
+| Свои слова спиннера | `settings.json → spinnerVerbs` (append): «Колдую», «Собираю пульт», «Глажу гейты»… |
+| Свои подсказки спиннера | `spinnerTipsOverride`: напоминания про /stats, пульт миссии, ccusage, панель |
+| Прогресс в доке терминала | `terminalProgressBarEnabled: true` (OSC 9;4) |
+| Время ответа + метки времени | `showTurnDuration: true`, `showMessageTimestamps: true` |
+| Защита перемотки /rewind | `fileCheckpointingEnabled: true` — снимок файла перед каждой правкой |
+| Сводка при старте сессии | хук `SessionStart` → `hooks/session-start-digest.mjs`: пересобирает дайджест уроков (~40мс) и кладёт в контекст здоровье jidoka + активные уроки |
+| Утренний отчёт 09:00 | launchd `com.mityamit.claude-daily-digest` → `hooks/daily-digest.sh`: аналитика за день в `~/.claude/digests/`, уведомление macOS + звук |
+| Панель всегда живая | launchd `com.mityamit.agent-monitor` (RunAtLoad + KeepAlive): http://localhost:4820 поднимается при входе и переживает падения |
+| Звук провала инструмента | хук `PostToolUseFailure` → `hooks/tool-failure-sound.sh`: halt.wav на громкости 0.35, дебаунс 60 сек |
 
 ## Сквозные правила работы (2026-06-05, по запросу владельца)
 
