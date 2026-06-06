@@ -1,0 +1,21 @@
+{
+  "name": "Jidoka Neon",
+  "base": "dark-daltonized",
+  "overrides": {
+    "claude": "#2be8b0",
+    "promptBorder": "#2be8b0",
+    "planMode": "#eaf2ee",
+    "autoAccept": "#e0af68",
+    "bashBorder": "#88a39b",
+    "permission": "#ffca6e",
+    "suggestion": "#93a8a1",
+    "subtle": "#93a8a1",
+    "inactive": "#5b6e67",
+    "success": "#2be8b0",
+    "warning": "#e0af68",
+    "error": "#ff7a93",
+    "fastMode": "#ffd866",
+    "ide": "#eaf2ee",
+    "remember": "#c9ead9"
+  }
+}
