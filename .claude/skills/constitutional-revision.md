@@ -40,7 +40,7 @@ this project adaptation:
 | 6 E2E scenarios | `docs/PRODUCT_PHILOSOPHY.md` | What product actually does for customer |
 | 5-role scope matrix | `docs/ROLE_PERMISSION_MATRIX.md` | Per-role entity × action permissions |
 | Voice per role | `docs/VOICE_GUIDE.md` | Brand voice consistency |
-| Approval ceilings | `docs/AGENT_LAYER_ARCHITECTURE.md` §3.2 | Default thresholds per role |
+| Approval ceilings | `docs/archive/imported-product/AGENT_LAYER_ARCHITECTURE.md` §3.2 (архив продукта) | Default thresholds per role |
 | Funnel-stage thinking | `docs/FUNNEL_REGISTRY.md` | Work flows through stages, not flat lists |
 
 ---

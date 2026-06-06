@@ -1,5 +1,5 @@
 # agent-regression — runs the eval harness against the framework's own agents.
-# docs/AGENTIC_ENGINEERING_TZ_V2.md referenced this workflow; it now exists. run-evals
+# docs/archive/imported-product/AGENTIC_ENGINEERING_TZ_V2.md referenced this workflow; it now exists. run-evals
 # honest-skips (DORMANT, exit 0) until docs/evals/<agent>/golden-cases.jsonl is seeded,
 # so this is green today and becomes a real regression gate the moment datasets land.
 name: agent-regression

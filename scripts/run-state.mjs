@@ -40,7 +40,8 @@ export function phasesFromPlan(task) {
 
 export function initState(wave, task, now = new Date().toISOString()) {
   const phases = phasesFromPlan(task);
-  return { wave, task, phases, current: phases[0]?.phase ?? null, events: [], createdAt: now, updatedAt: now };
+  const terminalId = process.env.TERM_SESSION_ID ?? process.env.ITERM_SESSION_ID ?? null;
+  return { wave, task, phases, current: phases[0]?.phase ?? null, events: [], createdAt: now, updatedAt: now, terminalId };
 }
 
 export function advanceState(state, phase, status, note = '', now = new Date().toISOString()) {
@@ -169,6 +170,18 @@ function selfTest() {
   const bs = (() => { let x = initState('wv-a', { risk: 'normal', surfaces: ['backend'] }); for (const p of x.phases) { if (p.phase === 'build') break; x = advanceState(x, p.phase, 'done'); } return x; })();
   const bp = bs.phases.find(p => p.phase === 'build');
   ok('nextStep: message names the agents, not "(no agents)" (agents.join || fallback)', bp.agents.length > 0 && !/\(no agents\)/.test(nextStep(bs).message));
+
+  // terminalId: env-sourced field in initState
+  const prevT = process.env.TERM_SESSION_ID; const prevI = process.env.ITERM_SESSION_ID;
+  process.env.TERM_SESSION_ID = 'tmux:test-1'; delete process.env.ITERM_SESSION_ID;
+  const stWithTerm = initState('wave-tid', { risk: 'normal', surfaces: ['backend'] });
+  ok('terminalId: TERM_SESSION_ID → state.terminalId equals it', stWithTerm.terminalId === 'tmux:test-1');
+  delete process.env.TERM_SESSION_ID; delete process.env.ITERM_SESSION_ID;
+  const stNoTerm = initState('wave-tid2', { risk: 'normal', surfaces: ['backend'] });
+  ok('terminalId: no env vars → state.terminalId is null', stNoTerm.terminalId === null);
+  // restore env
+  if (prevT !== undefined) process.env.TERM_SESSION_ID = prevT; else delete process.env.TERM_SESSION_ID;
+  if (prevI !== undefined) process.env.ITERM_SESSION_ID = prevI; else delete process.env.ITERM_SESSION_ID;
 
   if (fails.length) { console.log(`\n\x1b[31mrun-state self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ run-state: journal init/advance/resume/render correct\x1b[0m');

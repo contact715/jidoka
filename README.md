@@ -39,7 +39,7 @@ docs/
   MULTI_LEVEL_VERIFICATION.md гейты L0.95–L0.99
   HIERARCHICAL_SPEC_SYSTEM.md 5 уровней спеков
   SELF_IMPROVEMENT_PROTOCOL.md петли самоулучшения
-  AGENTIC_ENGINEERING_TZ*.md  ТЗ среды
+  archive/imported-product/   архив доков продукта-прародителя (read-only)
   CODING_STANDARDS / TESTING / SECURITY / DEBUGGING / DEVOPS
   formal/AndonHalt.tla       TLA+ верификация andon-механизма
   decisions/_TEMPLATE.md     формат ADR

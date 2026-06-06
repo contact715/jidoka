@@ -28,7 +28,7 @@ last_updated: 2026-06-05
 
 The this project agent layer has 24 named agents, 9 canonical funnels, ~20 primary UI surfaces, and 6 cross-cutting infrastructure modules. Before wave-108, that knowledge was scattered across four constitutional docs:
 
-- `AGENT_LAYER_ARCHITECTURE.md` — agents at a high level, no per-agent contract
+- `AGENT_ROSTER.md` — agents at a high level, no per-agent contract
 - `FUNNEL_REGISTRY.md` — funnel stages, no per-funnel scope or role projection
 - `PRODUCT_PHILOSOPHY.md` — 6 end-to-end scenarios, not structured for dispatch
 - `ROLE_PERMISSION_MATRIX.md` — role permissions, not linked to specific modules
@@ -58,7 +58,7 @@ A module spec covers exactly one bounded concern. The right level of granularity
 - A hook that serves one component (`useInboxUnread`)
 
 **No — too broad:**
-- "The agent layer" (that is `AGENT_LAYER_ARCHITECTURE.md`)
+- "The agent layer" (that is `AGENT_ROSTER.md`)
 - "All funnels" (that is `FUNNEL_REGISTRY.md`)
 - "The dashboard" (that is `PRODUCT_NAVIGATION_AUDIT.md`)
 

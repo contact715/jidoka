@@ -1,5 +1,5 @@
 ---
-status: Active
+status: Archived
 version: 1.0.0
 level: L1
 type: core-arch

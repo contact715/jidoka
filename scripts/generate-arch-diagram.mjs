@@ -11,7 +11,7 @@
  *     wave-169 owns spec-lineage from YAML parents[]. This script owns
  *     agent-topology from AGENT_ROSTER.md. Different source, content, output.
  *   - This is NOT a replacement for the hand-authored diagrams in
- *     AGENT_LAYER_ARCHITECTURE.md (erDiagram + sequenceDiagram at lines
+ *     docs/archive/imported-product/AGENT_LAYER_ARCHITECTURE.md (erDiagram + sequenceDiagram at lines
  *     85-111 and 1423-1450). Those are different views requiring author judgment.
  *
  * Usage:
@@ -171,7 +171,7 @@ function generateContent(roster) {
   outputLines.push('');
   outputLines.push('See also:');
   outputLines.push('- `docs/AGENT_ROSTER.md` — canonical agent definitions and line assignments (source of truth)');
-  outputLines.push('- `docs/AGENT_LAYER_ARCHITECTURE.md` — hand-authored ER and sequence diagrams (different views, not generated)');
+  outputLines.push('- `docs/archive/imported-product/AGENT_LAYER_ARCHITECTURE.md` — hand-authored ER and sequence diagrams (archived product example)');
   outputLines.push('- `docs/specs/_LINEAGE.md` — spec-ancestry lineage (wave-169 domain, different source)');
   outputLines.push('');
   outputLines.push(...mermaidLines);

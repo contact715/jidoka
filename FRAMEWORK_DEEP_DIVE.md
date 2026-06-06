@@ -81,7 +81,7 @@ Claude Code из коробки — один агент, который пише
 - `TOYOTA_WAY.md` — две философии (Jidoka + Kaizen)
 - `AUTONOMOUS_PIPELINE.md`, `MULTI_LEVEL_VERIFICATION.md` — конвейер и гейты
 - `HIERARCHICAL_SPEC_SYSTEM.md` — 5 уровней спеков (L0 конституция → L4 коммит)
-- `AGENT_LAYER_ARCHITECTURE.md` + `AGENT_LAYER_QUALITY_SPEC.md` — образец того, как специфицируется сложная агентная система (L1 core-arch, версионирование, parent-иерархия, анализ реальных production-инцидентов)
+- `docs/archive/imported-product/AGENT_LAYER_ARCHITECTURE.md` + `AGENT_LAYER_QUALITY_SPEC.md` (архив продукта-прародителя) — образец того, как специфицируется сложная агентная система (L1 core-arch, версионирование, parent-иерархия, анализ реальных production-инцидентов)
 - `formal/AndonHalt.tla` — формальная верификация в TLA+
 
 ---
@@ -148,7 +148,7 @@ Claude Code из коробки — один агент, который пише
 2. `docs/ENGINEERING_SYSTEM_ASSESSMENT.md` — структурированная оценка с маппингом на research.
 3. `docs/CONSTITUTION.md` + `docs/TOYOTA_WAY.md` — принципы и философия качества.
 4. `.claude/agents/best-of-N-judge.md` — как на практике выбирается лучшее решение.
-5. `docs/AGENT_LAYER_ARCHITECTURE.md` — образец того, как у нас специфицируется сложная система.
+5. `docs/archive/imported-product/AGENT_LAYER_ARCHITECTURE.md` (архив) — образец того, как у нас специфицируется сложная система.
 
 Проверить цифры:
 ```bash

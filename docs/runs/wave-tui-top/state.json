@@ -1,0 +1,136 @@
+{
+  "wave": "wave-tui-top",
+  "task": {
+    "type": "feature",
+    "risk": "normal",
+    "surfaces": [
+      "cli",
+      "frontend"
+    ]
+  },
+  "phases": [
+    {
+      "phase": "discovery",
+      "status": "done",
+      "agents": [
+        "user-researcher",
+        "product-strategist"
+      ],
+      "note": "Бизнес-вопросы отвечены: живая TUI-панель jidoka top, только просмотр, живёт в фреймворке; переиспользуем collectors/run-state; новое: terminal renderer + session-id в run-state. Kaizen-метрика: время до обнаружения застрявшей волны; меряем логом запусков панели"
+    },
+    {
+      "phase": "spec",
+      "status": "done",
+      "agents": [
+        "chief-architect",
+        "micro-architect",
+        "macro-architect",
+        "surface-cartographer",
+        "chief-product-officer",
+        "business-process-architect",
+        "kaizen-officer",
+        "design-system-architect",
+        "ux-designer",
+        "ux-writer"
+      ],
+      "note": "Мастер-спека docs/specs/wave-tui-top_MASTER_SPEC.md: 14 AC (EARS), ADR raw-ANSI vs Bubbletea, 3 файла <150 LOC, Kaizen-лог запусков. 4 брифа в docs/specs/briefs/"
+    },
+    {
+      "phase": "tests",
+      "status": "done",
+      "agents": [
+        "test-engineer"
+      ],
+      "note": "Приёмочный харнесс scripts/tui-top-acceptance.mjs (214 LOC, 14 AC). Красная фаза подтверждена реальным прогоном: 12 FAIL / 1 PASS (AC-3), exit 1"
+    },
+    {
+      "phase": "build",
+      "status": "done",
+      "agents": [
+        "engineering-lead",
+        "frontend-agent"
+      ],
+      "note": "3 файла: tui-top.mjs 98 LOC, tui-render.mjs 207 LOC (pure), run-state.mjs +terminalId. Acceptance 13/13 PASS (перепроверено оркестратором), self-tests run-state 22 / collectors 19 / tui-render зелёные. Живой снимок на реальных данных работает"
+    },
+    {
+      "phase": "gate",
+      "status": "done",
+      "agents": [
+        "reflexion-critic",
+        "constitutional-reviewer",
+        "coverage-auditor",
+        "budget-gate",
+        "policy-sandbox",
+        "a11y-auditor",
+        "perf-profiler",
+        "visual-qa"
+      ],
+      "note": "constitutional PASS (terminalId — не PII; .gitignore дополнен), reflexion REVISE→исправлено: crash-recovery restore() на exit/uncaughtException/unhandledRejection, raw-mode guard. Acceptance 13/13 re-verified"
+    },
+    {
+      "phase": "debug",
+      "status": "done",
+      "agents": [
+        "debug-agent"
+      ],
+      "note": "round-2 фикс 98→123 LOC (осознанно >120 ради crash-safety), AC-crash unit-кейс в self-test"
+    },
+    {
+      "phase": "memory",
+      "status": "done",
+      "agents": [
+        "skill-extractor",
+        "data-analyst",
+        "kaizen-officer"
+      ],
+      "note": "Ретро docs/retros/wave-tui-top.md: 4 урока (restore() на всех exit-путях — требование уровня спеки для TUI; перепроверка прогоном; сверка чисел с кодом; terminalId не PII). Kaizen-петля задокументирована"
+    }
+  ],
+  "current": null,
+  "events": [
+    {
+      "at": "2026-06-06T04:14:44.369Z",
+      "phase": "discovery",
+      "status": "done",
+      "note": "Бизнес-вопросы отвечены: живая TUI-панель jidoka top, только просмотр, живёт в фреймворке; переиспользуем collectors/run-state; новое: terminal renderer + session-id в run-state. Kaizen-метрика: время до обнаружения застрявшей волны; меряем логом запусков панели"
+    },
+    {
+      "at": "2026-06-06T04:26:02.647Z",
+      "phase": "spec",
+      "status": "done",
+      "note": "Мастер-спека docs/specs/wave-tui-top_MASTER_SPEC.md: 14 AC (EARS), ADR raw-ANSI vs Bubbletea, 3 файла <150 LOC, Kaizen-лог запусков. 4 брифа в docs/specs/briefs/"
+    },
+    {
+      "at": "2026-06-06T04:28:59.755Z",
+      "phase": "tests",
+      "status": "done",
+      "note": "Приёмочный харнесс scripts/tui-top-acceptance.mjs (214 LOC, 14 AC). Красная фаза подтверждена реальным прогоном: 12 FAIL / 1 PASS (AC-3), exit 1"
+    },
+    {
+      "at": "2026-06-06T04:37:52.527Z",
+      "phase": "build",
+      "status": "done",
+      "note": "3 файла: tui-top.mjs 98 LOC, tui-render.mjs 207 LOC (pure), run-state.mjs +terminalId. Acceptance 13/13 PASS (перепроверено оркестратором), self-tests run-state 22 / collectors 19 / tui-render зелёные. Живой снимок на реальных данных работает"
+    },
+    {
+      "at": "2026-06-06T04:43:45.529Z",
+      "phase": "gate",
+      "status": "done",
+      "note": "constitutional PASS (terminalId — не PII; .gitignore дополнен), reflexion REVISE→исправлено: crash-recovery restore() на exit/uncaughtException/unhandledRejection, raw-mode guard. Acceptance 13/13 re-verified"
+    },
+    {
+      "at": "2026-06-06T04:43:45.561Z",
+      "phase": "debug",
+      "status": "done",
+      "note": "round-2 фикс 98→123 LOC (осознанно >120 ради crash-safety), AC-crash unit-кейс в self-test"
+    },
+    {
+      "at": "2026-06-06T04:44:24.689Z",
+      "phase": "memory",
+      "status": "done",
+      "note": "Ретро docs/retros/wave-tui-top.md: 4 урока (restore() на всех exit-путях — требование уровня спеки для TUI; перепроверка прогоном; сверка чисел с кодом; terminalId не PII). Kaizen-петля задокументирована"
+    }
+  ],
+  "createdAt": "2026-06-06T04:14:44.336Z",
+  "updatedAt": "2026-06-06T04:44:24.689Z"
+}

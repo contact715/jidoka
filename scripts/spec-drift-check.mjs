@@ -48,12 +48,18 @@ const SKIP_DIRS = new Set([
   '.next', 'out', 'coverage', '.turbo', '.cache', 'logs', 'site-packages', '.mypy_cache',
 ]);
 
+// Spec scanning skips archived material: docs/archive/** is read-only history whose
+// references are EXPECTED to be stale (e.g. imported product docs). The existence
+// index (walkIndex) still sees archive files, so references TO the archive resolve.
+const SPEC_SKIP_DIRS = new Set([...SKIP_DIRS, 'archive']);
+
 // ── pure: is this backtick/link token a plausible local file reference? ──────────
 export function looksLikeFileRef(raw) {
   if (!raw) return false;
   const s = raw.trim();
   if (!s || /\s/.test(s)) return false;                 // commands / prose
-  if (/[*?<>|]/.test(s)) return false;                  // globs / placeholders
+  if (/[*?<>|{}]/.test(s)) return false;                // globs / placeholders / {wave-id}
+  if (/\b(?:NN|YYYY|MM|DD|HH)\b/.test(s)) return false; // template placeholders (wave-NN.md, YYYY-WNN)
   if (s.startsWith('-') || s.startsWith('$') || s.startsWith('@')) return false; // flags / vars / handles
   if (s.includes(':')) return false;                    // endpoints (:8080/api), urls, user:pass — not files
   if (s.startsWith('/') || s.startsWith('~')) return false; // absolute / home — out of scope (+ privacy)
@@ -154,7 +160,7 @@ function listSpecs(root, specPaths) {
   const addDir = (d) => {
     const abs = join(root, d); let entries; try { entries = readdirSync(abs, { withFileTypes: true }); } catch { return; }
     for (const e of entries) {
-      if (e.isDirectory()) { if (!SKIP_DIRS.has(e.name)) addDir(join(d, e.name)); }
+      if (e.isDirectory()) { if (!SPEC_SKIP_DIRS.has(e.name)) addDir(join(d, e.name)); }
       else if (e.name.endsWith('.md')) out.add(join(d, e.name).replace(/\\/g, '/'));
     }
   };
@@ -202,6 +208,10 @@ function selfTest() {
     ['a url is NOT a file ref', looksLikeFileRef('https://x.io/a.png') === false],
     ['an endpoint (port:path) is NOT a file ref', looksLikeFileRef(':8080/api/send') === false],
     ['a directory mention (trailing slash) is NOT a file ref', looksLikeFileRef('castells-automation/whatsapp_agent/') === false],
+    ['a template placeholder (wave-NN.md) is NOT a file ref', looksLikeFileRef('docs/retros/wave-NN.md') === false],
+    ['a date placeholder (YYYY-WNN) is NOT a file ref', looksLikeFileRef('docs/audit-reports/routine-weekly-YYYY-WNN.md') === false],
+    ['a braces placeholder ({wave-id}) is NOT a file ref', looksLikeFileRef('docs/specs/{wave-id}_MASTER_SPEC.md') === false],
+    ['a real path is still a file ref after placeholder filters', looksLikeFileRef('docs/specs/wave-188_MASTER_SPEC.md') === true],
     ['extractLocalRefs pulls backticks + md links, drops noise + dedups', extractLocalRefs(specOK).length === 3],
     ['declared parents are extracted from a prose line', extractDeclaredParents(specOK).includes('../NORTH_STAR.md')],
     ['a clean spec yields zero findings', fOK.length === 0],

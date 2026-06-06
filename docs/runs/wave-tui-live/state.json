@@ -1,0 +1,129 @@
+{
+  "wave": "wave-tui-live",
+  "task": {
+    "type": "feature",
+    "risk": "normal",
+    "surfaces": [
+      "cli"
+    ]
+  },
+  "phases": [
+    {
+      "phase": "discovery",
+      "status": "done",
+      "agents": [
+        "user-researcher",
+        "product-strategist"
+      ],
+      "note": "Фидбек владельца по живой панели: (1) мусор перерисовки/задвоенный футер, (2) done-волны в ЗАВИСЛО, (3) нужен риалтайм из всех сессий — источник уже есть: ~/.claude/session-env/state-*.json (пишется хуками на каждом действии)"
+    },
+    {
+      "phase": "spec",
+      "status": "done",
+      "agents": [
+        "chief-architect",
+        "micro-architect",
+        "macro-architect",
+        "surface-cartographer",
+        "chief-product-officer",
+        "business-process-architect",
+        "kaizen-officer"
+      ],
+      "note": "Спека инлайн в задаче строителя: erase-to-EOL+EOJ при repaint, isStuck исключает done, секция СЕССИИ из session-env, fs.watch + poll 2с. Расширить acceptance-харнесс"
+    },
+    {
+      "phase": "tests",
+      "status": "done",
+      "agents": [
+        "test-engineer"
+      ],
+      "note": "Харнесс расширен до 18 AC (5 новых: erase-to-EOL/EOJ, done≠stuck, СЕССИИ рендер, битые session-файлы, flat SESSION без ANSI), red→green TDD"
+    },
+    {
+      "phase": "build",
+      "status": "done",
+      "agents": [
+        "engineering-lead"
+      ],
+      "note": "tui-top 179 LOC (poll 2с + fs.watch debounce 300мс на session-env и docs/runs), tui-render 260 LOC (+renderSessions pure)"
+    },
+    {
+      "phase": "gate",
+      "status": "done",
+      "agents": [
+        "reflexion-critic",
+        "constitutional-reviewer",
+        "coverage-auditor",
+        "budget-gate",
+        "policy-sandbox"
+      ],
+      "note": "18/18 AC + 3 self-tests перепроверены оркестратором; живой снимок показывает 4 реальные сессии с topic+activity. Лёгкий граф: без независимых ревизоров (контained-доработка, наследует гейты wave-tui-top)"
+    },
+    {
+      "phase": "debug",
+      "status": "done",
+      "agents": [
+        "debug-agent"
+      ],
+      "note": "нечего"
+    },
+    {
+      "phase": "memory",
+      "status": "done",
+      "agents": [
+        "skill-extractor",
+        "data-analyst",
+        "kaizen-officer"
+      ],
+      "note": "Урок в retro wave-tui-top актуален; новый: источник риалтайма для панелей — session-env state-файлы хуков, не журналы фаз (журналы редкие, хуки на каждом действии)"
+    }
+  ],
+  "current": null,
+  "events": [
+    {
+      "at": "2026-06-06T04:50:11.207Z",
+      "phase": "discovery",
+      "status": "done",
+      "note": "Фидбек владельца по живой панели: (1) мусор перерисовки/задвоенный футер, (2) done-волны в ЗАВИСЛО, (3) нужен риалтайм из всех сессий — источник уже есть: ~/.claude/session-env/state-*.json (пишется хуками на каждом действии)"
+    },
+    {
+      "at": "2026-06-06T04:50:11.238Z",
+      "phase": "spec",
+      "status": "done",
+      "note": "Спека инлайн в задаче строителя: erase-to-EOL+EOJ при repaint, isStuck исключает done, секция СЕССИИ из session-env, fs.watch + poll 2с. Расширить acceptance-харнесс"
+    },
+    {
+      "at": "2026-06-06T04:54:40.869Z",
+      "phase": "tests",
+      "status": "done",
+      "note": "Харнесс расширен до 18 AC (5 новых: erase-to-EOL/EOJ, done≠stuck, СЕССИИ рендер, битые session-файлы, flat SESSION без ANSI), red→green TDD"
+    },
+    {
+      "at": "2026-06-06T04:54:40.908Z",
+      "phase": "build",
+      "status": "done",
+      "note": "tui-top 179 LOC (poll 2с + fs.watch debounce 300мс на session-env и docs/runs), tui-render 260 LOC (+renderSessions pure)"
+    },
+    {
+      "at": "2026-06-06T04:54:40.959Z",
+      "phase": "gate",
+      "status": "done",
+      "note": "18/18 AC + 3 self-tests перепроверены оркестратором; живой снимок показывает 4 реальные сессии с topic+activity. Лёгкий граф: без независимых ревизоров (контained-доработка, наследует гейты wave-tui-top)"
+    },
+    {
+      "at": "2026-06-06T04:54:41.007Z",
+      "phase": "debug",
+      "status": "done",
+      "note": "нечего"
+    },
+    {
+      "at": "2026-06-06T04:54:41.060Z",
+      "phase": "memory",
+      "status": "done",
+      "note": "Урок в retro wave-tui-top актуален; новый: источник риалтайма для панелей — session-env state-файлы хуков, не журналы фаз (журналы редкие, хуки на каждом действии)"
+    }
+  ],
+  "createdAt": "2026-06-06T04:50:11.177Z",
+  "updatedAt": "2026-06-06T04:54:41.060Z",
+  "terminalId": null
+}

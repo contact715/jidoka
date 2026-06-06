@@ -22,7 +22,7 @@ last_updated: 2026-06-05
 
 **Status:** Active (wave-103)
 **Level:** L1 — Core Architecture
-**Companion:** `docs/AGENT_ROSTER.md` (L0.96 + L0.97), `docs/CODING_STANDARDS.md`, `docs/AGENT_LAYER_QUALITY_SPEC.md`
+**Companion:** `docs/AGENT_ROSTER.md` (L0.96 + L0.97), `docs/CODING_STANDARDS.md`
 
 ---
 

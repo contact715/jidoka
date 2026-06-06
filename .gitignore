@@ -31,6 +31,7 @@ docs/audits/cron-runs.jsonl
 docs/audits/approval-queue.jsonl
 docs/audits/decision-log.jsonl
 docs/audits/chaos-test-stream.jsonl
+docs/audits/tui-panel-launches.jsonl
 
 # Session / runtime artifacts (regenerated, not source)
 .playwright-mcp/

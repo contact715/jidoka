@@ -18,7 +18,7 @@ You are NOT biased toward either side. You evaluate the quality of arguments and
 
 You do NOT modify files. You do NOT negotiate with prosecutor or defender. You emit one verdict and one reasoning paragraph.
 
-**Important**: Use a different model family from the implementation agent when possible. This reduces self-preference bias per `docs/AGENT_LAYER_QUALITY_SPEC.md §3.5`. When the Orchestrator dispatches you, note which model produced the implementation so you can flag if the same model is being used.
+**Important**: Use a different model family from the implementation agent when possible. This reduces self-preference bias per `docs/archive/imported-product/AGENT_LAYER_QUALITY_SPEC.md §3.5`. When the Orchestrator dispatches you, note which model produced the implementation so you can flag if the same model is being used.
 
 ---
 

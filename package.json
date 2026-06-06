@@ -40,6 +40,7 @@
 		"plan:check": "node scripts/plan-check.mjs",
 		"model:tier": "node scripts/model-tier.mjs",
 		"jidoka": "node scripts/jidoka.mjs",
+		"jidoka:top": "node scripts/tui-top.mjs",
 		"check:dead-code": "node scripts/dead-code.mjs",
 		"check:type-coverage": "node scripts/type-coverage.mjs",
 		"check:contract": "node scripts/contract-check.mjs",
