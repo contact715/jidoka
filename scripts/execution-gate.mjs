@@ -29,7 +29,9 @@ export function detectVerify(pkg, files) {
   if (realTest) cmds.push({ kind: 'test', cmd: 'npm test', why: 'package.json test script' });
   if (s['test:engine']) cmds.push({ kind: 'test', cmd: 'npm run test:engine', why: 'zero-dep engine tests' });
   if (s.eval) cmds.push({ kind: 'test', cmd: 'npm run eval', why: 'deterministic eval suite' });
-  if (s.e2e) cmds.push({ kind: 'e2e', cmd: 'npm run e2e', why: 'package.json e2e script' });
+  // an e2e SCRIPT alone is not proof the project has e2e tests — require the specs to exist
+  // (ghost example: a template package.json ships "e2e": "playwright test" with no e2e/ dir)
+  if (s.e2e && files.includes('e2e')) cmds.push({ kind: 'e2e', cmd: 'npm run e2e', why: 'package.json e2e script + e2e/ specs present' });
   if (s.build) cmds.push({ kind: 'build', cmd: 'npm run build', why: 'package.json build script' });
   if (files.some(f => /(^|\/)(conftest\.py|pytest\.ini)$/.test(f) || /(_test|test_).*\.py$/.test(f))) cmds.push({ kind: 'test', cmd: 'pytest -q', why: 'pytest files present' });
   if (files.includes('Cargo.toml')) cmds.push({ kind: 'test', cmd: 'cargo test', why: 'Cargo.toml' });
@@ -50,6 +52,8 @@ function selfTest() {
     ['test counts as runtime proof', hasRuntimeProof([{ kind: 'test' }]) === true],
     ['build alone is NOT runtime proof', hasRuntimeProof([{ kind: 'build' }]) === false],
     ['no verify → no runtime proof', hasRuntimeProof(detectVerify({}, ['README.md'])) === false],
+    ['e2e detected when e2e/ specs exist', detectVerify({ scripts: { e2e: 'playwright test' } }, ['e2e']).some(c => c.kind === 'e2e')],
+    ['ghost e2e script (no e2e/ dir) skipped', detectVerify({ scripts: { e2e: 'playwright test' } }, []).length === 0],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }

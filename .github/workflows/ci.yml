@@ -37,6 +37,8 @@ jobs:
         run: npm run test:engine
       - name: agent eval suite (deterministic fitness signal — regression-gated)
         run: npm run eval
+      - name: selftest-reality (blocks self-tests that exit 0 without asserting)
+        run: npm run gate:selftest
 
       # ── Structural / security / privacy gates ──────────────────────────────
       - name: structural decomposition gate
