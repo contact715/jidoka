@@ -51,6 +51,16 @@
       "revisions": []
     },
     {
+      "id": "spec:docs/COMMUNICATION_STYLE.md",
+      "kind": "spec",
+      "label": "Communication Style — talking to the user",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/COMMUNICATION_STYLE.md",
+      "revisions": []
+    },
+    {
       "id": "spec:docs/CONSTITUTION.md",
       "kind": "spec",
       "label": "Jidoka Framework Constitution",
@@ -533,6 +543,16 @@
       "revisions": []
     },
     {
+      "id": "spec:docs/runs/wave-judge-debias/STATE.md",
+      "kind": "spec",
+      "label": "Run state — wave-judge-debias",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/runs/wave-judge-debias/STATE.md",
+      "revisions": []
+    },
+    {
       "id": "spec:docs/runs/wave-meta-gates/STATE.md",
       "kind": "spec",
       "label": "Run state — wave-meta-gates",
@@ -573,6 +593,464 @@
       "revisions": []
     },
     {
+      "id": "spec:docs/specs/domains/installer-federation.md",
+      "kind": "spec",
+      "label": "Domain — Installer & Federation",
+      "resolved": true,
+      "level": "L2",
+      "version": "1.0.0",
+      "path": "docs/specs/domains/installer-federation.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/wave-federation_MASTER_SPEC.md",
+      "kind": "spec",
+      "label": "docs/specs/wave-federation_MASTER_SPEC.md",
+      "resolved": true,
+      "path": "docs/specs/wave-federation_MASTER_SPEC.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/domains/memory.md",
+      "kind": "spec",
+      "label": "Domain — Memory & Knowledge",
+      "resolved": true,
+      "level": "L2",
+      "version": "1.0.0",
+      "path": "docs/specs/domains/memory.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/domains/meta-engine.md",
+      "kind": "spec",
+      "label": "Domain — Meta-Engine & Self-Improvement",
+      "resolved": true,
+      "level": "L2",
+      "version": "1.0.0",
+      "path": "docs/specs/domains/meta-engine.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/domains/observability.md",
+      "kind": "spec",
+      "label": "Domain — Dashboard & Observability",
+      "resolved": true,
+      "level": "L2",
+      "version": "1.0.0",
+      "path": "docs/specs/domains/observability.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/domains/orchestration.md",
+      "kind": "spec",
+      "label": "Domain — Agent Orchestration & Pipeline",
+      "resolved": true,
+      "level": "L2",
+      "version": "1.0.0",
+      "path": "docs/specs/domains/orchestration.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/domains/quality-gates.md",
+      "kind": "spec",
+      "label": "Domain — Quality Gates & Verification",
+      "resolved": true,
+      "level": "L2",
+      "version": "1.0.0",
+      "path": "docs/specs/domains/quality-gates.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/domains/spec-system.md",
+      "kind": "spec",
+      "label": "Domain — Hierarchical Spec System",
+      "resolved": true,
+      "level": "L2",
+      "version": "1.0.0",
+      "path": "docs/specs/domains/spec-system.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/installer-federation/footprint-audit.md",
+      "kind": "spec",
+      "label": "Module — Dead-Install Detector",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/installer-federation/footprint-audit.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/installer-federation/global-snapshot.md",
+      "kind": "spec",
+      "label": "Module — Global Setup Version Capturer",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/installer-federation/global-snapshot.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/installer-federation/instantiation-audit.md",
+      "kind": "spec",
+      "label": "Module — Ghost Automation Detector",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/installer-federation/instantiation-audit.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/installer-federation/project-federation.md",
+      "kind": "spec",
+      "label": "Module — Project Steward & Integrity Charter",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/installer-federation/project-federation.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/installer-federation/project-installer.md",
+      "kind": "spec",
+      "label": "Module — Per-Project Engine Installer",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/installer-federation/project-installer.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/memory/grounding-contract.md",
+      "kind": "spec",
+      "label": "Module — Agent Output Citation Contract",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/memory/grounding-contract.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/memory/memory-consolidate.md",
+      "kind": "spec",
+      "label": "Module — Episodic-to-Semantic Digest",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/memory/memory-consolidate.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/memory/memory-merge-protocol.md",
+      "kind": "spec",
+      "label": "Module — Agent-Driven Graph Merge",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/memory/memory-merge-protocol.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/memory/retro-memory-extractor.md",
+      "kind": "spec",
+      "label": "Module — Retro-to-Graph Staging Extractor",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/memory/retro-memory-extractor.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/memory/specs-to-memory-extractor.md",
+      "kind": "spec",
+      "label": "Module — Spec-to-Graph Staging Extractor",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/memory/specs-to-memory-extractor.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/meta-engine/meta-audit-engine.md",
+      "kind": "spec",
+      "label": "Module — Meta-Audit Recurrence Detector",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/meta-engine/meta-audit-engine.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/meta-engine/meta-gate-registry.md",
+      "kind": "spec",
+      "label": "Module — Meta-Gate Registry (Remedies)",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/meta-engine/meta-gate-registry.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/meta-engine/meta-mistake-ledger.md",
+      "kind": "spec",
+      "label": "Module — Meta-Mistake Ledger & Primitives",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/meta-engine/meta-mistake-ledger.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/meta-engine/prompt-evolution-system.md",
+      "kind": "spec",
+      "label": "Module — Prompt Evolution System",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/meta-engine/prompt-evolution-system.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/meta-engine/red-team.md",
+      "kind": "spec",
+      "label": "Module — Red Team (Adversarial Tester)",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/meta-engine/red-team.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/observability/compute-cost.md",
+      "kind": "spec",
+      "label": "Module — FinOps Agent Cost",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/observability/compute-cost.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/observability/compute-dora.md",
+      "kind": "spec",
+      "label": "Module — DORA Delivery Metrics",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/observability/compute-dora.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/observability/dashboard-collectors.md",
+      "kind": "spec",
+      "label": "Module — Dashboard Data Layer",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/observability/dashboard-collectors.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/observability/gdoc-export.md",
+      "kind": "spec",
+      "label": "Module — Snapshot Exporter (Markdown + HTML)",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/observability/gdoc-export.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/orchestration/agent-roster.md",
+      "kind": "spec",
+      "label": "Module — Agent Roster & Line Classification",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/orchestration/agent-roster.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/orchestration/cross-line-dispatch-guard.md",
+      "kind": "spec",
+      "label": "Module — Cross-Line Dispatch Guard",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/orchestration/cross-line-dispatch-guard.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/orchestration/raci-governance.md",
+      "kind": "spec",
+      "label": "Module — RACI/DACI Governance Matrix",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/orchestration/raci-governance.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/orchestration/wave-lifecycle.md",
+      "kind": "spec",
+      "label": "Module — Wave Lifecycle & Run State",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/orchestration/wave-lifecycle.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/quality-gates/andon-halt-system.md",
+      "kind": "spec",
+      "label": "Module — Andon Halt State Machine",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/quality-gates/andon-halt-system.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/quality-gates/bundle-perf-gate.md",
+      "kind": "spec",
+      "label": "Module — Bundle Size & Performance Gate",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/quality-gates/bundle-perf-gate.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/quality-gates/constitutional-drift-monitor.md",
+      "kind": "spec",
+      "label": "Module — Constitutional Drift Monitor",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/quality-gates/constitutional-drift-monitor.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/quality-gates/coverage-gate.md",
+      "kind": "spec",
+      "label": "Module — Coverage Delta Gate",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/quality-gates/coverage-gate.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/quality-gates/meta-process-audit.md",
+      "kind": "spec",
+      "label": "Module — Anti-Pattern Recurrence Detector",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/quality-gates/meta-process-audit.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/quality-gates/verification-pipeline.md",
+      "kind": "spec",
+      "label": "Module — Four-Tier Verification Pipeline",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/quality-gates/verification-pipeline.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/spec-system/ac-coverage-mapper.md",
+      "kind": "spec",
+      "label": "Module — AC-to-Test Coverage Mapper",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/spec-system/ac-coverage-mapper.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/spec-system/cascade-regenerate.md",
+      "kind": "spec",
+      "label": "Module — Cascade Version Propagator",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/spec-system/cascade-regenerate.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/spec-system/cascade-validate.md",
+      "kind": "spec",
+      "label": "Module — Cascade Compatibility Validator",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/spec-system/cascade-validate.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/spec-system/coverage-reporter.md",
+      "kind": "spec",
+      "label": "Module — Spec Coverage Report Generator",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/spec-system/coverage-reporter.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/spec-system/get-spec-context.md",
+      "kind": "spec",
+      "label": "Module — Spec Context & Ancestry Lookup",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/spec-system/get-spec-context.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/spec-system/lineage-graph-builder.md",
+      "kind": "spec",
+      "label": "Module — Lineage Graph Builder",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/spec-system/lineage-graph-builder.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/spec-system/spec-drift-checker.md",
+      "kind": "spec",
+      "label": "Module — Spec-vs-File Drift Checker",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/spec-system/spec-drift-checker.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/spec-system/spec-index-generator.md",
+      "kind": "spec",
+      "label": "Module — Spec Index Generator",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/spec-system/spec-index-generator.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/modules/spec-system/spec-size-check.md",
+      "kind": "spec",
+      "label": "Module — Spec Size Pre-Build Gate",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/modules/spec-system/spec-size-check.md",
+      "revisions": []
+    },
+    {
       "id": "spec:docs/specs/wave-cost-ledger_MASTER_SPEC.md",
       "kind": "spec",
       "label": "wave-cost-ledger Master Spec — running token-cost ledger + daily-limit alert",
@@ -583,16 +1061,6 @@
       "revisions": []
     },
     {
-      "id": "spec:docs/specs/wave-federation_MASTER_SPEC.md",
-      "kind": "spec",
-      "label": "wave-federation Master Spec — Project Federation & Integrity Defense",
-      "resolved": true,
-      "level": "L1",
-      "version": null,
-      "path": "docs/specs/wave-federation_MASTER_SPEC.md",
-      "revisions": []
-    },
-    {
       "id": "spec:docs/specs/wave-frontier_MASTER_SPEC.md",
       "kind": "spec",
       "label": "wave-frontier Master Spec — Close the gap to frontier autonomous agentic development",
@@ -600,6 +1068,16 @@
       "level": null,
       "version": null,
       "path": "docs/specs/wave-frontier_MASTER_SPEC.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/wave-judge-debias_MASTER_SPEC.md",
+      "kind": "spec",
+      "label": "wave-judge-debias — Master Spec",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/wave-judge-debias_MASTER_SPEC.md",
       "revisions": []
     },
     {
@@ -800,6 +1278,384 @@
       "agent": null
     },
     {
+      "src": "spec:docs/specs/domains/installer-federation.md",
+      "rel": "implements",
+      "dst": "spec:docs/CONSTITUTION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/domains/installer-federation.md",
+      "rel": "refines",
+      "dst": "spec:docs/specs/wave-federation_MASTER_SPEC.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/domains/memory.md",
+      "rel": "implements",
+      "dst": "spec:docs/CONSTITUTION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/domains/memory.md",
+      "rel": "refines",
+      "dst": "spec:docs/MEMORY_MERGE_PROTOCOL.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/domains/meta-engine.md",
+      "rel": "implements",
+      "dst": "spec:docs/CONSTITUTION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/domains/meta-engine.md",
+      "rel": "refines",
+      "dst": "spec:docs/SELF_IMPROVEMENT_PROTOCOL.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/domains/observability.md",
+      "rel": "implements",
+      "dst": "spec:docs/CONSTITUTION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/domains/observability.md",
+      "rel": "refines",
+      "dst": "spec:docs/DASHBOARD_SPEC.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/domains/orchestration.md",
+      "rel": "implements",
+      "dst": "spec:docs/CONSTITUTION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/domains/orchestration.md",
+      "rel": "refines",
+      "dst": "spec:docs/AUTONOMOUS_PIPELINE.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/domains/quality-gates.md",
+      "rel": "implements",
+      "dst": "spec:docs/CONSTITUTION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/domains/quality-gates.md",
+      "rel": "refines",
+      "dst": "spec:docs/MULTI_LEVEL_VERIFICATION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/domains/spec-system.md",
+      "rel": "implements",
+      "dst": "spec:docs/CONSTITUTION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/domains/spec-system.md",
+      "rel": "refines",
+      "dst": "spec:docs/HIERARCHICAL_SPEC_SYSTEM.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/installer-federation/footprint-audit.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/installer-federation.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/installer-federation/global-snapshot.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/installer-federation.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/installer-federation/instantiation-audit.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/installer-federation.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/installer-federation/project-federation.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/installer-federation.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/installer-federation/project-installer.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/installer-federation.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/memory/grounding-contract.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/memory.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/memory/memory-consolidate.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/memory.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/memory/memory-merge-protocol.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/memory.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/memory/retro-memory-extractor.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/memory.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/memory/specs-to-memory-extractor.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/memory.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/meta-engine/meta-audit-engine.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/meta-engine.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/meta-engine/meta-gate-registry.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/meta-engine.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/meta-engine/meta-mistake-ledger.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/meta-engine.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/meta-engine/prompt-evolution-system.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/meta-engine.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/meta-engine/red-team.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/meta-engine.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/observability/compute-cost.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/observability.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/observability/compute-dora.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/observability.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/observability/dashboard-collectors.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/observability.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/observability/gdoc-export.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/observability.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/orchestration/agent-roster.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/orchestration.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/orchestration/cross-line-dispatch-guard.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/orchestration.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/orchestration/raci-governance.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/orchestration.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/orchestration/wave-lifecycle.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/orchestration.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/quality-gates/andon-halt-system.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/quality-gates.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/quality-gates/bundle-perf-gate.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/quality-gates.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/quality-gates/constitutional-drift-monitor.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/quality-gates.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/quality-gates/coverage-gate.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/quality-gates.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/quality-gates/meta-process-audit.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/quality-gates.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/quality-gates/verification-pipeline.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/quality-gates.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/spec-system/ac-coverage-mapper.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/spec-system.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/spec-system/cascade-regenerate.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/spec-system.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/spec-system/cascade-validate.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/spec-system.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/spec-system/coverage-reporter.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/spec-system.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/spec-system/get-spec-context.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/spec-system.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/spec-system/lineage-graph-builder.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/spec-system.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/spec-system/spec-drift-checker.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/spec-system.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/spec-system/spec-index-generator.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/spec-system.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/modules/spec-system/spec-size-check.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/spec-system.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/wave-judge-debias_MASTER_SPEC.md",
+      "rel": "governs",
+      "dst": "spec:docs/NORTH_STAR.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/wave-judge-debias_MASTER_SPEC.md",
+      "rel": "constraints",
+      "dst": "spec:docs/CONSTITUTION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
       "src": "wave:wave-117",
       "rel": "triggered",
       "dst": "anti-pattern:anti-pattern-reactive-incremental-thinking",
@@ -851,7 +1707,7 @@
   ],
   "meta": {
     "_do_not_edit": true,
-    "built_at": "2026-06-06T05:03:37.681Z",
+    "built_at": "2026-06-06T05:23:29.202Z",
     "wave_id_scheme": "wave-NNN (3-digit zero-padded)",
     "r2_normalization": "wave-NNN.R2 collapsed to wave-NNN base ID; revision labels stored in revisions[]",
     "mcp_boundary": "This graph does not mirror live MCP entities. It covers only file-accessible governance surfaces: specs, ADRs, anti-patterns, waves, files. Memory snapshot staleness bound: last npm run memory:snapshot run."

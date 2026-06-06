@@ -1,0 +1,59 @@
+{
+  "generated": "2026-06-05",
+  "source": "spec-tree-overhaul cartographer survey",
+  "domains": {
+    "quality-gates": [
+      "verification-pipeline",
+      "andon-halt-system",
+      "coverage-gate",
+      "bundle-perf-gate",
+      "meta-process-audit",
+      "constitutional-drift-monitor"
+    ],
+    "orchestration": [
+      "agent-roster",
+      "raci-governance",
+      "cross-line-dispatch-guard",
+      "wave-lifecycle"
+    ],
+    "spec-system": [
+      "lineage-graph-builder",
+      "cascade-validate",
+      "cascade-regenerate",
+      "spec-drift-checker",
+      "spec-size-check",
+      "get-spec-context",
+      "ac-coverage-mapper",
+      "spec-index-generator",
+      "coverage-reporter"
+    ],
+    "meta-engine": [
+      "meta-mistake-ledger",
+      "meta-audit-engine",
+      "meta-gate-registry",
+      "prompt-evolution-system",
+      "red-team"
+    ],
+    "memory": [
+      "memory-consolidate",
+      "specs-to-memory-extractor",
+      "retro-memory-extractor",
+      "grounding-contract",
+      "memory-merge-protocol"
+    ],
+    "installer-federation": [
+      "project-installer",
+      "footprint-audit",
+      "instantiation-audit",
+      "global-snapshot",
+      "project-federation"
+    ],
+    "observability": [
+      "dashboard-collectors",
+      "gdoc-export",
+      "compute-dora",
+      "compute-cost"
+    ]
+  },
+  "total_modules": 38
+}

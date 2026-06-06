@@ -171,8 +171,18 @@ function walkAncestry(startSpec, allSpecsByRelPath) {
       const parentRelPath = parent.path;
       let parentSpec = allSpecsByRelPath.get(parentRelPath);
 
+      // Index only covers docs/specs/** ; L0/L1 parents live at docs/*.md.
+      // Fall back to loading the parent directly from disk by its root-relative path.
       if (!parentSpec) {
-        // Parent file doesn't exist on disk — note as missing
+        const abs = path.join(ROOT, parentRelPath);
+        if (fs.existsSync(abs)) {
+          parentSpec = loadSpec(abs);
+          if (parentSpec) allSpecsByRelPath.set(parentRelPath, parentSpec);
+        }
+      }
+
+      if (!parentSpec) {
+        // Parent file genuinely doesn't exist on disk — note as missing
         ancestry.push({
           level: null,
           path: parentRelPath,

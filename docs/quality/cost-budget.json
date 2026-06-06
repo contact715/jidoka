@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "_note": "FinOps cost model for compute-cost.mjs. Prices are public Anthropic API list prices (USD per million tokens) as of 2026-06; update when pricing changes. All computed figures are ESTIMATES (token counts come from dashboard estimates, not billed actuals).",
+  "scope_note": "Covers the framework's own pipeline run cost (agent token usage per wave). Does NOT cover product-runtime cost of projects built on the framework — that lives in each product's own FinOps config.",
+  "cost_model": {
+    "default_tier": "opus",
+    "token_split_assumption": "50/50 input/output split applied uniformly (v1). Refine with real input/output breakdown when the dashboard captures it per wave.",
+    "token_split_ratio": {
+      "input_fraction": 0.5,
+      "output_fraction": 0.5
+    },
+    "sonnet": {
+      "input_per_mtok": 3.0,
+      "output_per_mtok": 15.0
+    },
+    "opus": {
+      "input_per_mtok": 15.0,
+      "output_per_mtok": 75.0
+    }
+  },
+  "anomaly": {
+    "rolling_window_waves": 10,
+    "multiplier": 3,
+    "_note": "A wave whose estimated cost exceeds multiplier × rolling median over the last window emits a cost_anomaly event."
+  }
+}

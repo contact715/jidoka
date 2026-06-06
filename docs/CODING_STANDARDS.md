@@ -603,10 +603,10 @@ Every new spec file must declare a `level:` and `parents:` block in YAML frontma
 | Level | Name | Typical parent doc | Example `parents[].path` | Relationship |
 |---|---|---|---|---|
 | L0 | Constitution | (root — no parents) | — | — |
-| L1 | Core Architecture | `docs/MISSION.md` | `docs/MISSION.md` | `implements` |
-| L2 | Domain | `docs/FRONTEND_ARCHITECTURE.md` | `docs/FRONTEND_ARCHITECTURE.md` | `refines` |
-| L3 | Module | L2 domain spec | `docs/specs/domains/voice-domain.md` | `implements` |
-| L4 | Wave | `docs/FRONTEND_ARCHITECTURE.md` | `docs/FRONTEND_ARCHITECTURE.md` | `implements` |
+| L1 | Core Architecture | `docs/NORTH_STAR.md` | `docs/NORTH_STAR.md` | `implements` |
+| L2 | Domain | `docs/CONSTITUTION.md` + L1 doc | `docs/CONSTITUTION.md` | `implements` |
+| L3 | Module | L2 domain spec | `docs/specs/domains/spec-system.md` | `implements` |
+| L4 | Wave | L3 module spec(s) | `docs/specs/domains/spec-system.md` | `implements` |
 
 **Minimum valid YAML block per level:**
 

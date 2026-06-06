@@ -42,14 +42,14 @@ last_updated: 2026-06-05
                  │ refines
      ┌───────────▼───────────┐
      │          L2           │   Domain Specs (docs/specs/domains/)
-     │  [voice-domain].md    │   One per product vertical or system boundary.
-     │  [billing-domain].md  │   Lead-tech owner. Defines L3 inventory.
+     │  spec-system.md       │   One per system boundary / bounded context.
+     │  quality-gates.md     │   Lead-tech owner. Defines L3 inventory.
      └───────────┬───────────┘
                  │ implements
     ┌────────────▼────────────┐
     │           L3            │   Module Specs (docs/specs/modules/)
-    │  [frontliner].md        │   One per agent, funnel, surface, or infra.
-    │  [lead-qual-funnel].md  │   Tech owner. Acceptance criteria per module.
+    │  cascade-validate.md    │   One per agent, script, surface, or infra unit.
+    │  andon-halt-system.md   │   Tech owner. Acceptance criteria per module.
     └────────────┬────────────┘
                  │ implements
 ┌───────────────▼─────────────────┐
@@ -65,11 +65,11 @@ last_updated: 2026-06-05
 
 | Level | Name | Example docs | Owner role | Scope |
 |---|---|---|---|---|
-| L0 | Constitution | `docs/MISSION.md` | owner | Non-negotiable principles, mission, role definitions. Never changes without MAJOR bump and owner approval. |
-| L1 | Core Architecture | `docs/FRONTEND_ARCHITECTURE.md`, `docs/.claude/AGENT_PLAYBOOK.md` | platform | System structure, patterns, extension points. Changes trigger cascade-validate across all L2-L4. |
-| L2 | Domains | `docs/specs/domains/voice-domain.md` (pending) | lead-tech | Product vertical or system boundary. Owns the inventory of L3 modules. L2 is sparse until wave-118 backfill. |
-| L3 | Modules | `docs/specs/modules/agents/frontliner.md` | tech | Single agent, funnel, surface, or infra unit. Has full AC suite. Linked waves section tracks history. |
-| L4 | Waves | `docs/specs/wave-117_MASTER_SPEC.md` | dispatcher | Sprint-level work unit. References L3 modules it modifies. Transient — retro written at ship. |
+| L0 | Constitution | `docs/NORTH_STAR.md`, `docs/CONSTITUTION.md` | owner | Non-negotiable principles, mission, role definitions. Never changes without MAJOR bump and owner approval. |
+| L1 | Core Architecture | `docs/MULTI_LEVEL_VERIFICATION.md`, `docs/AUTONOMOUS_PIPELINE.md` | platform | System structure, patterns, extension points. Changes trigger cascade-validate across all L2-L4. |
+| L2 | Domains | `docs/specs/domains/spec-system.md` | lead-tech | A system boundary / bounded context of the framework. Owns the inventory of L3 modules. 7 domains, backfilled 2026-06-05. |
+| L3 | Modules | `docs/specs/modules/spec-system/cascade-validate.md` | tech | A single script, agent, surface, or infra unit. Has full AC suite tied to an executable check. Linked waves section tracks history. |
+| L4 | Waves | `docs/specs/wave-NN_MASTER_SPEC.md` | dispatcher | Sprint-level work unit. References L3 modules it modifies. Transient — retro written at ship. |
 
 ---
 
@@ -245,6 +245,30 @@ No change to existing wave spec body content is required. The YAML block is addi
 |---|---|---|
 | `cascade_hard_block` | `false` | When `true`: pre-commit hook exits 1 on INCOMPATIBLE child specs for L0 edits |
 | `hard_block_ac` | `false` | Existing wave-95 field — AC reference enforcement |
+| `specFrontmatter.hardBlockEnabled` | `false` | When `true`: `validate-spec-frontmatter.mjs` exits 1 on ERROR findings (missing required frontmatter, quoted/non-semver versions, unresolvable parents[], wave specs without `wave:`) |
+| `specFrontmatter.requiredIn` | `["docs/specs/modules/", "docs/specs/domains/"]` | Path prefixes where frontmatter is MANDATORY (elsewhere: validated only if present) |
+| `specFrontmatter.excludeDirs` | `["briefs"]` | Directory names skipped entirely — architect briefs are scaffolding, not specs |
+| `specAmendment.hardBlockEnabled` | `false` | When `true`: `spec-amendment-gate.mjs` exits 1 when staged code touches files cited by a Shipped/Implemented spec without staging that spec (waiver: `SPEC_AMEND_WAIVE=1`) |
+| `acCoverage.hardBlockEnabled` | `false` | When `true`: `ac-coverage-check.mjs` exits 1 when a staged spec has acceptance criteria with no matching `AC-`-tagged test |
+
+### Spec-tree integrity trio (added 2026-06-05)
+
+Born from a 200-wave project audit: 99 specs returned false INCOMPATIBLE because
+versions were written `"1.0"` instead of `1.0.0`, 30 wave specs had no frontmatter
+at all, and drift was detected but never forced a spec amendment — templates
+existed, nothing validated instances.
+
+- `validate-spec-frontmatter.mjs` — schema half of spec integrity (`spec-drift-check.mjs`
+  is the tree half). Rules F1-F7: frontmatter required in configured dirs, required
+  fields (level/version/status), level enum L0-L4, unquoted 3-part semver, parents[]
+  resolve + carry versions, wave specs carry `wave:`, status enum.
+- `ac-coverage-check.mjs` — AC→test traceability at commit time: an AC label in a
+  staged spec must be referenced by at least one test (`AC-<id>` / `[id]` tag).
+- `spec-amendment-gate.mjs` — the spec-ANCHORED loop: staged code cited in a living
+  spec's `code_references` requires that spec amended in the same commit. Frozen wave
+  deltas (`inventory_check: false`) are exempt — history is not rewritten.
+
+All three: zero-dep, `--self-test`, `--staged` for pre-commit, soft→hard graduation.
 
 Activate hard cascade enforcement after 30-day soft trial:
 
