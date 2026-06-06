@@ -270,6 +270,22 @@ existed, nothing validated instances.
 
 All three: zero-dep, `--self-test`, `--staged` for pre-commit, soft→hard graduation.
 
+### Change ceremony — S/M/L right-sizing (added 2026-06-05)
+
+`change-ceremony.mjs` classifies a staged change and names the artifact it owes,
+so a one-line bugfix never owes a full wave spec ("16 acceptance criteria for a
+bug fix" is the canonical failure this prevents) and a new surface never ships
+without one. ADVISORY by design — it routes, never blocks:
+
+| Tier | Default bounds | Owes |
+|---|---|---|
+| **S** | ≤2 files, ≤40 LOC, no new route/store, no protected zone | no wave spec — the spec-amendment gate covers the trail |
+| **M** | ≤10 files, ≤400 LOC | mini-spec: ONE file, goal + ≤5 ACs + affected surfaces |
+| **L** | beyond M, or new route, or protected zone (NORTH_STAR/billing/auth/migrations) | full pipeline: master spec + architects + tests-first |
+
+`spec-size-check.mjs` remains the UPPER bound (a written spec too big to build);
+change-ceremony is the LOWER bound + routing. Tunable: `.sdd-config.json → changeCeremony`.
+
 Activate hard cascade enforcement after 30-day soft trial:
 
 ```sh

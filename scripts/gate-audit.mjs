@@ -60,6 +60,7 @@ export const GATES = [
   { id: 'spec-frontmatter', layer: 'product', mode: 'soft', token: 'validate-spec-frontmatter.mjs' },
   { id: 'ac-coverage', layer: 'product', mode: 'soft', token: 'ac-coverage-check.mjs' },
   { id: 'spec-amendment', layer: 'product', mode: 'soft', token: 'spec-amendment-gate.mjs' },
+  { id: 'change-ceremony', layer: 'product', mode: 'soft', token: 'change-ceremony.mjs' },
   { id: 'detect-injection', layer: 'runtime', mode: 'soft', token: null },
   { id: 'detect-constitutional-drift', layer: 'runtime', mode: 'soft', token: null },
   // LLM judges — measured via golden cases

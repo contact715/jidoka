@@ -45,6 +45,16 @@ const COMMON = [ // standard adds the everyday gates
   // before product code. get-spec-context (canonical, now logs its runs) + the gate that reads
   // that log. Leaf scripts (node builtins only) → import-closure stays green.
   'get-spec-context.mjs', 'spec-first-gate.mjs',
+  // spec-tree integrity trio (born 2026-06-05 from the projectx spec-tree audit: 99 false-INCOMPATIBLE
+  // specs + 30 invisible wave specs accumulated because templates existed but nothing validated
+  // instances, and drift was detected but never forced an amendment). All zero-dep leaf scripts.
+  //   validate-spec-frontmatter — schema half (spec-drift-check is the tree half)
+  //   ac-coverage-check        — AC→test traceability at commit time
+  //   spec-amendment-gate      — spec-anchored loop: living-spec code requires spec amendment
+  'validate-spec-frontmatter.mjs', 'ac-coverage-check.mjs', 'spec-amendment-gate.mjs',
+  // change-ceremony — S/M/L right-sizing: a bugfix owes no wave spec, a feature owes one ('16 AC
+  // for a one-line fix' is the failure this prevents; spec-size-check is the upper bound, this the lower).
+  'change-ceremony.mjs',
   'execution-gate.mjs', 'coverage-gate.mjs', 'dependency-audit.mjs', 'gate-audit.mjs',
   'parallel-guard.mjs',
   // product-grade gates built this session (precision-guard + resource-guard battle-tested on Mosco).
@@ -218,6 +228,11 @@ node "$ROOT/.jidoka/scripts/meta-audit.mjs"   || exit 1
 node "$ROOT/.jidoka/scripts/spec-drift-check.mjs" --root "$ROOT" || exit 1
 # spec-first read gate (soft/warn by default; add --block to enforce after a trial)
 node "$ROOT/.jidoka/scripts/spec-first-gate.mjs" --staged || true
+# spec-tree integrity trio (soft by default; flip per-gate hardBlockEnabled in .sdd-config.json).
+# Each script reads its own config: returns non-zero only in hard mode with ERROR findings.
+node "$ROOT/.jidoka/scripts/validate-spec-frontmatter.mjs" --staged --root "$ROOT" || exit 1
+node "$ROOT/.jidoka/scripts/ac-coverage-check.mjs" --staged --root "$ROOT" || exit 1
+node "$ROOT/.jidoka/scripts/spec-amendment-gate.mjs" --staged --root "$ROOT" || exit 1
 exit 0
 `;
   const prePush = `#!/bin/sh
