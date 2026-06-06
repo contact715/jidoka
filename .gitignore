@@ -31,3 +31,10 @@ docs/audits/cron-runs.jsonl
 docs/audits/approval-queue.jsonl
 docs/audits/decision-log.jsonl
 docs/audits/chaos-test-stream.jsonl
+
+# Session / runtime artifacts (regenerated, not source)
+.playwright-mcp/
+dashboard-current.png
+docs/CURRENT_WAVE.md
+docs/dashboard-snapshot.md
+docs/audits/spec-context-runs.jsonl
