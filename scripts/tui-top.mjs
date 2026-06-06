@@ -103,6 +103,12 @@ export function heartbeatLine(tick, secSinceChange) {
   return `  ${SPIN[tick % SPIN.length]} live${age}`;
 }
 
+// BUG-4: a transient draw error (a journal being written mid-read, a vanished file) must
+// not kill the panel. Exit only in crash-test mode or after a persistent failure streak.
+export function drawErrorPolicy(consecutiveFails, isCrashTest) {
+  return (isCrashTest || consecutiveFails >= 5) ? 'exit' : 'continue';
+}
+
 // ── live run ─────────────────────────────────────────────────────────
 function runLive(p) {
   if (!process.stdout.isTTY) { runFlat(p); return; }
@@ -117,6 +123,7 @@ function runLive(p) {
     return costList;
   };
   const quit = () => { if (done) return; done = true; closeWatchers(); restore(); process.exit(0); };
+  let drawFails = 0;
   const draw = () => {
     try {
       if (process.env.JIDOKA_TOP_CRASH_TEST === '1') throw new Error('crash-test-draw');
@@ -132,7 +139,15 @@ function runLive(p) {
       lines.push(...renderOverlay(ui, cols));
       lines.push(heartbeatLine(tick++, Math.round((Date.now() - lastChange) / 1000)));
       process.stdout.write(buildRepaintBuffer(lines));
-    } catch (e) { restore(); process.stderr.write('tui-top draw error: ' + (e?.message || e) + '\n'); process.exit(1); }
+      drawFails = 0;
+    } catch (e) {
+      drawFails += 1;
+      if (drawErrorPolicy(drawFails, process.env.JIDOKA_TOP_CRASH_TEST === '1') === 'exit') {
+        restore(); process.stderr.write('tui-top draw error: ' + (e?.message || e) + '\n'); process.exit(1);
+      }
+      // transient: show the problem in-frame, keep the loop alive (next poll usually heals it)
+      process.stdout.write(buildRepaintBuffer([`  \x1b[33m⚠ ошибка чтения данных (${drawFails}/5): ${String(e?.message || e).slice(0, 80)} — продолжаю\x1b[0m`]));
+    }
   };
   process.on('SIGTERM', quit); process.on('SIGINT', quit);
   const snap0 = collectProject(p); logLaunch(p.split('/').pop(), snap0);
@@ -226,6 +241,12 @@ async function selfTest() {
   ok('AC-heartbeat: fresh change → «только что»', heartbeatLine(0, 1).includes('только что'));
   ok('AC-heartbeat: old change → seconds ago', heartbeatLine(0, 42).includes('42с назад'));
   ok('AC-heartbeat: null age → bare live', heartbeatLine(2, null) === `  ${SPIN[2]} live`);
+  // BUG-4: a single transient draw error (e.g. state.json mid-write) must NOT kill the
+  // panel — only crash-test mode or a persistent failure streak exits
+  ok('bug-4: first transient error → continue', drawErrorPolicy(1, false) === 'continue');
+  ok('bug-4: short streak → continue', drawErrorPolicy(4, false) === 'continue');
+  ok('bug-4: persistent streak → exit', drawErrorPolicy(5, false) === 'exit');
+  ok('bug-4: crash-test mode → exit immediately', drawErrorPolicy(1, true) === 'exit');
   // AC-crash: restore() emits \x1b[?1049l when _inAltScreen=true (crash-path coverage)
   { const captured = []; const origWrite = process.stdout.write.bind(process.stdout);
     process.stdout.write = (...a) => { captured.push(a[0]); return true; };

@@ -14,7 +14,7 @@ const R = '\x1b[0m', G = '\x1b[32m', A = '\x1b[33m', X = '\x1b[31m', D = '\x1b[9
 const STUCK_THRESHOLD_MS = 90 * 60 * 1000;
 const SYM = { done: '✓', running: '▸', stuck: '!', pending: '○', idle: '◦' };
 const STAGE = { discovery:'ПОИСК', spec:'СПЕК', tests:'ТЕСТЫ', build:'СБОРКА', gate:'ГЕЙТ', debug:'ДЕБАГ', launch:'ЗАПУСК', memory:'ПАМЯТЬ', done:'ГОТОВО' };
-const COL_ORDER = ['discovery','spec','tests','build','gate','debug','memory','done'];
+const COL_ORDER = ['discovery','spec','tests','build','gate','debug','launch','memory','done'];
 const CORE = new Set(['discovery','spec','tests','build','gate','debug','memory']);
 
 const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
@@ -163,7 +163,10 @@ export function renderFrame(snapshot, collectedAt, cols, ui = null) {
   cols = cols || 80;
   const h = snapshot.health || {}, halt = h.halt === true, waves = snapshot.waves || [];
   const stuck = waves.filter((w) => isStuck(w, collectedAt));
-  const selectedWave = ui ? (waves[Math.min(ui.sel ?? 0, Math.max(0, waves.length - 1))]?.wave ?? null) : null;
+  // selId (wave identity) wins; the row index is the legacy fallback (BUG-1)
+  const selectedWave = ui
+    ? (ui.selId && waves.some((w) => w.wave === ui.selId) ? ui.selId : (waves[Math.min(ui.sel ?? 0, Math.max(0, waves.length - 1))]?.wave ?? null))
+    : null;
   const lines = [...renderHeader(snapshot, collectedAt, cols)];
   if (halt) lines.push('', ...renderHaltBanner(halt, cols));
   if (stuck.length) lines.push('', ...renderStuckSection(stuck, collectedAt, cols));
@@ -274,6 +277,14 @@ async function selfTest() {
   ok('AC-9: ui=null keeps legacy footer', renderFrame(ms(), AT, 120).some((l) => l.includes('← → проект')));
   ok('AC-9: interactive board is linear even when wide', !il.some((l) => l.includes('ПОИСК') && l.includes('СПЕК') && l.includes('ГОТОВО')));
   ok('AC-9: selection clamps beyond bounds', renderFrame(isnap, AT, 120, { sel: 99 }).some((l) => l.includes('▶')));
+  // BUG-1: the frame must honour selId (wave identity), not just the row number
+  const bySel = renderFrame(isnap, AT, 120, { sel: 0, selId: 'wave-two' });
+  ok('bug-1: frame marks the wave by selId over the row index', bySel.some((l) => l.includes('▶') && l.includes('wave-two')));
+  // BUG-2: a wave at the launch phase must have its own kanban column, not fall into Shipped
+  const lw = mw({ wave: 'wave-l', current: 'launch' });
+  const kb = renderBoard([lw], 140, {});
+  ok('bug-2: ЗАПУСК column exists on the kanban', kb.some((l) => l.includes('ЗАПУСК')));
+  ok('bug-2: launch wave is NOT in the done bucket', (() => { const r = kb.find((l) => l.includes('wave-l')); return r != null; })() && kb.some((l) => l.includes('ЗАПУСК')));
 
   const { readFileSync: rfs } = await import('node:fs');
   const src = rfs(new URL(import.meta.url).pathname, 'utf8');

@@ -15,11 +15,17 @@ const R = '\x1b[0m', G = '\x1b[32m', A = '\x1b[33m', X = '\x1b[31m', D = '\x1b[9
 const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
 export function initialUi() {
-  return { mode: 'board', sel: 0, msg: '', confirm: null, input: null, log: null, logScroll: 0, cost: null };
+  return { mode: 'board', sel: 0, selId: null, msg: '', confirm: null, input: null, log: null, logScroll: 0, cost: null };
 }
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
-const selWave = (ui, ctx) => (ctx.waves || [])[clamp(ui.sel, 0, Math.max(0, (ctx.waves || []).length - 1))] || null;
+// BUG-1: the board re-sorts live — selection follows the WAVE ID; the row index is only
+// a fallback for when the selected wave vanished from the snapshot.
+const selIndex = (ui, waves) => {
+  const byId = ui.selId ? waves.findIndex((w) => w.wave === ui.selId) : -1;
+  return byId !== -1 ? byId : clamp(ui.sel, 0, Math.max(0, waves.length - 1));
+};
+const selWave = (ui, ctx) => (ctx.waves || [])[selIndex(ui, ctx.waves || [])] || null;
 
 // re-run target: the first FAILED phase, else the current phase (AC-3).
 export function rerunTarget(wave) {
@@ -32,8 +38,9 @@ export function rerunTarget(wave) {
 function boardKey(ui, key, ctx) {
   const waves = ctx.waves || [];
   const u = { ...ui, msg: '' };
-  if (key === '\x1b[A' || key === 'k') return { ui: { ...u, sel: clamp(ui.sel - 1, 0, Math.max(0, waves.length - 1)) }, effects: [] };
-  if (key === '\x1b[B' || key === 'j') return { ui: { ...u, sel: clamp(ui.sel + 1, 0, Math.max(0, waves.length - 1)) }, effects: [] };
+  const move = (d) => { const i = clamp(selIndex(ui, waves) + d, 0, Math.max(0, waves.length - 1)); return { ui: { ...u, sel: i, selId: waves[i]?.wave ?? null }, effects: [] }; };
+  if (key === '\x1b[A' || key === 'k') return move(-1);
+  if (key === '\x1b[B' || key === 'j') return move(+1);
   if (key === 'q' || key === '\x03') return { ui: u, effects: [{ type: 'quit' }] };
   if (key === 'r') return { ui: u, effects: [{ type: 'refresh' }] };
   if (key === '\r' || key === '\n') {
@@ -98,6 +105,11 @@ function inputKey(ui, key) {
     if (!v) return { ui: { ...ui, mode: 'board', input: null, msg: 'пустой ввод — отменено' }, effects: [] };
     if (inp.action === 'newWave') {
       return { ui: { ...ui, mode: 'board', input: null, msg: 'открываю терминал: новая волна' }, effects: [{ type: 'openTerminal', command: `claude "/jidoka-plan ${v.replace(/"/g, "'")}"` }] };
+    }
+    // BUG-3: andon-resume rejects reason/root-cause under 10 chars — catch it HERE with a
+    // human message instead of a shell error after the fact
+    if (v.length < 10) {
+      return { ui: { ...ui, input: { ...inp, label: 'Причина слишком короткая — журнал разбора требует минимум 10 символов. Допиши (Esc — отмена)' } }, effects: [] };
     }
     return { ui: { ...ui, mode: 'board', input: null, msg: 'СТОП: снимаю…' }, effects: [{ type: 'resumeHalt', wave: inp.wave, reason: v }] };
   }
@@ -178,8 +190,9 @@ function selfTest() {
   ok('AC-2: typing accumulates', r.ui.input.value === 'xy');
   r = reduce(r.ui, '\x7f', ctx);
   ok('AC-2: backspace deletes', r.ui.input.value === 'x');
+  for (const ch of ' — починили гейт') r = reduce(r.ui, ch, ctx); // дотягиваем до ≥10 символов (правило журнала)
   r = reduce(r.ui, '\r', ctx);
-  ok('AC-2: Enter yields resumeHalt effect with reason', r.effects.length === 1 && r.effects[0].type === 'resumeHalt' && r.effects[0].reason === 'x');
+  ok('AC-2: Enter yields resumeHalt effect with reason', r.effects.length === 1 && r.effects[0].type === 'resumeHalt' && r.effects[0].reason.startsWith('x'));
   let r2 = reduce(initialUi(), 's', { ...ctx, halt: true }); r2 = reduce(r2.ui, '\x1b', ctx);
   ok('AC-2: Esc cancels with no effect', r2.effects.length === 0 && r2.ui.mode === 'board');
   ok('AC-2: s without halt → message, no input', reduce(initialUi(), 's', ctx).ui.mode === 'board');
@@ -224,6 +237,31 @@ function selfTest() {
   ok('overlay: cost row renders ≈$', oc.some((l) => l.includes('≈$3.21') && l.includes('1ч 15м') && l.includes('1.5M')));
   ok('overlay: msg line renders', renderOverlay({ ...initialUi(), msg: 'hi' }, 80)[0].includes('hi'));
   ok('overlay: board+no msg → empty', renderOverlay(initialUi(), 80).length === 0);
+
+  // BUG-1 (2026-06-06 hunt): the board re-sorts every second — selection must follow the
+  // WAVE ID, not the row number, or p/g/Enter hit the WRONG wave mid-reorder
+  let s1 = reduce(initialUi(), '\x1b[B', ctx); // move onto wave-b (row 1)
+  ok('bug-1: selection records the wave id', s1.ui.selId === 'wave-b');
+  const reordered = { waves: [W({ wave: 'wave-b', current: 'build' }), W()], halt: false }; // wave-b jumped to row 0
+  const p1 = reduce(s1.ui, 'p', reordered);
+  ok('bug-1: action targets the selected WAVE after reorder', p1.ui.confirm?.wave === 'wave-b' && p1.ui.confirm?.phase === 'build');
+  const s2 = reduce(s1.ui, '\x1b[B', reordered); // from wave-b (now row 0) down → wave-a
+  ok('bug-1: arrows continue from the wave\'s NEW position', s2.ui.selId === 'wave-a');
+  const en1 = reduce(s1.ui, '\r', reordered);
+  ok('bug-1: Enter resumes the selected wave, not the row', en1.effects[0]?.command.includes('wave-b'));
+  ok('bug-1: vanished selection falls back to a safe row', reduce(s1.ui, 'p', { waves: [W()], halt: false }).ui.confirm?.wave === 'wave-a');
+
+  // BUG-3: andon-resume validates reason/root-cause at MIN 10 chars — the panel must
+  // catch a short reason BEFORE shelling out, with a clear message
+  let rh = reduce(initialUi(), 's', { ...ctx, halt: true });
+  for (const ch of 'мало') rh = reduce(rh.ui, ch, ctx);
+  rh = reduce(rh.ui, '\r', ctx);
+  ok('bug-3: short СТОП reason rejected in the panel', rh.effects.length === 0 && rh.ui.mode === 'input');
+  ok('bug-3: rejection explains the 10-char rule', (rh.ui.input.label || '').includes('10'));
+  let rh2 = { ui: rh.ui, effects: [] };
+  for (const ch of ' договорились с владельцем') rh2 = reduce(rh2.ui, ch, ctx);
+  rh2 = reduce(rh2.ui, '\r', ctx);
+  ok('bug-3: long reason passes through', rh2.effects[0]?.type === 'resumeHalt' && rh2.effects[0].reason.length >= 10);
 
   // help: ? opens the in-panel legend, Esc closes, full wording present
   let hp = reduce(initialUi(), '?', ctx);
