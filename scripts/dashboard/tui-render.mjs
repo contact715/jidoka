@@ -61,16 +61,26 @@ export function renderStuckSection(stuckWaves, at, cols) {
   return [...lines, hline(cols)];
 }
 
-function boardLinear(waves, cols) {
-  const lines = [sec('ДОСКА', cols)];
-  for (const w of waves) {
-    const s = w.status || 'pending', p = w.progress ?? 0;
-    lines.push(`${cstat(s)}${ssym(s)}${R} ${pad(w.wave || '—', 22)} ${pad(stageLabel(w), 7)} ${String(p).padStart(3)}%${cols >= 80 ? ' ' + bar(p) : ''}`);
+// one wave row; sel=true → ▶ marker + bold name. cost {durMin, usd} → ⏱/$ tail (cols permitting).
+function waveRow(w, cols, sel, cost) {
+  const s = w.status || 'pending', p = w.progress ?? 0;
+  const mark = sel ? `\x1b[36m▶\x1b[0m` : ' ';
+  const name = sel ? `\x1b[1m${pad(w.wave || '—', 22)}\x1b[22m` : pad(w.wave || '—', 22);
+  let tailStr = cols >= 80 ? ' ' + bar(p) : '';
+  if (cols >= 96 && cost && cost.durMin != null) {
+    const money = cost.usd != null ? ` · ≈$${cost.usd.toFixed(2)}` : '';
+    tailStr += `  ${D}⏱ ${Math.round(cost.durMin)}м${money}${R}`;
   }
+  return `${mark}${cstat(s)}${ssym(s)}${R} ${name} ${pad(stageLabel(w), 7)} ${String(p).padStart(3)}%${tailStr}`;
+}
+
+function boardLinear(waves, cols, opts = {}) {
+  const lines = [sec('ДОСКА', cols)];
+  waves.forEach((w, i) => lines.push(waveRow(w, cols, opts.selectedWave != null && w.wave === opts.selectedWave, (opts.costs || {})[w.wave])));
   return [...lines, hline(cols)];
 }
 
-function boardKanban(waves, cols, frozen) {
+function boardKanban(waves, cols, frozen, selectedWave = null) {
   const buckets = Object.fromEntries(COL_ORDER.map((p) => [p, []]));
   for (const w of waves) { const ph = w.current || 'done'; (buckets[ph] ?? buckets['done']).push(w); }
   const shown = COL_ORDER.filter((p) => CORE.has(p) || buckets[p]?.length > 0);
@@ -78,7 +88,7 @@ function boardKanban(waves, cols, frozen) {
   const lines = [sec(frozen ? 'ДОСКА (заморожена)' : 'ДОСКА', cols), shown.map((p) => pad(STAGE[p] || p.toUpperCase(), cw)).join(' '), shown.map(() => '─'.repeat(cw)).join('  ')];
   const maxR = Math.max(1, ...shown.map((p) => buckets[p].length));
   for (let r = 0; r < maxR; r++) {
-    lines.push(shown.map((ph) => { const w = buckets[ph][r]; if (!w) return ' '.repeat(cw); const s = frozen ? 'idle' : (w.status || 'pending'); return `${frozen ? D : cstat(s)}${frozen ? SYM.idle : ssym(s)}${R} ${pad((w.wave || '—').slice(0, cw - 3), cw - 2)}`; }).join(' '));
+    lines.push(shown.map((ph) => { const w = buckets[ph][r]; if (!w) return ' '.repeat(cw); const s = frozen ? 'idle' : (w.status || 'pending'); const seld = selectedWave != null && w.wave === selectedWave; const nm = pad((w.wave || '—').slice(0, cw - 3), cw - 2); return `${frozen ? D : cstat(s)}${frozen ? SYM.idle : ssym(s)}${R} ${seld ? `\x1b[7m${nm}\x1b[27m` : nm}`; }).join(' '));
     if (shown.some((p) => buckets[p][r])) lines.push(shown.map((ph) => { const w = buckets[ph][r]; return pad(w ? `  ${String(w.progress ?? 0).padStart(3)}% ${bar(w.progress ?? 0, 4)}` : '', cw); }).join(' '));
   }
   return [...lines, hline(cols)];
@@ -86,7 +96,8 @@ function boardKanban(waves, cols, frozen) {
 
 export function renderBoard(waves, cols, opts = {}) {
   if (!waves?.length) return [sec('ДОСКА', cols), ''];
-  return cols < 100 ? boardLinear(waves, cols) : boardKanban(waves, cols, opts.frozen || false);
+  // selection / cost columns need the row layout — prefer linear whenever the panel is interactive
+  return (cols < 100 || opts.interactive) ? boardLinear(waves, cols, opts) : boardKanban(waves, cols, opts.frozen || false, opts.selectedWave);
 }
 
 export function renderTerminals(waves, cols) {
@@ -119,7 +130,12 @@ export function renderActivity(activity, cols) {
   return [...lines, hline(cols)];
 }
 
-export function renderFooter(cols) { return [hline(cols), `  ${cols >= 100 ? 'q выход · r обновить · ← → проект' : 'q · r · ←→'}`]; }
+export function renderFooter(cols, controls = false) {
+  if (!controls) return [hline(cols), `  ${cols >= 100 ? 'q выход · r обновить · ← → проект' : 'q · r · ←→'}`];
+  return [hline(cols), cols >= 110
+    ? `  ↑↓ выбор · Enter продолжить волну · n новая · s снять СТОП · g перезапуск этапа · p пропустить · l лог · $ деньги · q выход`
+    : `  ↑↓ · Enter волна · n нов · s СТОП · g перезапуск · p пропуск · l лог · $ деньги · q`];
+}
 
 export function renderEmpty(snapshot, cols) {
   const lines = ['', '  Нет активных волн.', '', sec('НЕДАВНО ЗАВЕРШИЛИСЬ', cols)];
@@ -141,16 +157,19 @@ function renderHeader(snapshot, at, cols) {
   return [top, la + ' '.repeat(Math.max(0, cols - 1 - strip(la).length)) + '║', lb + ' '.repeat(Math.max(0, cols - 1 - strip(lb).length)) + '║', bot];
 }
 
-export function renderFrame(snapshot, collectedAt, cols) {
+// ui (optional, from tui-control.mjs initialUi/reduce): selection cursor + interactive footer.
+// snapshot.costs (optional, from wave-cost.mjs): { [wave]: {durMin, usd} } → row tails.
+export function renderFrame(snapshot, collectedAt, cols, ui = null) {
   cols = cols || 80;
   const h = snapshot.health || {}, halt = h.halt === true, waves = snapshot.waves || [];
   const stuck = waves.filter((w) => isStuck(w, collectedAt));
+  const selectedWave = ui ? (waves[Math.min(ui.sel ?? 0, Math.max(0, waves.length - 1))]?.wave ?? null) : null;
   const lines = [...renderHeader(snapshot, collectedAt, cols)];
   if (halt) lines.push('', ...renderHaltBanner(halt, cols));
   if (stuck.length) lines.push('', ...renderStuckSection(stuck, collectedAt, cols));
   if (!waves.length) lines.push(...renderEmpty(snapshot, cols));
-  else lines.push('', ...renderBoard(waves, cols, { frozen: halt }));
-  lines.push(...renderTerminals(waves, cols), ...renderSessions(snapshot.sessions, cols), ...renderActivity(snapshot.activity, cols), ...renderFooter(cols));
+  else lines.push('', ...renderBoard(waves, cols, { frozen: halt, interactive: Boolean(ui), selectedWave, costs: snapshot.costs || {} }));
+  lines.push(...renderTerminals(waves, cols), ...renderSessions(snapshot.sessions, cols), ...renderActivity(snapshot.activity, cols), ...renderFooter(cols, Boolean(ui)));
   return lines;
 }
 
@@ -243,6 +262,18 @@ async function selfTest() {
   const ffLines = renderFlat(ffSnap, AT);
   ok('flat: SESSION entry', ffLines.some((l) => l.startsWith('SESSION')));
   ok('flat: SESSION no ANSI', ffLines.every((l) => !l.includes('\x1b')));
+
+  // wave-tui-control AC-9: selection + cost + interactive footer
+  const iw = [mw({ wave: 'wave-one' }), mw({ wave: 'wave-two' })];
+  const isnap = ms({ waves: iw, costs: { 'wave-two': { durMin: 95, usd: 12.34 } } });
+  const il = renderFrame(isnap, AT, 120, { sel: 1 });
+  ok('AC-9: selected wave marked ▶', il.some((l) => l.includes('▶') && l.includes('wave-two')));
+  ok('AC-9: unselected wave not marked', !il.some((l) => l.includes('▶') && l.includes('wave-one')));
+  ok('AC-9: cost tail ≈$ on its wave row', il.some((l) => l.includes('wave-two') && l.includes('≈$12.34') && l.includes('⏱')));
+  ok('AC-9: interactive footer lists control keys', il.some((l) => l.includes('СТОП') && l.includes('деньги')));
+  ok('AC-9: ui=null keeps legacy footer', renderFrame(ms(), AT, 120).some((l) => l.includes('← → проект')));
+  ok('AC-9: interactive board is linear even when wide', !il.some((l) => l.includes('ПОИСК') && l.includes('СПЕК') && l.includes('ГОТОВО')));
+  ok('AC-9: selection clamps beyond bounds', renderFrame(isnap, AT, 120, { sel: 99 }).some((l) => l.includes('▶')));
 
   const { readFileSync: rfs } = await import('node:fs');
   const src = rfs(new URL(import.meta.url).pathname, 'utf8');

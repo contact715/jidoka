@@ -1,0 +1,137 @@
+{
+  "wave": "wave-tui-control",
+  "task": {
+    "type": "feature",
+    "risk": "normal",
+    "surfaces": [
+      "backend"
+    ]
+  },
+  "phases": [
+    {
+      "phase": "discovery",
+      "status": "done",
+      "agents": [
+        "user-researcher",
+        "product-strategist"
+      ],
+      "note": "surfaces surveyed: reuse andon-resume, run-state, compute-cost"
+    },
+    {
+      "phase": "spec",
+      "status": "done",
+      "agents": [
+        "chief-architect",
+        "micro-architect",
+        "macro-architect",
+        "surface-cartographer",
+        "chief-product-officer",
+        "business-process-architect",
+        "kaizen-officer"
+      ],
+      "note": "MASTER_SPEC approved by owner answers"
+    },
+    {
+      "phase": "tests",
+      "status": "done",
+      "agents": [
+        "test-engineer"
+      ],
+      "note": "7 self-test suites, 80+ checks green"
+    },
+    {
+      "phase": "build",
+      "status": "done",
+      "agents": [
+        "engineering-lead",
+        "backend-agent"
+      ],
+      "note": "tui-control + tui-actions + wave-cost + render/top wiring"
+    },
+    {
+      "phase": "gate",
+      "status": "done",
+      "agents": [
+        "reflexion-critic",
+        "constitutional-reviewer",
+        "coverage-auditor",
+        "budget-gate",
+        "policy-sandbox",
+        "security-scanner"
+      ],
+      "note": "self-tests 7 suites green + pty smoke 10/10 + e2e action proof"
+    },
+    {
+      "phase": "debug",
+      "status": "done",
+      "agents": [
+        "debug-agent"
+      ],
+      "note": "fixed: cost double-billing on overlapping wave windows"
+    },
+    {
+      "phase": "memory",
+      "status": "done",
+      "agents": [
+        "skill-extractor",
+        "data-analyst",
+        "kaizen-officer"
+      ],
+      "note": "lesson: smoke-test scenario must respect reducer modes (n inside board opens input)"
+    }
+  ],
+  "current": null,
+  "events": [
+    {
+      "at": "2026-06-06T05:36:01.730Z",
+      "phase": "discovery",
+      "status": "done",
+      "note": "surfaces surveyed: reuse andon-resume, run-state, compute-cost"
+    },
+    {
+      "at": "2026-06-06T05:36:01.759Z",
+      "phase": "spec",
+      "status": "done",
+      "note": "MASTER_SPEC approved by owner answers"
+    },
+    {
+      "at": "2026-06-06T05:43:37.368Z",
+      "phase": "tests",
+      "status": "done",
+      "note": "7 self-test suites, 80+ checks green"
+    },
+    {
+      "at": "2026-06-06T05:43:37.398Z",
+      "phase": "build",
+      "status": "done",
+      "note": "tui-control + tui-actions + wave-cost + render/top wiring"
+    },
+    {
+      "at": "2026-06-06T05:44:59.947Z",
+      "phase": "gate",
+      "status": "pending",
+      "note": "re-run by operator (tui)"
+    },
+    {
+      "at": "2026-06-06T05:45:45.792Z",
+      "phase": "gate",
+      "status": "done",
+      "note": "self-tests 7 suites green + pty smoke 10/10 + e2e action proof"
+    },
+    {
+      "at": "2026-06-06T05:45:45.823Z",
+      "phase": "debug",
+      "status": "done",
+      "note": "fixed: cost double-billing on overlapping wave windows"
+    },
+    {
+      "at": "2026-06-06T05:45:45.857Z",
+      "phase": "memory",
+      "status": "done",
+      "note": "lesson: smoke-test scenario must respect reducer modes (n inside board opens input)"
+    }
+  ],
+  "createdAt": "2026-06-06T05:36:01.700Z",
+  "updatedAt": "2026-06-06T05:45:45.857Z",
+  "terminalId": null
+}

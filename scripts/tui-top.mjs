@@ -1,7 +1,10 @@
 #!/usr/bin/env node
-// tui-top.mjs — `jidoka top` live pipeline panel entry point. ≤200 LOC.
-// non-TTY: flat snapshot, no ANSI, exit 0.  TTY: alt-screen poll loop, q=quit, r=refresh.
-// Kaizen log: docs/audits/tui-panel-launches.jsonl  {ts, project, wavesInFlight, stuckCount}
+// tui-top.mjs — `jidoka top` CONTROL PANEL entry point. ≤260 LOC.
+// non-TTY: flat snapshot, no ANSI, exit 0.  TTY: alt-screen poll loop + operator controls
+// (wave-tui-control spec): ↑↓ select · Enter resume wave · n new wave · s clear HALT ·
+// g re-run phase · p skip phase · l live log · $ cost view · r refresh · q quit.
+// Brain: dashboard/tui-control.mjs (pure reducer) · Hands: dashboard/tui-actions.mjs.
+// Kaizen logs: docs/audits/tui-panel-launches.jsonl + docs/audits/tui-actions.jsonl
 
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, statSync, watch } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -20,6 +23,9 @@ if (hasFlag('--self-test')) { const i = process.argv.indexOf('--self-test'); if 
 
 const { collectProject, discoverProjects } = await import('./dashboard/collectors.mjs');
 const { renderFrame, renderFlat } = await import('./dashboard/tui-render.mjs');
+const { initialUi, reduce, renderOverlay } = await import('./dashboard/tui-control.mjs');
+const { runEffect, readProjectLog } = await import('./dashboard/tui-actions.mjs');
+const { collectWaveCosts } = await import('./dashboard/wave-cost.mjs');
 
 // ── session collection ────────────────────────────────────────────────
 const SESSION_DIR = join(homedir(), '.claude', 'session-env');
@@ -103,6 +109,13 @@ function runLive(p) {
   const ms = parseInt(process.env.JIDOKA_TOP_INTERVAL || '', 10) || 1000;
   process.stdout.write('\x1b[?1049h\x1b[?25l'); _inAltScreen = true;
   let done = false; let tick = 0; let prevSnapJson = ''; let lastChange = Date.now();
+  let ui = initialUi(); let lastSnap = null;
+  // cost cache: a full transcript scan is ~250ms — refresh at most every 30s, never per-frame
+  let costList = []; let costAt = 0;
+  const costs = (force = false) => {
+    if (force || Date.now() - costAt > 30000) { try { costList = collectWaveCosts(p); } catch { costList = []; } costAt = Date.now(); }
+    return costList;
+  };
   const quit = () => { if (done) return; done = true; closeWatchers(); restore(); process.exit(0); };
   const draw = () => {
     try {
@@ -110,20 +123,38 @@ function runLive(p) {
       const at = new Date().toISOString();
       const snap = collectProject(p);
       snap.sessions = collectSessions();
+      snap.costs = Object.fromEntries(costs().map((c) => [c.wave, c]));
+      lastSnap = snap;
       const sj = JSON.stringify(snap);
       if (sj !== prevSnapJson) { if (prevSnapJson) lastChange = Date.now(); prevSnapJson = sj; }
       const cols = process.stdout.columns || 80;
-      const lines = renderFrame(snap, at, cols);
+      const lines = renderFrame(snap, at, cols, ui);
+      lines.push(...renderOverlay(ui, cols));
       lines.push(heartbeatLine(tick++, Math.round((Date.now() - lastChange) / 1000)));
       process.stdout.write(buildRepaintBuffer(lines));
     } catch (e) { restore(); process.stderr.write('tui-top draw error: ' + (e?.message || e) + '\n'); process.exit(1); }
   };
   process.on('SIGTERM', quit); process.on('SIGINT', quit);
   const snap0 = collectProject(p); logLaunch(p.split('/').pop(), snap0);
+  costs(true);
   draw();
   const timer = setInterval(draw, ms);
   process.stdout.on('resize', draw);
-  const onKey = (k) => { if (k === 'q' || k === '' || k.includes('q')) { clearInterval(timer); quit(); } else if (k === 'r' || k.includes('r')) draw(); };
+  // keys → pure reducer (tui-control.mjs) → effects → action layer (tui-actions.mjs)
+  const onKey = (k) => {
+    if (k === '\x03') { clearInterval(timer); quit(); return; }   // Ctrl-C always quits
+    const ctx = { waves: lastSnap?.waves || [], halt: lastSnap?.health?.halt === true };
+    const r = reduce(ui, k, ctx);
+    ui = r.ui;
+    for (const eff of r.effects) {
+      if (eff.type === 'quit') { clearInterval(timer); quit(); return; }
+      else if (eff.type === 'refresh') { costs(true); }
+      else if (eff.type === 'loadLog') { ui = { ...ui, log: readProjectLog(p) }; }
+      else if (eff.type === 'loadCost') { ui = { ...ui, cost: costs(true) }; }
+      else { const res = runEffect(eff, { projectPath: p }); ui = { ...ui, msg: res.msg }; }
+    }
+    draw();
+  };
   if (process.stdin.isTTY && typeof process.stdin.setRawMode === 'function') {
     process.stdin.setRawMode(true); process.stdin.resume(); process.stdin.setEncoding('utf8');
     process.stdin.on('data', onKey);
@@ -180,6 +211,16 @@ async function selfTest() {
     ok('Kaizen: valid JSON with ts+project', rec && !!rec.ts && !!rec.project);
     ok('Kaizen: wavesInFlight + stuckCount', rec && rec.wavesInFlight != null && rec.stuckCount != null);
   } finally { rmSync(tmp, { recursive: true, force: true }); }
+  // wave-tui-control: brain + overlay are wired into the shell
+  const { initialUi: iu, reduce: rd, renderOverlay: ro } = await import('./dashboard/tui-control.mjs');
+  const ctlCtx = { waves: [tw, { ...tw, wave: 'wave-2' }], halt: false };
+  const moved = rd(iu(), '\x1b[B', ctlCtx);
+  ok('control: ↓ moves selection through wired reducer', moved.ui.sel === 1);
+  const frameSel = rf(sn, AT, 120, moved.ui);
+  ok('control: frame renders interactive footer with ui', frameSel.some((l) => l.includes('СТОП')));
+  ok('control: overlay renders msg through wired renderer', ro({ ...iu(), msg: 'wired' }, 80).some((l) => l.includes('wired')));
+  const { runEffect: re } = await import('./dashboard/tui-actions.mjs');
+  ok('control: action layer rejects unknown effect gracefully', re({ type: 'bogus' }, { projectPath: '/tmp' }).ok === false);
   // AC-heartbeat: visible liveness line — spinner rotates, age honest
   ok('AC-heartbeat: spinner rotates', heartbeatLine(0, 10) !== heartbeatLine(1, 10) && heartbeatLine(0, 10) === heartbeatLine(4, 10));
   ok('AC-heartbeat: fresh change → «только что»', heartbeatLine(0, 1).includes('только что'));
