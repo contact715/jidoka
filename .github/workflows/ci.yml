@@ -52,6 +52,24 @@ jobs:
       - name: instantiation-audit (does scaffolding point at real objects?)
         run: node scripts/instantiation-audit.mjs
 
+      # ── Spec-tree structural gates ─────────────────────────────────────────
+      # The five-level spec hierarchy must stay consistent: lineage edges valid,
+      # RACI complete, and no NEW broken refs / orphans / missing-meta (ratchet).
+      - name: spec lineage graph (regenerate — fails CI if it cannot build)
+        run: node scripts/build-lineage-graph.mjs --json
+      - name: RACI governance validator (one human-accountable seat per activity)
+        run: node scripts/validate-raci.mjs
+      - name: cascade-validate (L0 → children compatibility)
+        run: node scripts/cascade-validate.mjs --root docs/CONSTITUTION.md --level L1
+      - name: spec coverage report (module inventory)
+        run: node scripts/regenerate-coverage-report.mjs --dry
+      - name: spec-structural-gate (RATCHET — blocks NEW broken refs / orphans / missing-meta)
+        run: node scripts/spec-structural-gate.mjs
+      - name: spec-drift-check self-test
+        run: node scripts/spec-drift-check.mjs --self-test
+      - name: spec-structural-gate self-test
+        run: node scripts/spec-structural-gate.mjs --self-test
+
       # ── Gate self-checks: verification-by-execution + the gate map (catches a ghost gate) ──
       - name: execution-gate self-test
         run: node scripts/execution-gate.mjs --self-test

@@ -45,6 +45,105 @@
       "responsible": ["orchestrator"],
       "consulted": ["meta-process-auditor"],
       "informed": ["metrics-aggregator"]
+    },
+    {
+      "id": "RA-DISCOVERY",
+      "label": "Discover the product/business problem before a wave (positioning, user need, process)",
+      "frame": "RACI",
+      "accountable": "human:product-lead",
+      "responsible": ["chief-product-officer", "product-strategist", "user-researcher"],
+      "consulted": ["business-process-architect", "competitive-intelligence-officer"],
+      "informed": ["chief-architect"]
+    },
+    {
+      "id": "RA-DESIGN",
+      "label": "Design the user flow, screen states, and interface copy for a wave",
+      "frame": "RACI",
+      "accountable": "human:tech-lead",
+      "responsible": ["ux-designer", "ux-writer"],
+      "consulted": ["design-system-architect"],
+      "informed": ["frontend-agent"]
+    },
+    {
+      "id": "RA-IMPL-SERVER",
+      "label": "Implement the server/data side of a wave to the approved contract",
+      "frame": "RACI",
+      "accountable": "human:tech-lead",
+      "responsible": ["backend-agent", "data-engineer"],
+      "consulted": ["engineering-lead"],
+      "informed": ["test-engineer"]
+    },
+    {
+      "id": "RA-TIER1",
+      "label": "Run the parallel automated quality gates after a commit",
+      "frame": "RACI",
+      "accountable": "human:tech-lead",
+      "responsible": ["test-runner", "coverage-auditor", "a11y-auditor", "perf-profiler"],
+      "consulted": ["integration-tester"],
+      "informed": ["reflexion-critic"]
+    },
+    {
+      "id": "RA-SELECT",
+      "label": "Select the best of N parallel implementations",
+      "frame": "RACI",
+      "accountable": "human:tech-lead",
+      "responsible": ["best-of-n-judge"],
+      "consulted": ["reflexion-critic"],
+      "informed": ["orchestrator"]
+    },
+    {
+      "id": "RA-DEBUG",
+      "label": "Triage and recover from a test/gate failure or andon halt",
+      "frame": "RACI",
+      "accountable": "human:tech-lead",
+      "responsible": ["debug-agent"],
+      "consulted": ["error-recovery-stub"],
+      "informed": ["test-runner"]
+    },
+    {
+      "id": "RA-VISUAL",
+      "label": "Verify the rendered UI against the spec (visual QA)",
+      "frame": "RACI",
+      "accountable": "human:tech-lead",
+      "responsible": ["visual-qa"],
+      "consulted": ["a11y-auditor"],
+      "informed": ["reflexion-critic"]
+    },
+    {
+      "id": "RA-LEARN",
+      "label": "Turn a completed wave into durable improvement (skills, cross-wave patterns)",
+      "frame": "RACI",
+      "accountable": "human:tech-lead",
+      "responsible": ["self-improvement-reviewer", "skill-extractor"],
+      "consulted": ["kaizen-officer"],
+      "informed": ["proactive-surfacing-agent"]
+    },
+    {
+      "id": "RA-SURFACE",
+      "label": "Proactively surface unaddressed concerns across waves",
+      "frame": "RACI",
+      "accountable": "human:tech-lead",
+      "responsible": ["proactive-surfacing-agent"],
+      "consulted": ["meta-process-auditor"],
+      "informed": ["orchestrator"]
+    },
+    {
+      "id": "RA-DATA",
+      "label": "Measure whether the product/process metric actually moved",
+      "frame": "RACI",
+      "accountable": "human:product-lead",
+      "responsible": ["data-analyst", "data-engineer"],
+      "consulted": ["data-lead"],
+      "informed": ["chief-product-officer"]
+    },
+    {
+      "id": "RA-DEPLOY",
+      "label": "Ship a green build to production with a tested rollback",
+      "frame": "RACI",
+      "accountable": "human:tech-lead",
+      "responsible": ["release-engineer"],
+      "consulted": ["devops-lead"],
+      "informed": ["orchestrator"]
     }
   ],
   "daci_decisions": [

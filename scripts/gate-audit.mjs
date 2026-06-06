@@ -24,6 +24,11 @@ export const GATES = [
   { id: 'instantiation-audit', layer: 'CI', mode: 'hard', token: 'instantiation-audit.mjs' },
   { id: 'execution-gate', layer: 'CI', mode: 'hard', token: 'execution-gate.mjs' },
   { id: 'gate-audit', layer: 'CI', mode: 'hard', token: 'gate-audit.mjs' },
+  // CI — spec-tree structural gates (wave: spec-tree-overhaul)
+  { id: 'spec-structural-gate', layer: 'CI', mode: 'hard', token: 'spec-structural-gate.mjs' },
+  { id: 'validate-raci', layer: 'CI', mode: 'hard', token: 'validate-raci.mjs' },
+  { id: 'lineage-graph', layer: 'CI', mode: 'hard', token: 'build-lineage-graph.mjs' },
+  { id: 'cascade-validate', layer: 'CI', mode: 'hard', token: 'cascade-validate.mjs' },
   { id: 'semgrep-sast', layer: 'CI', mode: 'hard', token: 'semgrep' },
   { id: 'trufflehog-secrets', layer: 'CI', mode: 'hard', token: 'trufflehog' },
   { id: 'dependency-audit', layer: 'CI', mode: 'hard', token: 'dependency-audit' },
@@ -51,6 +56,9 @@ export const GATES = [
   { id: 'cost-ledger', layer: 'product', mode: 'hard', token: null },
   // soft-trial — warn until graduated (gate-graduation proposes the flip)
   { id: 'spec-drift', layer: 'product', mode: 'soft', token: null },
+  { id: 'spec-frontmatter', layer: 'product', mode: 'soft', token: 'validate-spec-frontmatter.mjs' },
+  { id: 'ac-coverage', layer: 'product', mode: 'soft', token: 'ac-coverage-check.mjs' },
+  { id: 'spec-amendment', layer: 'product', mode: 'soft', token: 'spec-amendment-gate.mjs' },
   { id: 'detect-injection', layer: 'runtime', mode: 'soft', token: null },
   { id: 'detect-constitutional-drift', layer: 'runtime', mode: 'soft', token: null },
   // LLM judges — measured via golden cases

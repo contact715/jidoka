@@ -20,6 +20,17 @@
 | RA-VERIFY | Verify a change before merge | RACI | human:tech-lead | reflexion-critic, constitutional-reviewer | debate-prosecutor, debate-defender | debate-judge |
 | RA-SECURITY | Run the security gate on a change | RACI | human:tech-lead | security-scanner | pfca-agent | meta-process-auditor |
 | RA-MERGE | Approve and trigger the merge | RACI | human:tech-lead | orchestrator | meta-process-auditor | metrics-aggregator |
+| RA-DISCOVERY | Discover the product/business problem before a wave (positioning, user need, process) | RACI | human:product-lead | chief-product-officer, product-strategist, user-researcher | business-process-architect, competitive-intelligence-officer | chief-architect |
+| RA-DESIGN | Design the user flow, screen states, and interface copy for a wave | RACI | human:tech-lead | ux-designer, ux-writer | design-system-architect | frontend-agent |
+| RA-IMPL-SERVER | Implement the server/data side of a wave to the approved contract | RACI | human:tech-lead | backend-agent, data-engineer | engineering-lead | test-engineer |
+| RA-TIER1 | Run the parallel automated quality gates after a commit | RACI | human:tech-lead | test-runner, coverage-auditor, a11y-auditor, perf-profiler | integration-tester | reflexion-critic |
+| RA-SELECT | Select the best of N parallel implementations | RACI | human:tech-lead | best-of-n-judge | reflexion-critic | orchestrator |
+| RA-DEBUG | Triage and recover from a test/gate failure or andon halt | RACI | human:tech-lead | debug-agent | error-recovery-stub | test-runner |
+| RA-VISUAL | Verify the rendered UI against the spec (visual QA) | RACI | human:tech-lead | visual-qa | a11y-auditor | reflexion-critic |
+| RA-LEARN | Turn a completed wave into durable improvement (skills, cross-wave patterns) | RACI | human:tech-lead | self-improvement-reviewer, skill-extractor | kaizen-officer | proactive-surfacing-agent |
+| RA-SURFACE | Proactively surface unaddressed concerns across waves | RACI | human:tech-lead | proactive-surfacing-agent | meta-process-auditor | orchestrator |
+| RA-DATA | Measure whether the product/process metric actually moved | RACI | human:product-lead | data-analyst, data-engineer | data-lead | chief-product-officer |
+| RA-DEPLOY | Ship a green build to production with a tested rollback | RACI | human:tech-lead | release-engineer | devops-lead | orchestrator |
 
 ## DACI Decision Rows
 

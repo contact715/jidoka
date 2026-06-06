@@ -34,6 +34,12 @@
     "hardBlockEnabled": false,
     "dailyEnabled": false
   },
+  "specStructural": {
+    "_comment": "wave spec-tree-overhaul: spec-structural-gate.mjs is a RATCHET wired into pre-push + CI. It hard-blocks any INCREASE in broken refs / orphans / missing-meta above docs/metrics/spec-structural-baseline.json, and auto-tightens the baseline when debt drops. Pre-existing debt stays soft (driftDetection above), so the line is not paralyzed.",
+    "enabled": true,
+    "hardBlockEnabled": true,
+    "baseline": "docs/metrics/spec-structural-baseline.json"
+  },
   "metaProcessAuditor": {
     "autoHaltEnabled": false
   },
