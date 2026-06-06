@@ -71,16 +71,16 @@
     },
     {
       "phase": "memory",
-      "status": "pending",
+      "status": "done",
       "agents": [
         "skill-extractor",
         "data-analyst",
         "kaizen-officer"
       ],
-      "note": ""
+      "note": "skill wire-before-claim extracted (3 gates PASS, scope global); regression+strengthening in ledger/registry-proposal; data-analyst skipped (no product metrics surface in framework wave)"
     }
   ],
-  "current": "memory",
+  "current": null,
   "events": [
     {
       "at": "2026-06-03T18:12:48.986Z",
@@ -146,8 +146,14 @@
       "phase": "debug",
       "status": "done",
       "note": "debug-agent: npm test repointed to node --test (setup.ts never existed, 14/14 green); ghost e2e gated by e2e/-dir existence check in execution-gate; gate-audit strengthened with orphan-gate detection (counterfactual catches the incident)"
+    },
+    {
+      "at": "2026-06-06T06:12:46.509Z",
+      "phase": "memory",
+      "status": "done",
+      "note": "skill wire-before-claim extracted (3 gates PASS, scope global); regression+strengthening in ledger/registry-proposal; data-analyst skipped (no product metrics surface in framework wave)"
     }
   ],
   "createdAt": "2026-06-03T18:12:48.949Z",
-  "updatedAt": "2026-06-06T06:08:19.738Z"
+  "updatedAt": "2026-06-06T06:12:46.509Z"
 }
