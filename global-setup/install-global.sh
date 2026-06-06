@@ -32,13 +32,22 @@ echo "  ✓ dev-pipeline skill"
 
 # 3. engine (from framework — the source of truth; meta-lib itself detects the
 # global install location and switches to the global cross-project ledger)
-for f in meta-lib meta-remedies meta-audit meta-honesty meta-trend meta-premortem meta-log proof-gate pre-publish-guard memory-consolidate northstar-check kaizen-loop charter-check get-spec-context spec-first-gate orchestration-planner debate-trigger adaptive-verify run-state agent-trace approval-queue code-map coverage-gate debate-engine dependency-audit execution-gate gate-audit gate-graduation parallel-guard policy-enforce-hook sandbox-run spec-drift-check; do
+for f in meta-lib meta-remedies meta-audit meta-honesty meta-trend meta-premortem meta-log proof-gate pre-publish-guard memory-consolidate northstar-check kaizen-loop charter-check get-spec-context spec-first-gate orchestration-planner debate-trigger adaptive-verify run-state agent-trace approval-queue code-map coverage-gate debate-engine dependency-audit execution-gate gate-audit gate-graduation parallel-guard policy-enforce-hook sandbox-run spec-drift-check spec-structural-gate ac-verify-map build-lineage-graph cascade-validate validate-raci; do
   [ -f "$FW/scripts/$f.mjs" ] && cp "$FW/scripts/$f.mjs" "$DEST/jidoka/scripts/"
 done
 [ -f "$FW/lib/redaction/redact-pii.mjs" ] && cp "$FW/lib/redaction/redact-pii.mjs" "$DEST/jidoka/lib/redaction/"
 # North Star template — the CPO uses it to create docs/NORTH_STAR.md in any project
 [ -f "$FW/docs/NORTH_STAR_TEMPLATE.md" ] && cp "$FW/docs/NORTH_STAR_TEMPLATE.md" "$DEST/jidoka/NORTH_STAR_TEMPLATE.md"
 [ -f "$FW/docs/PROJECT_CHARTER_TEMPLATE.md" ] && cp "$FW/docs/PROJECT_CHARTER_TEMPLATE.md" "$DEST/jidoka/PROJECT_CHARTER_TEMPLATE.md"
+# Re-grounded canon docs — keep the global reference copy matching the repo (spec-tree overhaul).
+# Without this the global docs/ drifts (an old product-flavoured CONSTITUTION would mislead every session).
+mkdir -p "$DEST/jidoka/docs"
+for d in NORTH_STAR CONSTITUTION MISSION HIERARCHICAL_SPEC_SYSTEM MODULE_SPEC_SYSTEM MULTI_LEVEL_VERIFICATION AUTONOMOUS_PIPELINE AGENT_ROSTER TOYOTA_WAY; do
+  [ -f "$FW/docs/$d.md" ] && cp "$FW/docs/$d.md" "$DEST/jidoka/docs/$d.md"
+done
+# Drop docs that were archived in the repo (no longer canon) from the global copy.
+rm -f "$DEST/jidoka/docs/AGENT_LAYER_ARCHITECTURE.md" "$DEST/jidoka/docs/AGENT_LAYER_QUALITY_SPEC.md" "$DEST/jidoka/docs/KAIZEN_PHILOSOPHY.md" 2>/dev/null || true
+echo "  ✓ canon docs → ~/.claude/jidoka/docs/"
 # rewrite remedy mechanism paths to the installed location so meta-audit's broken-gate check resolves them (parity with install-into.mjs)
 perl -i -pe "s{'scripts/}{'$DEST/jidoka/scripts/}g" "$DEST/jidoka/scripts/meta-remedies.mjs" 2>/dev/null || true
 echo "  ✓ engine → ~/.claude/jidoka/scripts/"
