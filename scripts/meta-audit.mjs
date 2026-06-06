@@ -23,6 +23,7 @@
 //   node scripts/meta-log.mjs ...          # append a mistake to the ledger
 
 import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { loadLedger, groupByClass, daysBetween, todayISO, recurrencesAfter } from './meta-lib.mjs';
 import { REMEDIES } from './meta-remedies.mjs'; // single source of truth for gates
 
@@ -73,9 +74,12 @@ for (const [cls, items] of classes) {
 
   // Self-consistency: the engine must not itself declare a gate it can't point to.
   // (This is the declaration-over-implementation class applied to the engine's own claims.)
-  if (remedy?.mechanism && !existsSync(remedy.mechanism)) {
+  // Mechanism paths may carry a {HOME} placeholder (portable remedy entries) — expand
+  // it before the existence check, otherwise a real gate reads as a broken one.
+  const mech = remedy?.mechanism?.replace('{HOME}', homedir());
+  if (mech && !existsSync(mech)) {
     brokenGate++;
-    console.log(`\x1b[31m  ‼ gate for "${cls}" names ${remedy.mechanism}, but that file does not exist —`);
+    console.log(`\x1b[31m  ‼ gate for "${cls}" names ${mech}, but that file does not exist —`);
     console.log(`     the gate is a claim, not a mechanism. Build it or null the mechanism field.\x1b[0m\n`);
   }
 }

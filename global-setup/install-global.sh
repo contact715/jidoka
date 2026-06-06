@@ -30,16 +30,15 @@ node -e 'const fs=require("fs"),os=require("os");const p=os.homedir()+"/.claude/
 cp "$SRC/skills/dev-pipeline/SKILL.md" "$DEST/skills/dev-pipeline/"
 echo "  ✓ dev-pipeline skill"
 
-# 3. engine (from framework — the source of truth, with global ledger path)
-for f in meta-lib meta-remedies meta-audit meta-honesty meta-trend meta-premortem meta-log proof-gate pre-publish-guard memory-consolidate northstar-check kaizen-loop charter-check get-spec-context spec-first-gate orchestration-planner debate-trigger adaptive-verify run-state; do
+# 3. engine (from framework — the source of truth; meta-lib itself detects the
+# global install location and switches to the global cross-project ledger)
+for f in meta-lib meta-remedies meta-audit meta-honesty meta-trend meta-premortem meta-log proof-gate pre-publish-guard memory-consolidate northstar-check kaizen-loop charter-check get-spec-context spec-first-gate orchestration-planner debate-trigger adaptive-verify run-state agent-trace approval-queue code-map coverage-gate debate-engine dependency-audit execution-gate gate-audit gate-graduation parallel-guard policy-enforce-hook sandbox-run spec-drift-check; do
   [ -f "$FW/scripts/$f.mjs" ] && cp "$FW/scripts/$f.mjs" "$DEST/jidoka/scripts/"
 done
 [ -f "$FW/lib/redaction/redact-pii.mjs" ] && cp "$FW/lib/redaction/redact-pii.mjs" "$DEST/jidoka/lib/redaction/"
 # North Star template — the CPO uses it to create docs/NORTH_STAR.md in any project
 [ -f "$FW/docs/NORTH_STAR_TEMPLATE.md" ] && cp "$FW/docs/NORTH_STAR_TEMPLATE.md" "$DEST/jidoka/NORTH_STAR_TEMPLATE.md"
 [ -f "$FW/docs/PROJECT_CHARTER_TEMPLATE.md" ] && cp "$FW/docs/PROJECT_CHARTER_TEMPLATE.md" "$DEST/jidoka/PROJECT_CHARTER_TEMPLATE.md"
-# point meta-lib at the GLOBAL cross-project ledger
-perl -i -pe "s{'docs/audits/meta-mistakes.jsonl'}{(process.env.HOME||'')+'/.claude/jidoka/meta-mistakes.jsonl'}g" "$DEST/jidoka/scripts/meta-lib.mjs" 2>/dev/null || true
 # rewrite remedy mechanism paths to the installed location so meta-audit's broken-gate check resolves them (parity with install-into.mjs)
 perl -i -pe "s{'scripts/}{'$DEST/jidoka/scripts/}g" "$DEST/jidoka/scripts/meta-remedies.mjs" 2>/dev/null || true
 echo "  ✓ engine → ~/.claude/jidoka/scripts/"

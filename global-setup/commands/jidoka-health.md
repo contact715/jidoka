@@ -4,6 +4,11 @@ allowed-tools: Read, Bash, Grep
 ---
 Run the jidoka health check and report concisely (do NOT fix anything — just report pass/fail).
 Use `scripts/` in the framework repo, or `.jidoka/scripts/` in an installed project.
+If the current directory is NEITHER (no `scripts/eval-suite.mjs` and no `.jidoka/`) — e.g. you are
+in the global install `~/.claude/jidoka`, which is a generated artifact, not the repo — locate the
+framework repo clone first (`mdfind -name eval-suite.mjs` or the known clone, e.g.
+`~/claude-code-dev-framework`) and run ALL checks there. Never report a script as "missing"
+without first checking the framework repo.
 
 1. Eval suite: `node scripts/eval-suite.mjs` — pass-rate, any regression.
 2. Engine self-tests: run `--self-test` on each engine script that has one; count green.

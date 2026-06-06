@@ -6,9 +6,21 @@
 // synthetic ledger without mutating production data.
 
 import { readFileSync, existsSync, appendFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-export const LEDGER = process.env.META_LEDGER || 'docs/audits/meta-mistakes.jsonl';
-export const TRIP_LOG = process.env.META_TRIP_LOG || 'docs/audits/gate-trips.jsonl';
+// Where this engine is INSTALLED decides where the ledger lives — no install-time
+// path rewriting needed:
+//   - framework repo / project install (.jidoka/scripts/) → the project-local ledger
+//   - global install (~/.claude/jidoka/scripts/) → the GLOBAL cross-project ledger,
+//     so a class caught in one repo is known to the engine in all repos.
+// Both stay env-overridable (META_LEDGER / META_TRIP_LOG) so every engine is
+// testable against a synthetic ledger without mutating production data.
+const JIDOKA_HOME = process.env.JIDOKA_HOME || join(homedir(), '.claude', 'jidoka');
+const IS_GLOBAL = dirname(fileURLToPath(import.meta.url)).startsWith(JIDOKA_HOME);
+export const LEDGER = process.env.META_LEDGER || (IS_GLOBAL ? join(JIDOKA_HOME, 'meta-mistakes.jsonl') : 'docs/audits/meta-mistakes.jsonl');
+export const TRIP_LOG = process.env.META_TRIP_LOG || (IS_GLOBAL ? join(JIDOKA_HOME, 'gate-trips.jsonl') : 'docs/audits/gate-trips.jsonl');
 
 function loadJsonl(path, who) {
   if (!existsSync(path)) return [];
