@@ -39,20 +39,45 @@ function resolve(projectPath, rel) {
 }
 
 // ── project discovery ───────────────────────────────────────────────────────
+// Three tiers, in display order:
+//   framework — the jidoka repo itself
+//   project   — jidoka installed (.jidoka marker or raci.json)
+//   plain     — any other top-level home dir that looks like a project (.git or package.json)
+// Manual overrides live in ~/.claude/jidoka-projects.json:
+//   { "include": ["careta", "/abs/path"], "exclude": ["node_modules"] }
+// include adds dirs the heuristics miss (e.g. a container folder of sub-projects);
+// exclude hides noise by name. Both are optional; a missing file means no overrides.
 export function discoverProjects(home = homedir(), frameworkRoot = null) {
   const projects = [];
+  const seen = new Set();
+  const push = (name, path, kind) => {
+    if (seen.has(path)) return;
+    seen.add(path);
+    projects.push({ name, path, kind });
+  };
   if (frameworkRoot && existsSync(join(frameworkRoot, 'scripts'))) {
-    projects.push({ name: frameworkRoot.split('/').pop(), path: frameworkRoot, kind: 'framework' });
+    push(frameworkRoot.split('/').pop(), frameworkRoot, 'framework');
   }
+  const reg = readJson(join(home, '.claude', 'jidoka-projects.json')) || {};
+  const excluded = new Set(reg.exclude || []);
   let entries = [];
   try { entries = readdirSync(home, { withFileTypes: true }); } catch { /* none */ }
+  const plain = [];
   for (const e of entries) {
-    if (!e.isDirectory()) continue;
+    if (!e.isDirectory() || e.name.startsWith('.') || excluded.has(e.name)) continue;
     const p = join(home, e.name);
     if (p === frameworkRoot) continue;
     if (existsSync(join(p, '.jidoka')) || existsSync(join(p, 'docs/governance/raci.json'))) {
-      projects.push({ name: e.name, path: p, kind: 'project' });
+      push(e.name, p, 'project');
+    } else if (existsSync(join(p, '.git')) || existsSync(join(p, 'package.json'))) {
+      plain.push({ name: e.name, path: p });
     }
+  }
+  for (const q of plain) push(q.name, q.path, 'plain');
+  for (const inc of reg.include || []) {
+    const p = inc.startsWith('/') ? inc : join(home, inc);
+    const name = p.split('/').filter(Boolean).pop();
+    if (existsSync(p) && !excluded.has(name)) push(name, p, 'plain');
   }
   return projects;
 }
