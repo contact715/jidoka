@@ -1,6 +1,20 @@
+---
+status: Template
+version: 1.0.0
+level: L0
+type: template
+owner_role: owner
+parents: []
+children: []
+breaking_change_in_v: null
+created: 2026-05-25
+last_validated_against_parents: 2026-06-05
+last_updated: 2026-06-05
+---
+
 # Mission — <YOUR PRODUCT>
 
-> This is a template. Replace the product specifics with your own. Keep the structure — the framework's `constitutional-reviewer` and several agents read the **Mission Compass** at the bottom.
+> This is a template. Replace the product specifics with your own. Keep the structure — the framework's `constitutional-reviewer` and several agents read the **Mission Compass** at the bottom. (In the framework repo itself this file stays a template; the framework's own L0 is `docs/NORTH_STAR.md`.)
 
 ## What this product is
 

@@ -1,24 +1,27 @@
 ---
 status: Active
-version: 1.0.0
+version: 2.0.0
 level: L0
 type: constitution
 owner_role: platform
-parents: []
+parents:
+  - path: docs/NORTH_STAR.md
+    version: 1.0.0
+    relationship: implements
 children: []
-breaking_change_in_v: null
+breaking_change_in_v: 2.0.0
 created: 2026-05-25
-last_validated_against_parents: 2026-05-27
-last_updated: 2026-05-25
+last_validated_against_parents: 2026-06-05
+last_updated: 2026-06-05
 ---
 
-# this project Constitution
+# Jidoka Framework Constitution
 
-> The set of DURABLE choices that govern every wave. If something is in this file, it doesn't get re-decided per-spec.
+> The set of DURABLE choices that govern every wave of work on the framework itself. If something is in this file, it doesn't get re-decided per-spec.
 >
-> Specs link to ONE doc (this one) instead of six. Lower cognitive load for Chief Architect synthesis.
+> Specs link to ONE doc (this one) instead of nine. Lower cognitive load for Chief Architect synthesis.
 >
-> Adopted: wave-60. Sources existing canonical docs as sections rather than duplicating their content.
+> Adopted: wave-60 (as the product constitution). Re-grounded to the framework itself: v2.0.0, 2026-06-05 — see Applied amendments. The pre-2.0 product content lives in git history and `docs/archive/imported-product/`.
 
 ---
 
@@ -26,131 +29,110 @@ last_updated: 2026-05-25
 
 1. **A single canonical pointer**. Each section is a one-paragraph synopsis + a link to the full source doc.
 2. **Versioned with the code**. Lives in the repo. Changes via PR with rationale.
-3. **The thing Chief Architect cites instead of 6 separate docs.** Spec format §1 references this file; the §1 reader follows the link to the relevant section here.
+3. **The thing Chief Architect cites instead of 9 separate docs.** Spec format §1 references this file; the §1 reader follows the link to the relevant section here.
 4. **A boundary**. If something changes weekly, it's not constitutional — it's a config or a setting.
 
 ## What the Constitution IS NOT
 
 - Not a wishlist or roadmap.
-- Not a style guide for prose (that's `VOICE_GUIDE.md`).
 - Not implementation details (those live in spec files).
-- Not the philosophy doc itself (this LINKS to it; doesn't replace it).
+- Not the philosophy doc itself (this LINKS to `NORTH_STAR.md` and `TOYOTA_WAY.md`; doesn't replace them).
 
 ---
 
-## 1. Product mission
+## 1. Mission
 
-**One-line**: this project is the Multi-Agent Operating System for home-services and auto-shop SMBs (5-50 employees). Agents do the work, humans approve and decide.
+**One-line**: Jidoka is the agentic engineering framework for Claude Code — it ships software at a senior team's quality bar, autonomously, and gets measurably better at it every wave.
 
-**Full source**: [`docs/MISSION.md`](MISSION.md)
+**Full source**: [`docs/NORTH_STAR.md`](NORTH_STAR.md)
 
-**Mission Compass** (5 questions every spec must answer "yes" to before dispatch):
-1. Strengthens one of the five role positions (owner / dispatcher / tech / lead-tech / office)?
-2. Work passes through an AI funnel stage?
-3. Human stays in the approval seat?
-4. Respects role scope?
-5. Chat-first / page-second pattern?
+**Framework Compass** (5 questions every framework spec must answer "yes" to before dispatch):
+1. Does it raise the quality of what the line ships, or the reliability of the line itself?
+2. Is every claim backed by an executable proof (test, gate, script output)?
+3. Can the defect it guards against halt the pipeline, with a human in the approval seat?
+4. Does it land in the right home (framework vs product vs global) without duplicating what exists?
+5. Does the system learn from it (retro, meta-engine entry, skill, golden case)?
 
-A spec failing any compass question is rejected by SR-11. The compass is the constitution's enforcement layer in the spec review stage.
+A spec failing any compass question is rejected at review. `constitutional-reviewer` runs these five questions independently; any VIOLATION halts the pipeline. (Products run their own product-level Mission Compass instantiated from the `docs/MISSION.md` template.)
 
 ---
 
-## 2. Product philosophy
+## 2. Philosophy — the two Toyota pillars
 
-**One-line**: Six end-to-end scenarios (Sales / Service / Installation / Maintenance / HR / Reputation) running on universal-agent + funnel-builder + Knowledge-Base architecture. 10 principles. Internal artifact, not marketing copy.
+**One-line**: Jidoka (built-in quality — the product gets better) + Kaizen (continuous improvement — the process gets better). Neither is optional.
 
-**Full source**: [`docs/PRODUCT_PHILOSOPHY.md`](PRODUCT_PHILOSOPHY.md) (or the Russian variant [`docs/PRODUCT_PHILOSOPHY_RU.md`](PRODUCT_PHILOSOPHY_RU.md) for native context)
-
-**Kaizen layer**: [`docs/TOYOTA_WAY.md`](TOYOTA_WAY.md) — continuous-improvement principles that govern HOW we ship, not WHAT we ship.
+**Full source**: [`docs/TOYOTA_WAY.md`](TOYOTA_WAY.md) — maps each Toyota Production System principle to the concrete mechanism implementing it in the pipeline.
 
 **Key axioms** for spec authors:
-- Universal agent roster spans all verticals (not one-vertical-per-agent).
-- Funnel-builder is the central differentiator — drag stages, agents auto-attach.
-- Knowledge Base layer is shared infrastructure (not per-feature scratchpad).
-- Approve / Edit / Decline card is the canonical interaction motif.
-- Security is architectural (sandbox, prompt-injection defense, audit log, role-gated access) — claims must be backed by code.
+- A defect is never passed to the next station; gates verify at the station, not after merge.
+- The line stops on quality drop (andon), not only on hard failure.
+- Every wave feeds the meta-engine; mistakes become catalog entries and golden cases.
+- Self-improvement applies to the agents and prompts too (`docs/SELF_IMPROVEMENT_PROTOCOL.md`).
 
 ---
 
-## 3. Voice + copy register
+## 3. Engineering standards
 
-**One-line**: Engineer-to-operator tone. Concrete > aspirational. Named roles, named outcomes, no marketing inflation.
+**One-line**: Senior-engineer discipline, encoded: decomposition limits, test discipline, security patterns, honest reporting.
 
-**Full source**: [`docs/VOICE_GUIDE.md`](VOICE_GUIDE.md)
+**Full sources**: [`docs/CODING_STANDARDS.md`](CODING_STANDARDS.md), [`docs/TESTING.md`](TESTING.md), [`docs/SECURITY.md`](SECURITY.md), [`docs/DEBUGGING.md`](DEBUGGING.md), [`docs/DEVOPS.md`](DEVOPS.md)
 
-**Banned vocabulary** (SR-5 enforces in user-facing strings):
-- "orchestrator", "preset", "variant", "BRANDNAME" (capitalised)
-- generic AI marketing words: "transformative", "pivotal", "groundbreaking", "leverage", "synergy", "innovative", "robust", "seamless"
-- promotional inflation: "nestled in", "showcasing", "testament to"
-
-**Required register**:
-- Names (per-role personas: Frontliner addresses Owner; Dispatcher addresses Scheduler; etc.)
-- Numbers (no "many" / "several" — say "47 days" / "3.2 days").
-- Verbs not nouns (action, not aspiration).
-
-Specs must reference voice examples by file:line if rewriting copy.
+**Non-negotiables**:
+- No "done" without executable proof in the same turn.
+- Decomposition limits: ≤400 LOC/file, ≤80 LOC/function (enforced, not aspirational).
+- No fabricated data, credentials, or results — missing things are named, not faked.
+- Honest scope: bounded work (top-N, sampled, partial) states its boundary explicitly.
+- Secrets and PII never enter the repo.
 
 ---
 
-## 4. Role permission model
+## 4. Agent layer
 
-**One-line**: Five operational roles (owner / dispatcher / tech / lead-tech / office). JWT-claim-based via `useAuth().user.role`. Demo role-switcher (`useRoleStore`) is local-only — never used for permission decisions.
+**One-line**: A layered roster — product/architecture layers (L0.5–L0.7), execution (L1), quality gates (L0.95–L0.99), adversarial verification — each agent with one charter, one write-scope.
 
-**Full source**: [`docs/ROLE_PERMISSION_MATRIX.md`](ROLE_PERMISSION_MATRIX.md)
+**Full source**: [`docs/AGENT_ROSTER.md`](AGENT_ROSTER.md) (+ `.claude/agents/*.md` — one charter file per agent)
 
 **Enforcement**:
-- SR-12 blocks any spec that gates a surface via `useRoleStore.operationalRole` (demo store, can be flipped from localStorage).
-- All role gates read from `useAuth().user.role` (server-issued).
-- Permission matrix lives in `ROLE_PERMISSION_MATRIX.md` — spec changes that grant new permissions MUST update the matrix in the same wave.
+- An agent acts only inside its declared write-scope; scope-escape is a red-team attack class.
+- Halt authority is explicit: only the named halt-authority agents may stop the line.
+- New agents require a roster entry, a charter, and a RACI placement in the same wave (`docs/governance/raci.json`).
 
 ---
 
-## 5. Funnel registry
+## 5. Pipeline
 
-**One-line**: 7 canonical funnels (Sales / Service / Installation / Maintenance / HR / Reputation / Quality Control). Pre-built templates with stage owners pre-bound to agent kinds.
+**One-line**: business questions → master spec (architect synthesis) → tests → code → gates → debate → debug → memory. Spec-first, never code-first.
 
-**Full source**: [`docs/FUNNEL_REGISTRY.md`](FUNNEL_REGISTRY.md)
+**Full source**: [`docs/AUTONOMOUS_PIPELINE.md`](AUTONOMOUS_PIPELINE.md)
 
-**Registry A** (canonical): `lib/funnels/templates/*.json` — 6 JSON files with role IDs.
-**Registry B** (vertical packs): `components/pipeline/PipelineTemplateSelector.tsx` — 8 hardcoded packs with `funnelTemplateId` reference to Registry A (wave-49b wired 6 of 8; 2 explicit TODO(wave-49c) for missing subscription templates).
-
-The duplicate-registry pattern surfaced in wave-45 audit. The Cartographer protocol (wave-39) now greps registries during synthesis to prevent re-emergence.
+**Key invariants**:
+- No implementation before an approved master spec for non-trivial waves.
+- The spec contract binds backend and frontend; nobody invents a contract the other side hasn't agreed to.
+- Wave artifacts (spec → diff → retro → metrics) form a complete, auditable chain.
 
 ---
 
-## 6. Design system
+## 6. Verification gates
 
-**One-line**: Single token system (height / spacing / colour / radius / shadow) enforced via ESLint rules + drift ratchet CI + visual baselines.
+**One-line**: Multi-level verification L0.95–L0.99: reflexion, constitutional review, security scan, coverage, a11y, perf, integration, debate, meta-process audit. Gates block; they don't advise.
 
-**Full source**: [`docs/DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md)
+**Full source**: [`docs/MULTI_LEVEL_VERIFICATION.md`](MULTI_LEVEL_VERIFICATION.md)
 
-**Token tiers**:
-- Heights: `h-icon` (24) / `h-chip` (28) / `h-control` (32) / `h-cta` (36) / `h-form` (40) / `h-touch` (44) / `h-cardheader` (48)
-- Surface: `--surface-primary` / `--surface-secondary` / `--surface-tertiary` (CSS vars)
-- Text: Tailwind text-xs..text-xl scale (raw `text-[Npx]` blocked by ESLint per wave-44)
-- Semantic palettes (off-limits): `HEAT_COLORS` / `STAGE_COLORS` / `PlatformBadge`
+**Enforcement points**: `.claude/agents/` gate charters + `scripts/` gate runners + CI (`.github/workflows/ci.yml`). The andon primitive (`scripts/andon-halt-helpers.mjs`) is the single halt mechanism all gates share.
+
+---
+
+## 7. Spec system
+
+**One-line**: Five-level spec tree — L0 constitution/north-star → L1 core architecture → L2 domains → L3 modules → L4 waves — with frontmatter lineage, cascade validation, drift detection, and coverage measurement.
+
+**Full sources**: [`docs/HIERARCHICAL_SPEC_SYSTEM.md`](HIERARCHICAL_SPEC_SYSTEM.md), [`docs/MODULE_SPEC_SYSTEM.md`](MODULE_SPEC_SYSTEM.md)
 
 **Enforcement**:
-- ESLint `app-custom/no-raw-control-height` (wave-44) on interactive elements
-- ESLint `app-custom/no-raw-text-px-size` (wave-44) for typography
-- ESLint `app-custom/no-tinted-surface-bg` (wave-29.2) blocks `bg-{color}-500/N` on card-sized surfaces
-- Drift ratchet CI (wave-46) fails build if any category count goes up
-- DSA agent (wave-43) writes per-spec design contract referencing this section
-
----
-
-## 7. Agency / dev system
-
-**One-line**: 4 L0.7 architects (Micro + Macro + Cartographer + DSA) → Chief Architect synthesis → FE Agent execution → Reflexion Critic post-commit → Self-Improvement Reviewer cross-wave. 5 cadences self-maintenance.
-
-**Full source**: [`docs/AGENT_ROSTER.md`](AGENT_ROSTER.md) + `.claude/AGENT_PLAYBOOK.md` (the latter is gitignored — local agent definitions)
-
-**Cadences** (durable chart in `AGENT_ROSTER.md`):
-- Per-commit (size-gated) — Reflexion queue
-- Per-commit (selective) — wave-artifact validator
-- Per-5-waves — Self-Improvement Reviewer queue
-- Weekly — `npm run routine:weekly`
-- Monthly — `npm run routine:monthly`
+- Every spec carries frontmatter: status / version / level / parents[] / last_validated_against_parents.
+- L0/L1 changes trigger cascade validation across children (`scripts/cascade-validate.mjs`).
+- The spec-custodian agent audits structural integrity; `scripts/spec-drift-check.mjs` catches broken references.
+- Wave specs (L4) are transient and reference the L3 modules they modify.
 
 ---
 
@@ -161,12 +143,12 @@ The duplicate-registry pattern surfaced in wave-45 audit. The Cartographer proto
 This is our **Jidoka** pillar: quality is built into each unit of work, not inspected after the fact. The full Toyota-to-dev-system mapping lives in [`docs/TOYOTA_WAY.md`](TOYOTA_WAY.md).
 
 **Definition of quality** — four criteria, scored Likert 1–5 each at the selection point:
-1. **Architectural Coherence** — follows established project patterns (Zustand stores, apiClient, design system); introduces no parallel abstraction.
+1. **Architectural Coherence** — follows established project patterns; introduces no parallel abstraction.
 2. **Maintainability under extension** — within LOC limits (400/file, 80/function); no hidden coupling; still readable in six months.
 3. **Edge-case resilience** — null / empty / error / loading / race states handled with evidence (tests), not only the happy path.
 4. **Design durability** — fixes the root cause; no patch-over, no added debt.
 
-**Trade-off rule**: quality wins over speed and cost. Expensive measures (N≥3 parallel candidates, hard quality-andon) apply only to **critical phases** — those touching L0/L1 artifacts (Constitution, MISSION, master specs, agent charters, andon/gate machinery), security / auth / billing / money / PII, foundational waves, or ≥3 modules / a shared store / a public API contract. Non-critical phases weight quality strongly but do not hard-stop.
+**Trade-off rule**: quality wins over speed and cost. Expensive measures (N≥3 parallel candidates, hard quality-andon) apply only to **critical phases** — those touching L0/L1 artifacts (Constitution, NORTH_STAR, master specs, agent charters, andon/gate machinery), security / auth / billing / money / PII, foundational waves, or ≥3 modules / a shared store / a public API contract. Non-critical phases weight quality strongly but do not hard-stop.
 
 **Reconciliation with Minimal footprint** (CLAUDE.md Engineering Principles): minimal footprint still holds against padding and duplication, never against clarity or defensive code. Clarity outranks line count. The two rules meet at: no bloat, no shortcut.
 
@@ -174,58 +156,66 @@ This is our **Jidoka** pillar: quality is built into each unit of work, not insp
 
 ---
 
+## 9. Self-improvement
+
+**One-line**: The framework learns from every wave: meta-engine mistake ledger, anti-pattern catalog, skill extraction, prompt evolution with regression guard, red-team hardening.
+
+**Full sources**: [`docs/SELF_IMPROVEMENT_PROTOCOL.md`](SELF_IMPROVEMENT_PROTOCOL.md), [`docs/ANTI_PATTERNS_CATALOG.md`](ANTI_PATTERNS_CATALOG.md)
+
+**Key invariants**:
+- Every caught process mistake is logged (`scripts/meta-log.mjs`) with class, claimed-vs-real, and who caught it.
+- Recurrence of a documented anti-pattern blocks new wave dispatch (meta-process-auditor) until a human resolves.
+- Prompt changes to agents require golden-case evidence of strict improvement (prompt-evolver + regression guard).
+
+---
+
 ## How specs use the Constitution
 
-Old (pre-wave-60):
-```markdown
-## 1. Vision
-... per docs/MISSION.md ... per docs/PRODUCT_PHILOSOPHY.md ... per docs/VOICE_GUIDE.md ... per docs/ROLE_PERMISSION_MATRIX.md ...
-```
-
-New (wave-60+):
 ```markdown
 ## 1. Vision
 ... per Constitution §1 (Mission) and §2 (Philosophy) — see docs/CONSTITUTION.md ...
 ```
 
-Chief Architect spec template (§1 Vision, §7 Mission Compass cross-check) now cites Constitution sections by number. The reader follows ONE link to navigate the canonical sources.
+Chief Architect spec template (§1 Vision, §7 Compass cross-check) cites Constitution sections by number. The reader follows ONE link to navigate the canonical sources.
 
-The 6 source docs (MISSION / PRODUCT_PHILOSOPHY / VOICE_GUIDE / ROLE_PERMISSION_MATRIX / FUNNEL_REGISTRY / DESIGN_SYSTEM) remain as the durable content. The Constitution is a navigation layer, not a content replacement.
+The source docs (NORTH_STAR / TOYOTA_WAY / CODING_STANDARDS / AGENT_ROSTER / AUTONOMOUS_PIPELINE / MULTI_LEVEL_VERIFICATION / HIERARCHICAL_SPEC_SYSTEM / SELF_IMPROVEMENT_PROTOCOL) remain the durable content. The Constitution is a navigation layer, not a content replacement.
 
 ---
 
 ## Amendment process
 
 A constitutional amendment is any change to:
-- Mission compass questions (§1)
-- The 10 product principles (§2)
-- The 5 operational roles (§4)
-- The 7 funnel definitions (§5)
-- The token tiers (§6)
-- The 5 cadences (§7)
+- The Framework Compass questions (§1)
+- The two pillars and their mechanism mapping (§2)
+- The engineering non-negotiables (§3)
+- The agent-layer invariants (§4)
+- The pipeline invariants (§5)
+- The gate set and halt mechanism (§6)
+- The spec-system levels and lineage rules (§7)
 - The Quality-First Principle (§8)
+- The self-improvement invariants (§9)
 
 Procedure:
 1. Open a wave whose spec explicitly proposes the amendment in §8 Open questions.
 2. Chief Architect synthesis cites the existing Constitution section + the proposed change + the rationale.
-3. Spec Reviewer flags any spec that AMENDS the Constitution without naming the amendment in §8 — implicit changes are P0 (constitution drift).
-4. Approved amendment: the source doc is edited AND this Constitution file's section synopsis is updated in the same PR.
+3. Spec Reviewer flags any spec that AMENDS the Constitution without naming the amendment — implicit changes are P0 (constitution drift).
+4. Approved amendment: the source doc is edited AND this Constitution file's section synopsis is updated in the same PR. L0 files are write-protected for agents (`policy-enforce-hook`); the final edit is applied by the human owner.
 
-Non-constitutional changes (UI polish, performance, bug fixes, new features that don't touch §1-§8) do NOT need this process.
+Non-constitutional changes (script fixes, new tests, dashboard polish, docs that don't touch §1–§9) do NOT need this process.
 
 ### Applied amendments
-- **wave-188** (2026-05-29) — added §8 Quality-First Principle, the Jidoka pillar of the Toyota Way. Source: `docs/specs/wave-188_MASTER_SPEC.md`. Companion: `docs/TOYOTA_WAY.md`.
+- **wave-188** (2026-05-29) — added §8 Quality-First Principle, the Jidoka pillar of the Toyota Way. Source: `docs/TOYOTA_WAY.md`.
+- **spec-tree-overhaul** (2026-06-05) — v2.0.0 MAJOR: re-grounded the Constitution from the imported product (home-services SMB OS) to the framework itself. Added §1 NORTH_STAR + Framework Compass, §3 engineering standards, §9 self-improvement; replaced product sections (voice guide, role matrix, funnel registry, design system) with framework sections. Product-specific content archived under `docs/archive/imported-product/`. Approved and applied by the owner.
 
 ---
 
 ## What we deliberately DIDN'T put here
 
-- **Backend contracts** — those are in `the backend` (read-only from this repo per CLAUDE.md).
-- **Marketing / brand site** — `components/site/**` uses a separate token system (`--site-*`). Off-limits for the dashboard's design system.
-- **Per-customer customisation** — this project is multi-tenant; per-tenant overrides live in `tenantStore`, not here.
-- **Roadmap / vision** — that's `docs/PRODUCT_PHILOSOPHY.md` and product strategy, not constitutional.
-- **Code style** — `docs/CODING_STANDARDS.md`. Style is configurable; constitution is binding.
+- **Product content** — missions, role matrices, funnels, design tokens of products built ON the framework live in those products' repos (instantiated from `docs/MISSION.md` and `docs/NORTH_STAR_TEMPLATE.md`).
+- **Roadmap / vision** — that's product strategy per project, not constitutional.
+- **Code style details** — `docs/CODING_STANDARDS.md`. Style is configurable; constitution is binding.
+- **Operational run-state** — `docs/CURRENT_WAVE.md`, dashboards, metrics snapshots. They change too often to be constitutional.
 
 ---
 
-**Last constitutional change**: wave-60 (this file's adoption).
+**Last constitutional change**: v2.0.0 — re-grounding to the framework (2026-06-05).

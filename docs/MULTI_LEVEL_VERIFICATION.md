@@ -5,17 +5,17 @@ level: L1
 type: core-arch
 owner_role: platform
 parents:
-  - path: docs/MISSION.md
+  - path: docs/NORTH_STAR.md
     version: 1.0.0
     relationship: implements
-  - path: docs/PRODUCT_PHILOSOPHY.md
-    version: 1.0.0
+  - path: docs/CONSTITUTION.md
+    version: 2.0.0
     relationship: refines
 children: []
 breaking_change_in_v: null
 created: 2026-05-27
-last_validated_against_parents: 2026-05-27
-last_updated: 2026-05-27
+last_validated_against_parents: 2026-06-05
+last_updated: 2026-06-05
 ---
 
 # Multi-Level Verification System — this project Dev Environment

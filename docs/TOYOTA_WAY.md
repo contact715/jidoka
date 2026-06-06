@@ -1,3 +1,23 @@
+---
+status: Active
+version: 1.0.0
+level: L1
+type: core-arch
+owner_role: platform
+parents:
+  - path: docs/NORTH_STAR.md
+    version: 1.0.0
+    relationship: implements
+  - path: docs/CONSTITUTION.md
+    version: 2.0.0
+    relationship: refines
+children: []
+breaking_change_in_v: null
+created: 2026-05-29
+last_validated_against_parents: 2026-06-05
+last_updated: 2026-06-05
+---
+
 # The Toyota Way — our dev system
 
 **One-line**: We build the way Toyota builds. Two pillars carry everything: **Jidoka** (built-in quality, so the product gets better) and **Kaizen** (continuous improvement, so the process gets better). This document maps each Toyota Production System principle to the concrete mechanism that implements it in our pipeline.
