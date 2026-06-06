@@ -29,6 +29,7 @@ export const GATES = [
   { id: 'validate-raci', layer: 'CI', mode: 'hard', token: 'validate-raci.mjs' },
   { id: 'lineage-graph', layer: 'CI', mode: 'hard', token: 'build-lineage-graph.mjs' },
   { id: 'cascade-validate', layer: 'CI', mode: 'hard', token: 'cascade-validate.mjs' },
+  { id: 'ac-verify-map', layer: 'CI', mode: 'hard', token: 'ac-verify-map.mjs' },
   { id: 'semgrep-sast', layer: 'CI', mode: 'hard', token: 'semgrep' },
   { id: 'trufflehog-secrets', layer: 'CI', mode: 'hard', token: 'trufflehog' },
   { id: 'dependency-audit', layer: 'CI', mode: 'hard', token: 'dependency-audit' },

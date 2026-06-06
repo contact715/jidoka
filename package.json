@@ -54,6 +54,8 @@
 		"verify:adaptive": "node scripts/adaptive-verify.mjs",
 		"frontier:eval": "node scripts/frontier-eval.mjs",
 		"spec:size": "node scripts/spec-size-check.mjs",
+		"spec:structural": "node scripts/spec-structural-gate.mjs",
+		"spec:ac-verify": "node scripts/ac-verify-map.mjs",
 		"model:route": "node scripts/model-router.mjs",
 		"skill:select": "node scripts/skill-selector.mjs",
 		"spec:tldr": "node scripts/spec-tldr.mjs",
