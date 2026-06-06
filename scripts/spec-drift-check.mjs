@@ -51,7 +51,7 @@ const SKIP_DIRS = new Set([
 // Spec scanning skips archived material: docs/archive/** is read-only history whose
 // references are EXPECTED to be stale (e.g. imported product docs). The existence
 // index (walkIndex) still sees archive files, so references TO the archive resolve.
-const SPEC_SKIP_DIRS = new Set([...SKIP_DIRS, 'archive']);
+const SPEC_SKIP_DIRS = new Set([...SKIP_DIRS, 'archive', 'runs']);
 
 // ── pure: is this backtick/link token a plausible local file reference? ──────────
 export function looksLikeFileRef(raw) {

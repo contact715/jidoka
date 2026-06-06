@@ -153,6 +153,7 @@ function sanitiseNodeId(relPath) {
 // Prefix matching is relative to docs/ to keep the list minimal.
 const SPEC_EXCLUDE_PREFIXES = [
   'retros',
+  'runs',          // transient per-wave run-state journals (STATE.md), not governance specs
   'checklists',
   'runbooks',
   'specs/briefs',

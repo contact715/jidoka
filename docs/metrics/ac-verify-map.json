@@ -70,7 +70,7 @@
       "spec": "docs/specs/modules/installer-federation/instantiation-audit.md",
       "id": "AC-2",
       "title": "A reference to a nonexistent workflow → ghost, exit 1",
-      "command": "fixture: cite missing .github/workflows/foo.yml → exit 1",
+      "command": "fixture: a doc citing a workflow file that is not on disk → exit 1",
       "kind": "manual",
       "script": null,
       "wired": true
