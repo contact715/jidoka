@@ -4,6 +4,7 @@
 // Kaizen log: docs/audits/tui-panel-launches.jsonl  {ts, project, wavesInFlight, stuckCount}
 
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, statSync, watch } from 'node:fs';
+import { spawn } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
@@ -21,6 +22,7 @@ if (hasFlag('--self-test')) { const i = process.argv.indexOf('--self-test'); if 
 const { collectProject, discoverProjects } = await import('./dashboard/collectors.mjs');
 const { renderFlat, renderInteractive, reduceKey, buildSelectables, parseMouse, heartbeatLine, buildRepaintBuffer } = await import('./dashboard/tui-render.mjs');
 const { resolveFocusMethod, runFocus } = await import('./dashboard/focus.mjs');
+const { readSessionEconomics, fleetSummary } = await import('./dashboard/economics.mjs');
 
 // ── session collection ────────────────────────────────────────────────
 const SESSION_DIR = join(homedir(), '.claude', 'session-env');
@@ -37,12 +39,51 @@ function collectSessions(now = Date.now()) {
         const mt = statSync(fp).mtimeMs;
         if (now - mt > SESSION_MAX_AGE_MS) continue;
         const data = JSON.parse(readFileSync(fp, 'utf8'));
-        sessions.push({ state: data.state || 'working', topic: data.topic || data.prompt || '', activity: data.activity || '', mtime: mt, terminalId: data.terminalId || null, sessionId: f.replace(/^state-/, '').replace(/\.json$/, '') });
+        const sessionId = f.replace(/^state-/, '').replace(/\.json$/, '');
+        // деньги/токены + «вопрос сессии» из транскрипта (кэш по mtime → дёшево на 1с-поллинге; null при любой ошибке)
+        const cost = readSessionEconomics(sessionId);
+        sessions.push({ state: data.state || 'working', topic: data.topic || data.prompt || '', activity: data.activity || '', mtime: mt, terminalId: data.terminalId || null, sessionId, cost, question: cost?.question || null });
       } catch { /* skip corrupt */ }
     }
     sessions.sort((a, b) => b.mtime - a.mtime);
     return sessions.slice(0, SESSION_MAX_COUNT);
   } catch { return []; }
+}
+
+// ── push-уведомления (В) ──────────────────────────────────────────────
+// Зовут тебя, когда сессия переходит в «ждёт» или пайплайн встаёт в HALT — чтобы можно было
+// отойти от экрана. Срабатывает ТОЛЬКО на переходе (дебаунс встроен), и не шумит на старте
+// панели (первое наблюдение состояния не уведомляет). macOS-only; off при JIDOKA_TOP_NOTIFY=0.
+const _prevSessionState = new Map();   // sessionId → последнее виденное состояние
+let _prevHalt = null;                  // последнее виденное состояние halt
+
+// SECURITY: текст идёт в osascript (AppleScript-строку). Прошлая волна словила RCE через
+// интерполяцию в osascript — поэтому ВЫРЕЗАЕМ кавычки/слэши/переводы строк и режем длину.
+function sanitizeForOsa(s) { return String(s || '').replace(/["\\\n\r\t]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120); }
+
+function notify(title, body) {
+  if (process.env.JIDOKA_TOP_NOTIFY === '0' || process.platform !== 'darwin') return;
+  try {
+    const t = sanitizeForOsa(title), b = sanitizeForOsa(body);
+    const child = spawn('osascript', ['-e', `display notification "${b}" with title "🦞 jidoka" subtitle "${t}" sound name "Glass"`], { stdio: 'ignore', detached: true });
+    child.on('error', () => {}); child.unref();
+  } catch { /* уведомления — не критично */ }
+}
+
+// detect transitions across one snapshot and fire at most one notification per real change.
+function maybeNotify(snap) {
+  try {
+    for (const s of (snap.sessions || [])) {
+      const prev = _prevSessionState.get(s.sessionId);
+      if (prev !== undefined && prev !== 'waiting' && s.state === 'waiting') {
+        notify('Сессия ждёт тебя', s.question || s.topic || 'нужен твой ответ');
+      }
+      _prevSessionState.set(s.sessionId, s.state);
+    }
+    const halt = (snap.health || {}).halt === true;
+    if (_prevHalt === false && halt) notify('Пайплайн остановлен', 'нужна команда resume');
+    _prevHalt = halt;
+  } catch { /* never break the loop */ }
 }
 
 // ── kaizen log ────────────────────────────────────────────────────────
@@ -66,6 +107,7 @@ function runFlat(p) {
   const at = new Date().toISOString();
   const snap = collectProject(p);
   snap.sessions = collectSessions();
+  snap.fleet = fleetSummary(snap.sessions);
   process.stdout.write(renderFlat(snap, at).join('\n') + '\n');
   logLaunch(p.split('/').pop(), snap);
   process.exit(0);
@@ -158,6 +200,8 @@ function runLive(p) {
   const collect = () => {
     at = new Date().toISOString();
     snap = collectProject(p); snap.sessions = collectSessions();
+    snap.fleet = fleetSummary(snap.sessions);
+    maybeNotify(snap);          // В: пуш-уведомление при переходе сессии в «ждёт» или volna→halt
     const sj = JSON.stringify(snap);
     if (sj !== prevSnapJson) { if (prevSnapJson) lastChange = Date.now(); prevSnapJson = sj; }
   };

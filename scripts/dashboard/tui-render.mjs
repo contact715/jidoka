@@ -10,6 +10,8 @@
 // ANSI: \x1b[32m green/done · \x1b[33m amber/running · \x1b[31m red/stuck
 //       \x1b[90m grey/pending · \x1b[0m reset  (matches statusline-jidoka.mjs)
 
+import { fmtUsd, fmtTok, sparkline } from './economics.mjs';
+
 const R = '\x1b[0m', G = '\x1b[32m', A = '\x1b[33m', X = '\x1b[31m', D = '\x1b[90m';
 const STUCK_THRESHOLD_MS = 90 * 60 * 1000;
 const SYM = { done: '✓', running: '▸', stuck: '!', pending: '○', idle: '◦' };
@@ -26,6 +28,30 @@ const cstat = (s) => s === 'done' ? G : s === 'running' ? A : (s === 'stuck' || 
 const ssym = (s) => SYM[s] || SYM.idle;
 const stageLabel = (w) => { const ph = w.current; return ph ? (STAGE[ph] || ph.toUpperCase()) : (w.progress === 100 ? 'ГОТОВО' : '—'); };
 const dur = (ms) => { const h = Math.floor(ms/3600000), m = Math.floor((ms%3600000)/60000); return h > 0 ? `${h}ч ${m}м` : `${m}м`; };
+
+// pure: «деньги рядом с исходом» для строки сессии (А+Д). Иконка статуса слева = исход; тут цена справа.
+// Деньги помечены «≈» — это оценка по прайсу (токены точные). Пусто, если расхода нет/не прочитался.
+function sessionCostSuffix(s) {
+  const c = s && s.cost; if (!c || !(c.usd > 0)) return '';
+  return `  ${D}≈${fmtUsd(c.usd)} · ${fmtTok(c.workTok)} ток${R}`;
+}
+
+// pure: громкий баннер «нужен ты» (Б) — самый свежий вопрос ждущей сессии в амбер-рамке наверху.
+// sessions отсортированы по свежести (caller), поэтому первая waiting = самая актуальная. [] если никто не ждёт.
+export function renderQuestionBanner(sessions, cols) {
+  const w = (sessions || []).find((s) => s.state === 'waiting');
+  if (!w) return [];
+  const width = Math.max(10, cols - 2);
+  const q = String(w.question || w.topic || 'нужен твой ответ').replace(/\s+/g, ' ').trim().slice(0, width - 4);
+  const b = '─'.repeat(width);
+  return [
+    `┌${b}┐`,
+    `│${pad(`  ${A}⏳ НУЖЕН ТЫ${R}`, width)}│`,
+    `│${pad(`  ${q}`, width)}│`,
+    `│${pad(`  ${D}Enter на этой сессии ниже → перейти в окно и ответить${R}`, width)}│`,
+    `└${b}┘`,
+  ];
+}
 
 // ── interactive primitives (pure) ──────────────────────────────────────
 const INV = '\x1b[7m';          // inverse video — the selected-row bar (colorblind-safe, not color-only)
@@ -164,7 +190,7 @@ export function renderSessions(sessions, cols) {
     const icon = SES_ICON[s.state] || `${D}◦${R}`;
     const topic = (s.topic || s.prompt || '').slice(0, 45);
     const act = s.activity ? `  ${D}${s.activity.slice(0, 35)}${R}` : '';
-    lines.push(`  ${icon} ${pad(topic, 46)}${act}`);
+    lines.push(`  ${icon} ${pad(topic, 46)}${act}${sessionCostSuffix(s)}`);
   }
   return [...lines, hline(cols)];
 }
@@ -273,7 +299,15 @@ function renderHeader(snapshot, at, cols) {
   const ac = (snapshot.waves || []).filter((w) => w.current).length;
   const top = `╔${'═'.repeat(cols - 2)}╗`, bot = `╚${'═'.repeat(cols - 2)}╝`;
   const la = `║  🦞 jidoka  ${hc}${hs}${R}${ev}    ${br ? `[${br}]` : ''}`;
-  const lb = `║  ${ac} волн в полёте · обновлено ${at ? String(at).slice(11, 19) : ''}`;
+  let lb = `║  ${ac} волн в полёте · обновлено ${at ? String(at).slice(11, 19) : ''}`;
+  // Г: здоровье флота одной строкой — счётчики + общий прожиг ($, оценка) + спарклайн расхода.
+  // Дописываем ТОЛЬКО если влезает в рамку (иначе ║ уедет) — узкий терминал просто без этого блока.
+  const f = snapshot.fleet;
+  if (f && f.total) {
+    const spark = f.usd > 0 ? ` ${sparkline(f.costs, 12)}` : '';
+    const fleetTxt = `   ${G}▶${f.working}${R} ${A}⏳${f.waiting}${R} ${D}✓${f.done}${R}${f.usd > 0 ? ` · ${D}≈${fmtUsd(f.usd)}${R}${D}${spark}${R}` : ''}`;
+    if (strip(lb).length + strip(fleetTxt).length <= cols - 1) lb += fleetTxt;
+  }
   return [top, la + ' '.repeat(Math.max(0, cols - 1 - strip(la).length)) + '║', lb + ' '.repeat(Math.max(0, cols - 1 - strip(lb).length)) + '║', bot];
 }
 
@@ -292,6 +326,8 @@ export function renderInteractive(snapshot, collectedAt, cols, ui = {}) {
   const rows = new Map();
   const lines = [...renderHeader(snapshot, collectedAt, cols)];
   if (halt) lines.push('', ...renderHaltBanner(halt, cols));
+  const qb = halt ? [] : renderQuestionBanner(snapshot.sessions, cols);   // Б: баннер «нужен ты»
+  if (qb.length) lines.push('', ...qb);
 
   // helper: push a section header + its selectable rows, mapping each row's screen line → its sel index.
   const pushSection = (header, items, makeLine, sub = 'stuck') => {
@@ -344,7 +380,7 @@ function sessionRowText(s) {
   const icon = SES_ICON[s.state] || `${D}◦${R}`;
   const topic = (s.topic || s.prompt || '').slice(0, 45);
   const act = s.activity ? `  ${D}${s.activity.slice(0, 35)}${R}` : '';
-  return `  ${icon} ${pad(topic, 46)}${act}`;
+  return `  ${icon} ${pad(topic, 46)}${act}${sessionCostSuffix(s)}`;
 }
 function boardRowText(w) {
   const s = w.status || 'pending', p = w.progress ?? 0;
@@ -357,6 +393,8 @@ export function renderFrame(snapshot, collectedAt, cols, ui = {}) {
   const stuck = waves.filter((w) => isStuck(w, collectedAt));
   const lines = [...renderHeader(snapshot, collectedAt, cols)];
   if (halt) lines.push('', ...renderHaltBanner(halt, cols));
+  const qb = halt ? [] : renderQuestionBanner(snapshot.sessions, cols);   // Б: баннер «нужен ты»
+  if (qb.length) lines.push('', ...qb);
   if (stuck.length) lines.push('', ...renderStuckSection(stuck, collectedAt, cols));
   if (!waves.length) lines.push(...renderEmpty(snapshot, cols));
   else lines.push('', ...renderBoard(waves, cols, { frozen: halt }));
@@ -370,8 +408,10 @@ export function renderFlat(snapshot, collectedAt) {
   for (const w of waves) lines.push(`WAVE ${w.wave} stage=${stageLabel(w)} progress=${w.progress ?? 0}% status=${w.status || (w.current ? 'running' : 'done')}${w.terminalId ? ` terminal=${w.terminalId}` : ''}`);
   const sw = waves.filter((w) => w.status === 'stuck');
   if (sw.length) { lines.push(''); for (const w of sw) lines.push(`STUCK ${w.wave} stage=${stageLabel(w)}`); }
+  const f = snapshot.fleet;
+  if (f && f.total) lines.push('', `FLEET working=${f.working} waiting=${f.waiting} done=${f.done} usd=${(f.usd || 0).toFixed(4)}`);
   const ses = (snapshot.sessions || []);
-  if (ses.length) { lines.push(''); for (const s of ses) lines.push(`SESSION ${s.state || 'unknown'} topic=${String(s.topic || s.prompt || '').slice(0, 45)}${s.activity ? ` activity=${s.activity.slice(0, 35)}` : ''}`); }
+  if (ses.length) { lines.push(''); for (const s of ses) lines.push(`SESSION ${s.state || 'unknown'} topic=${String(s.topic || s.prompt || '').slice(0, 45)}${s.cost && s.cost.usd > 0 ? ` usd=${s.cost.usd.toFixed(4)} worktok=${s.cost.workTok}` : ''}${s.activity ? ` activity=${s.activity.slice(0, 35)}` : ''}`); }
   const act = (snapshot.activity || []).slice(0, 5);
   if (act.length) { lines.push(''); for (const a of act) lines.push(`ACTIVITY ${a.ts ? String(a.ts).slice(11, 16) : '—'} ${a.agent || '—'} action=${a.action || ''}`); }
   return lines;
@@ -525,6 +565,31 @@ async function selfTest() {
   // relocated helpers still work
   ok('heartbeat: spinner rotates', heartbeatLine(0, 10) !== heartbeatLine(1, 10) && heartbeatLine(0, 10) === heartbeatLine(4, 10));
   ok('repaint: \\x1b[K + \\x1b[J', buildRepaintBuffer(['a']).includes('a\x1b[K') && buildRepaintBuffer(['a']).endsWith('\x1b[J'));
+
+  // ── wave-tui-economics (А деньги · Б баннер · Г флот · Д стоимость+исход) ──
+  const sesCost = [
+    { state: 'waiting', topic: 'нужен код', question: 'Введи код из Telegram?', sessionId: 'a', cost: { usd: 2.4, workTok: 165000 } },
+    { state: 'working', topic: 'строю панель', sessionId: 'b', cost: { usd: 0.004, workTok: 300 } },
+    { state: 'done', topic: 'фича сдана', sessionId: 'c', cost: { usd: 12.5, workTok: 900000 } },
+  ];
+  const csl = renderSessions(sesCost, C);
+  ok('econ-А: ≈$ on session row', csl.some((l) => l.includes('≈$2.40')));
+  ok('econ-А: tokens shown', csl.some((l) => l.includes('ток')));
+  ok('econ-А: tiny cost → <$0.01', csl.some((l) => l.includes('<$0.01')));
+  const qbn = renderQuestionBanner(sesCost, C);
+  ok('econ-Б: banner shown when waiting', qbn.length > 0 && qbn.join('\n').includes('НУЖЕН ТЫ'));
+  ok('econ-Б: banner carries the question', qbn.join('\n').includes('Введи код из Telegram'));
+  ok('econ-Б: no waiting → no banner', renderQuestionBanner([{ state: 'working', topic: 'x' }], C).length === 0);
+  const econSnap = ms({ waves: [mw()], sessions: sesCost, fleet: { total: 3, working: 1, waiting: 1, done: 1, usd: 14.9, costs: [2.4, 0.004, 12.5] } });
+  ok('econ-Б: banner in interactive frame', renderInteractive(econSnap, AT, C, { cursor: 0 }).lines.join('\n').includes('НУЖЕН ТЫ'));
+  const fh = renderFrame(econSnap, AT, C);
+  ok('econ-Г: fleet counts in header', fh.slice(0, 4).join('\n').includes('⏳1') && fh.slice(0, 4).join('\n').includes('▶1'));
+  ok('econ-Г: fleet total $ in header', fh.slice(0, 4).join('\n').includes('≈$15'));
+  ok('econ-Г: header box intact (║ at end)', fh[2].trimEnd().endsWith('║'));
+  ok('econ-Г: HALT suppresses question banner', !renderInteractive(ms({ sessions: sesCost, health: { halt: true } }), AT, C, {}).lines.join('\n').includes('НУЖЕН ТЫ'));
+  const ff = renderFlat(econSnap, AT);
+  ok('econ-flat: FLEET line', ff.some((l) => l.startsWith('FLEET') && l.includes('waiting=1')));
+  ok('econ-flat: SESSION usd', ff.some((l) => l.startsWith('SESSION') && l.includes('usd=')));
 
   const { readFileSync: rfs } = await import('node:fs');
   const src = rfs(new URL(import.meta.url).pathname, 'utf8');
