@@ -19,7 +19,8 @@ const hasFlag = (k) => args.includes(k);
 if (hasFlag('--self-test')) { const i = process.argv.indexOf('--self-test'); if (i !== -1) process.argv.splice(i, 1); }
 
 const { collectProject, discoverProjects } = await import('./dashboard/collectors.mjs');
-const { renderFrame, renderFlat } = await import('./dashboard/tui-render.mjs');
+const { renderFlat, renderInteractive, reduceKey, buildSelectables, parseMouse, heartbeatLine, buildRepaintBuffer } = await import('./dashboard/tui-render.mjs');
+const { resolveFocusMethod, runFocus } = await import('./dashboard/focus.mjs');
 
 // ── session collection ────────────────────────────────────────────────
 const SESSION_DIR = join(homedir(), '.claude', 'session-env');
@@ -36,7 +37,7 @@ function collectSessions(now = Date.now()) {
         const mt = statSync(fp).mtimeMs;
         if (now - mt > SESSION_MAX_AGE_MS) continue;
         const data = JSON.parse(readFileSync(fp, 'utf8'));
-        sessions.push({ state: data.state || 'working', topic: data.topic || data.prompt || '', activity: data.activity || '', mtime: mt, sessionId: f.replace(/^state-/, '').replace(/\.json$/, '') });
+        sessions.push({ state: data.state || 'working', topic: data.topic || data.prompt || '', activity: data.activity || '', mtime: mt, terminalId: data.terminalId || null, sessionId: f.replace(/^state-/, '').replace(/\.json$/, '') });
       } catch { /* skip corrupt */ }
     }
     sessions.sort((a, b) => b.mtime - a.mtime);
@@ -74,78 +75,147 @@ function runFlat(p) {
 let _restored = false; let _inAltScreen = false;
 function restore() {
   if (_restored) return; _restored = true;
-  if (_inAltScreen) process.stdout.write('\x1b[?25h\x1b[?1049l');
+  // mouse-off (\x1b[?1000l\x1b[?1006l) MUST live inside restore() so it tears down on EVERY exit path
+  // (q, SIGTERM, SIGINT, uncaughtException, unhandledRejection, process.on('exit')) — a left-behind
+  // mouse mode makes the user's terminal unusable after quit. Order: mouse-off, then cursor+alt-screen.
+  if (_inAltScreen) process.stdout.write('\x1b[?1000l\x1b[?1006l\x1b[?25h\x1b[?1049l');
   try { if (process.stdin.isTTY && typeof process.stdin.setRawMode === 'function') process.stdin.setRawMode(false); } catch { /* non-TTY guard */ }
 }
 process.on('exit', restore);
 process.on('uncaughtException', (e) => { restore(); process.stderr.write('tui-top crash: ' + (e?.message || e) + '\n'); process.exit(1); });
 process.on('unhandledRejection', (r) => { restore(); process.stderr.write('tui-top unhandled rejection: ' + (r?.message || r) + '\n'); process.exit(1); });
 
-// ── repaint: compose raw frame lines into a stdout write with erase sequences ──
-// Pure renderer returns clean string[]. We add \x1b[K (erase to end of line) after each
-// line and \x1b[J (erase below) after the last so no stale content persists between frames.
-function buildRepaintBuffer(lines) {
-  return '\x1b[H' + lines.map((l) => l + '\x1b[K').join('\n') + '\n\x1b[J';
+// buildRepaintBuffer + heartbeatLine are now PURE helpers in tui-render.mjs (imported above) — the
+// entry file keeps only impure plumbing (stdin/stdout/raw mode/mouse/subprocess focus).
+
+// ── key decoding (pure) ───────────────────────────────────────────────
+// Escape sequences arrive as whole strings in utf8 mode. Map a raw stdin chunk to a logical key name,
+// or null if it's not one we handle (e.g. a mouse report — those route through parseMouse separately).
+function decodeKey(k) {
+  if (k === '\x1b[A') return 'up';
+  if (k === '\x1b[B') return 'down';
+  if (k === '\x1b[C') return 'right';
+  if (k === '\x1b[D') return 'left';
+  if (k === '\r' || k === '\n') return 'enter';
+  if (k === '\t' || k === '\x09') return 'tab';
+  if (k === '\x1b[Z') return 'shiftTab';
+  if (k === '\x1b') return 'esc';        // bare ESC (a CSI sequence is longer, handled above)
+  if (k === 'q') return 'q';
+  if (k === 'r') return 'r';
+  return null;
 }
 
-// ── heartbeat: visible liveness + honest data age (pure, testable) ──
-// `◐ live · данные менялись 12с назад` — the spinner proves the loop is alive even when
-// nothing changes; the age says when the SNAPSHOT last actually differed.
-const SPIN = ['◐', '◓', '◑', '◒'];
-export function heartbeatLine(tick, secSinceChange) {
-  const age = secSinceChange == null ? '' : secSinceChange < 3 ? ' · данные изменились только что' : ` · данные менялись ${secSinceChange}с назад`;
-  return `  ${SPIN[tick % SPIN.length]} live${age}`;
+// ── focus dispatch (impure: runs osascript/tmux/zellij via focus.mjs; logs the Kaizen metric) ──
+// Enter on a session row → jump the OS terminal to it. Returns the hint to flash (null when it worked).
+function dispatchFocus(session, logDir) {
+  const method = resolveFocusMethod(process.env);
+  let res; try { res = runFocus(method, session.terminalId, process.env); }
+  catch (e) { res = { ok: false, method, hint: `[focus] ошибка: ${String(e?.message || e).slice(0, 60)}` }; }
+  // Kaizen metric: append {ts, action:'focus', method, ok} to the existing launch log.
+  try {
+    mkdirSync(logDir, { recursive: true });
+    appendFileSync(join(logDir, 'tui-panel-launches.jsonl'),
+      JSON.stringify({ ts: new Date().toISOString(), action: 'focus', method: res.method, ok: res.ok }) + '\n');
+  } catch { /* non-fatal */ }
+  return res.ok ? null : (res.hint || `[focus] не удалось переключить окно (${method}).`);
+}
+
+// wire the single stdin handler in raw mode (utf8). One handler, no extra listeners (spec §8.2).
+function wireStdin(onKey) {
+  if (process.stdin.isTTY && typeof process.stdin.setRawMode === 'function') process.stdin.setRawMode(true);
+  process.stdin.setEncoding('utf8'); process.stdin.on('data', onKey); process.stdin.resume();
+}
+
+// fs.watch debounce: any change in the data sources → redraw within 300ms (true realtime; the 1s poll
+// is the safety net). recursive=true: macOS delivers events from wave subdirs only with a recursive watcher.
+function setupWatchers(p, draw) {
+  const watchers = []; let debounceTimer = null;
+  const sched = () => { if (debounceTimer) clearTimeout(debounceTimer); debounceTimer = setTimeout(draw, 300); };
+  const tryWatch = (dir, recursive = false) => { try { watchers.push(watch(dir, { persistent: false, recursive }, sched)); } catch { /* missing/unsupported */ } };
+  tryWatch(SESSION_DIR);                       // пульт миссии сессий
+  tryWatch(join(p, 'docs', 'runs'), true);     // прогресс волн (state.json в подпапках)
+  tryWatch(join(p, 'docs', 'audits'));         // лента активности, бэклог, halt
+  tryWatch(join(p, 'docs', 'evals'));          // eval baseline (здоровье)
+  tryWatch(join(homedir(), '.claude', 'todos')); // прогресс планов задач
+  return () => { for (const w of watchers) { try { w.close(); } catch { /* */ } } if (debounceTimer) clearTimeout(debounceTimer); };
 }
 
 // ── live run ─────────────────────────────────────────────────────────
 function runLive(p) {
   if (!process.stdout.isTTY) { runFlat(p); return; }
   const ms = parseInt(process.env.JIDOKA_TOP_INTERVAL || '', 10) || 1000;
-  process.stdout.write('\x1b[?1049h\x1b[?25l'); _inAltScreen = true;
+  // alt-screen + hide-cursor, THEN mouse on (SGR 1006). The mouse-off lives in restore() so it tears
+  // down on every exit path; here we only turn it ON, right after entering the alt-screen.
+  process.stdout.write('\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h'); _inAltScreen = true;
   let done = false; let tick = 0; let prevSnapJson = ''; let lastChange = Date.now();
+  let snap = null; let at = ''; let lastRows = new Map();
+  // interaction state (caller-owned, threaded INTO the pure renderer — never read from globals):
+  const ui = { cursor: 0, section: 'session', expanded: null, scroll: {}, lastClick: null, lastHint: null };
+  let closeWatchers = () => {};
   const quit = () => { if (done) return; done = true; closeWatchers(); restore(); process.exit(0); };
-  const draw = () => {
+
+  // collect(): the fs read + heartbeat bookkeeping. Runs on the 1s poll and on fs.watch events.
+  const collect = () => {
+    at = new Date().toISOString();
+    snap = collectProject(p); snap.sessions = collectSessions();
+    const sj = JSON.stringify(snap);
+    if (sj !== prevSnapJson) { if (prevSnapJson) lastChange = Date.now(); prevSnapJson = sj; }
+  };
+  // paint(snap, ui): build selectables, clamp cursor, render the interactive frame, store the rows map,
+  // write. A keypress calls paint() ONLY (move the cursor over the existing snapshot — no disk read).
+  const paint = () => {
     try {
       if (process.env.JIDOKA_TOP_CRASH_TEST === '1') throw new Error('crash-test-draw');
-      const at = new Date().toISOString();
-      const snap = collectProject(p);
-      snap.sessions = collectSessions();
-      const sj = JSON.stringify(snap);
-      if (sj !== prevSnapJson) { if (prevSnapJson) lastChange = Date.now(); prevSnapJson = sj; }
+      if (!snap) collect();
+      const sel = buildSelectables(snap, at);
+      ui.cursor = sel.length ? Math.max(0, Math.min(sel.length - 1, ui.cursor)) : 0;
       const cols = process.stdout.columns || 80;
-      const lines = renderFrame(snap, at, cols);
+      const { lines, rows } = renderInteractive(snap, at, cols, ui);
+      lastRows = rows;
       lines.push(heartbeatLine(tick++, Math.round((Date.now() - lastChange) / 1000)));
       process.stdout.write(buildRepaintBuffer(lines));
     } catch (e) { restore(); process.stderr.write('tui-top draw error: ' + (e?.message || e) + '\n'); process.exit(1); }
   };
+  const draw = () => { collect(); paint(); };   // poll/watch path: re-read then repaint
+
   process.on('SIGTERM', quit); process.on('SIGINT', quit);
   const snap0 = collectProject(p); logLaunch(p.split('/').pop(), snap0);
   draw();
   const timer = setInterval(draw, ms);
-  process.stdout.on('resize', draw);
-  const onKey = (k) => { if (k === 'q' || k === '' || k.includes('q')) { clearInterval(timer); quit(); } else if (k === 'r' || k.includes('r')) draw(); };
-  if (process.stdin.isTTY && typeof process.stdin.setRawMode === 'function') {
-    process.stdin.setRawMode(true); process.stdin.resume(); process.stdin.setEncoding('utf8');
-    process.stdin.on('data', onKey);
-  } else {
-    process.stdin.setEncoding('utf8'); process.stdin.on('data', onKey); process.stdin.resume();
-  }
+  process.stdout.on('resize', paint);
 
-  // fs.watch debounce: any change in the data sources → redraw within 300ms (true realtime,
-  // the 1s poll is just the safety net). recursive=true: macOS delivers events from wave
-  // subdirs (docs/runs/<wave>/state.json) only with a recursive watcher.
-  const watchers = [];
-  let debounceTimer = null;
-  const schedDraw = () => { if (debounceTimer) clearTimeout(debounceTimer); debounceTimer = setTimeout(draw, 300); };
-  function tryWatch(dir, recursive = false) {
-    try { const w = watch(dir, { persistent: false, recursive }, schedDraw); watchers.push(w); } catch { /* dir missing or unsupported */ }
-  }
-  tryWatch(SESSION_DIR);                              // пульт миссии сессий
-  tryWatch(join(p, 'docs', 'runs'), true);            // прогресс волн (state.json в подпапках)
-  tryWatch(join(p, 'docs', 'audits'));                // лента активности, бэклог, halt
-  tryWatch(join(p, 'docs', 'evals'));                 // eval baseline (здоровье)
-  tryWatch(join(homedir(), '.claude', 'todos'));      // прогресс планов задач
-  function closeWatchers() { for (const w of watchers) { try { w.close(); } catch { /* */ } } if (debounceTimer) clearTimeout(debounceTimer); }
+  // one stdin handler (no new listeners): mouse reports route through parseMouse; everything else is a
+  // key. Navigation goes through the pure reduceKey; Enter on a session triggers the focus dispatcher.
+  const onMouse = (mo) => {
+    if (mo.button === 64 || mo.button === 65) { ui.cursor += mo.button === 65 ? 1 : -1; paint(); return; }
+    if (!mo.press || (mo.button & 0b11) !== 0) return;          // release / non-left / motion → ignore
+    const idx = lastRows.get(mo.row); if (idx === undefined) return;
+    const now = Date.now();
+    const dbl = ui.lastClick && ui.lastClick.idx === idx && (now - ui.lastClick.time) < 400;
+    ui.lastClick = { idx, time: now };
+    if (dbl && idx === ui.cursor) { onKey('\r'); return; }       // double-click = Enter
+    ui.cursor = idx; paint();
+  };
+  const onKey = (k) => {
+    const mo = parseMouse(k); if (mo) { onMouse(mo); return; }
+    const key = decodeKey(k);
+    if (key === 'q' || k === '\x03') { clearInterval(timer); quit(); return; }
+    if (key === 'r') { draw(); return; }
+    if (!key) return;
+    if (key === 'enter') {                                       // act on the current row
+      const sel = buildSelectables(snap, at); const row = sel[ui.cursor];
+      if (row && row.kind === 'session') {
+        if ((snap.health || {}).halt === true) return;          // HALT freezes dispatch
+        ui.lastHint = dispatchFocus(row.session, join(p, 'docs', 'audits')); paint(); return;
+      }
+    }
+    ui.lastHint = null;                                          // any other key clears a stale hint
+    const sel = buildSelectables(snap, at);
+    Object.assign(ui, reduceKey(ui, key, sel));
+    paint();
+  };
+  wireStdin(onKey);
+  closeWatchers = setupWatchers(p, draw);
 }
 
 // ── self-test ─────────────────────────────────────────────────────────
@@ -184,8 +254,14 @@ async function selfTest() {
   ok('AC-heartbeat: spinner rotates', heartbeatLine(0, 10) !== heartbeatLine(1, 10) && heartbeatLine(0, 10) === heartbeatLine(4, 10));
   ok('AC-heartbeat: fresh change → «только что»', heartbeatLine(0, 1).includes('только что'));
   ok('AC-heartbeat: old change → seconds ago', heartbeatLine(0, 42).includes('42с назад'));
-  ok('AC-heartbeat: null age → bare live', heartbeatLine(2, null) === `  ${SPIN[2]} live`);
-  // AC-crash: restore() emits \x1b[?1049l when _inAltScreen=true (crash-path coverage)
+  ok('AC-heartbeat: null age → bare live', heartbeatLine(2, null) === '  ◑ live');
+  // AC-mouse-enable: the enable sequence \x1b[?1000h\x1b[?1006h sits in the source right after alt-enter
+  const { readFileSync: rfsSrc } = await import('node:fs');
+  const selfSrc = rfsSrc(new URL(import.meta.url).pathname, 'utf8');
+  const enableSeq = '\\x1b[?1000h\\x1b[?1006h';
+  ok('AC-mouse-enable: enable seq present after alt-enter', selfSrc.includes('?1049h\\x1b[?25l\\x1b[?1000h\\x1b[?1006h'));
+  // AC-mouse-disable / teardown: restore() captured-output includes the mouse-off on the crash path
+  let crashCapture = '';
   { const captured = []; const origWrite = process.stdout.write.bind(process.stdout);
     process.stdout.write = (...a) => { captured.push(a[0]); return true; };
     const prev_r = _restored; const prev_a = _inAltScreen;
@@ -193,7 +269,32 @@ async function selfTest() {
     restore();
     process.stdout.write = origWrite;
     _restored = prev_r; _inAltScreen = prev_a;
-    ok('AC-crash: restore on crash path emits \\x1b[?1049l', captured.join('').includes('\x1b[?1049l')); }
+    crashCapture = captured.join('');
+    ok('AC-crash: restore on crash path emits \\x1b[?1049l', crashCapture.includes('\x1b[?1049l')); }
+  ok('AC-mouse-disable: restore() tears down mouse (\\x1b[?1000l\\x1b[?1006l)', crashCapture.includes('\x1b[?1000l\x1b[?1006l'));
+  ok('AC-mouse-disable: mouse-off before cursor/alt-screen restore', crashCapture.indexOf('\x1b[?1000l') < crashCapture.indexOf('\x1b[?1049l'));
+  // interactive: decodeKey maps escape sequences to logical keys
+  ok('decodeKey: arrows', decodeKey('\x1b[A') === 'up' && decodeKey('\x1b[B') === 'down' && decodeKey('\x1b[C') === 'right' && decodeKey('\x1b[D') === 'left');
+  ok('decodeKey: enter/tab/shiftTab/esc', decodeKey('\r') === 'enter' && decodeKey('\t') === 'tab' && decodeKey('\x1b[Z') === 'shiftTab' && decodeKey('\x1b') === 'esc');
+  ok('decodeKey: q/r and unknown→null', decodeKey('q') === 'q' && decodeKey('r') === 'r' && decodeKey('x') === null);
+  // interactive: focus dispatcher chooses method + logs the metric (unknown env → fallback hint, ok:false)
+  { const { mkdtempSync: mt, rmSync: rm, readFileSync: rf2 } = await import('node:fs');
+    const { tmpdir: td } = await import('node:os'); const { join: jj } = await import('node:path');
+    const tmp = mt(jj(td(), 'tui-focus-')); const logDir = jj(tmp, 'audits');
+    try {
+      const prevTP = process.env.TERM_PROGRAM; delete process.env.TERM_PROGRAM;
+      const prevTMUX = process.env.TMUX; delete process.env.TMUX;
+      const prevZ = process.env.ZELLIJ; delete process.env.ZELLIJ;
+      const hint = dispatchFocus({ terminalId: 'tty:/dev/ttys003' }, logDir);
+      if (prevTP !== undefined) process.env.TERM_PROGRAM = prevTP;
+      if (prevTMUX !== undefined) process.env.TMUX = prevTMUX;
+      if (prevZ !== undefined) process.env.ZELLIJ = prevZ;
+      ok('dispatchFocus: unknown env → honest hint string', typeof hint === 'string' && hint.includes('/dev/ttys003'));
+      const logLine = rf2(jj(logDir, 'tui-panel-launches.jsonl'), 'utf8').trim();
+      let rec; try { rec = JSON.parse(logLine); } catch { rec = null; }
+      ok('dispatchFocus: appends {action:focus, method, ok} metric', rec && rec.action === 'focus' && rec.method != null && rec.ok === false);
+    } finally { rm(tmp, { recursive: true, force: true }); }
+  }
   if (fails.length) { console.log(`\n\x1b[31mFAIL (${fails.length}): ${fails.join(', ')}\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ tui-top: alt-screen lifecycle + ТЕРМИНАЛЫ + Kaizen log + repaint correct\x1b[0m');
   process.exit(0);

@@ -27,6 +27,65 @@ const ssym = (s) => SYM[s] || SYM.idle;
 const stageLabel = (w) => { const ph = w.current; return ph ? (STAGE[ph] || ph.toUpperCase()) : (w.progress === 100 ? 'ГОТОВО' : '—'); };
 const dur = (ms) => { const h = Math.floor(ms/3600000), m = Math.floor((ms%3600000)/60000); return h > 0 ? `${h}ч ${m}м` : `${m}м`; };
 
+// ── interactive primitives (pure) ──────────────────────────────────────
+const INV = '\x1b[7m';          // inverse video — the selected-row bar (colorblind-safe, not color-only)
+const WINDOW = 8;               // max rows shown per section before clip summaries kick in
+
+// pure: parse one SGR-1006 mouse report → {button,col,row,press} | null. M=press, m=release.
+export function parseMouse(chunk) {
+  const m = /\x1b\[<(\d+);(\d+);(\d+)([Mm])/.exec(chunk || '');
+  if (!m) return null;
+  return { button: +m[1], col: +m[2], row: +m[3], press: m[4] === 'M' };
+}
+
+// pure: flat, ordered list of selectable rows, rebuilt every paint. Attention priority decides order
+// so the cursor lands on what matters first: ЗАВИСЛО → СЕССИИ → ДОСКА. Sections are non-selectable;
+// only their rows are. Each entry: { kind:'stuck'|'session'|'wave', id, label, ...payload }.
+export function buildSelectables(snapshot, at) {
+  const waves = snapshot.waves || [];
+  const stuck = waves.filter((w) => isStuck(w, at));
+  const sel = [];
+  for (const w of stuck) sel.push({ kind: 'stuck', id: w.wave || '—', label: w.wave || '—', wave: w });
+  for (const s of (snapshot.sessions || [])) sel.push({ kind: 'session', id: s.sessionId, label: s.topic || s.prompt || '', session: s });
+  const stuckIds = new Set(stuck.map((w) => w.wave));
+  for (const w of waves) { if (stuckIds.has(w.wave)) continue; sel.push({ kind: 'wave', id: w.wave || '—', label: w.wave || '—', wave: w }); }
+  return sel;
+}
+
+// pure: navigation reducer — given current ui, a key, and the selectables list, return the next ui.
+// The caller owns clamping intent; this returns a clamped cursor so the renderer never guards bounds.
+export function reduceKey(ui, key, selectables) {
+  const n = selectables.length;
+  const clamp = (i) => n === 0 ? 0 : Math.max(0, Math.min(n - 1, i));
+  const cur = clamp(ui.cursor || 0);
+  const next = { ...ui, cursor: cur };
+  if (n === 0) return next;
+  if (key === 'down') return { ...next, cursor: clamp(cur + 1) };
+  if (key === 'up') return { ...next, cursor: clamp(cur - 1) };
+  if (key === 'tab' || key === 'shiftTab') return { ...next, cursor: sectionJump(selectables, cur, key === 'tab' ? 1 : -1) };
+  if (key === 'esc') return { ...next, expanded: null };
+  if (key === 'enter') {
+    const row = selectables[cur];
+    if (row && (row.kind === 'wave' || row.kind === 'stuck')) {
+      return { ...next, expanded: ui.expanded === row.id ? null : row.id };
+    }
+    return next; // session Enter is a side-effect (focus), handled by the caller, not the reducer
+  }
+  return next;
+}
+
+// pure: jump the cursor to the first row of the next/prev non-empty section (wraps). Sections are the
+// runs of equal .kind in selectables (ЗАВИСЛО → СЕССИИ → ДОСКА order is already baked into the list).
+function sectionJump(selectables, cur, dir) {
+  const kinds = [];
+  for (const s of selectables) if (!kinds.includes(s.kind)) kinds.push(s.kind);
+  if (kinds.length <= 1) return cur;
+  const curKind = selectables[cur]?.kind;
+  const ki = kinds.indexOf(curKind);
+  const targetKind = kinds[(ki + dir + kinds.length) % kinds.length];
+  return selectables.findIndex((s) => s.kind === targetKind);
+}
+
 export function isStuck(wave, at) {
   // Done waves are NEVER stuck — finished is finished regardless of age.
   if (wave.status === 'done') return false;
@@ -110,6 +169,35 @@ export function renderSessions(sessions, cols) {
   return [...lines, hline(cols)];
 }
 
+// pure: wrap a rendered row as the SELECTED bar — inverse video over the full padded width PLUS a ▶
+// gutter marker replacing the leading 2-space indent. pad/strip discount ANSI so columns stay aligned.
+export function markSelected(line, cols) {
+  const body = line.startsWith('  ') ? line.slice(2) : line;
+  const padded = pad(`▶ ${body}`, cols);
+  return `${INV}${padded}${R}`;
+}
+
+// pure: the 3-line inline detail block for an expanded wave — phases, last 3 events, owner note.
+// All dim (\x1b[90m), indented 4 spaces, non-selectable. Pulled straight from the snapshot the caller
+// already holds, so this stays pure.
+export function renderWaveDetail(wave) {
+  const stages = wave.stages || [];
+  const byPhase = Object.fromEntries(stages.map((s) => [s.phase, s.status]));
+  const sym = (st) => st === 'done' ? SYM.done : st === 'running' ? SYM.running : (st === 'stuck' || st === 'failed') ? SYM.stuck : SYM.pending;
+  const CORE_ORDER = ['discovery', 'spec', 'tests', 'build', 'gate', 'debug', 'memory'];
+  const phaseLine = CORE_ORDER.map((p) => `${sym(byPhase[p])}${STAGE[p]}`).join(' ');
+  const events = (wave.events || []).slice(0, 3);
+  const evLines = events.length
+    ? events.map((e) => `    ${D}${(e.ts ? String(e.ts).slice(11, 16) : '—')} · ${(e.who || '—')} · ${(e.what || '')}${R}`)
+    : [`    ${D}(событий нет)${R}`];
+  const note = wave.note || '—';
+  return [
+    `    ${D}${phaseLine}${R}`,
+    ...evLines,
+    `    ${D}заметка: ${note}${R}`,
+  ];
+}
+
 export function renderActivity(activity, cols) {
   const items = (activity || []).slice(0, 5);
   const lines = [sec('ЛЕНТА (последние действия)', cols)];
@@ -120,6 +208,54 @@ export function renderActivity(activity, cols) {
 }
 
 export function renderFooter(cols) { return [hline(cols), `  ${cols >= 100 ? 'q выход · r обновить · ← → проект' : 'q · r · ←→'}`]; }
+
+// ── relocated pure helpers (moved out of tui-top.mjs to free its LOC budget) ──
+const SPIN = ['◐', '◓', '◑', '◒'];
+// pure: visible liveness + honest data age. The spinner proves the loop is alive even when nothing
+// changes; the age says when the SNAPSHOT last actually differed. tui-top imports this back.
+export function heartbeatLine(tick, secSinceChange) {
+  const age = secSinceChange == null ? '' : secSinceChange < 3 ? ' · данные изменились только что' : ` · данные менялись ${secSinceChange}с назад`;
+  return `  ${SPIN[tick % SPIN.length]} live${age}`;
+}
+
+// pure: compose raw frame lines into a stdout write with erase sequences. \x1b[K erases to end of line
+// after each line, \x1b[J erases below after the last, so no stale content persists between frames.
+export function buildRepaintBuffer(lines) {
+  return '\x1b[H' + lines.map((l) => l + '\x1b[K').join('\n') + '\n\x1b[J';
+}
+
+// pure: the two-line context footer (§6.5). Line 1 = action hint for the row under the cursor (drops
+// when nothing is selectable); line 2 = constant key legend. Honest about unreachable windows.
+export function renderContextFooter(selectables, ui, cols, halt) {
+  const legend = cols >= 100
+    ? '  ↑↓ выбор · Tab секция · Enter действие · Esc свернуть · q выход · r обновить · ←→ проект'
+    : '  ↑↓ · Tab · Enter · q · r · ←→';
+  const lines = [hline(cols)];
+  const row = selectables[ui.cursor || 0];
+  let hint1 = null;
+  if (halt) hint1 = `  ${X}СТОП — пайплайн остановлен; resume: node .jidoka/scripts/andon-resume.mjs${R}`;
+  else if (ui.lastHint) hint1 = `  ${A}${ui.lastHint}${R}`;
+  else if (row) hint1 = `  ${footerHintFor(row, ui)}`;
+  if (hint1 != null) lines.push(cols < 100 ? clip(hint1, cols) : hint1);
+  lines.push(legend);
+  return lines;
+}
+
+// pure: line-1 hint text for one selectable row, per the §6.5 table.
+function footerHintFor(row, ui) {
+  if (row.kind === 'session') {
+    const s = row.session, t = (s.topic || s.prompt || '').slice(0, 40);
+    if (s.state === 'done') return `${D}✓ ${t} — сессия завершена${R}`;
+    if (!s.terminalId) return `${A}▶ ${t} — это окно нельзя переключить отсюда${R}`;
+    return `${G}▶ ${t} — Enter: перейти в это окно${R}`;
+  }
+  if (row.kind === 'stuck') return `${X}! ${row.label} — застыло, Enter: что случилось${R}`;
+  // wave
+  const open = ui.expanded === row.id;
+  return open ? `${A}▼ ${row.label} — Enter/Esc: свернуть${R}` : `${A}▶ ${row.label} — Enter: показать детали волны${R}`;
+}
+
+const clip = (s, cols) => { const v = strip(s); return v.length <= cols - 2 ? s : '  ' + v.slice(0, cols - 3) + '…'; };
 
 export function renderEmpty(snapshot, cols) {
   const lines = ['', '  Нет активных волн.', '', sec('НЕДАВНО ЗАВЕРШИЛИСЬ', cols)];
@@ -141,7 +277,81 @@ function renderHeader(snapshot, at, cols) {
   return [top, la + ' '.repeat(Math.max(0, cols - 1 - strip(la).length)) + '║', lb + ' '.repeat(Math.max(0, cols - 1 - strip(lb).length)) + '║', bot];
 }
 
-export function renderFrame(snapshot, collectedAt, cols) {
+// ── interactive frame (pure) ───────────────────────────────────────────
+// Returns { lines, rows } where rows: Map<screenRow(1-based), selectableIndex> for mouse mapping.
+// Same content as renderFrame, plus: the selected row gets the inverse+▶ bar, the expanded wave/stuck
+// row gets its 3-line detail block, and the footer becomes the two-line context footer. PURE: all of
+// cursor/expanded/scroll come in via `ui`; nothing is read from globals.
+export function renderInteractive(snapshot, collectedAt, cols, ui = {}) {
+  cols = cols || 80;
+  const h = snapshot.health || {}, halt = h.halt === true, waves = snapshot.waves || [];
+  const selectables = buildSelectables(snapshot, collectedAt);
+  const cursor = selectables.length ? Math.max(0, Math.min(selectables.length - 1, ui.cursor || 0)) : 0;
+  const expanded = halt ? null : ui.expanded;       // §6.6: HALT freezes expansion/selection
+  const stuck = waves.filter((w) => isStuck(w, collectedAt));
+  const rows = new Map();
+  const lines = [...renderHeader(snapshot, collectedAt, cols)];
+  if (halt) lines.push('', ...renderHaltBanner(halt, cols));
+
+  // helper: push a section header + its selectable rows, mapping each row's screen line → its sel index.
+  const pushSection = (header, items, makeLine, sub = 'stuck') => {
+    if (!items.length) return;
+    lines.push('', header);
+    for (const it of items) {
+      const idx = selectables.findIndex((s) => s.kind === it.kind && s.id === it.id);
+      let line = makeLine(it.payload);
+      if (!halt && idx === cursor) line = markSelected(line, cols);
+      lines.push(line);
+      if (idx >= 0) rows.set(lines.length, idx);   // 1-based screen row = lines.length (0-based + header offset handled by caller)
+      if (!halt && expanded != null && it.id === expanded && (sub === 'wave' || sub === 'stuck')) {
+        for (const dl of renderWaveDetail(it.payload)) lines.push(dl);
+      }
+    }
+    lines.push(hline(cols));
+  };
+
+  // ЗАВИСЛО (stuck)
+  pushSection(sec(`ЗАВИСЛО (${stuck.length})`, cols),
+    stuck.map((w) => ({ kind: 'stuck', id: w.wave || '—', payload: w })),
+    (w) => stuckRowText(w, collectedAt), 'stuck');
+
+  // СЕССИИ
+  const sessions = (snapshot.sessions || []);
+  pushSection(sec('СЕССИИ', cols),
+    sessions.map((s) => ({ kind: 'session', id: s.sessionId, payload: s })),
+    (s) => sessionRowText(s), 'session');
+
+  // ДОСКА — linear list of non-stuck waves (interactive path uses the linear layout for a 1:1 row map)
+  const stuckIds = new Set(stuck.map((w) => w.wave));
+  const boardWaves = waves.filter((w) => !stuckIds.has(w.wave));
+  if (!waves.length) { lines.push(...renderEmpty(snapshot, cols)); }
+  else pushSection(sec('ДОСКА', cols),
+    boardWaves.map((w) => ({ kind: 'wave', id: w.wave || '—', payload: w })),
+    (w) => boardRowText(w), 'wave');
+
+  lines.push(...renderContextFooter(selectables, { ...ui, cursor, expanded }, cols, halt));
+  return { lines, rows };
+}
+
+// pure row-text helpers shared by renderInteractive (mirror the section renderers' row formatting).
+function stuckRowText(w, at) {
+  let age = '';
+  if (w.updatedAt && at) { const ms = new Date(at) - new Date(w.updatedAt); if (!isNaN(ms) && ms > 0) age = ` — застыло ${dur(ms)}`; }
+  return `  ${X}!${R} ${w.wave || '—'}    ${stageLabel(w)}${age}`;
+}
+function sessionRowText(s) {
+  const SES_ICON = { working: `${G}▶${R}`, waiting: `${A}⏳${R}`, done: `${D}✓${R}` };
+  const icon = SES_ICON[s.state] || `${D}◦${R}`;
+  const topic = (s.topic || s.prompt || '').slice(0, 45);
+  const act = s.activity ? `  ${D}${s.activity.slice(0, 35)}${R}` : '';
+  return `  ${icon} ${pad(topic, 46)}${act}`;
+}
+function boardRowText(w) {
+  const s = w.status || 'pending', p = w.progress ?? 0;
+  return `  ${cstat(s)}${ssym(s)}${R} ${pad(w.wave || '—', 22)} ${pad(stageLabel(w), 7)} ${String(p).padStart(3)}%`;
+}
+
+export function renderFrame(snapshot, collectedAt, cols, ui = {}) {
   cols = cols || 80;
   const h = snapshot.health || {}, halt = h.halt === true, waves = snapshot.waves || [];
   const stuck = waves.filter((w) => isStuck(w, collectedAt));
@@ -243,6 +453,78 @@ async function selfTest() {
   const ffLines = renderFlat(ffSnap, AT);
   ok('flat: SESSION entry', ffLines.some((l) => l.startsWith('SESSION')));
   ok('flat: SESSION no ANSI', ffLines.every((l) => !l.includes('\x1b')));
+
+  // ── wave-tui-interactive ────────────────────────────────────────────
+  // parseMouse
+  const mp = parseMouse('\x1b[<0;5;12M');
+  ok('mouse: press parsed', mp && mp.button === 0 && mp.col === 5 && mp.row === 12 && mp.press === true);
+  ok('mouse: release press=false', parseMouse('\x1b[<0;5;12m')?.press === false);
+  ok('mouse: non-mouse → null', parseMouse('hello') === null);
+  ok('mouse: wheel-up button 64', parseMouse('\x1b[<64;1;1M')?.button === 64);
+
+  // interactive fixture: stuck + 2 sessions + 1 wave
+  const detW = mw({ wave: 'wave-detail', current: 'tests', status: 'running', progress: 30,
+    stages: [{ phase: 'discovery', status: 'done' }, { phase: 'spec', status: 'done' },
+      { phase: 'tests', status: 'running', current: true }, { phase: 'build', status: 'pending' },
+      { phase: 'gate', status: 'pending' }, { phase: 'debug', status: 'pending' }, { phase: 'memory', status: 'pending' }],
+    events: [{ ts: '2026-06-06T13:59:00Z', who: 'tester', what: 'тесты написаны' },
+      { ts: '2026-06-06T13:58:00Z', who: 'arch', what: 'спека готова' }],
+    note: 'жду ревью' });
+  const isnap = ms({ waves: [detW], pipeline: detW, sessions: ses2 });
+
+  // buildSelectables order: stuck → sessions → waves
+  const sels = buildSelectables(isnap, AT);
+  ok('selectables: includes 2 sessions', sels.filter((s) => s.kind === 'session').length === 2);
+  ok('selectables: includes wave-detail', sels.some((s) => s.kind === 'wave' && s.id === 'wave-detail'));
+  ok('selectables: sessions before waves', sels.findIndex((s) => s.kind === 'session') < sels.findIndex((s) => s.kind === 'wave'));
+
+  // IAC-1: selected row → one inverse bar + ▶ marker
+  const i0 = renderInteractive(isnap, AT, C, { cursor: 0 });
+  const invLines = i0.lines.filter((l) => l.includes(INV));
+  ok('interactive: exactly one inverse-selected row', invLines.length === 1, `count=${invLines.length}`);
+  ok('interactive: selected row has ▶ marker', invLines[0]?.includes('▶'));
+  ok('interactive: returns rows map', i0.rows instanceof Map && i0.rows.size > 0);
+  ok('interactive: rows map contains index 0', [...i0.rows.values()].includes(0));
+
+  // IAC-3: drill-down expand → 7 stage labels + event, dim; collapse removes
+  const wIdx = sels.findIndex((s) => s.kind === 'wave' && s.id === 'wave-detail');
+  const iExp = renderInteractive(isnap, AT, C, { cursor: wIdx, expanded: 'wave-detail' });
+  const etxt = iExp.lines.join('\n');
+  ok('drilldown: all 7 stage labels', ['ПОИСК', 'СПЕК', 'ТЕСТЫ', 'СБОРКА', 'ГЕЙТ', 'ДЕБАГ', 'ПАМЯТЬ'].every((s) => etxt.includes(s)));
+  ok('drilldown: recent event text', etxt.includes('тесты написаны'));
+  ok('drilldown: detail line is dim', iExp.lines.find((l) => l.includes('тесты написаны'))?.includes(D));
+  ok('drilldown: note shown', etxt.includes('жду ревью'));
+  const iCol = renderInteractive(isnap, AT, C, { cursor: wIdx, expanded: null });
+  ok('drilldown: collapse removes block', !iCol.lines.join('\n').includes('тесты написаны'));
+
+  // reduceKey navigation
+  ok('reduceKey: down increments cursor', reduceKey({ cursor: 0 }, 'down', sels).cursor === 1);
+  ok('reduceKey: up clamps at 0', reduceKey({ cursor: 0 }, 'up', sels).cursor === 0);
+  ok('reduceKey: down clamps at end', reduceKey({ cursor: sels.length - 1 }, 'down', sels).cursor === sels.length - 1);
+  ok('reduceKey: enter on wave toggles expand', reduceKey({ cursor: wIdx, expanded: null }, 'enter', sels).expanded === 'wave-detail');
+  ok('reduceKey: enter on expanded wave collapses', reduceKey({ cursor: wIdx, expanded: 'wave-detail' }, 'enter', sels).expanded === null);
+  ok('reduceKey: esc collapses', reduceKey({ cursor: 0, expanded: 'wave-detail' }, 'esc', sels).expanded === null);
+  ok('reduceKey: enter on session is no-op (focus is caller side-effect)', reduceKey({ cursor: sels.findIndex((s) => s.kind === 'session'), expanded: null }, 'enter', sels).expanded == null);
+  ok('reduceKey: empty selectables → cursor 0, no throw', reduceKey({ cursor: 5 }, 'down', []).cursor === 0);
+  // Tab jumps between sections (session → wave)
+  const sIdx = sels.findIndex((s) => s.kind === 'session');
+  ok('reduceKey: Tab jumps to next section', sels[reduceKey({ cursor: sIdx }, 'tab', sels).cursor].kind !== 'session');
+
+  // IAC-2: renderFrame backward-compat — no-ui vs empty-ui byte-identical, no inverse bar
+  const bcA = renderFrame(isnap, AT, C);
+  const bcB = renderFrame(isnap, AT, C, {});
+  ok('compat: renderFrame ui-less == empty-ui', bcA.join('\n') === bcB.join('\n'));
+  ok('compat: renderFrame has no inverse bar', !bcA.some((l) => l.includes(INV)));
+
+  // HALT freezes interaction: no inverse marker even with a cursor
+  const haltSnap = ms({ waves: [detW], pipeline: detW, sessions: ses2, health: { level: 'red', evalPct: 0, recentFails: 1, halt: true } });
+  const iHalt = renderInteractive(haltSnap, AT, C, { cursor: 0, expanded: 'wave-detail' });
+  ok('halt: no inverse selection bar', !iHalt.lines.some((l) => l.includes(INV)));
+  ok('halt: no detail block while stopped', !iHalt.lines.join('\n').includes('тесты написаны'));
+
+  // relocated helpers still work
+  ok('heartbeat: spinner rotates', heartbeatLine(0, 10) !== heartbeatLine(1, 10) && heartbeatLine(0, 10) === heartbeatLine(4, 10));
+  ok('repaint: \\x1b[K + \\x1b[J', buildRepaintBuffer(['a']).includes('a\x1b[K') && buildRepaintBuffer(['a']).endsWith('\x1b[J'));
 
   const { readFileSync: rfs } = await import('node:fs');
   const src = rfs(new URL(import.meta.url).pathname, 'utf8');

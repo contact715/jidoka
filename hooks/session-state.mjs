@@ -11,6 +11,7 @@
 // Self-test: node session-state.mjs --self-test
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 
@@ -60,6 +61,17 @@ export function nextState(prev, event, payload = {}) {
   if (event === 'Stop') return { ...s, state: 'done', activity: '' };
   if (event === 'Notification') return { ...s, state: 'waiting' };
   return s;
+}
+
+// pure: resolve a stable-ish terminal identity for THIS session from env + parent tty (testable).
+// Priority per the focus research: TERM_SESSION_ID (Terminal.app), then ITERM_SESSION_ID (iTerm2),
+// then the precise tmux pane, then the zellij pane id, then the parent shell's tty as a last resort.
+// The panel later uses this string to jump the OS terminal window to the session (see focus.mjs).
+export function resolveTerminalId(env = {}, ppidTty = null) {
+  const fromEnv = env.TERM_SESSION_ID || env.ITERM_SESSION_ID
+    || (env.TMUX_PANE ? `tmux:${env.TMUX_PANE}` : null)
+    || (env.ZELLIJ ? `zellij:${env.ZELLIJ_PANE_ID || ''}` : null);
+  return fromEnv || (ppidTty ? `tty:${ppidTty}` : null);
 }
 
 // pure: terminal tab title for the current state — visible from other tabs.
@@ -114,6 +126,13 @@ function selfTest() {
     ['bash: английское описание → понятная фраза', describeActivity('Bash', { description: 'Run tui-top against a corrupted state.json' }) === 'выполняю команду в терминале'],
     ['bash: русское описание остаётся', describeActivity('Bash', { description: 'ставлю ccboard' }) === 'ставлю ccboard'],
     ['bash: без описания → понятная фраза', describeActivity('Bash', { command: 'ls -la' }) === 'выполняю команду в терминале'],
+    ['resolveTerminalId: TERM_SESSION_ID выигрывает у всего', resolveTerminalId({ TERM_SESSION_ID: 'w0t0p0:UUID', ITERM_SESSION_ID: 'x', TMUX_PANE: '%1', ZELLIJ: '1' }, 'ttys003') === 'w0t0p0:UUID'],
+    ['resolveTerminalId: ITERM_SESSION_ID когда нет TERM_SESSION_ID', resolveTerminalId({ ITERM_SESSION_ID: 'w1t2p3:ABC' }, null) === 'w1t2p3:ABC'],
+    ['resolveTerminalId: TMUX_PANE → tmux:%N', resolveTerminalId({ TMUX_PANE: '%4' }, 'ttys009') === 'tmux:%4'],
+    ['resolveTerminalId: ZELLIJ без pane → zellij:', resolveTerminalId({ ZELLIJ: '0' }, null) === 'zellij:'],
+    ['resolveTerminalId: ZELLIJ с pane id', resolveTerminalId({ ZELLIJ: '0', ZELLIJ_PANE_ID: '7' }, null) === 'zellij:7'],
+    ['resolveTerminalId: пустой env + ppidTty → tty:<ppidTty>', resolveTerminalId({}, 'ttys017') === 'tty:ttys017'],
+    ['resolveTerminalId: пустой env без ppidTty → null', resolveTerminalId({}, null) === null],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
@@ -135,6 +154,18 @@ if (isMain) {
       const file = join(dir, `state-${sid}.json`);
       let prev = {}; try { prev = JSON.parse(readFileSync(file, 'utf8')); } catch { /* fresh */ }
       const next = nextState(prev, event, { now: Date.now(), prompt: d.prompt, tool_name: d.tool_name, tool_input: d.tool_input });
+      // capture the terminal identity ONCE per session so the panel knows where to jump (Enter→focus).
+      // UserPromptSubmit returns a FRESH record that drops unknown fields, so we read prev.terminalId
+      // (not next.terminalId) and re-stamp here. Run the `ps` subprocess only on first capture.
+      // process.ppid = the `claude` process that owns the tty (not this node hook).
+      if (!prev.terminalId) {
+        let tty = null;
+        try { tty = execFileSync('ps', ['-o', 'tty=', '-p', String(process.ppid)], { encoding: 'utf8' }).trim() || null; }
+        catch { /* headless / no ps */ }
+        next.terminalId = resolveTerminalId(process.env, tty);
+      } else {
+        next.terminalId = prev.terminalId;
+      }
       writeFileSync(file, JSON.stringify(next), 'utf8');
       // pin the task into the terminal tab title (OSC 0), straight to the tty so it never
       // touches stdout (which would leak into the model context on UserPromptSubmit)
