@@ -1,0 +1,7 @@
+#!/bin/sh
+# Delegation shim — the real hooks live in .githooks/ (single source of truth).
+# package.json prepare:"husky" re-points core.hooksPath to .husky/_ on npm install; that
+# silently killed ALL framework gates once (found 2026-06-10, gate-claims-block-but-passes).
+# With this shim the .githooks gates keep running under husky too.
+# Direct activation without husky: git config core.hooksPath .githooks
+exec "$(git rev-parse --show-toplevel)/.githooks/pre-push" "$@"

@@ -17,6 +17,13 @@
 #   T5  commit message names wave-NN whose metrics-dashboard row is missing →
 #         husky flavor (product repo): wave-artifact BLOCKER refuses the commit
 #         githooks flavor (framework): informational by documented design — passes
+#   T0  the REAL pre-commit still writes the sentinel (tripwire: the fixture stubs
+#       pre-commit, so without this check deleting the sentinel write would go unseen)
+#   T6  refused attempt leaves a stale sentinel → the NEXT --no-verify must still be
+#       logged (commit-msg removes the sentinel when a gate refuses)
+#   T7  cherry-pick fires post-commit WITHOUT pre-commit → must NOT be logged as a
+#       bypass (sequencer ops are suppressed; plain single `git revert` is an accepted
+#       residual — no marker survives to post-commit time)
 #
 # The fixture pre-commit is a 2-line stub that only writes .sdd-precommit-sentinel —
 # the single part of the real pre-commit that bypass detection depends on. Everything
@@ -24,10 +31,12 @@
 set -u
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-if [ -f "$REPO/.husky/commit-msg" ]; then
-  HOOKS_SRC="$REPO/.husky"; FLAVOR="husky"
-elif [ -f "$REPO/.githooks/commit-msg" ]; then
+# .githooks wins when both exist: in the framework, .husky/* are delegation shims that
+# exec the .githooks originals (the shims would dangle inside the fixture).
+if [ -f "$REPO/.githooks/commit-msg" ]; then
   HOOKS_SRC="$REPO/.githooks"; FLAVOR="githooks"
+elif [ -f "$REPO/.husky/commit-msg" ]; then
+  HOOKS_SRC="$REPO/.husky"; FLAVOR="husky"
 else
   echo "FATAL: no commit-msg hook found in $REPO (.husky or .githooks)"; exit 2
 fi
@@ -63,6 +72,14 @@ big_file() { # $1 = path; >50 insertions under lib/ to cross the AC-gate thresho
 }
 
 echo "SDD hard-block integration test — flavor: $FLAVOR, fixture: $TMP"
+
+# ── T0: the real pre-commit must write the bypass-detection sentinel ──
+echo "T0: real pre-commit writes .sdd-precommit-sentinel"
+if grep -q 'sdd-precommit-sentinel' "$HOOKS_SRC/pre-commit"; then
+  ok "real pre-commit references the sentinel"
+else
+  bad "real pre-commit no longer writes .sdd-precommit-sentinel — bypass detection is dead"
+fi
 
 # ── baseline commit (chore — no gate applies) ─────────────────────────
 git add -A
@@ -146,6 +163,47 @@ else
   else
     bad "githooks flavor unexpectedly blocked (exit=$T5_EXIT)"
   fi
+fi
+
+# ── T6: stale sentinel from a refused attempt must not mask a bypass ─
+echo "T6: refused attempt, then --no-verify — bypass must still be logged"
+echo '{ "hard_block_ac": true }' > .sdd-config.json
+big_file lib/big6.ts
+git add lib/big6.ts
+git commit -m "feat: refused before bypass" >t6a.log 2>&1  # refusal expected (asserted in T1)
+PRE_LINES=$(wc -l < .sdd-bypass.log 2>/dev/null | tr -d ' '); PRE_LINES=${PRE_LINES:-0}
+if git commit --no-verify -m "feat: bypass after refusal" >t6b.log 2>&1; then
+  ok "--no-verify after a refusal passed"
+else
+  bad "--no-verify after a refusal failed:"; sed 's/^/      /' t6b.log
+fi
+H6=$(git log --pretty=%h -1)
+NOW_LINES=$(wc -l < .sdd-bypass.log 2>/dev/null | tr -d ' '); NOW_LINES=${NOW_LINES:-0}
+if [ "$NOW_LINES" -eq $((PRE_LINES + 1)) ] && grep -q "commit=$H6" .sdd-bypass.log 2>/dev/null; then
+  ok "bypass after refusal logged (stale sentinel did not mask it)"
+else
+  bad "bypass after refusal NOT logged correctly (lines $PRE_LINES→$NOW_LINES, want +1 with commit=$H6)"
+fi
+
+# ── T7: sequencer ops are not bypasses ────────────────────────────────
+echo "T7: cherry-pick runs post-commit without pre-commit — must NOT be logged"
+PRE_LINES=$NOW_LINES
+git checkout -q -b cherry-src
+echo cherry > docs/cherry.md
+git add docs/cherry.md
+git commit -q -m "chore: cherry source" >t7a.log 2>&1 || bad "cherry source commit failed: $(cat t7a.log)"
+git checkout -q -
+if git cherry-pick cherry-src >t7b.log 2>&1; then
+  ok "cherry-pick succeeded"
+else
+  bad "cherry-pick failed:"; sed 's/^/      /' t7b.log
+fi
+NOW_LINES=$(wc -l < .sdd-bypass.log 2>/dev/null | tr -d ' '); NOW_LINES=${NOW_LINES:-0}
+if [ "$NOW_LINES" -eq "$PRE_LINES" ]; then
+  ok "no false bypass entry from cherry-pick"
+else
+  bad "cherry-pick produced a false bypass entry (lines $PRE_LINES→$NOW_LINES):"
+  tail -2 .sdd-bypass.log | sed 's/^/      /'
 fi
 
 echo ""
