@@ -7,6 +7,20 @@
 # PILE-UP GUARD: only launch each background job if a previous instance isn't still running.
 # Without this, a hung job would accumulate one extra detached node process per commit.
 ROOT="$(git rev-parse --show-toplevel)"
+
+# 2026-06-10 — bypass audit trail: pre-commit writes .sdd-precommit-sentinel; absence here
+# means hooks were skipped (--no-verify). Log ONLY then, and only while hard_block_ac=true in
+# .sdd-config.json. Logging every commit was the projectx gate-claims-block-but-passes incident.
+# Regression test: scripts/test-sdd-hard-block.sh
+if [ ! -f "$ROOT/.sdd-precommit-sentinel" ]; then
+  HARD_BLOCK=$(node -p "try{String(JSON.parse(require('fs').readFileSync('$ROOT/.sdd-config.json','utf8')).hard_block_ac===true)}catch{false}" 2>/dev/null || echo false)
+  if [ "$HARD_BLOCK" = "true" ]; then
+    HASH=$(git log --pretty=%h -1 2>/dev/null || echo unknown)
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) commit=$HASH" >> "$ROOT/.sdd-bypass.log" 2>/dev/null || true
+  fi
+fi
+rm -f "$ROOT/.sdd-precommit-sentinel" 2>/dev/null || true
+
 if ! pgrep -f 'auto-reflexion-trigger.sh' >/dev/null 2>&1; then
   sh "$ROOT/scripts/auto-reflexion-trigger.sh" >/dev/null 2>&1 &
 fi

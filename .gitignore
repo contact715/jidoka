@@ -1,5 +1,6 @@
 # Runtime state — not source
 .sdd-halt-state.json
+.sdd-precommit-sentinel
 *-queue/
 memory-staging/
 worktrees/

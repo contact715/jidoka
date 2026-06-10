@@ -25,4 +25,8 @@ if echo "$out" | grep -qE 'ghosts: [1-9]'; then
 else
   echo "✓ pre-commit · instantiation-audit: no ghosts"
 fi
+
+# 2026-06-10 — sentinel for --no-verify detection: post-commit treats its absence as a bypassed
+# hook run and logs it to .sdd-bypass.log while hard_block_ac=true. Transient, gitignored.
+echo "$$" > "$ROOT/.sdd-precommit-sentinel"
 exit 0

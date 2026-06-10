@@ -6,4 +6,11 @@ ROOT="$(git rev-parse --show-toplevel)"
 if grep -qiE 'wave-[0-9]+' "$1" 2>/dev/null; then
   sh "$ROOT/scripts/check-wave-artifacts.sh" "$1" || echo "↑ wave-artifact check flagged (informational, not blocking)"
 fi
+
+# 2026-06-10 — AC-footer gate: soft warn by default, hard block when hard_block_ac=true in
+# .sdd-config.json (or SDD_HARD_BLOCK_AC=1). The script decides soft/hard; the hook MUST
+# propagate the exit code. Its projectx twin swallowed it with `|| true` — the gate printed
+# "Commit refused" while the commit landed anyway (meta class: gate-claims-block-but-passes).
+# Regression test: scripts/test-sdd-hard-block.sh
+sh "$ROOT/scripts/check-ac-reference.sh" "$1" || exit $?
 exit 0
