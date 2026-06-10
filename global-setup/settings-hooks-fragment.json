@@ -54,6 +54,19 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "WebFetch|WebSearch|mcp__",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/injection-watch.mjs",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
     ]
   }
 }
