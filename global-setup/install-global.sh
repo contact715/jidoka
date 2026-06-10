@@ -32,7 +32,7 @@ echo "  ✓ dev-pipeline skill"
 
 # 3. engine (from framework — the source of truth; meta-lib itself detects the
 # global install location and switches to the global cross-project ledger)
-for f in meta-lib meta-remedies meta-audit meta-honesty meta-trend meta-premortem meta-log proof-gate pre-publish-guard memory-consolidate northstar-check kaizen-loop charter-check get-spec-context spec-first-gate orchestration-planner debate-trigger adaptive-verify run-state acceptance-verdict enforcement-reconcile red-team kaizen-feed cost-crosscheck agent-trace approval-queue code-map coverage-gate debate-engine dependency-audit execution-gate gate-audit gate-graduation parallel-guard policy-enforce-hook sandbox-run spec-drift-check; do
+for f in meta-lib meta-remedies meta-audit meta-honesty meta-trend meta-premortem meta-log proof-gate pre-publish-guard memory-consolidate northstar-check kaizen-loop charter-check get-spec-context spec-first-gate orchestration-planner debate-trigger adaptive-verify run-state acceptance-verdict enforcement-reconcile red-team kaizen-feed cost-crosscheck trajectory-eval agent-trace approval-queue code-map coverage-gate debate-engine dependency-audit execution-gate gate-audit gate-graduation parallel-guard policy-enforce-hook sandbox-run spec-drift-check; do
   [ -f "$FW/scripts/$f.mjs" ] && cp "$FW/scripts/$f.mjs" "$DEST/jidoka/scripts/"
 done
 [ -f "$FW/lib/redaction/redact-pii.mjs" ] && cp "$FW/lib/redaction/redact-pii.mjs" "$DEST/jidoka/lib/redaction/"

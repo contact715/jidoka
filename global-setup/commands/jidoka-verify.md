@@ -25,5 +25,10 @@ Verify wave $1.
      Re-running in a fresh context is what makes the verdict independent (the reflexion-critic pattern).
    - Not optional: `run-state.mjs` REFUSES to close the wave's final phase without a passing
      `verdict.json`. A red verdict keeps the wave open and routes to debug-agent.
-6. Green → `node scripts/run-state.mjs --advance $1 --phase gate --status done`. Red →
+6. Trajectory check (optional, path-not-just-outcome): `node scripts/trajectory-eval.mjs --wave $1`
+   compares the agents that actually ran (agent-traces) against the agents plan() requires for the
+   wave's task — surfacing a required agent that was SKIPPED (e.g. a critical wave shipped without
+   security-scanner / debate). Precise only when agent-trace --ingest tags rows with the wave; else
+   it reports approximate and does not fail.
+7. Green → `node scripts/run-state.mjs --advance $1 --phase gate --status done`. Red →
    `--status failed --note "<what broke>"` and route to debug-agent before re-running.
