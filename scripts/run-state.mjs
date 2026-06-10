@@ -66,6 +66,40 @@ export function nextStep(state) {
   return { done: false, phase: pending.phase, status: pending.status, agents: pending.agents, message: `${verb}: ${agents}` };
 }
 
+// ── independent acceptance verdict ─────────────────────────────────
+// THE FORCING FUNCTION against declaration-over-implementation: a wave cannot be marked complete
+// on someone's word. The transition that closes the LAST open phase must be backed by
+// docs/runs/<wave>/verdict.json — a record of each acceptance criterion's proof COMMAND re-run with
+// its exit code, produced by acceptance-verdict.mjs in a fresh check. Verdict and journal entry then
+// land in ONE act, so the journal cannot lie by omission about "done".
+
+// pure: would advancing phase→status flip the wave from "not all done" to "all done"?
+// That single wave-completing transition is the one the acceptance verdict gates.
+export function completesWave(state, phase, status) {
+  if (status !== 'done') return false;
+  if (state.phases.every(p => p.status === 'done')) return false; // already complete — not a new completion
+  if (!state.phases.some(p => p.phase === phase)) return false;
+  return advanceState(state, phase, status).phases.every(p => p.status === 'done');
+}
+
+// pure: validate an acceptance verdict object. Returns { ok, reasons[] }.
+// Passing = pass===true AND acs is an array AND every AC re-ran with exitCode 0.
+export function verdictStatus(verdict, wave = null) {
+  if (!verdict || typeof verdict !== 'object') return { ok: false, reasons: ['verdict.json missing or not an object'] };
+  const reasons = [];
+  if (wave && verdict.wave && verdict.wave !== wave) reasons.push(`verdict is for ${verdict.wave}, not ${wave}`);
+  if (!Array.isArray(verdict.acs)) reasons.push('verdict.acs is not an array');
+  else for (const ac of verdict.acs) if (ac.exitCode !== 0) reasons.push(`AC ${ac.id ?? '?'} failed: exit ${ac.exitCode} · ${ac.command ?? '?'}`);
+  if (verdict.pass !== true) reasons.push('verdict.pass is not true');
+  return { ok: reasons.length === 0, reasons };
+}
+
+export function loadVerdict(root, wave) {
+  const f = join(runDir(root, wave), 'verdict.json');
+  if (!existsSync(f)) return null;
+  try { return JSON.parse(readFileSync(f, 'utf8')); } catch { return null; }
+}
+
 export function renderStateMd(state) {
   const ns = nextStep(state);
   const lines = [
@@ -183,6 +217,20 @@ function selfTest() {
   if (prevT !== undefined) process.env.TERM_SESSION_ID = prevT; else delete process.env.TERM_SESSION_ID;
   if (prevI !== undefined) process.env.ITERM_SESSION_ID = prevI; else delete process.env.ITERM_SESSION_ID;
 
+  // ── acceptance verdict (pure) ──
+  let cw = initState('wv-cw', { risk: 'trivial', surfaces: ['frontend'] }, t(0));
+  const lastPhase = cw.phases[cw.phases.length - 1].phase;
+  for (const p of cw.phases.slice(0, -1)) cw = advanceState(cw, p.phase, 'done', '', t(1));
+  ok('completesWave: true on the transition that closes the final phase', completesWave(cw, lastPhase, 'done') === true);
+  ok('completesWave: false when an earlier phase advances (wave stays open)', completesWave(initState('wv-cw2', { risk: 'normal', surfaces: ['backend'] }), 'discovery', 'done') === false);
+  ok('completesWave: false for a non-done status', completesWave(cw, lastPhase, 'running') === false);
+  ok('completesWave: false for an unknown phase', completesWave(cw, 'no-such-phase', 'done') === false);
+  ok('verdictStatus: null verdict → not ok', verdictStatus(null, 'wv').ok === false);
+  ok('verdictStatus: pass + all exit0 → ok', verdictStatus({ wave: 'wv', pass: true, acs: [{ id: 'AC1', command: 'true', exitCode: 0 }] }, 'wv').ok === true);
+  ok('verdictStatus: a failing AC → not ok', verdictStatus({ wave: 'wv', pass: true, acs: [{ id: 'AC1', command: 'x', exitCode: 1 }] }, 'wv').ok === false);
+  ok('verdictStatus: pass!==true → not ok even with green acs', verdictStatus({ wave: 'wv', pass: false, acs: [] }, 'wv').ok === false);
+  ok('verdictStatus: wrong wave flagged', verdictStatus({ wave: 'other', pass: true, acs: [] }, 'wv').ok === false);
+
   if (fails.length) { console.log(`\n\x1b[31mrun-state self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ run-state: journal init/advance/resume/render correct\x1b[0m');
   process.exit(0);
@@ -213,9 +261,24 @@ if (isMain) {
     const s = loadState(ROOT, wave);
     if (!s) { console.error(`no run found for ${wave} (run --init first)`); process.exit(1); }
     try {
-      const ns = advanceState(s, arg('--phase'), arg('--status'), arg('--note') || '');
+      const phase = arg('--phase'), status = arg('--status');
+      const ns = advanceState(s, phase, status, arg('--note') || '');
+      // FORCING FUNCTION: the transition that closes the wave needs an independent acceptance verdict.
+      if (completesWave(s, phase, status)) {
+        const vs = verdictStatus(loadVerdict(ROOT, wave), wave);
+        if (!vs.ok) {
+          console.error(`✗ ${wave}: cannot close the wave — independent acceptance verdict missing or failing:`);
+          for (const r of vs.reasons) console.error(`    · ${r}`);
+          console.error(`  Produce it in a fresh check:  node scripts/acceptance-verdict.mjs ${wave}`);
+          console.error(`  (re-runs the proof command of each AC in docs/runs/${wave}/acceptance.json → verdict.json)`);
+          console.error(`  The wave stays OPEN until a passing verdict exists — "done" is proven, not declared.`);
+          process.exit(2);
+        }
+        const v = loadVerdict(ROOT, wave);
+        console.log(`  ✓ acceptance verdict OK — ${v.acs.length} AC re-run green (produced ${v.executedAt || '?'})`);
+      }
       saveState(ROOT, ns);
-      console.log(`✓ ${wave}: ${arg('--phase')} → ${arg('--status')}`);
+      console.log(`✓ ${wave}: ${phase} → ${status}`);
       console.log('  ' + nextStep(ns).message);
       process.exit(0);
     } catch (e) { console.error(`✗ ${e.message}`); process.exit(1); }
