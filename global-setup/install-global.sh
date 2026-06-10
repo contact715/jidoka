@@ -67,9 +67,16 @@ const fs=require("fs"),os=require("os");const home=os.homedir();const p=home+"/.
 const s=fs.existsSync(p)?JSON.parse(fs.readFileSync(p,"utf8")):{};
 const frag=JSON.parse(fs.readFileSync(process.argv[1],"utf8").replaceAll("$HOME",home));
 s.hooks=s.hooks||{};
+// dedup at the COMMAND level, not the block level: an extended live block (e.g. UserPromptSubmit
+// gaining session-state/session-lock) no longer matched the 2-hook fragment block, so the fragment
+// got re-appended as a duplicate on every install. Compare by command string instead.
 for(const [evt,arr] of Object.entries(frag.hooks||{})){
   s.hooks[evt]=s.hooks[evt]||[];
-  for(const h of arr) if(!s.hooks[evt].some(x=>JSON.stringify(x)===JSON.stringify(h))) s.hooks[evt].push(h);
+  const seen=new Set(s.hooks[evt].flatMap(b=>(b.hooks||[]).map(h=>h.command)));
+  for(const block of arr){
+    const fresh=(block.hooks||[]).filter(h=>!seen.has(h.command));
+    if(fresh.length){ s.hooks[evt].push(Object.assign({},block,{hooks:fresh})); fresh.forEach(h=>seen.add(h.command)); }
+  }
 }
 fs.writeFileSync(p,JSON.stringify(s,null,2)+"\n");
 console.log("  ✓ merged hooks into settings.json (permissions untouched)");

@@ -20,6 +20,17 @@
             "timeout": 15
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/session-state.mjs PreToolUse",
+            "timeout": 5,
+            "async": true
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
@@ -35,6 +46,11 @@
             "type": "command",
             "command": "node $HOME/claude-code-dev-framework/scripts/skill-selector.mjs --hook",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/session-state.mjs UserPromptSubmit",
+            "timeout": 5
           }
         ]
       }
