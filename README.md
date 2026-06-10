@@ -22,11 +22,11 @@
 .claude/
   agents/            47 агентов-ролей + _TEMPLATE (вкл. project-steward, spec-custodian, prompt-evolver, red-team — непрерывная самоатака) (полная продуктовая студия: продукт/архитектура/build/дизайн/данные/запуск/качество) (chief-architect, reflexion-critic,
                      best-of-N-judge, debate-*, security-scanner, ...)
-  skills/            31 навык + _INDEX/_TEMPLATE (переиспользуемые паттерны)
+  skills/            32 навыка + _INDEX/_TEMPLATE (переиспользуемые паттерны)
   AGENT_PLAYBOOK.md  главный плейбук агентства
   settings.local.json
 
-scripts/             174 скрипта-движка (159 .mjs в корне + 7 в подпапках + 15 .sh):
+scripts/             181 скрипт-движок (.mjs движок + .sh обвязка; счёт = instantiation-audit):
                      andon-halt (stop-the-line), run-tla (формальная проверка),
                      compute-dora/slos/cost/carbon (observability),
                      detect-injection/drift/hallucinations (защита),
