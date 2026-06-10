@@ -1,0 +1,30 @@
+{
+  "targets": [
+    {
+      "metric": "rework_rounds",
+      "target": 0,
+      "direction": "down",
+      "series": [
+        1
+      ]
+    },
+    {
+      "metric": "completion_span_hours",
+      "target": 4,
+      "direction": "down",
+      "series": [
+        60
+      ]
+    },
+    {
+      "metric": "journaling_lag_hours",
+      "target": 1,
+      "direction": "down",
+      "series": [
+        0
+      ]
+    }
+  ],
+  "updatedAt": "2026-06-10T17:14:57.492Z",
+  "source": "kaizen-feed (run-state journals)"
+}

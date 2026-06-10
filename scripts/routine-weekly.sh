@@ -88,6 +88,20 @@ cat >> "$REPORT" <<EOF
 
 ---
 
+## 5. Dev-system Kaizen (the way we build, trending)
+
+EOF
+
+if [ -f scripts/kaizen-feed.mjs ]; then
+  node scripts/kaizen-feed.mjs >> "$REPORT" 2>&1 || true
+else
+  echo "(scripts/kaizen-feed.mjs not present; skipping)" >> "$REPORT"
+fi
+
+cat >> "$REPORT" <<EOF
+
+---
+
 ## What to do with this report
 
 1. If any drift category INCREASED week-over-week → action a sweep wave before new work.
