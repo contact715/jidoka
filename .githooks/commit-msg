@@ -3,14 +3,18 @@
 # Informational by default: the check surfaces a missing metrics row / retro but does
 # not block the commit (the wave-complete gate enforces hard).
 ROOT="$(git rev-parse --show-toplevel)"
+# Both gate scripts are bash (set -euo pipefail, arrays) — invoke with bash, not sh:
+# on Linux sh=dash rejects pipefail and the gates would fail on EVERY commit.
 if grep -qiE 'wave-[0-9]+' "$1" 2>/dev/null; then
-  sh "$ROOT/scripts/check-wave-artifacts.sh" "$1" || echo "↑ wave-artifact check flagged (informational, not blocking)"
+  bash "$ROOT/scripts/check-wave-artifacts.sh" "$1" || echo "↑ wave-artifact check flagged (informational, not blocking)"
 fi
 
 # 2026-06-10 — AC-footer gate: soft warn by default, hard block when hard_block_ac=true in
 # .sdd-config.json (or SDD_HARD_BLOCK_AC=1). The script decides soft/hard; the hook MUST
 # propagate the exit code. Its projectx twin swallowed it with `|| true` — the gate printed
 # "Commit refused" while the commit landed anyway (meta class: gate-claims-block-but-passes).
-# Regression test: scripts/test-sdd-hard-block.sh
-sh "$ROOT/scripts/check-ac-reference.sh" "$1" || exit $?
+# On refusal also drop the pre-commit sentinel: no commit is created, post-commit never
+# consumes it, and a stale sentinel would mask the NEXT real --no-verify in the bypass log.
+# Regression test: scripts/test-sdd-hard-block.sh (T1, T6)
+bash "$ROOT/scripts/check-ac-reference.sh" "$1" || { rc=$?; rm -f "$ROOT/.sdd-precommit-sentinel"; exit $rc; }
 exit 0
