@@ -17,6 +17,8 @@ F="$DIGESTS/$(date +%F).txt"
   echo ""
   echo "── Контроль гейтов (честность за 26ч) ──"
   node "$HOME/.claude/jidoka/scripts/enforcement-reconcile.mjs" 2>/dev/null | sed $'s/\x1b\\[[0-9;]*m//g'
+  echo ""
+  node "$HOME/.claude/jidoka/scripts/cost-crosscheck.mjs" 2>/dev/null
 } > "$F" 2>&1
 
 TOTAL=$(grep -o 'Итого.*' "$F" | head -1 | sed 's/Итого *//' | cut -c1-80)
