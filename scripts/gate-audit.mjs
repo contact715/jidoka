@@ -28,6 +28,7 @@ export const GATES = [
   { id: 'trufflehog-secrets', layer: 'CI', mode: 'hard', token: 'trufflehog' },
   { id: 'dependency-audit', layer: 'CI', mode: 'hard', token: 'dependency-audit' },
   { id: 'mutation-test', layer: 'CI', mode: 'hard', token: 'mutation-test' },
+  { id: 'red-team', layer: 'CI', mode: 'hard', token: 'red-team.mjs' },
   { id: 'selftest-reality', layer: 'CI', mode: 'hard', token: 'gate:selftest' },
   // PreToolUse — real-time, hard-block
   { id: 'policy-enforce-hook', layer: 'PreToolUse', mode: 'hard', token: null },

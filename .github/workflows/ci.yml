@@ -59,3 +59,7 @@ jobs:
         run: node scripts/execution-gate.mjs --self-test
       - name: gate-audit (every CI-layer gate really runs in a workflow)
         run: node scripts/gate-audit.mjs
+
+      # ── Red team: self-attack the gates on every push (deterministic catalog, ~zero cost) ──
+      - name: red-team (try to break our own gates; a miss is a vulnerability)
+        run: node scripts/red-team.mjs

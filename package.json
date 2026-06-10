@@ -68,6 +68,7 @@
 		"trace:reqs": "node scripts/req-trace.mjs",
 		"gate:e2e": "node scripts/e2e-run-gate.mjs",
 		"gate:selftest": "node scripts/selftest-reality.mjs",
+		"red:team": "node scripts/red-team.mjs",
 		"harvest:prod": "node scripts/prod-harvest.mjs",
 		"skill:coverage": "node scripts/skill-coverage.mjs",
 		"check:design-drift": "bash scripts/design-drift-audit.sh",
