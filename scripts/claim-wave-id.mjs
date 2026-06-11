@@ -134,6 +134,22 @@ export function claimWave({
   }
   if (!remote) return localClaim({ root, session, registryRel, say });
 
+  // detached HEAD (git worktree, rebase, checkout --detach): `--abbrev-ref HEAD` возвращает
+  // литерал "HEAD" — это не имя ветки. Пуш в refs/heads/HEAD создаёт на remote блудную ветку,
+  // а реестр на целевой ветке не обновляется (projectx 2026-06-11). Разыменовываем
+  // default-ветку remote; если она неизвестна — требуем явный --branch, молча пушить нельзя.
+  if (branch === 'HEAD') {
+    const sym = shTry(`git symbolic-ref refs/remotes/${remote}/HEAD`, { cwd: root });
+    const pre = `refs/remotes/${remote}/`;
+    const def = sym && sym.startsWith(pre) ? sym.slice(pre.length) : null;
+    if (def && def !== 'HEAD') {
+      branch = def;
+      say(`⚠ detached HEAD — клейм идёт в default-ветку ${remote}/${branch}`);
+    } else {
+      throw new Error(`detached HEAD: ветка не определяется (refs/remotes/${remote}/HEAD не настроен) — передай --branch <ветка>`);
+    }
+  }
+
   const remoteRef = `refs/remotes/${remote}/${branch}`;
   let lastErr = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -270,6 +286,27 @@ function selfTest() {
     const localReg = readFileSync(join(L, REGISTRY_REL), 'utf8');
     ok('T6 без remote — локальный fallback: wave-4, запись в локальный реестр',
       r6.n === 4 && r6.mode === 'local' && localReg.includes('"wave-4"'));
+
+    // T8 — detached HEAD (git worktree / checkout --detach): авторезолюция не должна
+    // принимать литерал "HEAD" за имя ветки. Инцидент projectx 2026-06-11: клейм ушёл
+    // в refs/heads/HEAD (блудная ветка на remote), реестр на целевой ветке не обновился,
+    // скрипт рапортовал успех.
+    const D = join(tmp, 'D');
+    sh(`git clone -q "${bare}" "${D}"`);
+    git(D, 'config user.name tester3');
+    git(D, 'config user.email t3@local');
+    git(D, 'checkout -q --detach');
+    const r8 = claimQ(D, { session: 'sessD', remote: undefined, branch: undefined });
+    ok('T8 detached HEAD + известная default-ветка remote → клейм уходит в неё (wave-503)',
+      r8.n === 503 && r8.mode === 'remote' && bareReg().includes('"wave-503"'));
+
+    git(A, 'checkout -q --detach'); // у A нет refs/remotes/origin/HEAD (init + remote add)
+    let t8err = null;
+    try { claimQ(A, { session: 'sessA', remote: undefined, branch: undefined }); } catch (e) { t8err = e; }
+    ok('T8 detached HEAD без известной default-ветки → явная ошибка с подсказкой --branch',
+      t8err !== null && /--branch/.test(t8err.message));
+    ok('T8 ни при каком исходе на remote не появляется ветка с именем HEAD',
+      !/refs\/heads\/HEAD/.test(sh(`git --git-dir="${bare}" show-ref --heads`)));
   } catch (e) {
     fails.push(`crash: ${e.message}`);
     console.log(`  \x1b[31m✗ self-test crashed: ${e.message}\x1b[0m`);

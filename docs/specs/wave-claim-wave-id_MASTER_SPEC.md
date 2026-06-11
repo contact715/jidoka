@@ -1,6 +1,6 @@
 ---
 status: Approved
-version: 1.0.0
+version: 1.1.0
 level: L3
 type: master-spec
 wave: wave-claim-wave-id
@@ -14,7 +14,7 @@ parents:
     relationship: constraints
 complexity: non-trivial
 created: 2026-06-10
-last_updated: 2026-06-10
+last_updated: 2026-06-11
 ---
 
 # wave-claim-wave-id — Master Spec
@@ -33,6 +33,12 @@ broken flow in both sessions, merge risk in generated registries.
 `scripts/claim-wave-id.mjs` reserves a number by PUBLISHING the reservation immediately:
 
 1. `git fetch <remote> <branch>` (remote/branch default to the upstream of HEAD).
+   Detached HEAD (worktree, rebase, `checkout --detach`): the literal `HEAD` returned by
+   `--abbrev-ref` is never accepted as a branch name — the script dereferences the remote's
+   default branch via `git symbolic-ref refs/remotes/<remote>/HEAD`, and if that is not
+   configured, fails loudly asking for an explicit `--branch`. Silently pushing to
+   `refs/heads/HEAD` is forbidden in all cases (incident: projectx 2026-06-11, a stray
+   `HEAD` branch on the remote plus a phantom claim reported as success).
 2. Compute the next free number as max+1 over the UNION of sources: local
    `docs/retros|specs|runs` file names (catches a spec created locally and not yet pushed),
    the remote tree (`git ls-tree`), commit subjects of both local HEAD and the remote head,
@@ -69,6 +75,10 @@ session's, because this session has not claimed yet.
 - AC8: the session-start digest reports fresh (<24h) claims from the union of the local
   registry and its `@{u}` version, deduped, and stays silent outside git repos.
   → session-start-digest self-test
+- AC9: from a detached-HEAD checkout with no explicit `--branch`, the claim either lands on
+  the remote's default branch (when `refs/remotes/<remote>/HEAD` is configured) or fails
+  with an explicit error naming `--branch`; under no outcome does a branch named `HEAD`
+  appear on the remote. → T8
 
 ## 4. Wiring (not a ghost)
 
