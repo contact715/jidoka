@@ -42,6 +42,7 @@
 		"model:tier": "node scripts/model-tier.mjs",
 		"jidoka": "node scripts/jidoka.mjs",
 		"jidoka:top": "node scripts/tui-top.mjs",
+		"claim:wave": "node scripts/claim-wave-id.mjs",
 		"check:dead-code": "node scripts/dead-code.mjs",
 		"check:type-coverage": "node scripts/type-coverage.mjs",
 		"check:contract": "node scripts/contract-check.mjs",

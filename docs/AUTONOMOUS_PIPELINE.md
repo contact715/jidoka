@@ -97,6 +97,20 @@ Boundary: `--resume` reports position plus the next step, it does not auto-execu
 
 ---
 
+## Wave-id claims (parallel sessions)
+
+Numeric wave ids are reserved mechanically, not by convention. Before creating ANY wave artifact (spec, run-state init, retro), a session claims the next free number:
+
+```
+node scripts/claim-wave-id.mjs        # prints wave-N (in a product: <project>/.jidoka/scripts/)
+```
+
+The claim is a one-line record appended to `docs/specs/_CLAIMED_WAVES.jsonl` and pushed as a micro-commit built directly on top of the fetched remote head via git plumbing — the local branch, index, and working tree are untouched, so a dirty tree or a branch that is N commits behind cannot block the claim. A rejected push means a parallel session took the number in those same seconds: the script re-fetches and takes the next one (CAS semantics on pure git, no server). Used-number sources are unioned: local `docs/retros|specs|runs`, the remote tree, commit subjects, and the claim registry itself.
+
+Why "git fetch before picking an id" was not enough: the chosen number lived only in session memory until the first commit — an hours-wide race window. Real incident: projectx 2026-06-10, two parallel sessions took the same number three times in one day, two pushes rejected, hand-merge conflicts in generated files. The session-start digest (`hooks/session-start-digest.mjs`) additionally warns when the registry holds a fresh (<24h) claim — at session start any fresh claim is by definition another session's.
+
+---
+
 ## Known limitations
 
 - **pre-merge fires on local `git merge` only.** The `.githooks/pre-merge-commit` hook fires when running `git merge` locally. It does NOT fire when merging a pull request via the GitHub UI. Teams using GitHub's merge button bypass this gate. To enforce quality gates on GitHub merges, configure branch protection rules with required status checks in GitHub Actions CI.
