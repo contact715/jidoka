@@ -11,8 +11,10 @@ export const meta = {
 }
 
 // ── Phase 0: recon — read the CURRENT state so the analysis never goes stale ──
+// repoPath comes from args (the weekly routine passes a clean clone path); defaults to cwd.
+const REPO = (typeof args !== 'undefined' && args && args.repoPath) ? args.repoPath : '.'
 phase('Recon')
-log('Reading current jidoka state (so we never re-propose what is already shipped)')
+log(`Reading current jidoka state from ${REPO} (so we never re-propose what is already shipped)`)
 
 const RECON_SCHEMA = {
   type: 'object', additionalProperties: true,
@@ -29,7 +31,7 @@ const RECON_SCHEMA = {
 
 const recon = await agent(
   `Ты — разведчик состояния движка разработки jidoka. Цель: дать ТОЧНЫЙ снимок текущей реальности, чтобы последующий ресёрч не предлагал то, что уже есть.
-Рабочая папка — корень репозитория jidoka (github.com/contact715/jidoka).
+Репозиторий jidoka находится в: ${REPO} — все чтения и команды выполняй относительно него (cd туда или используй абсолютные пути от него).
 Прочитай и обобщи:
 - docs/HONEST_SYSTEM_STATE.md и docs/ENGINEERING_SYSTEM_ASSESSMENT.md (что реально работает, честные границы).
 - Список скриптов: ls scripts/*.mjs (и .sh) — это арсенал механизмов.
