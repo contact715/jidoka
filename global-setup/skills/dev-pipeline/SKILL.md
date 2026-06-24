@@ -136,6 +136,11 @@ the spec system is `HIERARCHICAL_SPEC_SYSTEM.md`, the mission/constitution are a
    `node <проект>/.jidoka/scripts/parallel-guard.mjs --agents '[{slug,write_scope}...]'` — если
    write_scope пересекаются, запусти конфликтующих в git worktree (Agent `isolation:"worktree"`) или
    серийно; непересекающиеся идут параллельно безопасно.
+   **Контекст имплементеру одним файлом.** Перед dispatch собери плоский story-bundle, чтобы агент
+   не до-выяснял предков спеки заново: `node scripts/shard-story-bundle.mjs --feature <wave-id> --wave <wave-id> --task build`
+   (или `dispatch-parallel-implementations.mjs … --story`). Он инлайнит мастер-спеку + всю цепочку
+   предков L0→Ln + acceptance criteria в `docs/specs/stories/<wave>-build.story.md` — имплементер читает
+   один файл, поиск ноль раз.
 
 5. **Гейты (параллельно).** reflexion-critic (соответствие спеке), constitutional-reviewer
    (миссия), security-scanner, coverage / a11y / perf. + **execution proof**:

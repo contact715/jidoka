@@ -48,6 +48,7 @@ Flags:
   --n <number>     Number of parallel attempts (default: 1)
   --wave <id>      Wave identifier (e.g. wave-103)
   --spec <path>    Path to master spec (optional, copied to each attempt branch)
+  --story          Also build + copy a flattened story bundle (spec + inlined ancestry + ACs)
   --collect        Collect and compare completed attempts via best-of-N-judge
   --dry-run        Print what would happen without executing git commands
   --help           Show this message
@@ -70,6 +71,11 @@ const waveId = waveIdx !== -1 ? args[waveIdx + 1] : 'unknown';
 
 const specIdx = args.indexOf('--spec');
 const specPath = specIdx !== -1 ? args[specIdx + 1] : null;
+
+// --story (opt-in): hand each implementer a flattened story bundle (spec + inlined
+// ancestry + ACs) instead of just the raw spec, so it does retrieval zero times (gap #5).
+const useStory = args.includes('--story');
+const storyRel = useStory && waveId ? `docs/specs/stories/${String(waveId).toLowerCase().replace(/[^a-z0-9.-]+/g, '-')}-build.story.md` : null;
 
 const collect = args.includes('--collect');
 const dryRun = args.includes('--dry-run');
@@ -173,6 +179,21 @@ if (!collect) {
       }
     }
 
+    // --story: build the flattened bundle once, then copy it into each worktree (gap #5).
+    if (storyRel && !dryRun) {
+      try {
+        if (!fs.existsSync(path.resolve(ROOT, storyRel))) {
+          execSync(`node ${path.resolve(ROOT, 'scripts/shard-story-bundle.mjs')} --spec ${specPath} --wave ${waveId} --task build`, { cwd: ROOT, stdio: 'ignore' });
+        }
+        const absStory = path.resolve(ROOT, storyRel);
+        if (fs.existsSync(absStory)) {
+          const destStory = path.join(worktreePath, storyRel);
+          fs.mkdirSync(path.dirname(destStory), { recursive: true });
+          fs.copyFileSync(absStory, destStory);
+        }
+      } catch { /* best-effort; spec copy still happened */ }
+    }
+
     createdBranches.push(branch);
     createdWorktrees.push(worktreePath);
 
@@ -181,7 +202,7 @@ if (!collect) {
 
   console.log(`\n[PARALLEL] Created ${n} branches: ${createdBranches.join(', ')}`);
   console.log(`\nNext steps:`);
-  console.log(`  1. Implement the spec in each worktree independently.`);
+  console.log(`  1. Implement ${storyRel ? `the story bundle (${storyRel}) — everything is inlined` : 'the spec'} in each worktree independently.`);
   console.log(`  2. Run: node scripts/dispatch-parallel-implementations.mjs --wave ${waveId} --collect`);
   console.log(`  3. best-of-N-judge will compare all ${n} implementations and select the winner.\n`);
 
