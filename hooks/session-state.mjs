@@ -10,9 +10,10 @@
 //
 // Self-test: node session-state.mjs --self-test
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, appendFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { pushRing, detect } from '../scripts/stuck-detector.mjs';
 
 // pure: describe a tool call in a few human words (testable)
 export function describeActivity(toolName, toolInput = {}) {
@@ -140,6 +141,22 @@ if (isMain) {
       // touches stdout (which would leak into the model context on UserPromptSubmit)
       const title = titleFor(next.state, next.prompt, next.topic);
       if (title) { try { writeFileSync('/dev/tty', `\x1b]0;${title}\x07`); } catch { /* headless */ } }
+      // stuck-detector (soft trial): keep a per-session activity ring; on a loop/runaway
+      // pattern, log a diagnosis the andon layer can read. Never blocks the tool.
+      if (event === 'PreToolUse') {
+        try {
+          const rf = join(dir, `ring-${sid}.json`);
+          let ring = []; try { ring = JSON.parse(readFileSync(rf, 'utf8')); } catch { /* fresh */ }
+          ring = pushRing(ring, next.activity || '');
+          writeFileSync(rf, JSON.stringify(ring));
+          const v = detect(ring);
+          if (v.stuck) {
+            const log = join(homedir(), '.claude', 'jidoka', 'stuck-events.jsonl');
+            mkdirSync(join(homedir(), '.claude', 'jidoka'), { recursive: true });
+            appendFileSync(log, JSON.stringify({ ts: new Date().toISOString(), session: sid, ...v }) + '\n');
+          }
+        } catch { /* best-effort; never block the session */ }
+      }
     }
   } catch { /* never block the session */ }
   process.exit(0);
