@@ -2,7 +2,7 @@
 
 Wave-55 ships bundled weekly + monthly audit routines. They are NPM scripts that compose existing audits. The point: catch drift between sessions without manual triggering.
 
-## Two routines
+## Routines (two local npm audits + one scheduled Kaizen task)
 
 ### Weekly — `npm run routine:weekly`
 
@@ -31,6 +31,24 @@ Heavier audit (~15-30 min including agent dispatches the orchestrator picks up f
    - Skills aging deep dive
 
 Output: `docs/audit-reports/routine-monthly-YYYY-MM.md`
+
+### Weekly enrichment / Kaizen — scheduled Claude task `jidoka-weekly-enrichment`
+
+External-facing self-improvement (complements the internal weekly audit above). Every Monday
+~09:00 a scheduled Claude Code task runs deep GitHub research + an AI-war (prosecutor/defender/judge
+debates) to find new repos, methods and technologies that would strengthen jidoka, then writes a
+ranked improvement plan. Mode: PROPOSE only — it never implements code, it surfaces a plan for the
+owner to approve.
+
+- Engine: `.claude/workflows/jidoka-enrichment.js` (recon current state → research 8 domains →
+  adversarial verify → debates → ranked synthesis). Phase 0 reads the live jidoka state so it never
+  re-proposes what is already shipped.
+- The task clones a clean `main` into `~/.jidoka-weekly`, runs the workflow there, writes
+  `docs/research/weekly/jidoka-enrichment-YYYY-WNN.md`, commits + pushes to `main`, and notifies.
+- Manage it from the Claude Code "Scheduled" sidebar, or `list_scheduled_tasks` /
+  `update_scheduled_task` (taskId `jidoka-weekly-enrichment`). Runs while the app is open; if closed
+  when due, runs on next launch.
+- Run on demand: `Workflow({scriptPath:"<repo>/.claude/workflows/jidoka-enrichment.js"})`.
 
 ## Wiring to OS-level cron
 
