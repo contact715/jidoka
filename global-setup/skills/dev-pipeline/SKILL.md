@@ -83,7 +83,7 @@ the spec system is `HIERARCHICAL_SPEC_SYSTEM.md`, the mission/constitution are a
    **Механический спутник — clarify-engine (forcing function, не добровольность).** Пока
    задаёшь вопросы через AskUserQuestion, ЗАПИСЫВАЙ ответы в движок покрытия — иначе этот шаг
    остаётся прозой, которую агент может пропустить:
-   `node scripts/clarify-engine.mjs --feature <wave-id> --plan` показывает следующие вопросы,
+   `node ~/.claude/jidoka/scripts/clarify-engine.mjs --feature <wave-id> --plan` показывает следующие вопросы,
    упорядоченные по impact × uncertainty (9 категорий: проблема, пользователи, бизнес-метрика,
    объём, ограничения, данные, краевые случаи, критерии приёмки, риски). На каждый ответ:
    `--answer <категория> "<текст>"` (или `--defer <категория> "<причина>"` если осознанно
@@ -137,7 +137,7 @@ the spec system is `HIERARCHICAL_SPEC_SYSTEM.md`, the mission/constitution are a
    write_scope пересекаются, запусти конфликтующих в git worktree (Agent `isolation:"worktree"`) или
    серийно; непересекающиеся идут параллельно безопасно.
    **Контекст имплементеру одним файлом.** Перед dispatch собери плоский story-bundle, чтобы агент
-   не до-выяснял предков спеки заново: `node scripts/shard-story-bundle.mjs --feature <wave-id> --wave <wave-id> --task build`
+   не до-выяснял предков спеки заново: `node ~/.claude/jidoka/scripts/shard-story-bundle.mjs --feature <wave-id> --wave <wave-id> --task build`
    (или `dispatch-parallel-implementations.mjs … --story`). Он инлайнит мастер-спеку + всю цепочку
    предков L0→Ln + acceptance criteria в `docs/specs/stories/<wave>-build.story.md` — имплементер читает
    один файл, поиск ноль раз.
@@ -155,7 +155,7 @@ the spec system is `HIERARCHICAL_SPEC_SYSTEM.md`, the mission/constitution are a
 
 6. **Дебаг (с исполняемым возвратом гейта).** debug-agent на провалах тестов (авто-фикс если уверен и
    мелко, иначе эскалация). Маршрут «гейт→дебаг→гейт» не проза, а решение:
-   `node scripts/gate-loopback.mjs --phase gate --verdict <pass|fail> --rounds <n>` — pass уводит в
+   `node ~/.claude/jidoka/scripts/gate-loopback.mjs --phase gate --verdict <pass|fail> --rounds <n>` — pass уводит в
    memory, fail возвращает в debug с инкрементом раунда, после debug — обратно в gate; на 5-м провале
    возвращает HALT (exit 42, эскалация человеку через andon). Лимит 5 раундов теперь энфорсится.
 
