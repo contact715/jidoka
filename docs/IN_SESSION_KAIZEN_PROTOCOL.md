@@ -34,6 +34,19 @@ When the **same friction, mistake, or pattern recurs ≥2× within one session**
 - **Timing**: the next natural pause, never mid-action.
 - **"Same pattern"** is a semantic judgement (a café labelled a car-wash ≈ demo contradicts identity; "preview empty" ≈ "couldn't verify visually"). The tool counts; you canonicalise — same as the cross-wave reviewer.
 
+## Enforcement — why it can't be forgotten
+
+A rule that lives only in a doc is the anti-pattern this framework forbids
+(documentation-only enforcement). So the loop is **wired into the session-start
+digest** (`hooks/session-start-digest.mjs`): on every session start it runs
+`session-pattern-log.mjs report --all` and, if any class is still open at the
+threshold, prints a `🔴 неразобранные паттерны (In-Session Kaizen): …` line into
+the model context. Unresolved recurrence resurfaces at the top of the next
+session until it is `resolve`d — the agent cannot start work without seeing it.
+`resolve` then feeds the cross-wave meta-ledger, so the lesson also enters
+meta-trend / meta-audit. (Soft surfacing now; can harden to a pre-push warn later
+per the framework's gate-introduction pattern.)
+
 ## What counts as a pattern
 
 Friction or a miss that repeats: a verification path that keeps failing the same way, a manual workaround you do twice, a class of mistake (declaration-over-implementation, asking the owner a too-technical question), a step that keeps getting skipped. Positive patterns count too — an approach worth codifying once it proves itself twice.

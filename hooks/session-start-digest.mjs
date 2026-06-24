@@ -33,11 +33,23 @@ try {
   const lessons = [...active.matchAll(/^### ([^\n·]+)·[^\n]*$/gm)].map(m => m[1].trim());
   const ungated = [...active.matchAll(/^### ([^\n·]+)·[^\n]*\n(?!✓ gated)/gm)].map(m => m[1].trim());
 
+  // 4) In-Session Kaizen enforcement: unresolved recurring patterns (≥2× in a
+  //    session, never resolved) resurface here so the loop can't be dropped.
+  let iskLine = '';
+  try {
+    const rep = execSync(`node ${join(jidoka, 'scripts', 'session-pattern-log.mjs')} report --all`, { encoding: 'utf8', timeout: 3000 });
+    if (/🔴/.test(rep)) {
+      const found = [...rep.matchAll(/• (\S+) — (\d+)×/g)].map(m => `${m[1]} (${m[2]}×)`);
+      if (found.length) iskLine = `🔴 неразобранные паттерны (In-Session Kaizen): ${found.join(', ')} — разобрать и закрыть (resolve)`;
+    }
+  } catch { /* tool optional */ }
+
   const out = [
     '[session-start digest]',
     `jidoka: ${health}`,
     lessons.length ? `активные уроки (🔴): ${lessons.join(', ')}` : 'активных уроков нет',
     ungated.length ? `БЕЗ гейта (живой риск): ${ungated.join(', ')}` : '',
+    iskLine,
     'полный дайджест: ~/.claude/jidoka/memory-consolidated.md',
   ].filter(Boolean).join('\n');
   process.stdout.write(out);
