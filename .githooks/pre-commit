@@ -26,6 +26,16 @@ else
   echo "✓ pre-commit · instantiation-audit: no ghosts"
 fi
 
+# clarify-gate — WARN by default: a staged master spec must have complete business-question
+# coverage (clarify-engine). Soft trial; promote to --block via gate-graduation once stable.
+out=$(node "$ROOT/scripts/clarify-gate.mjs" --staged 2>&1)
+if echo "$out" | grep -q 'BUSINESS-QUESTION GATE'; then
+  echo "$out"
+  echo "↑ clarify-gate: under-elicited master spec flagged (WARN, not blocking)."
+else
+  echo "✓ pre-commit · clarify-gate: $(echo "$out" | tail -1)"
+fi
+
 # 2026-06-10 — sentinel for --no-verify detection: post-commit treats its absence as a bypassed
 # hook run and logs it to .sdd-bypass.log while hard_block_ac=true. Transient, gitignored.
 echo "$$" > "$ROOT/.sdd-precommit-sentinel"

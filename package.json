@@ -59,6 +59,8 @@
 		"model:route": "node scripts/model-router.mjs",
 		"skill:select": "node scripts/skill-selector.mjs",
 		"spec:tldr": "node scripts/spec-tldr.mjs",
+		"clarify": "node scripts/clarify-engine.mjs",
+		"clarify:gate": "node scripts/clarify-gate.mjs --staged",
 		"trend:scan": "node scripts/trend-scan.mjs",
 		"cost:ledger": "node scripts/cost-ledger.mjs",
 		"guard:resource": "node scripts/resource-guard.mjs",
