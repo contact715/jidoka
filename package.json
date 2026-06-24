@@ -90,7 +90,7 @@
 		"memory:curate": "node scripts/memory-curator.mjs --build",
 		"story:bundle": "node scripts/shard-story-bundle.mjs",
 		"dup:guard": "node scripts/dup-guard.mjs --staged",
-		"gate:loopback": "node scripts/gate-loopback.mjs",
+		"loopback": "node scripts/gate-loopback.mjs",
 		"stuck:check": "node scripts/stuck-detector.mjs",
 		"agents:improve": "bash scripts/check-self-improvement-due.sh --force && ls .claude/self-improvement-queue/ 2>/dev/null",
 		"audit:backlog": "bash scripts/audit-backlog-status.sh",

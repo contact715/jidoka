@@ -40,7 +40,7 @@ node scripts/instantiation-audit.mjs
 ### AC-2 — A reference to a nonexistent workflow → ghost, exit 1
 
 ```
-fixture: cite missing .github/workflows/foo.yml → exit 1
+fixture: cite a missing workflow file (a path under the workflows dir not on disk) -> ghost, exit 1
 ```
 
 ### AC-3 — --warn reports the same condition but exits 0
