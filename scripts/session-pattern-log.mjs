@@ -84,6 +84,20 @@ function cmdLog(rest) {
 }
 
 function cmdReport(rest) {
+  // --all: scan EVERY session for still-open ≥threshold classes. This is the
+  // enforcement read wired into the session-start digest — unresolved recurring
+  // patterns resurface at the start of the next session so the loop can't be
+  // silently dropped.
+  if (rest.includes('--all')) {
+    const recs = readAll();
+    const byClass = {};
+    for (const r of recs) if (r.status === 'open') byClass[r.class] = (byClass[r.class] || 0) + 1;
+    const due = Object.entries(byClass).filter(([, n]) => n >= THRESHOLD).map(([c, n]) => ({ class: c, count: n }));
+    if (!due.length) { console.log('✓ no unresolved recurring patterns.'); return 0; }
+    console.log(`🔴 ${due.length} unresolved recurring pattern(s):`);
+    for (const d of due) console.log(`  • ${d.class} — ${d.count}×`);
+    return 0;
+  }
   const session = sessionFrom(rest);
   const recs = readAll();
   const classes = [...new Set(recs.filter((r) => r.session === session && r.status === 'open').map((r) => r.class))];

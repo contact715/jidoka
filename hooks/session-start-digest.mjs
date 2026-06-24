@@ -125,12 +125,24 @@ try {
   let claims = [];
   try { claims = freshClaims(sh('git rev-parse --show-toplevel', process.cwd())); } catch { /* не git-репо */ }
 
+  // 5) In-Session Kaizen enforcement: unresolved recurring patterns (≥2× in a
+  //    session, never resolved) resurface here so the loop can't be dropped.
+  let iskLine = '';
+  try {
+    const rep = execSync(`node ${join(jidoka, 'scripts', 'session-pattern-log.mjs')} report --all`, { encoding: 'utf8', timeout: 3000 });
+    if (/🔴/.test(rep)) {
+      const found = [...rep.matchAll(/• (\S+) — (\d+)×/g)].map(m => `${m[1]} (${m[2]}×)`);
+      if (found.length) iskLine = `🔴 неразобранные паттерны (In-Session Kaizen): ${found.join(', ')} — разобрать и закрыть (resolve)`;
+    }
+  } catch { /* tool optional */ }
+
   const out = [
     '[session-start digest]',
     `jidoka: ${health}`,
     lessons.length ? `активные уроки (🔴): ${lessons.join(', ')}` : 'активных уроков нет',
     ungated.length ? `БЕЗ гейта (живой риск): ${ungated.join(', ')}` : '',
     claims.length ? `⚠️ занятые wave-id (клеймы <24ч): ${claims.join(', ')} — свой номер бери через claim-wave-id.mjs` : '',
+    iskLine,
     'полный дайджест: ~/.claude/jidoka/memory-consolidated.md',
   ].filter(Boolean).join('\n');
   process.stdout.write(out);
