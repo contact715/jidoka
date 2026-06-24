@@ -89,6 +89,7 @@
 		"memory:retrieve": "node scripts/memory-retrieve.mjs",
 		"memory:curate": "node scripts/memory-curator.mjs --build",
 		"story:bundle": "node scripts/shard-story-bundle.mjs",
+		"dup:guard": "node scripts/dup-guard.mjs --staged",
 		"stuck:check": "node scripts/stuck-detector.mjs",
 		"agents:improve": "bash scripts/check-self-improvement-due.sh --force && ls .claude/self-improvement-queue/ 2>/dev/null",
 		"audit:backlog": "bash scripts/audit-backlog-status.sh",
