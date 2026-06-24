@@ -100,8 +100,9 @@ if (process.argv.includes('--self-test')) selfTest();
 try {
   const jidoka = join(homedir(), '.claude', 'jidoka');
 
-  // 1) rebuild the digest (measured: ~40ms)
+  // 1) rebuild the digest (measured: ~40ms) + refresh the memory-curator utility priors
   try { execSync(`node ${join(jidoka, 'scripts', 'memory-consolidate.mjs')}`, { stdio: 'ignore', timeout: 5000 }); } catch { /* keep old digest */ }
+  try { execSync(`node ${join(jidoka, 'scripts', 'memory-curator.mjs')} --build`, { stdio: 'ignore', timeout: 5000 }); } catch { /* keep old priors */ }
 
   // 2) jidoka health (same cached signals as the statusline)
   let health = '⚪ нет baseline';

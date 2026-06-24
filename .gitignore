@@ -40,6 +40,8 @@ dashboard-current.png
 docs/CURRENT_WAVE.md
 docs/dashboard-snapshot.md
 docs/audits/spec-context-runs.jsonl
+docs/audits/clarify-runs.jsonl
+docs/audits/lesson-utility.json
 
 # local install/test artifacts — engine tests are zero-dep by design; products own their lockfiles
 package-lock.json

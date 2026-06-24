@@ -49,3 +49,12 @@ test('respects k', () => {
   const { results } = retrieve(items, 'secret react layout', 2);
   assert.equal(results.length, 2);
 });
+
+test('utility prior breaks ties toward live-risk lessons', () => {
+  const tied = [
+    { id: 'x', kind: 'lesson', title: 'solved', text: 'gate handling problem here', recency: 1, prior: 0.1 },
+    { id: 'y', kind: 'lesson', title: 'live-risk', text: 'gate handling problem here', recency: 1, prior: 0.9 },
+  ];
+  const { results } = retrieve(tied, 'gate handling problem', 2);
+  assert.equal(results[0].title, 'live-risk'); // same relevance+recency, higher prior wins
+});

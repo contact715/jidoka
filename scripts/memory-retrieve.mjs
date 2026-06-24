@@ -30,8 +30,11 @@
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { loadLedger, groupByClass, todayISO } from './meta-lib.mjs';
+import { loadLedger, groupByClass, todayISO, LEDGER } from './meta-lib.mjs';
 import { scoreCluster } from './memory-consolidate.mjs';
+
+// Same path the curator writes (next to the ledger), so priors are found in both contexts.
+const LESSON_UTILITY = process.env.LESSON_UTILITY || LEDGER.replace(/meta-mistakes\.jsonl$/, 'lesson-utility.json');
 
 // Small RU+EN stopword set — drop the noise words that would dominate overlap.
 const STOP = new Set((
@@ -89,13 +92,14 @@ export function retrieve(items, taskText, k = 5) {
   const scored = items.map((it, i) => {
     const relevance = scoreItem(q, docTfs[i], idf);
     const recencyNorm = (it.recency || 0) / maxRecency;
-    // relevance dominates; recency is a mild prior and the tiebreak.
-    const combined = relevance + 0.15 * recencyNorm;
-    return { ...it, relevance, recencyNorm, combined };
+    const prior = it.prior || 0; // memory-curator surfacePrior: boost live-risk lessons
+    // relevance dominates; recency + utility prior are mild and the tiebreak.
+    const combined = relevance + 0.15 * recencyNorm + 0.2 * prior;
+    return { ...it, relevance, recencyNorm, prior, combined };
   });
   const anyRelevant = scored.some((s) => s.relevance > 0);
-  // When nothing overlaps the task, fall back to pure recency (never worse than today's digest).
-  scored.sort((a, b) => (anyRelevant ? b.combined - a.combined : b.recencyNorm - a.recencyNorm));
+  // When nothing overlaps the task, fall back to recency + utility (never worse than today's digest).
+  scored.sort((a, b) => (anyRelevant ? b.combined - a.combined : (b.recencyNorm + 0.5 * b.prior) - (a.recencyNorm + 0.5 * a.prior)));
   // Dedupe: one representative per theme key.
   const seen = new Set();
   const out = [];
@@ -110,14 +114,26 @@ export function retrieve(items, taskText, k = 5) {
 }
 
 // ---- corpus builders ----
+function loadUtilityPriors() {
+  // memory-curator sidecar — surfacePrior per class; absent = no prior (all zero).
+  try {
+    const m = JSON.parse(readFileSync(LESSON_UTILITY, 'utf8'));
+    const out = {};
+    for (const [cls, u] of Object.entries(m.classes || {})) out[cls] = u.surfacePrior || 0;
+    return out;
+  } catch { return {}; }
+}
+
 function ledgerItems(today) {
   let rows = [];
   try { rows = loadLedger(); } catch { rows = []; }
+  const priors = loadUtilityPriors();
   const byClass = groupByClass(rows);
   return Object.entries(byClass).map(([cls, items]) => ({
     id: `lesson:${cls}`, kind: 'lesson', title: cls,
     text: items.map((r) => `${r.claimed || ''} ${r.real || ''}`).join(' '),
     recency: scoreCluster(items, today),
+    prior: priors[cls] || 0,
   }));
 }
 
