@@ -27,18 +27,38 @@ import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseModule } from './code-map.mjs';
 
 // Symbols so generic that two modules sharing them is not evidence of duplication.
 const GENERIC = new Set(['main', 'default', 'run', 'init', 'config', 'handler']);
+
+const isTest = (p) => /(^|\/)__tests__\//.test(p) || /\.test\.mjs$/.test(p);
+
+/**
+ * Line-anchored export extraction. We do NOT reuse code-map's parseModule here: it
+ * matches `export …` anywhere, including inside string literals (test fixtures, this
+ * file's own self-test), which produced false collisions. `^\s*export` only matches a
+ * real top-of-line declaration, so fixture strings like `content: 'export function x'`
+ * are correctly ignored.
+ */
+export function extractExports(content) {
+  const out = [];
+  let m;
+  const decl = /^\s*export\s+(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm;
+  while ((m = decl.exec(content))) out.push(m[1]);
+  const named = /^\s*export\s*\{([^}]+)\}/gm;
+  while ((m = named.exec(content))) for (const part of m[1].split(',')) {
+    const name = part.trim().split(/\s+as\s+/)[0].trim();
+    if (name) out.push(name);
+  }
+  return [...new Set(out)];
+}
 
 /** Map exported symbol → [files that export it], across a set of {path, content}. */
 export function buildExportIndex(files) {
   const idx = new Map();
   for (const f of files) {
-    let exp = [];
-    try { exp = parseModule(f.content).exports || []; } catch { exp = []; }
-    for (const s of exp) {
+    if (isTest(f.path)) continue;
+    for (const s of extractExports(f.content)) {
       if (GENERIC.has(s)) continue;
       if (!idx.has(s)) idx.set(s, []);
       idx.get(s).push(f.path);
@@ -49,8 +69,8 @@ export function buildExportIndex(files) {
 
 /** Collisions for a newly-added file against the index of all OTHER modules. */
 export function findCollisions(addedPath, addedContent, index) {
-  let exp = [];
-  try { exp = parseModule(addedContent).exports || []; } catch { exp = []; }
+  if (isTest(addedPath)) return [];
+  const exp = extractExports(addedContent);
   const hits = [];
   for (const s of exp) {
     if (GENERIC.has(s)) continue;
@@ -68,7 +88,7 @@ function listScripts(dir = 'scripts') {
 function stagedAdded() {
   try {
     return execSync('git diff --cached --name-only --diff-filter=A', { encoding: 'utf8' })
-      .split('\n').map((s) => s.trim()).filter((f) => f.endsWith('.mjs'));
+      .split('\n').map((s) => s.trim()).filter((f) => f.endsWith('.mjs') && !isTest(f));
   } catch { return []; }
 }
 
@@ -131,6 +151,12 @@ function selfTest() {
 
   const generic = findCollisions('scripts/e.mjs', 'export function main(){}', buildExportIndex([{ path: 'scripts/f.mjs', content: 'export function main(){}' }]));
   ok(generic.length === 0, 'generic-named exports never collide');
+
+  // string-literal robustness: an export-like token INSIDE a string must not count as an export.
+  const fixturey = "const demo = { content: 'export function loadThing(){}' };\nexport const realOne = 1;";
+  ok(extractExports(fixturey).join(',') === 'realOne', 'export inside a string literal is ignored');
+  ok(findCollisions('scripts/g.mjs', fixturey, index).length === 0, 'a file with fixture strings does not false-collide');
+  ok(isTest('scripts/__tests__/x.test.mjs') && isTest('scripts/y.test.mjs'), 'test files are recognised and excluded');
 
   console.log(fail === 0 ? '\ndup-guard: all self-tests passed' : `\ndup-guard: ${fail} self-test(s) FAILED`);
   process.exit(fail === 0 ? 0 : 1);

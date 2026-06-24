@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildExportIndex, findCollisions } from '../dup-guard.mjs';
+import { buildExportIndex, findCollisions, extractExports } from '../dup-guard.mjs';
 
 const corpus = [
   { path: 'scripts/a.mjs', content: 'export function loadThing(){}\nexport const X = 1;' },
@@ -34,4 +34,15 @@ test('a file never collides with itself', () => {
 test('generic-named exports never collide', () => {
   const index = buildExportIndex([{ path: 'scripts/f.mjs', content: 'export function run(){}' }]);
   assert.equal(findCollisions('scripts/e.mjs', 'export function run(){}', index).length, 0);
+});
+
+test('export-like tokens inside string literals are ignored (no false collisions)', () => {
+  const fixturey = "const demo = { content: 'export function loadThing(){}' };\nexport const realOne = 1;";
+  assert.deepEqual(extractExports(fixturey), ['realOne']);
+  const index = buildExportIndex([{ path: 'scripts/a.mjs', content: 'export function loadThing(){}' }]);
+  assert.equal(findCollisions('scripts/g.mjs', fixturey, index).length, 0);
+});
+
+test('export { a, b as c } named exports are extracted', () => {
+  assert.deepEqual(extractExports('export { foo, bar as baz };'), ['foo', 'bar']);
 });
