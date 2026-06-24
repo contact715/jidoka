@@ -153,7 +153,11 @@ the spec system is `HIERARCHICAL_SPEC_SYSTEM.md`, the mission/constitution are a
    уровне ядра. На критичных — дебаты: prosecutor →
    defender → judge. best-of-N-judge если было несколько попыток.
 
-6. **Дебаг.** debug-agent на провалах тестов (авто-фикс если уверен и мелко, иначе эскалация).
+6. **Дебаг (с исполняемым возвратом гейта).** debug-agent на провалах тестов (авто-фикс если уверен и
+   мелко, иначе эскалация). Маршрут «гейт→дебаг→гейт» не проза, а решение:
+   `node scripts/gate-loopback.mjs --phase gate --verdict <pass|fail> --rounds <n>` — pass уводит в
+   memory, fail возвращает в debug с инкрементом раунда, после debug — обратно в gate; на 5-м провале
+   возвращает HALT (exit 42, эскалация человеку через andon). Лимит 5 раундов теперь энфорсится.
 
 7. **Запуск (если есть прод-цель).** devops-lead (окружения, путь ОТКАТА до выката, что мониторим)
    → release-engineer (CI зелёный → версия + changelog → миграции с откатом → выкат + наблюдение,
