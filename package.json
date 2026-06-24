@@ -86,6 +86,7 @@
 		"memory:snapshot": "node scripts/export-memory-snapshot.mjs",
 		"memory:restore": "node scripts/restore-memory-from-snapshots.mjs",
 		"memory:status": "node scripts/memory-staging-status.mjs",
+		"memory:retrieve": "node scripts/memory-retrieve.mjs",
 		"agents:improve": "bash scripts/check-self-improvement-due.sh --force && ls .claude/self-improvement-queue/ 2>/dev/null",
 		"audit:backlog": "bash scripts/audit-backlog-status.sh",
 		"outcome:check": "node scripts/outcome-check.mjs",

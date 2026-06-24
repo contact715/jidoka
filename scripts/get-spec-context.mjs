@@ -19,6 +19,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { retrieve } from './memory-retrieve.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -297,6 +298,19 @@ function main() {
   if (matches.length === 0) {
     logRun(featureName, false, null, 0);
     process.stderr.write(`[not found] no spec matches "${featureName}"\n`);
+    // Semantic fallback (research #1): an unknown --feature should not dead-end —
+    // suggest the nearest specs by MEANING instead of exact name. Best-effort.
+    try {
+      const items = allSpecs.map((s) => ({
+        id: s.relPath, kind: 'doc', title: s.relPath,
+        text: `${s.title || ''} ${s.relPath} ${s.tldr || s.summary || ''}`, recency: 0,
+      }));
+      const { results, relevanceDriven } = retrieve(items, featureName, 3);
+      if (relevanceDriven && results.length) {
+        process.stderr.write(`[semantic] nearest specs by meaning:\n`);
+        for (const r of results) process.stderr.write(`  • ${r.title}${r.relevance ? ` (rel ${r.relevance.toFixed(2)})` : ''}\n`);
+      }
+    } catch { /* fallback is best-effort; never block the spec read on it */ }
     process.exit(0);
   }
 
