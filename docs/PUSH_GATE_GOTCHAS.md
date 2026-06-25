@@ -50,3 +50,31 @@ with **0 connection drops**, gate PASS, ref advanced.
 Full-tree vitest runs with `fileParallelism: false` in these repos (CLI/spec
 tests share the filesystem and race in parallel), so the suite is slow by design.
 Don't parallelize it to speed the gate — fix the wait instead (keepalive above).
+
+## Mass test failures in the gate = a corrupted shared fixture, not "flakiness"
+
+Caught the hard way in projectx-app 2026-06-24 (cost ~40 steps of wrong theories).
+
+When a pre-push gate fails on **many** tests at once (10-25) with the **same**
+error, and especially when the SAME files fail every run, the cause is almost
+always a **corrupted shared fixture**, not parallelism or random flake.
+
+Suites where CLI/coverage tests temporarily swap a canonical file (an agent
+roster, a registry, a baseline JSON) and restore it in a `finally` are fragile:
+**if a full test run is interrupted** (kill, Ctrl-C, timeout) while the swap is
+live, the canonical file is left in its stub state on disk, and every subsequent
+run deterministically fails the dozens of tests that validate against it.
+
+Rules:
+- **Never interrupt a full test run** that swaps shared fixtures. Let it finish;
+  wait with a real sleep (`perl -e 'select(undef,undef,undef,N)'`), not a foreground
+  `sleep` and not `read </dev/zero` (which may not block).
+- **Diagnose mass failures with `git status` FIRST** — look for a gutted/corrupted
+  tracked fixture (huge unexpected deletion). `git checkout -- <file>` fixes it.
+  Tell-tale: the SAME files fail every run (persistent corruption) vs DIFFERENT
+  files each run (genuine intermittent race).
+- A subset run (`vitest run path/to/dir`) is NOT a valid repro for suite-level
+  failures — coverage tests often depend on state set up by tests outside the subset.
+- Adversarial-retry caution: `vitest retry` on a test that holds a shared file in a
+  bad state AMPLIFIES the cascade (longer corruption window). Retry the racy check
+  INLINE instead, and only when it writes a benign (current, not zeroed) state.
