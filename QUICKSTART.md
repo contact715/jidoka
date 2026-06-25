@@ -41,6 +41,55 @@ node scripts/install-into.mjs /path/to/your/project --profile=full      # everyt
 The installer is secret-safe: it ensures `.gitignore` covers secret-shaped files before wiring any git
 hooks, and it never runs `git add` or `git commit`.
 
+## Make Jidoka always run in Codex
+
+Codex reads global instructions from `~/.codex/AGENTS.md`. Install the Jidoka Codex bootstrap once:
+
+```
+sh global-setup/install-codex.sh
+```
+
+This writes `~/.codex/AGENTS.md` and mirrors framework scripts/docs/skills to `~/.codex/jidoka/`.
+Start a new Codex session after running it.
+
+## Route Fable 5 vs Codex 5.5
+
+Use Fable 5 for architecture, root-cause investigation, long-horizon planning, and high-risk review.
+Use Codex 5.5 for local implementation, tests, builds, browser/terminal work, and final proof.
+
+```
+node scripts/jidoka.mjs model-route --task-text "plan a billing migration" --json
+node scripts/jidoka.mjs model-route --task-text "add a button and run tests" --json
+node scripts/jidoka.mjs model-route --task-text "review this auth diff" --phase after-code --changed-lines 120 --json
+```
+
+Protocol: `docs/MODEL_ROUTING_PROTOCOL.md`. Handoff templates:
+`docs/templates/FABLE_HANDOFF.md` and `docs/templates/FABLE_REVIEW.md`.
+
+## Run Claude and Codex together without an API
+
+For normal use, just write the task. Jidoka classifies it first and only starts the relay when Fable 5 is useful.
+
+```
+node ~/.codex/jidoka/scripts/jidoka.mjs model-route --task-text "plan and implement the billing migration" --json
+```
+
+Start the local watchers:
+
+```
+node ~/.codex/jidoka/scripts/jidoka.mjs relay start-watchers --allow-codex-write
+```
+
+Then work from one window:
+
+```
+node ~/.codex/jidoka/scripts/jidoka.mjs relay auto --cwd "$PWD" --from user --task "plan and implement the billing migration" --allow-codex-write
+```
+
+The relay stores every run in `~/.jidoka/relay/runs/`. Fable has a default `240000ms` timeout; Codex has a default `600000ms` timeout. Override them with `--claude-timeout-ms`, `--codex-timeout-ms`, `JIDOKA_CLAUDE_TIMEOUT_MS`, or `JIDOKA_CODEX_TIMEOUT_MS`.
+
+If Fable times out, Codex is queued with an explicit local fallback instead of leaving the run stuck. Timeout fallback is not a Fable handoff. See `docs/LOCAL_RELAY_PROTOCOL.md`.
+
 ## Check the system anytime
 
 ```

@@ -64,8 +64,14 @@ function print(payload) {
     return;
   }
 
+  // wave-memory-validity: every non-JSON banner ends with the supersede-check pointer, so the
+  // "validity window" check is surfaced at session start whenever memory:status runs.
+  const supersedePointer = () =>
+    process.stdout.write('\nAlso run: npm run memory:supersede  (flags facts a newer fact has contradicted).\n');
+
   if (!payload.files || payload.files.length === 0) {
     process.stdout.write(`✓ Memory staging clean. ${payload.message ?? ''}\n`);
+    supersedePointer();
     return;
   }
 
@@ -90,4 +96,5 @@ function print(payload) {
   process.stdout.write('and call mcp__memory__create_entities / add_observations only for new\n');
   process.stdout.write('items. See .claude/memory-staging/README.md for the merge protocol.\n');
   process.stdout.write(`${banner}\n\n`);
+  supersedePointer();
 }

@@ -31,6 +31,7 @@ You operate after all N implementations are complete. You do NOT implement code.
 | `docs/specs/<wave-id>_MASTER_SPEC.md §6` | Acceptance criteria — ground truth for the AC-compliance gate |
 | `docs/specs/<wave-id>_TASKS.md` frontmatter | `complexity` tag (critical / non-trivial / trivial) — drives N-policy and quality-andon |
 | `docs/CODING_STANDARDS.md` | LOC and file limits (400 LOC per component, 80 LOC per function) |
+| Spec anchor (optional) | Path supplied by the orchestrator via `--spec-anchor` flag or context. When present: treat every claim you make about the code as needing a citation to this document. State which AC your verdict relates to. When absent: emit WARN "no spec anchor — verdict based on rubric only", then proceed. |
 
 ### Outputs
 
@@ -157,6 +158,22 @@ writeHaltState(wave, "best-of-N-judge",
 (`writeHaltState` is defined in `scripts/andon-halt-helpers.mjs:112`.)
 
 **Soft-mode (current, until W3)**: `hardBlockEnabled` in `.sdd-config.json` stays `false`. In soft-mode the halt is recorded and surfaced for human attention but does NOT hard-block the pipeline. W3 enables hard-andon after three waves of soft-mode observation. This expansion of the Andon cord beyond defect-class events is deliberately phased in, not switched on at once.
+
+---
+
+## Spec-anchor check
+
+Before emitting your verdict, perform this check:
+
+If the orchestrator supplied a spec anchor (via `--spec-anchor` or context), your reasoning for each candidate must reference at least one AC from it by ID (e.g. "AC-3"). If your reasoning cites no AC and an anchor was present, prepend `[ANCHOR-MISS]` to your winner selection line so the orchestrator can log it.
+
+If no anchor was supplied, emit: `WARN: no spec anchor — verdict based on rubric only` at the top of the output document, then proceed normally.
+
+---
+
+## Position-swap note
+
+The orchestrator may run this judge twice with candidate ordering swapped (POSITION-DEBIAS). Each run is independent. Do not attempt to reconcile the two runs yourself — the debate-engine handles merging. Evaluate each run as if it is the only run.
 
 ---
 

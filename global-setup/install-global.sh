@@ -12,7 +12,7 @@ set -e
 SRC="$(cd "$(dirname "$0")" && pwd)"   # global-setup/
 FW="$(cd "$SRC/.." && pwd)"            # framework root (source of truth for engine + agents)
 DEST="$HOME/.claude"
-mkdir -p "$DEST/hooks" "$DEST/skills/dev-pipeline" "$DEST/jidoka/scripts" "$DEST/jidoka/lib/redaction" "$DEST/agents"
+mkdir -p "$DEST/hooks" "$DEST/skills/dev-pipeline" "$DEST/jidoka/scripts" "$DEST/jidoka/lib/redaction" "$DEST/jidoka/docs/templates" "$DEST/agents"
 
 # 1. hooks (shell guards + node policy-enforce hook)
 cp "$SRC/hooks/"*.sh "$DEST/hooks/" 2>/dev/null; chmod +x "$DEST/hooks/"*.sh 2>/dev/null || true
@@ -32,13 +32,26 @@ echo "  ✓ dev-pipeline skill"
 
 # 3. engine (from framework — the source of truth; meta-lib itself detects the
 # global install location and switches to the global cross-project ledger)
-for f in meta-lib meta-remedies meta-audit meta-honesty meta-trend meta-premortem meta-log proof-gate pre-publish-guard memory-consolidate northstar-check kaizen-loop charter-check get-spec-context spec-first-gate orchestration-planner debate-trigger adaptive-verify run-state acceptance-verdict enforcement-reconcile red-team kaizen-feed cost-crosscheck trajectory-eval agent-trace approval-queue code-map coverage-gate debate-engine dependency-audit execution-gate gate-audit gate-graduation parallel-guard policy-enforce-hook sandbox-run spec-drift-check clarify-engine clarify-gate memory-retrieve memory-curator shard-story-bundle stuck-detector dup-guard gate-loopback; do
+for f in jidoka meta-lib meta-remedies meta-audit meta-honesty meta-trend meta-premortem meta-log proof-gate pre-publish-guard memory-consolidate northstar-check kaizen-loop charter-check get-spec-context spec-first-gate orchestration-planner debate-trigger adaptive-verify run-state acceptance-verdict enforcement-reconcile red-team kaizen-feed cost-crosscheck trajectory-eval agent-trace approval-queue code-map coverage-gate debate-engine dependency-audit execution-gate gate-audit gate-graduation parallel-guard policy-enforce-hook sandbox-run spec-drift-check clarify-engine clarify-gate memory-retrieve memory-curator memory-supersede-check shard-story-bundle stuck-detector dup-guard gate-loopback; do
   [ -f "$FW/scripts/$f.mjs" ] && cp "$FW/scripts/$f.mjs" "$DEST/jidoka/scripts/"
 done
+cp "$FW/scripts/"*.mjs "$DEST/jidoka/scripts/" 2>/dev/null || true
+cp "$FW/scripts/"*.sh "$DEST/jidoka/scripts/" 2>/dev/null || true
+chmod +x "$DEST/jidoka/scripts/"*.sh 2>/dev/null || true
 [ -f "$FW/lib/redaction/redact-pii.mjs" ] && cp "$FW/lib/redaction/redact-pii.mjs" "$DEST/jidoka/lib/redaction/"
 # North Star template — the CPO uses it to create docs/NORTH_STAR.md in any project
 [ -f "$FW/docs/NORTH_STAR_TEMPLATE.md" ] && cp "$FW/docs/NORTH_STAR_TEMPLATE.md" "$DEST/jidoka/NORTH_STAR_TEMPLATE.md"
 [ -f "$FW/docs/PROJECT_CHARTER_TEMPLATE.md" ] && cp "$FW/docs/PROJECT_CHARTER_TEMPLATE.md" "$DEST/jidoka/PROJECT_CHARTER_TEMPLATE.md"
+# Re-grounded canon docs — keep the global reference copy matching the repo.
+# Without this the global docs/ drifts (an old product-flavoured CONSTITUTION would mislead every session).
+mkdir -p "$DEST/jidoka/docs/templates"
+for d in NORTH_STAR CONSTITUTION MISSION HIERARCHICAL_SPEC_SYSTEM MODULE_SPEC_SYSTEM MULTI_LEVEL_VERIFICATION AUTONOMOUS_PIPELINE AGENT_ROSTER TOYOTA_WAY MODEL_ROUTING_PROTOCOL LOCAL_RELAY_PROTOCOL; do
+  [ -f "$FW/docs/$d.md" ] && cp "$FW/docs/$d.md" "$DEST/jidoka/docs/$d.md"
+done
+[ -d "$FW/docs/templates" ] && cp "$FW/docs/templates/"*.md "$DEST/jidoka/docs/templates/" 2>/dev/null || true
+# Drop docs that were archived in the repo (no longer canon) from the global copy.
+rm -f "$DEST/jidoka/docs/AGENT_LAYER_ARCHITECTURE.md" "$DEST/jidoka/docs/AGENT_LAYER_QUALITY_SPEC.md" "$DEST/jidoka/docs/KAIZEN_PHILOSOPHY.md" 2>/dev/null || true
+echo "  ✓ canon docs → ~/.claude/jidoka/docs/"
 # rewrite remedy mechanism paths to the installed location so meta-audit's broken-gate check resolves them (parity with install-into.mjs)
 perl -i -pe "s{'scripts/}{'$DEST/jidoka/scripts/}g" "$DEST/jidoka/scripts/meta-remedies.mjs" 2>/dev/null || true
 echo "  ✓ engine → ~/.claude/jidoka/scripts/"
@@ -82,4 +95,9 @@ fs.writeFileSync(p,JSON.stringify(s,null,2)+"\n");
 console.log("  ✓ merged hooks into settings.json (permissions untouched)");
 ' "$SRC/settings-hooks-fragment.json"
 
-echo "✓ Global jidoka setup restored. Restart Claude Code to load hooks."
+# 7. Codex global bootstrap (separate from Claude hooks; safe/idempotent)
+if [ -f "$SRC/install-codex.sh" ]; then
+  sh "$SRC/install-codex.sh"
+fi
+
+echo "✓ Global jidoka setup restored. Restart Claude Code and start a new Codex session to load hooks/instructions."
