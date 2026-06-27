@@ -20,6 +20,7 @@
  * Usage:
  *   node scripts/build-lineage-graph.mjs           # write docs/specs/_LINEAGE.md
  *   node scripts/build-lineage-graph.mjs --dry     # print to stdout, do not write
+ *   node scripts/build-lineage-graph.mjs --counts  # print orphan/missing-meta counts only, write nothing
  *   node scripts/build-lineage-graph.mjs --json    # also write docs/specs/_LINEAGE.json
  *   node scripts/build-lineage-graph.mjs --json --dry  # JSON to stdout, no writes
  */
@@ -37,6 +38,10 @@ const OUT = path.join(ROOT, 'docs/specs/_LINEAGE.md');
 const OUT_JSON = path.join(ROOT, 'docs/specs/_LINEAGE.json');
 const isDry = process.argv.includes('--dry');
 const isJson = process.argv.includes('--json');
+// --counts: read-only measurement for the structural gate. Computes orphan / missing-meta
+// counts and prints ONLY the summary line; writes nothing (no _LINEAGE.md, no _LINEAGE.json,
+// no telemetry). This is what lets spec-structural-gate measure without self-mutating.
+const isCounts = process.argv.includes('--counts');
 
 // ── Wave-169: ID normalization ─────────────────────────────────────────
 // Canonical wave ID: wave-NNN (3-digit zero-padded, no R2/Tn suffix).
@@ -202,7 +207,27 @@ function collectSpecFiles() {
   }
 
   walk(DOCS_DIR);
-  return results;
+  return filterGitIgnored(results);
+}
+
+// Drop gitignored .md files (e.g. docs/CURRENT_WAVE.md, docs/surfacing-concerns-current.md)
+// from the spec corpus. These are runtime-generated docs, absent in a clean checkout and
+// recreated by hooks; collecting them would add a parentless ORPHAN + MISSING-META node
+// whenever they happen to exist on disk, making the counts flap between CI and local.
+// gitignore membership is pattern-based (independent of existence) → deterministic.
+// Guarded: git absent / not a repo → returns the list unchanged (portable fallback).
+function filterGitIgnored(absPaths) {
+  if (!absPaths.length) return absPaths;
+  const rel = absPaths.map(p => path.relative(ROOT, p).replace(/\\/g, '/'));
+  const ignored = new Set();
+  const collect = (out) => { for (const line of String(out).split('\n')) { const t = line.trim(); if (t) ignored.add(t); } };
+  try {
+    collect(execSync('git check-ignore --stdin', { cwd: ROOT, input: rel.join('\n'), encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }));
+  } catch (e) {
+    if (e && typeof e.stdout === 'string') collect(e.stdout);
+  }
+  if (!ignored.size) return absPaths;
+  return absPaths.filter(p => !ignored.has(path.relative(ROOT, p).replace(/\\/g, '/')));
 }
 
 // ── Main ───────────────────────────────────────────────────────────────
@@ -300,6 +325,13 @@ function main() {
         ].filter(Boolean).join(', '),
       });
     }
+  }
+
+  // --counts: read-only measurement for the structural gate. Emit only the summary
+  // counts and exit before any file is written or any telemetry is emitted.
+  if (isCounts) {
+    process.stdout.write(`[lineage-graph] orphans: ${orphans.length}, missing-meta: ${missingMeta.length}\n`);
+    process.exit(0);
   }
 
   // Build node declarations with labels

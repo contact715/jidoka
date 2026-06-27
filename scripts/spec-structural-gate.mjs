@@ -65,7 +65,11 @@ function measure() {
   try { driftOut = execFileSync('node', [join(ROOT, 'scripts/spec-drift-check.mjs')], { cwd: ROOT, encoding: 'utf8' }); }
   catch (e) { driftOut = (e.stdout || '') + (e.stderr || ''); } // soft mode exits 0, but be safe
   let lineageOut = '';
-  try { lineageOut = execFileSync('node', [join(ROOT, 'scripts/build-lineage-graph.mjs')], { cwd: ROOT, encoding: 'utf8' }); }
+  // --counts: read-only. The gate must MEASURE the tree, never mutate it — so we do NOT
+  // let build-lineage-graph rewrite docs/specs/_LINEAGE.md on every gate run (that write
+  // dirtied the tree and shifted the next run's counts). --counts computes orphans /
+  // missing-meta and prints only the summary line, writing nothing.
+  try { lineageOut = execFileSync('node', [join(ROOT, 'scripts/build-lineage-graph.mjs'), '--counts'], { cwd: ROOT, encoding: 'utf8' }); }
   catch (e) { lineageOut = (e.stdout || '') + (e.stderr || ''); }
 
   const brokenRefs = parseDrift(driftOut);

@@ -1,6 +1,6 @@
 {
-  "brokenRefs": 185,
-  "orphans": 48,
-  "missingMeta": 51,
-  "_note": "Spec-tree structural ceiling, set with a small headroom over the gate's observed run-to-run jitter (brokenRefs≤184, orphans 46-47, missingMeta 49-50). The gate self-mutates each run (writes runtime journals, regenerates _LINEAGE), so a tight baseline flaps between local and CI. Headroom keeps CI green; determinism fix tracked separately."
+  "brokenRefs": 160,
+  "orphans": 46,
+  "missingMeta": 49,
+  "_note": "Spec-tree structural ceiling. Lower is better; the gate blocks any increase and auto-tightens when a metric drops. These are the TRUE deterministic values: the gate now measures read-only (build-lineage-graph --counts, no _LINEAGE rewrite) and resolves references against the committed tree (git ls-files) while excluding gitignored runtime targets — so the count is identical in a fresh CI checkout and a warmed local tree. The earlier headroom (185/48/51) is no longer needed."
 }
