@@ -1,6 +1,6 @@
 {
   "brokenRefs": 160,
-  "orphans": 46,
-  "missingMeta": 49,
-  "_note": "Spec-tree structural ceiling. Lower is better; the gate blocks any increase and auto-tightens when a metric drops. These are the TRUE deterministic values: the gate now measures read-only (build-lineage-graph --counts, no _LINEAGE rewrite) and resolves references against the committed tree (git ls-files) while excluding gitignored runtime targets — so the count is identical in a fresh CI checkout and a warmed local tree. The earlier headroom (185/48/51) is no longer needed."
+  "orphans": 44,
+  "missingMeta": 48,
+  "_note": "Spec-tree structural ceiling. Lower is better; the gate blocks any increase. Auto-tightens when a metric drops."
 }

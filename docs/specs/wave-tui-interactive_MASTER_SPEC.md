@@ -1,8 +1,31 @@
+---
+status: Partially-Superseded
+version: 1.0.0
+level: L3
+type: wave
+wave: wave-tui-interactive
+owner_role: platform
+parents:
+  - path: docs/specs/wave-tui-top_MASTER_SPEC.md
+    relationship: extends
+children: []
+---
+
 # wave-tui-interactive Master Spec — Make `jidoka top` an interactive dispatcher
 
-**Status:** Draft · **Level:** L3 (module wave) · **Owner:** framework operator · **Created:** 2026-06-06
+**Status:** Partially-Superseded · **Level:** L3 (module wave) · **Owner:** framework operator · **Created:** 2026-06-06
 **Chief Architect:** drafted · **Spec Reviewer:** pending
 **Parents:** `docs/specs/wave-tui-top_MASTER_SPEC.md` (the view-only panel this wave makes interactive)
+
+> **Outcome (2026-06-26).** The full interactive mode specified below (`renderInteractive` + SGR mouse
+> + inline wave drill-down) was **NOT shipped**: the merge into main kept the debugged **kanban**
+> control-panel (`renderFrame` + `tui-control.mjs` / `tui-actions.mjs`). Three pieces of this wave were
+> **ported into that panel instead** and are live + tested (PAC-1..PAC-5 in `scripts/tui-top-acceptance.mjs`):
+> per-session **economics** (`scripts/dashboard/economics.mjs`), the **«НУЖНО ВНИМАНИЕ» banner**
+> (`renderNeedsYou`), and **focus-switch** (`f` → `scripts/dashboard/focus.mjs`, decision table §5,
+> via `methodFromTerminalId` since the panel jumps a remote session by its recorded id). The
+> session-identity hook (§8.1) and the focus decision table (§5; IAC-6..IAC-10) shipped as written.
+> §6.2–6.3 wave drill-down and §7 mouse are **historical** — kept for the design record, not shipped.
 
 > One-line: today `jidoka top` is a read-only window into the pipeline. This wave turns it into a
 > dispatcher you can act from: select a session, press Enter, and you are already in that terminal
