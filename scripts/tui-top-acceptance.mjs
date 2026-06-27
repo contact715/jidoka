@@ -218,103 +218,83 @@ async function groupLive() {
   });
 }
 
-// ── group 2c: interactive ACs for wave-tui-interactive (IAC-1..IAC-10) ──
+// ── group 2c: the kanban port — focus + session-economics + needs-you (PAC + IAC-6..10) ──
 async function groupInteractive() {
-  console.log('\n\x1b[1mwave-tui-interactive — IAC-1..IAC-10\x1b[0m');
-  const mod = existsSync(TUI_RENDER) ? await import(TUI_RENDER + `?t=${Date.now()}`).catch((e) => ({ __err: e })) : null;
-  const ri = mod && !mod.__err ? mod.renderInteractive : null;
-  const renderFrame = mod && !mod.__err ? mod.renderFrame : null;
-  const buildSelectables = mod && !mod.__err ? mod.buildSelectables : null;
-  const reduceKey = mod && !mod.__err ? mod.reduceKey : null;
-  const parseMouse = mod && !mod.__err ? mod.parseMouse : null;
-  const missing = !ri ? (existsSync(TUI_RENDER) ? 'renderInteractive not exported' : 'module missing') : '';
+  console.log('\n\x1b[1mported into the kanban panel — focus + session-economics + needs-you (PAC + IAC-6..10)\x1b[0m');
+  // The full interactive mode (renderInteractive + mouse + drill-down, old IAC-1..IAC-5) was NOT kept:
+  // the merge chose main's debugged kanban control-panel. Three pieces were ported into it instead —
+  // per-session economics, the "needs-you" banner, and focus-switch — covered by PAC-1..PAC-5. The
+  // session-identity hook + the focus decision table (IAC-6..IAC-10) stayed and are now WIRED.
+  const render = existsSync(TUI_RENDER) ? await import(TUI_RENDER + `?t=${Date.now()}`).catch((e) => ({ __err: e })) : null;
+  const renderFrame = render && !render.__err ? render.renderFrame : null;
+  const renderSessions = render && !render.__err ? render.renderSessions : null;
+  const renderNeedsYou = render && !render.__err ? render.renderNeedsYou : null;
   const at = '2026-06-06T14:00:00Z';
 
-  // A snapshot with a stuck wave, two sessions, and a running wave → selectables in all three sections.
-  const sess = [
-    { state: 'working', topic: 'build the auth feature', activity: 'running tests', mtime: 0, sessionId: 'a', terminalId: 'tmux:%3' },
-    { state: 'waiting', topic: 'fix the login bug', activity: '', mtime: 0, sessionId: 'b', terminalId: null },
-  ];
-  const detailedWave = (over = {}) => wave({
-    wave: 'wave-detail', current: 'tests', status: 'running', progress: 30, updatedAt: at,
-    stages: [
-      { phase: 'discovery', status: 'done' }, { phase: 'spec', status: 'done' },
-      { phase: 'tests', status: 'running', current: true }, { phase: 'build', status: 'pending' },
-      { phase: 'gate', status: 'pending' }, { phase: 'debug', status: 'pending' }, { phase: 'memory', status: 'pending' },
-    ],
-    events: [
-      { ts: '2026-06-06T13:59:00Z', who: 'tester', what: 'тесты написаны' },
-      { ts: '2026-06-06T13:58:00Z', who: 'architect', what: 'спека готова' },
-      { ts: '2026-06-06T13:57:00Z', who: 'owner', what: 'волна запущена' },
-    ],
-    note: 'жду ревью спеки', ...over,
-  });
-  const interactiveSnap = (over = {}) => snapshot({
-    waves: [detailedWave()], pipeline: detailedWave(), sessions: sess, ...over,
+  // PAC-1 — per-session economics ($ + tokens) render in the СЕССИИ list when the caller enriched s.cost.
+  await guard('PAC-1', 'session row shows ≈$ + compact tokens when economics present; absent without it', () => {
+    if (!renderSessions) return [false, 'renderSessions not exported'];
+    const withCost = renderSessions([{ state: 'working', topic: 'build auth', mtime: 0, sessionId: 'a', cost: { usd: 3.21, workTok: 1_500_000 } }], 120);
+    const without = renderSessions([{ state: 'working', topic: 'build auth', mtime: 0, sessionId: 'a' }], 120);
+    const hasMoney = withCost.some((l) => l.includes('≈$3.21') && l.includes('1.5M'));
+    const noMoney = !without.some((l) => l.includes('≈$'));
+    return [hasMoney && noMoney, `money=${hasMoney} cleanWithout=${noMoney}`];
   });
 
-  await guard('IAC-1', 'selected row renders inverse video \\x1b[7m + ▶ marker, only one row', () => {
-    if (!ri) return [false, missing];
-    const { lines } = ri(interactiveSnap(), at, 120, { cursor: 0 });
-    const inverseLines = lines.filter((l) => l.includes('\x1b[7m'));
-    const markerLines = lines.filter((l) => l.includes('▶') && l.includes('\x1b[7m'));
-    return [inverseLines.length === 1 && markerLines.length === 1,
-      `inverse=${inverseLines.length} marked=${markerLines.length}`];
+  // PAC-2 — the needs-you banner lists waiting sessions / pending questions; empty otherwise.
+  await guard('PAC-2', 'renderNeedsYou: waiting OR question → banner with the question; none → []', () => {
+    if (!renderNeedsYou) return [false, 'renderNeedsYou not exported'];
+    const waiting = renderNeedsYou([{ state: 'waiting', topic: 'fix login', mtime: 0, sessionId: 'b' }], 120);
+    const asking = renderNeedsYou([{ state: 'working', topic: 'auth', question: 'Введи код из Telegram?', mtime: 0, sessionId: 'c' }], 120);
+    const none = renderNeedsYou([{ state: 'working', topic: 'busy', mtime: 0, sessionId: 'd' }], 120);
+    const wOk = waiting.some((l) => l.includes('НУЖНО ВНИМАНИЕ')) && waiting.some((l) => l.includes('ждёт ответа'));
+    const aOk = asking.some((l) => l.includes('спрашивает:') && l.includes('Введи код'));
+    return [wOk && aOk && none.length === 0, `waiting=${wOk} question=${aOk} none=${none.length}`];
   });
 
-  await guard('IAC-2', 'selection is data-in: renderFrame() w/o ui byte-identical to pre-wave', () => {
-    if (!renderFrame) return [false, missing];
-    const snap = interactiveSnap();
-    const noUi = renderFrame(snap, at, 120);
-    const emptyUi = renderFrame(snap, at, 120, {});
-    const hasInverse = noUi.some((l) => l.includes('\x1b[7m'));
-    return [Array.isArray(noUi) && noUi.join('\n') === emptyUi.join('\n') && !hasInverse,
-      `equal=${noUi.join('\n') === emptyUi.join('\n')} inverse=${hasInverse}`];
+  // PAC-3 — banner placement in the assembled frame: under HALT/ЗАВИСЛО, above ДОСКА.
+  await guard('PAC-3', 'НУЖНО ВНИМАНИЕ sits between ЗАВИСЛО and ДОСКА in renderFrame', () => {
+    if (!renderFrame) return [false, 'renderFrame not exported'];
+    const stuckWave = wave({ wave: 'wave-s', status: 'stuck' });
+    const snap = snapshot({ waves: [stuckWave], pipeline: stuckWave, sessions: [{ state: 'waiting', topic: 'fix login', mtime: 0, sessionId: 'e' }] });
+    const lines = renderFrame(snap, at, 120);
+    const iStuck = lines.findIndex((l) => l.includes('ЗАВИСЛО'));
+    const iNeeds = lines.findIndex((l) => l.includes('НУЖНО ВНИМАНИЕ'));
+    const iBoard = lines.findIndex((l) => l.includes('ДОСКА'));
+    return [iNeeds !== -1 && iStuck !== -1 && iStuck < iNeeds && (iBoard === -1 || iNeeds < iBoard), `stuck@${iStuck} needs@${iNeeds} board@${iBoard}`];
   });
 
-  await guard('IAC-3', 'wave drill-down: expanded → 7 stage labels + recent event, dim; collapse removes', () => {
-    if (!ri || !buildSelectables) return [false, missing || 'buildSelectables missing'];
-    const snap = interactiveSnap();
-    const sel = buildSelectables(snap, at);
-    const waveIdx = sel.findIndex((s) => s.kind === 'wave' && s.id === 'wave-detail');
-    if (waveIdx < 0) return [false, `no wave selectable (sel=${sel.map((s) => s.kind).join(',')})`];
-    const exp = ri(snap, at, 120, { cursor: waveIdx, expanded: 'wave-detail' });
-    const txt = exp.lines.join('\n');
-    const allStages = ['ПОИСК', 'СПЕК', 'ТЕСТЫ', 'СБОРКА', 'ГЕЙТ', 'ДЕБАГ', 'ПАМЯТЬ'].every((s) => txt.includes(s));
-    const hasEvent = txt.includes('тесты написаны');
-    const detailLine = exp.lines.find((l) => l.includes('тесты написаны'));
-    const dim = detailLine && detailLine.includes('\x1b[90m');
-    const col = ri(snap, at, 120, { cursor: waveIdx, expanded: null });
-    const collapsed = !col.lines.join('\n').includes('тесты написаны');
-    return [allStages && hasEvent && dim && collapsed,
-      `stages=${allStages} event=${hasEvent} dim=${dim} collapsed=${collapsed}`];
+  // PAC-4 — methodFromTerminalId maps a recorded id to a focus method (the panel jumps a remote session).
+  await guard('PAC-4', 'methodFromTerminalId: tmux/zellij/tty/GUI/degenerate → correct method', async () => {
+    const FOCUS = join(HERE, 'dashboard', 'focus.mjs');
+    const fm = await import(FOCUS + `?t=${Date.now()}`).catch((e) => ({ __err: e }));
+    if (fm.__err || !fm.methodFromTerminalId) return [false, 'methodFromTerminalId not exported'];
+    const m = fm.methodFromTerminalId;
+    const cases = [['tmux:%3', 'tmux'], ['zellij:7', 'zellij'], ['tty:/dev/ttys017', 'terminal'], ['w0t0p0:UUID-1', 'iterm'], ['tty:??', 'unknown'], [null, 'unknown']];
+    const bad = cases.filter(([id, want]) => m(id) !== want).map(([id, want]) => `${id}≠${want}→${m(id)}`);
+    return [bad.length === 0, bad.length ? `bad=[${bad.join('; ')}]` : 'all map correctly'];
   });
 
-  await guard('IAC-4', 'parseMouse SGR press/release/null + row→selectable mapping', () => {
-    if (!parseMouse || !ri) return [false, missing || 'parseMouse missing'];
-    const press = parseMouse('\x1b[<0;5;12M');
-    const rel = parseMouse('\x1b[<0;5;12m');
-    const none = parseMouse('hello');
-    const pressOk = press && press.button === 0 && press.col === 5 && press.row === 12 && press.press === true;
-    const relOk = rel && rel.press === false;
-    const noneOk = none === null;
-    // row map: find a selectable's screen row, confirm rows.get(row) === its index
-    const snap = interactiveSnap();
-    const { rows } = ri(snap, at, 120, { cursor: 0 });
-    const mappedIdx = [...rows.values()];
-    const hasMapping = rows.size > 0 && mappedIdx.includes(0);
-    return [pressOk && relOk && noneOk && hasMapping,
-      `press=${pressOk} rel=${relOk} null=${noneOk} map=${hasMapping}`];
-  });
-
-  await guard('IAC-5', 'mouse mode enable after alt-enter + teardown in restore() (tui-top --self-test)', () => {
-    if (!existsSync(TUI_TOP)) return [false, 'tui-top.mjs missing'];
-    const r = spawnSync('node', [TUI_TOP, '--self-test'], { encoding: 'utf8', timeout: 8000 });
-    const out = r.stdout || '';
-    const hasEnable = /AC-mouse-enable|1000h.*1006h|mouse.*enable/i.test(out);
-    const hasDisable = /AC-mouse-disable|mouse.*teardown|1000l.*1006l|mouse.*restore/i.test(out);
-    return [r.status === 0 && hasEnable && hasDisable,
-      `exit=${r.status} enable=${hasEnable} disable=${hasDisable}`];
+  // PAC-5 — end-to-end wiring: reducer `f` → focusSession effect → action layer focuses via injected exec.
+  await guard('PAC-5', 'f on a waiting session → focusSession → runFocus(exec stub), logged as focus', async () => {
+    const CTRL = join(HERE, 'dashboard', 'tui-control.mjs');
+    const ACT = join(HERE, 'dashboard', 'tui-actions.mjs');
+    const ctrl = await import(CTRL + `?t=${Date.now()}`).catch((e) => ({ __err: e }));
+    const act = await import(ACT + `?t=${Date.now()}`).catch((e) => ({ __err: e }));
+    if (ctrl.__err || !ctrl.reduce) return [false, 'tui-control.reduce not exported'];
+    if (act.__err || !act.runEffect) return [false, 'tui-actions.runEffect not exported'];
+    const r = ctrl.reduce(ctrl.initialUi(), 'f', { waves: [], halt: false, sessions: [{ state: 'waiting', topic: 'нужен код', terminalId: 'tty:/dev/ttys017', sessionId: 'z' }] });
+    const eff = r.effects[0];
+    if (!eff || eff.type !== 'focusSession') return [false, `effect=${eff?.type}`];
+    const tmp = mkdtempSync(join(tmpdir(), 'pac5-'));
+    try {
+      let exCall = null; const stub = (c, a) => { exCall = { c, a }; return 'ok'; };
+      const res = act.runEffect(eff, { projectPath: tmp, exec: stub });
+      const focused = exCall?.c === 'osascript' && JSON.stringify(exCall.a).includes('/dev/ttys017') && res.ok === true;
+      const lf = join(tmp, 'docs', 'audits', 'tui-actions.jsonl');
+      const rec = existsSync(lf) ? JSON.parse(readFileSync(lf, 'utf8').trim().split('\n').pop()) : {};
+      return [focused && rec.action === 'focus' && rec.method === 'terminal', `focused=${focused} logged=${rec.action}/${rec.method}`];
+    } finally { rmSync(tmp, { recursive: true, force: true }); }
   });
 
   await guard('IAC-6', 'non-TTY flat path: no ANSI, no mouse mode, no selection markers, exit 0', () => {
@@ -430,7 +410,7 @@ function countLines(p) {
 }
 
 // ── main ─────────────────────────────────────────────────────────────
-console.log('\x1b[1mwave-tui-top acceptance harness\x1b[0m — 18+10 ACs (18 base + 10 wave-tui-interactive)\n');
+console.log('\x1b[1mwave-tui-top acceptance harness\x1b[0m — 28 ACs (18 base + 10 kanban-port: 5 ported-feature + 5 focus/hook)\n');
 await groupRunState();
 await groupRender();
 await groupLive();
@@ -442,7 +422,6 @@ const fail = results.length - pass;
 console.log(`\n${'─'.repeat(56)}`);
 if (fail) {
   console.log(`\x1b[31m${fail} FAIL\x1b[0m / ${pass} PASS  —  ${results.filter((r) => !r.pass).map((r) => r.id).join(', ')}`);
-  console.log('\x1b[90m(red phase expected before tui-render.mjs / tui-top.mjs exist)\x1b[0m');
   process.exit(1);
 }
 console.log(`\x1b[32mALL ${pass} ACs PASS\x1b[0m`);

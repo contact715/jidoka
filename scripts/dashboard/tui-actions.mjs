@@ -14,6 +14,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statS
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
+import { methodFromTerminalId, runFocus } from './focus.mjs';   // jump the OS terminal to a session
 
 // ── pure builders (self-tested) ───────────────────────────────────────────
 // AC-6: escape for a shell command embedded in an AppleScript double-quoted string.
@@ -137,6 +138,16 @@ export function runEffect(effect, ctx = {}) {
       execFileSync('osascript', ['-e', buildTerminalScript(projectPath, effect.command)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
       return done('openTerminal', null, true, 'вкладка Terminal открыта — подтверди запуск там');
     }
+    if (effect.type === 'focusSession') {
+      // jump the owner's terminal to the waiting session. The panel only has the session's RECORDED
+      // terminalId (not its live env), so resolve the focus method from the id's shape (focus.mjs).
+      // ctx.exec is injectable for tests — no real osascript/tmux/zellij runs in the harness.
+      const method = methodFromTerminalId(effect.terminalId);
+      const res = runFocus(method, effect.terminalId, {}, ctx.exec || execFileSync);
+      // Kaizen metric (spec §1): every jump is logged {action:'focus', method, ok} for the feedback loop.
+      logAction(projectPath, { ...actionRecord('focus', null, res.ok, now), method });
+      return { ok: res.ok, msg: res.ok ? `перешёл в окно сессии (${method})` : (res.hint || 'не удалось переключить окно — переключись вручную') };
+    }
     return { ok: false, msg: `неизвестный эффект: ${effect.type}` };
   } catch (e) {
     const msg = (e?.stderr?.toString?.() || e?.message || String(e)).trim().split('\n').pop();
@@ -202,8 +213,27 @@ async function selfTest() {
   } finally { rmSync(tmp, { recursive: true, force: true }); }
   ok('graceful: unknown effect', runEffect({ type: 'nope' }, { projectPath: '/tmp' }).ok === false);
 
+  // ported: focusSession wires the reducer's effect to focus.mjs (no real subprocess — exec injected)
+  const tmp2 = mkdtempSync(join(tmpdir(), 'tui-focus-'));
+  try {
+    // success path: a real tty id drives a terminal focus through the injected exec stub
+    let exCall = null; const stub = (c, a) => { exCall = { c, a }; return 'ok'; };
+    const rf = runEffect({ type: 'focusSession', terminalId: 'tty:/dev/ttys017', topic: 'нужен код' }, { projectPath: tmp2, exec: stub });
+    ok('focusSession: resolves method + invokes exec (osascript + tty)', exCall?.c === 'osascript' && JSON.stringify(exCall.a).includes('/dev/ttys017'));
+    ok('focusSession: ok:true names the method', rf.ok === true && rf.msg.includes('terminal'));
+    const lf = join(tmp2, 'docs', 'audits', 'tui-actions.jsonl');
+    const rec = JSON.parse(rfs(lf, 'utf8').trim().split('\n').pop());
+    ok('focusSession: logs Kaizen metric {action:focus, method, ok}', rec.action === 'focus' && rec.method === 'terminal' && rec.ok === true);
+    // honest fallback: a degenerate id can't focus → ok:false + hint, NO subprocess
+    let ran = false;
+    const rf2 = runEffect({ type: 'focusSession', terminalId: 'tty:??', topic: 'x' }, { projectPath: tmp2, exec: () => { ran = true; return ''; } });
+    ok('focusSession: degenerate id → ok:false + hint, no subprocess', rf2.ok === false && typeof rf2.msg === 'string' && ran === false);
+    const rec2 = JSON.parse(rfs(lf, 'utf8').trim().split('\n').pop());
+    ok('focusSession: fallback logged with method unknown', rec2.action === 'focus' && rec2.method === 'unknown' && rec2.ok === false);
+  } finally { rmSync(tmp2, { recursive: true, force: true }); }
+
   if (fails.length) { console.log(`\n\x1b[31mFAIL (${fails.length}): ${fails.join(', ')}\x1b[0m`); process.exit(1); }
-  console.log('\n\x1b[32m✓ tui-actions: builders (AC-6) + journal (AC-7) + log tail + graceful failures correct\x1b[0m'); process.exit(0);
+  console.log('\n\x1b[32m✓ tui-actions: builders (AC-6) + journal (AC-7) + log tail + focus + graceful failures correct\x1b[0m'); process.exit(0);
 }
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);

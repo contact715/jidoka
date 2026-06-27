@@ -26,6 +26,7 @@ const { renderFrame, renderFlat } = await import('./dashboard/tui-render.mjs');
 const { initialUi, reduce, renderOverlay } = await import('./dashboard/tui-control.mjs');
 const { runEffect, readProjectLog } = await import('./dashboard/tui-actions.mjs');
 const { collectWaveCosts } = await import('./dashboard/wave-cost.mjs');
+const { readSessionEconomics } = await import('./dashboard/economics.mjs');
 
 // ── session collection ────────────────────────────────────────────────
 const SESSION_DIR = join(homedir(), '.claude', 'session-env');
@@ -42,7 +43,7 @@ function collectSessions(now = Date.now()) {
         const mt = statSync(fp).mtimeMs;
         if (now - mt > SESSION_MAX_AGE_MS) continue;
         const data = JSON.parse(readFileSync(fp, 'utf8'));
-        sessions.push({ state: data.state || 'working', topic: data.topic || data.prompt || '', activity: data.activity || '', mtime: mt, sessionId: f.replace(/^state-/, '').replace(/\.json$/, '') });
+        sessions.push({ state: data.state || 'working', topic: data.topic || data.prompt || '', activity: data.activity || '', mtime: mt, sessionId: f.replace(/^state-/, '').replace(/\.json$/, ''), terminalId: data.terminalId || null });
       } catch { /* skip corrupt */ }
     }
     sessions.sort((a, b) => b.mtime - a.mtime);
@@ -109,6 +110,13 @@ export function drawErrorPolicy(consecutiveFails, isCrashTest) {
   return (isCrashTest || consecutiveFails >= 5) ? 'exit' : 'continue';
 }
 
+// pure: merge a cached economics map (sessionId → { cost, question }) into freshly-collected sessions.
+// The transcript scan is throttled (see enrichSessions in runLive); this merge is per-frame and cheap.
+export function mergeEconomics(sessions, ecoBySession) {
+  const get = ecoBySession && typeof ecoBySession.get === 'function' ? (id) => ecoBySession.get(id) : () => null;
+  return (sessions || []).map((s) => { const e = get(s.sessionId); return e ? { ...s, ...e } : s; });
+}
+
 // ── live run ─────────────────────────────────────────────────────────
 function runLive(p) {
   if (!process.stdout.isTTY) { runFlat(p); return; }
@@ -122,6 +130,21 @@ function runLive(p) {
     if (force || Date.now() - costAt > 30000) { try { costList = collectWaveCosts(p); } catch { costList = []; } costAt = Date.now(); }
     return costList;
   };
+  // per-session economics ($ + tokens + the pending "question") — same throttle: parsing a session's
+  // transcript is expensive, the (mtime,size) cache inside economics.mjs makes unchanged reads free,
+  // and the 30s window bounds the cost when several sessions are actively writing.
+  let ecoMap = new Map(); let ecoAt = 0;
+  const enrichSessions = (sessions, force = false) => {
+    if (force || Date.now() - ecoAt > 30000) {
+      const m = new Map();
+      for (const s of sessions) {
+        try { const e = readSessionEconomics(s.sessionId); if (e) m.set(s.sessionId, { cost: { usd: e.usd, workTok: e.workTok }, question: e.question }); }
+        catch { /* a session with no readable transcript just shows without economics */ }
+      }
+      ecoMap = m; ecoAt = Date.now();
+    }
+    return mergeEconomics(sessions, ecoMap);
+  };
   const quit = () => { if (done) return; done = true; closeWatchers(); restore(); process.exit(0); };
   let drawFails = 0;
   const draw = () => {
@@ -129,7 +152,7 @@ function runLive(p) {
       if (process.env.JIDOKA_TOP_CRASH_TEST === '1') throw new Error('crash-test-draw');
       const at = new Date().toISOString();
       const snap = collectProject(p);
-      snap.sessions = collectSessions();
+      snap.sessions = enrichSessions(collectSessions());
       snap.costs = Object.fromEntries(costs().map((c) => [c.wave, c]));
       lastSnap = snap;
       const sj = JSON.stringify(snap);
@@ -158,7 +181,7 @@ function runLive(p) {
   // keys → pure reducer (tui-control.mjs) → effects → action layer (tui-actions.mjs)
   const onKey = (k) => {
     if (k === '\x03') { clearInterval(timer); quit(); return; }   // Ctrl-C always quits
-    const ctx = { waves: lastSnap?.waves || [], halt: lastSnap?.health?.halt === true };
+    const ctx = { waves: lastSnap?.waves || [], halt: lastSnap?.health?.halt === true, sessions: lastSnap?.sessions || [] };
     const r = reduce(ui, k, ctx);
     ui = r.ui;
     for (const eff of r.effects) {
@@ -236,6 +259,13 @@ async function selfTest() {
   ok('control: overlay renders msg through wired renderer', ro({ ...iu(), msg: 'wired' }, 80).some((l) => l.includes('wired')));
   const { runEffect: re } = await import('./dashboard/tui-actions.mjs');
   ok('control: action layer rejects unknown effect gracefully', re({ type: 'bogus' }, { projectPath: '/tmp' }).ok === false);
+  // economics merge: cached { cost, question } folds into the matching session, others untouched
+  const ecoMap = new Map([['s1', { cost: { usd: 2.5, workTok: 1000 }, question: 'нужен код?' }]]);
+  const merged = mergeEconomics([{ sessionId: 's1', state: 'waiting', topic: 't' }, { sessionId: 's2', state: 'working', topic: 'u' }], ecoMap);
+  ok('eco: matching session gains cost + question', merged[0].cost?.usd === 2.5 && merged[0].question === 'нужен код?');
+  ok('eco: unmatched session left as-is', merged[1].cost === undefined && merged[1].question === undefined);
+  ok('eco: empty map → sessions unchanged', mergeEconomics([{ sessionId: 'x' }], new Map())[0].cost === undefined);
+  ok('eco: null map safe', mergeEconomics([{ sessionId: 'x' }], null).length === 1);
   // AC-heartbeat: visible liveness line — spinner rotates, age honest
   ok('AC-heartbeat: spinner rotates', heartbeatLine(0, 10) !== heartbeatLine(1, 10) && heartbeatLine(0, 10) === heartbeatLine(4, 10));
   ok('AC-heartbeat: fresh change → «только что»', heartbeatLine(0, 1).includes('только что'));

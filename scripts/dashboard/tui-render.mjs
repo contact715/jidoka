@@ -26,6 +26,8 @@ const cstat = (s) => s === 'done' ? G : s === 'running' ? A : (s === 'stuck' || 
 const ssym = (s) => SYM[s] || SYM.idle;
 const stageLabel = (w) => { const ph = w.current; return ph ? (STAGE[ph] || ph.toUpperCase()) : (w.progress === 100 ? 'ГОТОВО' : '—'); };
 const dur = (ms) => { const h = Math.floor(ms/3600000), m = Math.floor((ms%3600000)/60000); return h > 0 ? `${h}ч ${m}м` : `${m}м`; };
+// compact token count for the per-session economics tail (1_500_000 → "1.5M", 12_000 → "12k").
+const fmtTokShort = (t) => t >= 1e6 ? (t / 1e6).toFixed(1) + 'M' : t >= 1e3 ? Math.round(t / 1e3) + 'k' : String(t);
 
 export function isStuck(wave, at) {
   // Done waves are NEVER stuck — finished is finished regardless of age.
@@ -107,8 +109,9 @@ export function renderTerminals(waves, cols) {
   return [sec('ТЕРМИНАЛЫ', cols), ...wt.map((w) => `  ${pad(w.wave || '—', 22)} →  ${w.terminalId}`), hline(cols)];
 }
 
-// sessions: [{ state, topic, activity, mtime, sessionId }] — already resolved by caller (no fs here).
-// state icons: working=▶ green, waiting=⏳ gold, done=✓ grey.
+// sessions: [{ state, topic, activity, mtime, sessionId, cost?, question?, terminalId? }] — already
+// resolved by caller (no fs here). state icons: working=▶ green, waiting=⏳ gold, done=✓ grey.
+// cost (from economics.mjs, optional): { usd, workTok } → a dim "≈$X · Nk" tail when columns permit.
 export function renderSessions(sessions, cols) {
   if (!sessions?.length) return [];
   const SES_ICON = { working: `${G}▶${R}`, waiting: `${A}⏳${R}`, done: `${D}✓${R}` };
@@ -117,8 +120,39 @@ export function renderSessions(sessions, cols) {
     const icon = SES_ICON[s.state] || `${D}◦${R}`;
     const topic = (s.topic || s.prompt || '').slice(0, 45);
     const act = s.activity ? `  ${D}${s.activity.slice(0, 35)}${R}` : '';
-    lines.push(`  ${icon} ${pad(topic, 46)}${act}`);
+    let money = '';
+    if (cols >= 90 && s.cost && s.cost.usd != null) {
+      const tok = s.cost.workTok != null ? ` · ${fmtTokShort(s.cost.workTok)}` : '';
+      money = `  ${D}≈$${s.cost.usd.toFixed(2)}${tok}${R}`;
+    }
+    lines.push(`  ${icon} ${pad(topic, 46)}${act}${money}`);
   }
+  return [...lines, hline(cols)];
+}
+
+// pure: which sessions are waiting on the OWNER right now. Two honest signals:
+//   • state === 'waiting'  — straight from the session-state hook (Notification event), always fresh.
+//   • question            — the last thing the session asked (AskUserQuestion / last assistant text),
+//                            enriched from its transcript by the caller (economics.mjs), best-effort.
+export function needsYouSessions(sessions) {
+  return (sessions || []).filter((s) => s && (s.state === 'waiting' || (s.question && String(s.question).trim())));
+}
+
+// pure: the "НУЖНО ВНИМАНИЕ" banner — the highest-attention surface after HALT/ЗАВИСЛО. It answers
+// "which of my running sessions is waiting on me, and what is it asking?" so the owner can press `f`
+// and jump straight there. Empty (no waiting session, no pending question) → [] (section omitted).
+export function renderNeedsYou(sessions, cols) {
+  const ny = needsYouSessions(sessions);
+  if (!ny.length) return [];
+  const lines = [sec(`НУЖНО ВНИМАНИЕ (${ny.length})`, cols)];
+  for (const s of ny) {
+    const topic = (s.topic || s.prompt || '').slice(0, 38);
+    const q = s.question
+      ? `  ${A}спрашивает: ${String(s.question).replace(/\s+/g, ' ').slice(0, cols >= 100 ? 58 : 32)}${R}`
+      : `  ${A}ждёт ответа${R}`;
+    lines.push(`  ${A}⏳${R} ${pad(topic, 38)}${q}`);
+  }
+  lines.push(`  ${D}f — перейти к первой ждущей сессии${R}`);
   return [...lines, hline(cols)];
 }
 
@@ -134,8 +168,8 @@ export function renderActivity(activity, cols) {
 export function renderFooter(cols, controls = false) {
   if (!controls) return [hline(cols), `  ${cols >= 100 ? 'q выход · r обновить · ← → проект' : 'q · r · ←→'}`];
   return [hline(cols), cols >= 110
-    ? `  ↑↓ выбор · Enter продолжить волну · n новая · s снять СТОП · g перезапуск этапа · p пропустить · l лог · $ деньги · ? помощь · q выход`
-    : `  ↑↓ · Enter волна · n нов · s СТОП · g перезапуск · p пропуск · l лог · $ деньги · ? · q`];
+    ? `  ↑↓ выбор · Enter продолжить волну · n новая · s снять СТОП · g перезапуск этапа · p пропустить · l лог · $ деньги · f к сессии · ? помощь · q выход`
+    : `  ↑↓ · Enter волна · n нов · s СТОП · g перезапуск · p пропуск · l лог · $ деньги · f сессия · ? · q`];
 }
 
 export function renderEmpty(snapshot, cols) {
@@ -171,6 +205,9 @@ export function renderFrame(snapshot, collectedAt, cols, ui = null) {
   const lines = [...renderHeader(snapshot, collectedAt, cols)];
   if (halt) lines.push('', ...renderHaltBanner(halt, cols));
   if (stuck.length) lines.push('', ...renderStuckSection(stuck, collectedAt, cols));
+  // attention priority just under HALT/ЗАВИСЛО: which session is waiting on the owner (§needs-you).
+  const needs = renderNeedsYou(snapshot.sessions, cols);
+  if (needs.length) lines.push('', ...needs);
   if (!waves.length) lines.push(...renderEmpty(snapshot, cols));
   else lines.push('', ...renderBoard(waves, cols, { frozen: halt, interactive: Boolean(ui), selectedWave, costs: snapshot.costs || {} }));
   lines.push(...renderTerminals(waves, cols), ...renderSessions(snapshot.sessions, cols), ...renderActivity(snapshot.activity, cols), ...renderFooter(cols, Boolean(ui)));
@@ -255,6 +292,37 @@ async function selfTest() {
   ok('sessions: null → no output', renderSessions(null, C).length === 0);
   const slDone = renderSessions([{ state: 'done', topic: 'deploy prod', activity: '', mtime: 0, sessionId: 'c' }], C);
   ok('sessions: ✓ for done', slDone.some((l) => l.includes('✓')));
+
+  // ported: per-session economics tail (≈$ + tokens) when the caller enriched s.cost
+  const slCost = renderSessions([{ state: 'working', topic: 'build auth', activity: '', mtime: 0, sessionId: 'e', cost: { usd: 3.21, workTok: 1_500_000 } }], C);
+  ok('sessions: ≈$ tail when cost present', slCost.some((l) => l.includes('≈$3.21')));
+  ok('sessions: token tail compact (1.5M)', slCost.some((l) => l.includes('1.5M')));
+  ok('sessions: no cost → no ≈$ tail', !renderSessions([{ state: 'working', topic: 't', mtime: 0, sessionId: 'f' }], C).some((l) => l.includes('≈$')));
+  ok('sessions: narrow cols omit the cost tail', !renderSessions([{ state: 'working', topic: 't', mtime: 0, sessionId: 'g', cost: { usd: 1.0, workTok: 1000 } }], 80).some((l) => l.includes('≈$')));
+
+  // ported: needs-you banner — waiting state OR a pending question
+  ok('needsYou: waiting session selected', needsYouSessions([{ state: 'waiting', topic: 't' }]).length === 1);
+  ok('needsYou: question selected even if working', needsYouSessions([{ state: 'working', topic: 't', question: 'Введи код?' }]).length === 1);
+  ok('needsYou: plain working/done ignored', needsYouSessions([{ state: 'working', topic: 'a' }, { state: 'done', topic: 'b' }]).length === 0);
+  const nyW = renderNeedsYou([{ state: 'waiting', topic: 'fix login', mtime: 0, sessionId: 'h' }], C);
+  ok('needsYou: banner header + count', nyW.some((l) => l.includes('НУЖНО ВНИМАНИЕ (1)')));
+  ok('needsYou: waiting → «ждёт ответа»', nyW.some((l) => l.includes('ждёт ответа')));
+  ok('needsYou: hint names the f key', nyW.some((l) => l.includes('f — перейти')));
+  const nyQ = renderNeedsYou([{ state: 'working', topic: 'auth', question: 'Введи код из Telegram?', mtime: 0, sessionId: 'i' }], C);
+  ok('needsYou: question shown «спрашивает: …»', nyQ.some((l) => l.includes('спрашивает:') && l.includes('Введи код')));
+  ok('needsYou: empty → no section', renderNeedsYou([], C).length === 0 && renderNeedsYou(null, C).length === 0);
+
+  // banner placement: НУЖНО ВНИМАНИЕ sits under СТОП/ЗАВИСЛО and above ДОСКА
+  const stuckS = mw({ wave: 'wave-s', status: 'stuck' });
+  const nySnap = ms({ waves: [stuckS], pipeline: stuckS, sessions: [{ state: 'waiting', topic: 'fix login', mtime: 0, sessionId: 'j' }] });
+  const nyFrame = renderFrame(nySnap, AT, C);
+  const iNeeds = nyFrame.findIndex((l) => l.includes('НУЖНО ВНИМАНИЕ'));
+  const iStuck = nyFrame.findIndex((l) => l.includes('ЗАВИСЛО'));
+  const iBoard = nyFrame.findIndex((l) => l.includes('ДОСКА'));
+  ok('frame: НУЖНО ВНИМАНИЕ present with a waiting session', iNeeds !== -1);
+  ok('frame: ЗАВИСЛО before НУЖНО ВНИМАНИЕ', iStuck !== -1 && iStuck < iNeeds);
+  ok('frame: НУЖНО ВНИМАНИЕ before ДОСКА', iBoard === -1 || iNeeds < iBoard);
+  ok('frame: no waiting/question → no banner', !renderFrame(ms({ sessions: [{ state: 'working', topic: 't' }] }), AT, C).some((l) => l.includes('НУЖНО ВНИМАНИЕ')));
 
   // renderFrame includes sessions when snapshot.sessions present
   const sfSnap = ms({ sessions: ses2 });

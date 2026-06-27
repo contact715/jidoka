@@ -61,6 +61,24 @@ export function resolveFocusMethod(env = {}) {
   return 'unknown';
 }
 
+// pure: derive the focus METHOD from a session's RECORDED terminalId string. The panel jumps a
+// REMOTE session (a different process) and only has the id the hook captured (resolveTerminalId),
+// never that session's live env — so we resolve the method from the id's SHAPE, not from process.env.
+// Returns one of the method names runFocus understands. Anything unrecognisable or degenerate
+// (e.g. "tty:??" on a headless/SSH session with no controlling tty) → 'unknown', which runFocus
+// turns into an honest copy-pasteable hint instead of a focus command. Never throws.
+// Caveat: Apple Terminal's TERM_SESSION_ID and iTerm2's ITERM_SESSION_ID share the wXtYpZ:UUID
+// shape, so the GUI form maps to 'iterm' (best-effort); a non-match degrades to the honest hint.
+export function methodFromTerminalId(terminalId) {
+  const id = String(terminalId || '').trim();
+  if (!id) return 'unknown';
+  if (id.startsWith('tmux:')) return 'tmux';
+  if (id.startsWith('zellij:')) return 'zellij';
+  if (id.startsWith('tty:')) return ttyPathFromId(id) ? 'terminal' : 'unknown';
+  if (/^w\d+t\d+p\d+:[A-Za-z0-9-]+$/.test(id)) return 'iterm';
+  return 'unknown';
+}
+
 // pure-ish: derive a normalized tty path from a terminalId like "tty:ttys017" → "/dev/ttys017".
 function ttyPathFromId(terminalId) {
   if (!terminalId) return null;
@@ -138,6 +156,19 @@ function selfTest() {
   ok('method: empty → unknown', resolveFocusMethod({}) === 'unknown');
   ok('method: zellij beats TERM_PROGRAM', resolveFocusMethod({ ZELLIJ: '1', TERM_PROGRAM: 'Apple_Terminal' }) === 'zellij');
   ok('method: tmux beats TERM_PROGRAM', resolveFocusMethod({ TMUX: 'x', TERM_PROGRAM: 'iTerm.app' }) === 'tmux');
+
+  // methodFromTerminalId — the panel resolves a REMOTE session's method from its recorded id (no env)
+  ok('idMethod: tmux:%N → tmux', methodFromTerminalId('tmux:%3') === 'tmux');
+  ok('idMethod: zellij: → zellij', methodFromTerminalId('zellij:7') === 'zellij');
+  ok('idMethod: tty:/dev/ttys017 → terminal', methodFromTerminalId('tty:/dev/ttys017') === 'terminal');
+  ok('idMethod: tty:ttys017 → terminal', methodFromTerminalId('tty:ttys017') === 'terminal');
+  ok('idMethod: GUI wXtYpZ:UUID → iterm', methodFromTerminalId('w0t0p0:ABCD-1234') === 'iterm');
+  ok('idMethod: degenerate tty:?? → unknown (honest fallback)', methodFromTerminalId('tty:??') === 'unknown');
+  ok('idMethod: null → unknown', methodFromTerminalId(null) === 'unknown');
+  ok('idMethod: empty → unknown', methodFromTerminalId('') === 'unknown');
+  // round-trip: a tty id resolves to a method runFocus then actually focuses with (stubbed)
+  let rt = null; runFocus(methodFromTerminalId('tty:/dev/ttys042'), 'tty:/dev/ttys042', {}, (c, a) => { rt = { c, a }; return 'ok'; });
+  ok('idMethod→runFocus: tty id drives a real terminal focus', rt?.c === 'osascript' && JSON.stringify(rt.a).includes('/dev/ttys042'));
 
   // runFocus terminal → osascript + tty, via stub (no real subprocess)
   let rec = null; const stub = (cmd, argv) => { rec = { cmd, argv }; return 'ok'; };
