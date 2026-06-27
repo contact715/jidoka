@@ -34,9 +34,12 @@
 
 export const REMEDIES = {
   'declaration-over-implementation': {
-    since: '2026-05-29',
+    // 2026-06-06 regression (wave-meta-gates: commit said selftest-reality registered, registry got
+    // mutation-test; gate built but unwired). Strengthened: gate-audit.mjs now blocks ORPHAN gate:*
+    // scripts (no workflow/hook/installer caller) — "wired" is verified mechanically, not claimed.
+    since: '2026-06-06',
     mechanism: 'scripts/proof-gate.mjs',
-    family: ['claim-without-test', 'fixed-without-rerun', 'wired-without-trace'],
+    family: ['claim-without-test', 'fixed-without-rerun', 'wired-without-trace', 'orphaned-gate'],
     premortem: {
       risk: /\b(done|implemented|fixed|wired|works|working|complete[d]?|ready|finished|mechanical(?:ly)?)\b/i,
       clears: /\b(test|spec|passes|passing|exit code|output shown|proof|verified by running|\.test\.|\.spec\.)\b/i,
@@ -74,7 +77,7 @@ export const REMEDIES = {
   },
   'self-test-blindspot': {
     since: '2026-06-02',
-    mechanism: 'scripts/mutation-test.mjs',
+    mechanism: 'scripts/selftest-reality.mjs',
     family: ['threshold-untested', 'boundary-case-missed', 'near-target-untested', 'happy-path-only'],
     premortem: {
       risk: /\b(self-test|unit test|self-tested|passes|green|tested|covered|all cases)\b/i,
@@ -82,10 +85,10 @@ export const REMEDIES = {
       advise: 'test BOUNDARY/near-target cases, not just convenient ones; back the self-test with mutation-test (kills un-asserted code) + property-test (random inputs surface threshold bugs)',
     },
     gate:
-      'A self-test must cover boundary and near-target cases, not only convenient ones (a kaizen trend at 96→99 ' +
-      'toward 100; a metric exactly at its threshold). Back every self-test with mutation-test (scripts/mutation-test.mjs, ' +
-      'kills code no assertion catches) and property-test (scripts/property-test.mjs, random inputs find the threshold ' +
-      'bug the hand-picked cases miss). Real data surfacing a self-test gap = this class.',
+      'A self-test must actually run and assert (selftest-reality.mjs blocks exit-0-with-no-assertion-output, ' +
+      'the "never ran" fingerprint) AND cover boundary/near-target cases, not only convenient ones. Back it with ' +
+      'mutation-test (scripts/mutation-test.mjs, kills code no assertion catches) and property-test ' +
+      '(scripts/property-test.mjs, random inputs find the threshold bug). Real data surfacing a self-test gap = this class.',
   },
   'scope-narrowed-silently': {
     since: '2026-05-29',

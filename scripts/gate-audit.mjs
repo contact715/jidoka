@@ -34,6 +34,8 @@ export const GATES = [
   { id: 'trufflehog-secrets', layer: 'CI', mode: 'hard', token: 'trufflehog' },
   { id: 'dependency-audit', layer: 'CI', mode: 'hard', token: 'dependency-audit' },
   { id: 'mutation-test', layer: 'CI', mode: 'hard', token: 'mutation-test' },
+  { id: 'red-team', layer: 'CI', mode: 'hard', token: 'red-team.mjs' },
+  { id: 'selftest-reality', layer: 'CI', mode: 'hard', token: 'gate:selftest' },
   // PreToolUse — real-time, hard-block
   { id: 'policy-enforce-hook', layer: 'PreToolUse', mode: 'hard', token: null },
   { id: 'jidoka-guard', layer: 'PreToolUse', mode: 'hard', token: null },
@@ -88,6 +90,23 @@ export function verifyCI(gates, workflowText) {
   });
 }
 
+// the INVERSE of a ghost: an ORPHAN — a gate script that exists (package.json "gate:*") but has NO
+// standing caller (no workflow, no git hook). Built-but-unwired reads as protection while enforcing
+// nothing. Incident that taught this: gate:selftest (wave-meta-gates) lived 3 days with zero callers
+// while its commit claimed it "live + runnable" — declaration-over-implementation regression 2026-06-06.
+// "Wired" = the script NAME is invoked somewhere (workflow / git hook), OR the FILE it runs is
+// distributed to products by the installer (product-layer gates enforce in the target repo, not here).
+export function findOrphanGateScripts(pkg, callersText) {
+  const scripts = (pkg && pkg.scripts) || {};
+  const names = Object.keys(scripts).filter(n => n.startsWith('gate:'));
+  const text = String(callersText);
+  return names.filter(n => {
+    if (text.includes(n)) return false;
+    const file = (String(scripts[n]).match(/[\w./-]+\.(?:mjs|js|sh)/) || [])[0];
+    return !(file && text.includes(file.replace(/^.*\//, '')));
+  });
+}
+
 function workflowsText(root = process.cwd()) {
   const dir = join(root, '.github', 'workflows');
   if (!existsSync(dir)) return '';
@@ -109,6 +128,10 @@ function selfTest() {
     ['a real-run CI gate is NOT flagged selfTestOnly', stOnly['eval-suite'] === false],
     ['layers cover CI/runtime/product/LLM/PreToolUse', new Set(GATES.map(g => g.layer)).size >= 5],
     ['soft gates are explicitly marked', GATES.some(g => g.mode === 'soft')],
+    ['orphan gate:* script (no caller anywhere) is caught', findOrphanGateScripts({ scripts: { 'gate:x': 'node scripts/x.mjs' } }, 'run: npm test').includes('gate:x')],
+    ['gate:* called by name (CI/hook) is NOT an orphan', findOrphanGateScripts({ scripts: { 'gate:x': 'node scripts/x.mjs' } }, 'run: npm run gate:x').length === 0],
+    ['gate:* whose FILE ships via installer is NOT an orphan', findOrphanGateScripts({ scripts: { 'gate:x': 'node scripts/x.mjs' } }, "payload: 'x.mjs',").length === 0],
+    ['no gate:* scripts → no orphans', findOrphanGateScripts({ scripts: { test: 'vitest' } }, '').length === 0],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
@@ -140,5 +163,17 @@ if (isMain) {
   if (selfTestOnly.length) console.log(`  \x1b[33mℹ ${selfTestOnly.length} CI gate(s) run ONLY as --self-test in CI (logic verified, NOT enforcing on repo code): ${selfTestOnly.map(g => g.id).join(', ')}\x1b[0m`);
   if (ghosts.length) { console.error(`\n\x1b[31m✗ ${ghosts.length} CI gate(s) declared but absent from workflows: ${ghosts.map(g => g.id).join(', ')}\x1b[0m`); process.exit(1); }
   console.log('  \x1b[32m✓ every CI-layer gate is present in a workflow (no ghost gate).\x1b[0m');
+  // orphan check: every package.json gate:* script must have a standing caller (workflow or git hook)
+  const pkgPath = join(process.cwd(), 'package.json');
+  const pkg = existsSync(pkgPath) ? JSON.parse(readFileSync(pkgPath, 'utf8')) : null;
+  const hooksDir = join(process.cwd(), '.githooks');
+  const hooksText = existsSync(hooksDir)
+    ? readdirSync(hooksDir).map(f => { try { return readFileSync(join(hooksDir, f), 'utf8'); } catch { return ''; } }).join('\n')
+    : '';
+  const installerPath = join(process.cwd(), 'scripts', 'install-into.mjs');
+  const installerText = existsSync(installerPath) ? readFileSync(installerPath, 'utf8') : '';
+  const orphans = findOrphanGateScripts(pkg, wf + '\n' + hooksText + '\n' + installerText);
+  if (orphans.length) { console.error(`\n\x1b[31m✗ ${orphans.length} gate script(s) built but UNWIRED (no workflow / git-hook caller — an orphan enforces nothing): ${orphans.join(', ')}\x1b[0m`); process.exit(1); }
+  console.log('  \x1b[32m✓ every gate:* script has a standing caller (no orphan gate).\x1b[0m');
   process.exit(0);
 }

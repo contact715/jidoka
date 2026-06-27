@@ -1,0 +1,11 @@
+#!/bin/sh
+# jidoka-top — launch the jidoka control panel from a STABLE main-tracking worktree,
+# so the panel never depends on which branch the dev checkout happens to be on.
+# Self-updating: a background ff-only pull lands by the NEXT launch (never blocks this one).
+# Source of truth: scripts/bin/jidoka-top in the jidoka repo; installed to /opt/homebrew/bin.
+PANEL=/Users/mityamit/claude-code-dev-framework/.claude/worktrees/panel
+if [ -d "$PANEL/scripts" ]; then
+  (git -C "$PANEL" fetch -q origin main && git -C "$PANEL" merge -q --ff-only FETCH_HEAD) >/dev/null 2>&1 &
+  exec node "$PANEL/scripts/tui-top.mjs" "$@"
+fi
+exec node /Users/mityamit/claude-code-dev-framework/scripts/tui-top.mjs "$@"

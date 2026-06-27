@@ -26,82 +26,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/Tools/Claude-Code-Agent-Monitor/scripts/hook-handler.js\" PreToolUse"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "afplay $HOME/.claude/sounds/done.wav",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "node $HOME/.claude/hooks/session-state.mjs Stop",
+            "command": "node $HOME/.claude/hooks/session-state.mjs PreToolUse",
             "timeout": 5,
             "async": true
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/Tools/Claude-Code-Agent-Monitor/scripts/hook-handler.js\" Stop"
-          }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "afplay $HOME/.claude/sounds/agent.wav",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/Tools/Claude-Code-Agent-Monitor/scripts/hook-handler.js\" SubagentStop"
-          }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "afplay $HOME/.claude/sounds/attention.wav",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "node $HOME/.claude/hooks/session-state.mjs Notification",
-            "timeout": 5,
-            "async": true
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/Tools/Claude-Code-Agent-Monitor/scripts/hook-handler.js\" Notification"
           }
         ]
       }
@@ -124,85 +51,17 @@
             "type": "command",
             "command": "node $HOME/.claude/hooks/session-state.mjs UserPromptSubmit",
             "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "node $HOME/.claude/jidoka/scripts/session-lock.mjs --hook",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/Tools/Claude-Code-Agent-Monitor/scripts/hook-handler.js\" UserPromptSubmit"
-          }
-        ]
-      },
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/jidoka-feature-reminder.sh",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "node $HOME/claude-code-dev-framework/scripts/skill-selector.mjs --hook",
-            "timeout": 10
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "*",
+        "matcher": "WebFetch|WebSearch|mcp__",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$HOME/Tools/Claude-Code-Agent-Monitor/scripts/hook-handler.js\" PostToolUse"
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/Tools/Claude-Code-Agent-Monitor/scripts/hook-handler.js\" SessionStart"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node $HOME/.claude/hooks/session-start-digest.mjs",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$HOME/Tools/Claude-Code-Agent-Monitor/scripts/hook-handler.js\" SessionEnd"
-          }
-        ]
-      }
-    ],
-    "PostToolUseFailure": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/tool-failure-sound.sh",
+            "command": "node $HOME/.claude/hooks/injection-watch.mjs",
             "timeout": 5,
             "async": true
           }

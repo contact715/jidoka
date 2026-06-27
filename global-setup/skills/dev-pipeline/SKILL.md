@@ -80,6 +80,26 @@ the spec system is `HIERARCHICAL_SPEC_SYSTEM.md`, the mission/constitution are a
    каждый день — цель. На этом же шаге user-researcher проверяет JTBD и риск-предположения
    (есть ли реальный пользователь и боль, или это догадка). НЕ начинай код без ясности. Это самый важный шаг.
 
+   **Механический спутник — clarify-engine (forcing function, не добровольность).** Пока
+   задаёшь вопросы через AskUserQuestion, ЗАПИСЫВАЙ ответы в движок покрытия — иначе этот шаг
+   остаётся прозой, которую агент может пропустить:
+   `node ~/.claude/jidoka/scripts/clarify-engine.mjs --feature <wave-id> --plan` показывает следующие вопросы,
+   упорядоченные по impact × uncertainty (9 категорий: проблема, пользователи, бизнес-метрика,
+   объём, ограничения, данные, краевые случаи, критерии приёмки, риски). На каждый ответ:
+   `--answer <категория> "<текст>"` (или `--defer <категория> "<причина>"` если осознанно
+   откладываем). Когда покрытие COMPLETE (все категории clear или deferred-с-причиной), можно
+   писать мастер-спеку. `clarify-gate.mjs` (WARN в pre-commit) не даёт мастер-спеке закрыться
+   на недо-выясненном входе. Это «что и в каком порядке спрашивать» + проверка полноты, которой
+   раньше не было.
+
+   **Форма и стек — до кода (для ЛЮБОЙ визуальной фичи).** Для страницы / дашборда / экрана на
+   этом же шаге ОБЯЗАТЕЛЬНО подтверди через AskUserQuestion ФОРМУ (раскладка, ориентация, ключевые
+   экраны — лучше с коротким ASCII-наброском вариантов) и СТЕК (vanilla / Next.js / переиспользовать
+   существующий компонент) ДО написания кода. Урок ретро wave-dashboard: доску переделывали ДВАЖДЫ,
+   потому что форму и стек не подтвердили заранее. Подтверждение формы стоит одну минуту, переделка —
+   целую волну. (Когда пользователь не за клавиатурой и Telegram-доставка подключена — те же вопросы
+   уходят опросом в Telegram; пока этого нет, спрашивай в сессии.)
+
 2. **Мастер-спека — ДВЕ команды параллельно.** Дispatch ПАРАЛЛЕЛЬНО (Task tool) обе:
    • **Архитекторы (КАК строить):** micro-architect (взгляд изнутри), macro-architect
      (конкуренты/рынок), surface-cartographer («это уже где-то есть?»), design-system-architect.
@@ -116,6 +136,11 @@ the spec system is `HIERARCHICAL_SPEC_SYSTEM.md`, the mission/constitution are a
    `node <проект>/.jidoka/scripts/parallel-guard.mjs --agents '[{slug,write_scope}...]'` — если
    write_scope пересекаются, запусти конфликтующих в git worktree (Agent `isolation:"worktree"`) или
    серийно; непересекающиеся идут параллельно безопасно.
+   **Контекст имплементеру одним файлом.** Перед dispatch собери плоский story-bundle, чтобы агент
+   не до-выяснял предков спеки заново: `node ~/.claude/jidoka/scripts/shard-story-bundle.mjs --feature <wave-id> --wave <wave-id> --task build`
+   (или `dispatch-parallel-implementations.mjs … --story`). Он инлайнит мастер-спеку + всю цепочку
+   предков L0→Ln + acceptance criteria в `docs/specs/stories/<wave>-build.story.md` — имплементер читает
+   один файл, поиск ноль раз.
 
 5. **Гейты (параллельно).** reflexion-critic (соответствие спеке), constitutional-reviewer
    (миссия), security-scanner, coverage / a11y / perf. + **execution proof**:
@@ -128,7 +153,11 @@ the spec system is `HIERARCHICAL_SPEC_SYSTEM.md`, the mission/constitution are a
    уровне ядра. На критичных — дебаты: prosecutor →
    defender → judge. best-of-N-judge если было несколько попыток.
 
-6. **Дебаг.** debug-agent на провалах тестов (авто-фикс если уверен и мелко, иначе эскалация).
+6. **Дебаг (с исполняемым возвратом гейта).** debug-agent на провалах тестов (авто-фикс если уверен и
+   мелко, иначе эскалация). Маршрут «гейт→дебаг→гейт» не проза, а решение:
+   `node ~/.claude/jidoka/scripts/gate-loopback.mjs --phase gate --verdict <pass|fail> --rounds <n>` — pass уводит в
+   memory, fail возвращает в debug с инкрементом раунда, после debug — обратно в gate; на 5-м провале
+   возвращает HALT (exit 42, эскалация человеку через andon). Лимит 5 раундов теперь энфорсится.
 
 7. **Запуск (если есть прод-цель).** devops-lead (окружения, путь ОТКАТА до выката, что мониторим)
    → release-engineer (CI зелёный → версия + changelog → миграции с откатом → выкат + наблюдение,

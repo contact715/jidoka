@@ -50,7 +50,7 @@
     },
     {
       "phase": "gate",
-      "status": "running",
+      "status": "done",
       "agents": [
         "reflexion-critic",
         "constitutional-reviewer",
@@ -59,28 +59,28 @@
         "policy-sandbox",
         "security-scanner"
       ],
-      "note": "mechanisms proven; registration in meta-remedies.mjs is human-only L0 (block respected, not bypassed) — awaiting paste"
+      "note": "reflexion r2 PASS + constitutional PASS; all script gates green by execution (test 14/14, eval 100%, gate:selftest 0 blindspots, gate-audit no ghost/orphan); regression logged+strengthened (orphan-gate check); live L0 registry paste pending human"
     },
     {
       "phase": "debug",
-      "status": "pending",
+      "status": "done",
       "agents": [
         "debug-agent"
       ],
-      "note": ""
+      "note": "debug-agent: npm test repointed to node --test (setup.ts never existed, 14/14 green); ghost e2e gated by e2e/-dir existence check in execution-gate; gate-audit strengthened with orphan-gate detection (counterfactual catches the incident)"
     },
     {
       "phase": "memory",
-      "status": "pending",
+      "status": "done",
       "agents": [
         "skill-extractor",
         "data-analyst",
         "kaizen-officer"
       ],
-      "note": ""
+      "note": "skill wire-before-claim extracted (3 gates PASS, scope global); regression+strengthening in ledger/registry-proposal; data-analyst skipped (no product metrics surface in framework wave)"
     }
   ],
-  "current": "gate",
+  "current": null,
   "events": [
     {
       "at": "2026-06-03T18:12:48.986Z",
@@ -123,8 +123,37 @@
       "phase": "gate",
       "status": "running",
       "note": "mechanisms proven; registration in meta-remedies.mjs is human-only L0 (block respected, not bypassed) — awaiting paste"
+    },
+    {
+      "at": "2026-06-06T05:52:14.781Z",
+      "phase": "gate",
+      "status": "running"
+    },
+    {
+      "at": "2026-06-06T05:57:18.037Z",
+      "phase": "gate",
+      "status": "failed",
+      "note": "execution-gate red: vitest setupFiles ./tests/setup.ts never existed (pre-existing, initial commit); reflexion REVISE: registry mechanism=mutation-test not selftest-reality (human L0), gate:selftest has no standing caller"
+    },
+    {
+      "at": "2026-06-06T06:08:19.703Z",
+      "phase": "gate",
+      "status": "done",
+      "note": "reflexion r2 PASS + constitutional PASS; all script gates green by execution (test 14/14, eval 100%, gate:selftest 0 blindspots, gate-audit no ghost/orphan); regression logged+strengthened (orphan-gate check); live L0 registry paste pending human"
+    },
+    {
+      "at": "2026-06-06T06:08:19.738Z",
+      "phase": "debug",
+      "status": "done",
+      "note": "debug-agent: npm test repointed to node --test (setup.ts never existed, 14/14 green); ghost e2e gated by e2e/-dir existence check in execution-gate; gate-audit strengthened with orphan-gate detection (counterfactual catches the incident)"
+    },
+    {
+      "at": "2026-06-06T06:12:46.509Z",
+      "phase": "memory",
+      "status": "done",
+      "note": "skill wire-before-claim extracted (3 gates PASS, scope global); regression+strengthening in ledger/registry-proposal; data-analyst skipped (no product metrics surface in framework wave)"
     }
   ],
   "createdAt": "2026-06-03T18:12:48.949Z",
-  "updatedAt": "2026-06-03T19:29:27.984Z"
+  "updatedAt": "2026-06-06T06:12:46.509Z"
 }

@@ -10,10 +10,26 @@
 //
 // Self-test: node session-state.mjs --self-test
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, appendFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { pathToFileURL } from 'node:url';
+
+// stuck-detector lives in scripts/, which is a SIBLING of hooks/ in the repo but
+// installs to ~/.claude/jidoka/scripts/ globally (hooks install to ~/.claude/hooks/).
+// Resolve both layouts at runtime; a static import would crash the hook in the global
+// install (and a crashing PreToolUse hook blocks every tool call).
+async function loadStuckDetector() {
+  const candidates = [
+    new URL('../scripts/stuck-detector.mjs', import.meta.url),                 // repo layout
+    pathToFileURL(join(homedir(), '.claude', 'jidoka', 'scripts', 'stuck-detector.mjs')), // global install
+  ];
+  for (const url of candidates) {
+    try { if (url.protocol !== 'file:' || existsSync(url)) return await import(url.href); } catch { /* try next */ }
+  }
+  return null;
+}
 
 // pure: describe a tool call in a few human words (testable)
 export function describeActivity(toolName, toolInput = {}) {
@@ -171,6 +187,25 @@ if (isMain) {
       // touches stdout (which would leak into the model context on UserPromptSubmit)
       const title = titleFor(next.state, next.prompt, next.topic);
       if (title) { try { writeFileSync('/dev/tty', `\x1b]0;${title}\x07`); } catch { /* headless */ } }
+      // stuck-detector (soft trial): keep a per-session activity ring; on a loop/runaway
+      // pattern, log a diagnosis the andon layer can read. Never blocks the tool.
+      if (event === 'PreToolUse') {
+        try {
+          const sd = await loadStuckDetector();
+          if (sd) {
+            const rf = join(dir, `ring-${sid}.json`);
+            let ring = []; try { ring = JSON.parse(readFileSync(rf, 'utf8')); } catch { /* fresh */ }
+            ring = sd.pushRing(ring, next.activity || '');
+            writeFileSync(rf, JSON.stringify(ring));
+            const v = sd.detect(ring);
+            if (v.stuck) {
+              const log = join(homedir(), '.claude', 'jidoka', 'stuck-events.jsonl');
+              mkdirSync(join(homedir(), '.claude', 'jidoka'), { recursive: true });
+              appendFileSync(log, JSON.stringify({ ts: new Date().toISOString(), session: sid, ...v }) + '\n');
+            }
+          }
+        } catch { /* best-effort; never block the session */ }
+      }
     }
   } catch { /* never block the session */ }
   process.exit(0);

@@ -41,10 +41,14 @@ export const KERNEL = [
 ];
 const COMMON = [ // standard adds the everyday gates
   'northstar-check.mjs', 'charter-check.mjs', 'kaizen-loop.mjs', 'spec-drift-check.mjs',
+  // claim-wave-id — атомарное резервирование номера волны между параллельными сессиями
+  // (рождён тройной коллизией wave-id в projectx 2026-06-10). Leaf script → closure green.
+  'claim-wave-id.mjs',
   // spec-first read gate (ported from the Mosco build, genericized): read the controlling spec
   // before product code. get-spec-context (canonical, now logs its runs) + the gate that reads
-  // that log. Leaf scripts (node builtins only) → import-closure stays green.
-  'get-spec-context.mjs', 'spec-first-gate.mjs',
+  // that log; it also offers a semantic fallback for an unknown --feature, so it imports
+  // memory-retrieve (→ meta-lib KERNEL + memory-consolidate); ship both to keep import-closure green.
+  'get-spec-context.mjs', 'spec-first-gate.mjs', 'memory-retrieve.mjs', 'memory-consolidate.mjs',
   // spec-tree integrity trio (born 2026-06-05 from the projectx spec-tree audit: 99 false-INCOMPATIBLE
   // specs + 30 invisible wave specs accumulated because templates existed but nothing validated
   // instances, and drift was detected but never forced an amendment). All zero-dep leaf scripts.
