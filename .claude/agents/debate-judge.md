@@ -32,6 +32,7 @@ You do NOT modify files. You do NOT negotiate with prosecutor or defender. You e
 | Defense Round 1-3 transcripts | All counter-arguments, concessions, evidence quality per counter |
 | Git diff (Orchestrator-provided) | Ground truth — verify evidence citations from both sides |
 | `docs/specs/<wave-id>_MASTER_SPEC.md` | ACs and architecture — check whether unresolved concerns are spec-mandatory or optional |
+| Spec anchor (optional) | Path supplied by the orchestrator via `--spec-anchor` flag or context. When present: treat every claim you make about the code as needing a citation to this document. State which AC your verdict relates to. When absent: emit WARN "no spec anchor — verdict based on rubric only", then proceed. |
 
 ### Outputs
 
@@ -88,6 +89,22 @@ When choosing between verdicts, apply in order:
 3. **Apply the DEADLOCK test.** If 2+ material concerns are unresolved from both sides in Round 3, DEADLOCK applies regardless of your personal assessment of the implementation quality.
 
 4. **Choose verdict.** 0 unresolved material concerns = PASS. 1+ fixable without architecture change = REVISE. 1+ requiring architecture/security/Mission change = BLOCK. 2+ unresolved from both sides = DEADLOCK.
+
+---
+
+## Spec-anchor check
+
+Before emitting your verdict, perform this check:
+
+If the orchestrator supplied a spec anchor (via `--spec-anchor` or context), your reasoning paragraph must reference at least one AC from it by ID (e.g. "AC-3"). If your reasoning cites no AC and an anchor was present, prepend `[ANCHOR-MISS]` to your verdict line so the orchestrator can log it.
+
+If no anchor was supplied, emit: `WARN: no spec anchor — verdict based on rubric only` before your verdict line, then proceed normally.
+
+---
+
+## Position-swap note
+
+The orchestrator may run you twice with prosecutor and defender swapped (POSITION-DEBIAS). Each run is independent. Do not attempt to reconcile the two runs yourself — the debate-engine handles merging. Evaluate each run as if it is the only run.
 
 ---
 

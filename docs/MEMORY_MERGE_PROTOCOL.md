@@ -12,16 +12,17 @@ You can also merge any time after running `npm run memory:extract` (wave-35). Th
 
 The memory MCP tools (`mcp__memory__create_entities`, `mcp__memory__add_observations`, `mcp__memory__create_relations`, `mcp__memory__read_graph`) belong to a Claude agent's context. A bash or node script cannot call them. The extractor stages candidates; the agent does the merge with user-reviewable steps.
 
-## The 6-step merge
+## The 7-step merge
 
 1. **List staging files**: `npm run memory:status` or `ls .claude/memory-staging/*.json`.
 2. **Read the newest file**: highest date-suffix wins, older files are historical.
 3. **Read the live graph**: call `mcp__memory__read_graph()`. Get current entity names + observations.
 4. **Diff entities**: for each entity in staging not in the live graph, call `mcp__memory__create_entities([entity])`. Preserve the observations array; the staging format already prefixes each observation with a category tag like `[pattern]`, `[gap]`, `[lesson]`.
-5. **Diff observations**: for entities that exist in both, call `mcp__memory__add_observations` with ONLY the observation strings not already present. Compare string-exact (no fuzzy match this version).
+5. **Diff observations**: for entities that exist in both, call `mcp__memory__add_observations` with ONLY the observation strings not already present. Compare string-exact (no fuzzy match this version). If a staged observation is marked `[superseded YYYY-MM-DD by: …]`, or the supersede check has flagged the live observation it supersedes, do NOT silently add both — perform step 7.
 6. **Diff relations**: for each relation in staging, only create it if BOTH `from` and `to` entities exist in the live graph after step 4. Skip orphans. Call `mcp__memory__create_relations`.
+7. **Mark supersedes**: for each contradiction the supersede check flags (or each staged observation carrying a `[superseded …]` marker), the agent retires the old observation in the live graph by REPLACING it with its superseded-marked form — call `mcp__memory__delete_observations` for the bare old string, then `mcp__memory__add_observations` for the same string plus the `[superseded YYYY-MM-DD by: <successor>]` suffix, and add the new (successor) observation. This is the ONLY step allowed to remove an observation, it is agent-performed with user-reviewable output, and it removes ONLY to immediately re-add the marked form (no information is lost). Scripts never do this — MCP belongs to the agent context (see lines 12-13).
 
-Show the user the merge summary (`+N entities, +M observations, +K relations`) before declaring done. Optionally `rm` the staging file after a successful merge — `.claude/` is gitignored so this is local cleanup, not a git operation.
+Show the user the merge summary (`+N entities, +M observations, +K relations`, plus `+M marked superseded`) before declaring done. Optionally `rm` the staging file after a successful merge — `.claude/` is gitignored so this is local cleanup, not a git operation.
 
 ## Observation category tags
 
@@ -46,7 +47,7 @@ Preserve the tags on merge. They become searchable categories in the live graph.
 
 **A retro was renamed or deleted** — the extracted wave entity stays in the live graph; the merge protocol never deletes anything. To remove a stale wave entity, use `mcp__memory__delete_entities` directly.
 
-**Conflicting observation strings** — string-exact compare means "Pattern observed: dual-architect works" and "Pattern observed: Dual-architect works" are treated as different observations. Future enhancement: normalize whitespace + casing before compare.
+**Conflicting observation strings (validity window).** When a newer observation contradicts an older one about the same entity (same subject prefix, different value — see `npm run memory:supersede`), the older observation is not deleted and the two do not silently coexist. The older observation is MARKED superseded with a suffix `[superseded YYYY-MM-DD by: <successor>]`, and the newer observation is added normally. Run `npm run memory:supersede` to list candidates before merging, then apply step 7.
 
 ## Audit trail
 
@@ -77,7 +78,7 @@ Parses entity blocks (name, type, observations, wave), then writes a single cons
 
 ### After restore
 
-Run `npm run memory:status` to confirm the staging file is detected, then follow the standard 6-step merge above.
+Run `npm run memory:status` to confirm the staging file is detected, then follow the standard 7-step merge above.
 
 ### Conflict tiebreaker: graph-wins
 
@@ -85,4 +86,4 @@ If an observation exists in both the snapshot and the live MCP graph with differ
 
 ### MCP constraint
 
-`restore-memory-from-snapshots.mjs` never calls MCP tools directly. All MCP writes occur only via the 6-step merge with agent oversight per this protocol (see lines 12-13 above — scripts cannot call MCP tools; only a Claude agent context can).
+`restore-memory-from-snapshots.mjs` never calls MCP tools directly. All MCP writes occur only via the 7-step merge with agent oversight per this protocol (see lines 12-13 above — scripts cannot call MCP tools; only a Claude agent context can).

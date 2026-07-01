@@ -22,6 +22,19 @@ that do not already exist. See `docs/MEMORY_MERGE_PROTOCOL.md`.
 
 ---
 
+## Check 1b — Superseded facts (wave-memory-validity)
+
+```bash
+npm run memory:supersede
+```
+
+Lists facts where a newer observation contradicts an older one about the same entity
+(same subject, different value). For each candidate, confirm whether the old fact is
+truly superseded; if so, mark it per `docs/MEMORY_MERGE_PROTOCOL.md` step 7 before dispatching.
+Advisory (exit 0). Use `--strict` in CI to fail on unmarked contradictions.
+
+---
+
 ## Check 2 — Reflexion queue
 
 Inspect `.claude/reflexion-queue/`. If non-empty, the wave-33 auto-Reflexion hook has

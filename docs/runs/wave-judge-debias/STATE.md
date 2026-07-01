@@ -1,0 +1,31 @@
+# Run state — wave-judge-debias
+
+> Forward run-journal written by `scripts/run-state.mjs` as the orchestrator advances.
+> Source of truth is `state.json`; this file is rendered from it. Do not edit by hand.
+> Updated: 2026-06-06T05:27:00.481Z
+
+Task: `{"type":"feature","risk":"high","surfaces":["backend"]}`
+
+## Phases
+
+- [x] discovery — done (Источник: GH-research (JudgeLM ICLR-2025, бриф github-research_AGENT-PIPELINES.md). Два приёма: (1) position-bias — оценивать дважды с переставленным порядком кандидатов, усреднять; (2) spec-anchor — передавать судье принятую спеку якорем против галлюцинаций. Цель: debate-judge и best-of-N)
+- [x] spec — done (Мастер-спека docs/specs/wave-judge-debias_MASTER_SPEC.md: position-debias механикой в debate-engine (positionSwap+debiasedVerdict) и judge-panel.aggregate, spec-anchor флагом --spec-anchor + правки промптов 2 судей ([ANCHOR-MISS]), 10 AC, без новых файлов, backward-compatible. Найдены 2 ghost-ссылки (dispatch-parallel-implementations, judge-calibration отсутствуют) — не строим на них)
+- [x] tests — done (TDD: +9 self-test кейсов (AC-1..5,7,9,10) red→green)
+- [x] build — done (debate-engine 112 LOC (positionSwap, debiasedVerdict c порогом и flag position-sensitive, --spec-anchor), judge-panel 99 LOC (aggregate+swappedVotes backward-compat), промпты debate-judge и best-of-N-judge ([ANCHOR-MISS], двойной прогон). Перепроверено оркестратором: оба self-test exit 0, anchor в плане, исходники .claude/agents синхронизированы)
+- [x] gate — done (reflexion-critic round 1: REVISE (логика 10/10 AC, compat железная; 4 пункта уборки). Round 2 оркестратором: debris-записи уже сняты гейтом meta-honesty (само-защита!), 5 черновиков удалены, спека §4.3c ратифицирована (расширение на best-of-N задокументировано), битая ссылка archive-пути починена в 2 копиях. Self-tests зелёные)
+- [x] debug — done (нечего)
+- [x] memory — done (Уроки: (1) строитель обязан убирать за собой тестовые прогоны — debris в реальном леджере поймал meta-honesty на коммите; (2) отклонение от спеки даже в лучшую сторону требует ратификации, не молчания; (3) ссылки на перемещённые в архив доки проверять при правке промптов)
+
+## Next step
+
+wave wave-judge-debias complete — all 7 phases done
+
+## Events
+
+- 2026-06-06T05:09:41.279Z · discovery → done (Источник: GH-research (JudgeLM ICLR-2025, бриф github-research_AGENT-PIPELINES.md). Два приёма: (1) position-bias — оценивать дважды с переставленным порядком кандидатов, усреднять; (2) spec-anchor — передавать судье принятую спеку якорем против галлюцинаций. Цель: debate-judge и best-of-N)
+- 2026-06-06T05:12:44.482Z · spec → done (Мастер-спека docs/specs/wave-judge-debias_MASTER_SPEC.md: position-debias механикой в debate-engine (positionSwap+debiasedVerdict) и judge-panel.aggregate, spec-anchor флагом --spec-anchor + правки промптов 2 судей ([ANCHOR-MISS]), 10 AC, без новых файлов, backward-compatible. Найдены 2 ghost-ссылки (dispatch-parallel-implementations, judge-calibration отсутствуют) — не строим на них)
+- 2026-06-06T05:23:42.808Z · tests → done (TDD: +9 self-test кейсов (AC-1..5,7,9,10) red→green)
+- 2026-06-06T05:23:42.839Z · build → done (debate-engine 112 LOC (positionSwap, debiasedVerdict c порогом и flag position-sensitive, --spec-anchor), judge-panel 99 LOC (aggregate+swappedVotes backward-compat), промпты debate-judge и best-of-N-judge ([ANCHOR-MISS], двойной прогон). Перепроверено оркестратором: оба self-test exit 0, anchor в плане, исходники .claude/agents синхронизированы)
+- 2026-06-06T05:27:00.413Z · gate → done (reflexion-critic round 1: REVISE (логика 10/10 AC, compat железная; 4 пункта уборки). Round 2 оркестратором: debris-записи уже сняты гейтом meta-honesty (само-защита!), 5 черновиков удалены, спека §4.3c ратифицирована (расширение на best-of-N задокументировано), битая ссылка archive-пути починена в 2 копиях. Self-tests зелёные)
+- 2026-06-06T05:27:00.447Z · debug → done (нечего)
+- 2026-06-06T05:27:00.481Z · memory → done (Уроки: (1) строитель обязан убирать за собой тестовые прогоны — debris в реальном леджере поймал meta-honesty на коммите; (2) отклонение от спеки даже в лучшую сторону требует ратификации, не молчания; (3) ссылки на перемещённые в архив доки проверять при правке промптов)

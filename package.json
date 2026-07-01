@@ -90,6 +90,7 @@
 		"memory:status": "node scripts/memory-staging-status.mjs",
 		"memory:retrieve": "node scripts/memory-retrieve.mjs",
 		"memory:curate": "node scripts/memory-curator.mjs --build",
+		"memory:supersede": "node scripts/memory-supersede-check.mjs",
 		"story:bundle": "node scripts/shard-story-bundle.mjs",
 		"dup:guard": "node scripts/dup-guard.mjs --staged",
 		"loopback": "node scripts/gate-loopback.mjs",

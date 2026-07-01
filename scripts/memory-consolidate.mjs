@@ -39,6 +39,12 @@ export function scoreCluster(incidents, today) {
 
 const tierOf = (score) => (score >= ACTIVE ? 'ACTIVE' : score >= WATCH ? 'WATCH' : 'DORMANT');
 
+// wave-memory-validity: the SAME marker regex the supersede scanner uses. A row/observation whose
+// text carries `[superseded YYYY-MM-DD by: …]` has been retired by a newer fact — it is routed out
+// of the Active digest into a History tail (HIDE-from-active, KEEP-as-history; never deleted).
+export const SUPERSEDE_MARKER = /\s\[superseded \d{4}-\d{2}-\d{2} by: [^\]]+\]\s*$/;
+export const isSupersededText = (s) => SUPERSEDE_MARKER.test(String(s || ''));
+
 // EPISODIC rows → SEMANTIC clusters, ranked by recency-weighted frequency.
 export function consolidate(rows, today = todayISO(), remedies = REMEDIES) {
   // map every gated class AND its remedy family to the gate that covers it
@@ -53,8 +59,10 @@ export function consolidate(rows, today = todayISO(), remedies = REMEDIES) {
     const score = scoreCluster(items, today);
     const gateCls = familyGate[cls] || null;
     const gate = gateCls ? remedies[gateCls] : null;
+    const newest = sorted[0];
     return {
       cls, count: items.length, score: Math.round(score * 1000) / 1000, tier: tierOf(score),
+      superseded: isSupersededText(newest.real) || isSupersededText(newest.claimed),
       last: sorted[0].date, lastAge: daysBetween(sorted[0].date, today),
       projects: [...new Set(items.map(i => i.project).filter(Boolean))].sort(),
       gated: !!gate, gateMechanism: gate ? gate.mechanism : null,
@@ -83,7 +91,7 @@ export function scanRetros(dir = RETROS_DIR) {
   return { scanned: files.length, lessons };
 }
 
-const ICON = { ACTIVE: '🔴', WATCH: '🟡', DORMANT: '🟪' };
+const ICON = { ACTIVE: '🔴', WATCH: '🟡', DORMANT: '🟪', SUPERSEDED: '🗂' };
 
 function renderLesson(c) {
   const gate = c.gated
@@ -95,12 +103,17 @@ function renderLesson(c) {
 }
 
 export function render(model, retro = { scanned: 0, lessons: [] }) {
-  const byTier = t => model.clusters.filter(c => c.tier === t);
+  // superseded clusters are excluded from EVERY tier section and rendered in the History tail only.
+  const byTier = t => model.clusters.filter(c => c.tier === t && !c.superseded);
   const section = (title, t) => {
     const items = byTier(t);
     if (!items.length) return '';
     return `\n## ${ICON[t]} ${title}\n\n${items.map(renderLesson).join('\n\n')}\n`;
   };
+  const supersededItems = model.clusters.filter(c => c.superseded);
+  const historyBlock = supersededItems.length
+    ? `\n## ${ICON.SUPERSEDED} History — superseded (kept for the record)\n\n${supersededItems.map(renderLesson).join('\n\n')}\n`
+    : '';
   const retroBlock = retro.lessons.length
     ? `\n## 📓 From retros (${retro.scanned} scanned)\n\n${retro.lessons.map(l => `- ${l.text}  \`${l.file}\``).join('\n')}\n`
     : (retro.scanned ? `\n_${retro.scanned} retro(s) scanned, no structured lessons extracted._\n` : '');
@@ -116,6 +129,7 @@ export function render(model, retro = { scanned: 0, lessons: [] }) {
     section('Active — front of mind', 'ACTIVE'),
     section('Watch — recurring but lower-pressure', 'WATCH'),
     section('Decayed — demoted (old / one-off)', 'DORMANT'),
+    historyBlock,
     retroBlock,
   ].join('\n');
 }
@@ -134,11 +148,18 @@ function selfTest() {
     // gated class (has a remedy) + a family child (covered by the parent gate)
     { date: '2026-05-30', class: 'declaration-over-implementation', claimed: 'a', real: 'b', caught_by: 'user' },
     { date: '2026-05-29', class: 'claim-without-test', claimed: 'a', real: 'b', caught_by: 'user' },
+    // superseded: newest example carries a [superseded …] marker → routed OUT of Active into History
+    { date: '2026-05-30', class: 'retired-rule', claimed: 'old way', real: 'use new way [superseded 2026-05-30 by: new way]', caught_by: 'user', project: 'p3' },
+    { date: '2026-05-20', class: 'retired-rule', claimed: 'old way', real: 'old way', caught_by: 'user', project: 'p3' },
   ];
   const m = consolidate(rows, today);
   const get = cls => m.clusters.find(c => c.cls === cls);
   const out = render(m, scanRetros('/does/not/exist'));
   const m2 = consolidate(rows, today);
+  // split rendered output at the History header so we can assert section membership precisely
+  const HIST_HEADER = '🗂 History — superseded';
+  const beforeHist = out.includes(HIST_HEADER) ? out.slice(0, out.indexOf(HIST_HEADER)) : out;
+  const histSection = out.includes(HIST_HEADER) ? out.slice(out.indexOf(HIST_HEADER)) : '';
   const T = [
     ['hot ranks first (recency+frequency)', m.clusters[0].cls === 'hot'],
     ['hot > medium (frequency: 3 recent beats 1)', get('hot').score > get('medium').score],
@@ -149,6 +170,10 @@ function selfTest() {
     ['family child gated via parent', get('claim-without-test').gateVia === 'declaration-over-implementation'],
     ['deterministic (same input → same output)', JSON.stringify(m) === JSON.stringify(m2)],
     ['render emits the active marker + header', out.includes('🔴') && out.includes("what we've learned")],
+    // wave-memory-validity: superseded cluster routed out of Active/Watch/Decayed into History
+    ['superseded cluster flagged on the model', get('retired-rule') && get('retired-rule').superseded === true],
+    ['superseded cluster NOT in Active/Watch/Decayed sections', !beforeHist.includes('retired-rule')],
+    ['superseded cluster DOES render under History tail', histSection.includes('retired-rule')],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }

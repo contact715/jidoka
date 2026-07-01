@@ -95,6 +95,33 @@ Any change to HOW I work or to the development environment (a communication pref
 
 A project-local auto-memory note only loads for that one project, so it is never sufficient by itself for an environment-wide rule. Set by the user on 2026-06-04.
 
+## Local Claude/Codex Relay — no API orchestration
+
+The user does not need to say "use Jidoka", "use relay", or "use Fable". For every non-trivial development request, classify it automatically with:
+
+`node ~/.claude/jidoka/scripts/jidoka.mjs model-route --task-text "<task>" --json`
+
+If `automation.autoRelay` is `true`, run the one-window relay automatically:
+
+`node ~/.claude/jidoka/scripts/jidoka.mjs relay auto --cwd "$PWD" --from claude --task "<task>" --allow-codex-write`
+
+If `automation.mode` is `direct-codex`, continue directly. If `automation.mode` is `redact-then-relay`, redact or summarize sensitive material locally before any Fable handoff. Do not run the relay recursively when already inside a relay worker prompt.
+
+When a task should move between Claude Code and Codex without a custom API, use the local file relay:
+
+`node ~/.claude/jidoka/scripts/jidoka.mjs relay auto --cwd "$PWD" --from claude --task "<task>" --allow-codex-write`
+
+The relay queue lives in `~/.jidoka/relay`. Claude handles Fable 5 planning/review through the local `claude` CLI. Codex handles GPT-5.5 implementation/proof through the local `codex exec` CLI. If the user asks for "Claude then Codex", "Fable then Codex", "two agents", "handoff", "relay", or similar wording, route the task through this relay instead of only describing a plan.
+Prefer `relay auto` so the user can stay in one window.
+
+Start watchers:
+`node ~/.claude/jidoka/scripts/jidoka.mjs relay start-watchers --allow-codex-write`
+
+Relay defaults: Fable/Claude timeout `240000ms`, Codex timeout `600000ms`. Override with `--claude-timeout-ms`, `--codex-timeout-ms`, `JIDOKA_CLAUDE_TIMEOUT_MS`, or `JIDOKA_CODEX_TIMEOUT_MS`; restart watchers after changes.
+If Fable times out, relay records `claude-timed-out` and queues Codex fallback with `phase: codex-after-fable-timeout`. Do not claim Fable produced a plan/review; report Codex local fallback. If Codex times out, relay records `codex-timed-out`, marks the run failed, and no implementation/proof claim is allowed.
+
+Protocol: `~/.claude/jidoka/docs/LOCAL_RELAY_PROTOCOL.md`.
+
 ## Before Executing Any Task — Think First
 
 Before touching any file, running any command, or making any change:

@@ -1,0 +1,131 @@
+{
+  "wave": "wave-memory-validity",
+  "task": {
+    "type": "feature",
+    "risk": "normal",
+    "surfaces": [
+      "backend"
+    ]
+  },
+  "phases": [
+    {
+      "phase": "discovery",
+      "status": "done",
+      "agents": [
+        "user-researcher",
+        "product-strategist"
+      ],
+      "note": "Источник: GH-research Graphiti validity-window (бриф AGENT-PIPELINES.md п.1). Цель: MEMORY_MERGE_PROTOCOL §49 (конфликтующие факты сейчас хранятся дублями) + supersede-детектор wired в npm memory:status + дайджест перестаёт всплывать устаревшее. Зачем бизнесу: память не врёт про настоящее, хранит правду про прошлое"
+    },
+    {
+      "phase": "spec",
+      "status": "done",
+      "agents": [
+        "chief-architect",
+        "micro-architect",
+        "macro-architect",
+        "surface-cartographer",
+        "chief-product-officer",
+        "business-process-architect",
+        "kaizen-officer"
+      ],
+      "note": "Мастер-спека wave-memory-validity_MASTER_SPEC.md: supersede-конвенция [superseded YYYY-MM-DD by:], детектор-скрипт, wiring в memory:status, дайджест прячет устаревшее в History, протокол 6→7 шагов"
+    },
+    {
+      "phase": "tests",
+      "status": "done",
+      "agents": [
+        "test-engineer"
+      ],
+      "note": "TDD red→green: supersede-check 24 assert, consolidate +3"
+    },
+    {
+      "phase": "build",
+      "status": "done",
+      "agents": [
+        "engineering-lead",
+        "backend-agent"
+      ],
+      "note": "6 файлов: memory-supersede-check.mjs (new), memory-consolidate (History-секция), memory-staging-status (+pointer), package.json (memory:supersede), MEMORY_MERGE_PROTOCOL (7-step), SESSION_START (Check 1b)"
+    },
+    {
+      "phase": "gate",
+      "status": "done",
+      "agents": [
+        "reflexion-critic",
+        "constitutional-reviewer",
+        "coverage-auditor",
+        "budget-gate",
+        "policy-sandbox",
+        "security-scanner"
+      ],
+      "note": "Адверсариал REVISE 2 пункта: (1) ЛОЖНЫЕ СРАБАТЫВАНИЯ — детектор флагал любые 2 пункта с общим префиксом (два урока/причины). ИСПРАВЛЕНО: SINGLE_VALUED_KEYS allowlist (status/version/color/port/...) + срабатывание только при ровно 2 вхождениях; формулировка 'изменилось значение ключа' вместо 'противоречие'. (2) битый staging ронял — try/catch+exit2. Доказано: репро ревизора (2 Lesson+2 Status) → 1 кандидат (только status), 24/0 тестов, битый JSON код 2"
+    },
+    {
+      "phase": "debug",
+      "status": "done",
+      "agents": [
+        "debug-agent"
+      ],
+      "note": "нечего"
+    },
+    {
+      "phase": "memory",
+      "status": "done",
+      "agents": [
+        "skill-extractor",
+        "data-analyst",
+        "kaizen-officer"
+      ],
+      "note": "Урок: детектор/гейт, реагирующий на СТРУКТУРНОЕ совпадение (общий префикс) без СЕМАНТИКИ (одноместный ли это ключ), даёт ложные тревоги, маскируемые текущими данными — нужен allowlist того, что реально single-valued. Self-test, написанный автором детектора, закрепил сомнительный пример как истину; поймал только независимый adversarial. Класс over-eager-detector залогирован"
+    }
+  ],
+  "current": null,
+  "events": [
+    {
+      "at": "2026-06-06T06:57:47.362Z",
+      "phase": "discovery",
+      "status": "done",
+      "note": "Источник: GH-research Graphiti validity-window (бриф AGENT-PIPELINES.md п.1). Цель: MEMORY_MERGE_PROTOCOL §49 (конфликтующие факты сейчас хранятся дублями) + supersede-детектор wired в npm memory:status + дайджест перестаёт всплывать устаревшее. Зачем бизнесу: память не врёт про настоящее, хранит правду про прошлое"
+    },
+    {
+      "at": "2026-06-06T07:21:03.961Z",
+      "phase": "spec",
+      "status": "done",
+      "note": "Мастер-спека wave-memory-validity_MASTER_SPEC.md: supersede-конвенция [superseded YYYY-MM-DD by:], детектор-скрипт, wiring в memory:status, дайджест прячет устаревшее в History, протокол 6→7 шагов"
+    },
+    {
+      "at": "2026-06-06T07:21:03.991Z",
+      "phase": "tests",
+      "status": "done",
+      "note": "TDD red→green: supersede-check 24 assert, consolidate +3"
+    },
+    {
+      "at": "2026-06-06T07:21:04.019Z",
+      "phase": "build",
+      "status": "done",
+      "note": "6 файлов: memory-supersede-check.mjs (new), memory-consolidate (History-секция), memory-staging-status (+pointer), package.json (memory:supersede), MEMORY_MERGE_PROTOCOL (7-step), SESSION_START (Check 1b)"
+    },
+    {
+      "at": "2026-06-06T07:21:04.048Z",
+      "phase": "gate",
+      "status": "done",
+      "note": "Адверсариал REVISE 2 пункта: (1) ЛОЖНЫЕ СРАБАТЫВАНИЯ — детектор флагал любые 2 пункта с общим префиксом (два урока/причины). ИСПРАВЛЕНО: SINGLE_VALUED_KEYS allowlist (status/version/color/port/...) + срабатывание только при ровно 2 вхождениях; формулировка 'изменилось значение ключа' вместо 'противоречие'. (2) битый staging ронял — try/catch+exit2. Доказано: репро ревизора (2 Lesson+2 Status) → 1 кандидат (только status), 24/0 тестов, битый JSON код 2"
+    },
+    {
+      "at": "2026-06-06T07:21:04.075Z",
+      "phase": "debug",
+      "status": "done",
+      "note": "нечего"
+    },
+    {
+      "at": "2026-06-06T07:21:17.107Z",
+      "phase": "memory",
+      "status": "done",
+      "note": "Урок: детектор/гейт, реагирующий на СТРУКТУРНОЕ совпадение (общий префикс) без СЕМАНТИКИ (одноместный ли это ключ), даёт ложные тревоги, маскируемые текущими данными — нужен allowlist того, что реально single-valued. Self-test, написанный автором детектора, закрепил сомнительный пример как истину; поймал только независимый adversarial. Класс over-eager-detector залогирован"
+    }
+  ],
+  "createdAt": "2026-06-06T06:57:47.328Z",
+  "updatedAt": "2026-06-06T07:21:17.107Z",
+  "terminalId": null
+}

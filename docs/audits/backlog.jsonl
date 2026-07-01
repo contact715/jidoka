@@ -27,3 +27,4 @@
 {"title":"GH-research: memory-consolidate автоматически после каждого ретро волны, не вручную (Letta-паттерн)","status":"open","priority":"low","source":"github-research_AGENT-PIPELINES.md"}
 {"title":"GH-research: архив завершённых wave-спек после ретро — активное дерево показывает только живое (OpenSpec)","status":"open","priority":"low","source":"github-research_AGENT-PIPELINES.md"}
 {"title":"GH-research: справочник Piebald-AI/claude-code-system-prompts — сверяться перед написанием новых агентов/гейтов (не ставить)","status":"open","priority":"low","source":"github-research_CLAUDE-ECOSYSTEM.md"}
+{"title":"red-team: при активном l0-write-grant атаки на grantable-пути должны репортиться как SKIPPED-grant-active (с проверкой аудит-лога), а не VULNERABLE — ложная тревога 2026-06-06, eval-suite краснел из-за окна гранта","status":"open","priority":"medium","source":"red-team false-positive под owner-grant"}

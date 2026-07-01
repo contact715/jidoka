@@ -16,8 +16,8 @@ jobs:
   semgrep-sast:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
       - name: install semgrep
@@ -35,7 +35,7 @@ jobs:
   trufflehog-secrets:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0 # full history: scan every commit for leaked secrets
       - name: trufflehog secret scan (full history, verified only)
@@ -45,5 +45,8 @@ jobs:
         # local git history has no range to compute (robust) and is more thorough. --only-verified
         # means only live/verified secrets fail the build (test fixtures never false-trip it).
         run: |
-          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b "$RUNNER_TEMP/tfh"
+          # pin the installer to a release tag (not main) and split the curl|sh pipe:
+          # download the script to a file, then execute it — no piping remote content into a shell.
+          curl -sSfL "https://raw.githubusercontent.com/trufflesecurity/trufflehog/v3.95.7/scripts/install.sh" -o "$RUNNER_TEMP/tfh-install.sh"
+          sh "$RUNNER_TEMP/tfh-install.sh" -b "$RUNNER_TEMP/tfh" v3.95.7
           "$RUNNER_TEMP/tfh/trufflehog" git "file://$PWD" --only-verified --fail
