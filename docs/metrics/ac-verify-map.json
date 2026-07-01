@@ -1,0 +1,836 @@
+{
+  "generated": "spec-tree-overhaul",
+  "summary": {
+    "total": 91,
+    "byKind": {
+      "self": 11,
+      "engine": 2,
+      "cli": 36,
+      "manual": 42
+    },
+    "wired": 91,
+    "executable": 13
+  },
+  "rows": [
+    {
+      "spec": "docs/specs/modules/installer-federation/footprint-audit.md",
+      "id": "AC-1",
+      "title": "Self-test passes",
+      "command": "node scripts/footprint-audit.mjs --self-test",
+      "kind": "self",
+      "script": "scripts/footprint-audit.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/installer-federation/footprint-audit.md",
+      "id": "AC-2",
+      "title": "A script with no caller is classified dead",
+      "command": "covered by footprint-audit --self-test (classifyFootprint)",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/installer-federation/footprint-audit.md",
+      "id": "AC-3",
+      "title": "A target with 2+ native signals registers hasOwn:true → REDUNDANT",
+      "command": "covered by --self-test (footprintVerdict)",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/installer-federation/global-snapshot.md",
+      "id": "AC-1",
+      "title": "Snapshot exits 0 and writes present files, warning on absent ones",
+      "command": "node scripts/snapshot-global.mjs",
+      "kind": "cli",
+      "script": "scripts/snapshot-global.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/installer-federation/global-snapshot.md",
+      "id": "AC-2",
+      "title": "Every written file uses $HOME, no absolute home paths",
+      "command": "checked by pre-publish-guard home-path rule",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/installer-federation/instantiation-audit.md",
+      "id": "AC-1",
+      "title": "A clean repo exits 0",
+      "command": "node scripts/instantiation-audit.mjs",
+      "kind": "cli",
+      "script": "scripts/instantiation-audit.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/installer-federation/instantiation-audit.md",
+      "id": "AC-2",
+      "title": "A reference to a nonexistent workflow → ghost, exit 1",
+      "command": "fixture: a doc citing a workflow file that is not on disk → exit 1",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/installer-federation/instantiation-audit.md",
+      "id": "AC-3",
+      "title": "--warn reports the same condition but exits 0",
+      "command": "node scripts/instantiation-audit.mjs --warn",
+      "kind": "cli",
+      "script": "scripts/instantiation-audit.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/installer-federation/project-federation.md",
+      "id": "AC-1",
+      "title": "The charter template has all four sections (Roots, Trunk, Protected zones, Derivation)",
+      "command": "grep: four required headers present",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/installer-federation/project-federation.md",
+      "id": "AC-2",
+      "title": "The project-steward agent definition exists and references the Defense Process",
+      "command": "grep: .claude/agents/project-steward.md mentions Defense Process",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/installer-federation/project-installer.md",
+      "id": "AC-1",
+      "title": "Self-test passes (profile invariants: kernel-in-every-profile, import-closure)",
+      "command": "node scripts/install-into.mjs --self-test",
+      "kind": "self",
+      "script": "scripts/install-into.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/installer-federation/project-installer.md",
+      "id": "AC-2",
+      "title": "--profile=core installs exactly the kernel list",
+      "command": "observe: core profile file set",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/installer-federation/project-installer.md",
+      "id": "AC-3",
+      "title": "A target with its own framework gets a REDUNDANT/OVERLAP verdict before copy",
+      "command": "covered by footprint-audit",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/memory/grounding-contract.md",
+      "id": "AC-1",
+      "title": "A valid citation payload emits grounding_pass, exit 0",
+      "command": "node scripts/check-source-grounding.mjs --dry-run",
+      "kind": "cli",
+      "script": "scripts/check-source-grounding.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/memory/grounding-contract.md",
+      "id": "AC-2",
+      "title": "An unresolvable reference emits hallucination_detected",
+      "command": "fixture: bad chunk_id → unresolved_count>0",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/memory/memory-consolidate.md",
+      "id": "AC-1",
+      "title": "Self-test passes (9 checks)",
+      "command": "node scripts/memory-consolidate.mjs --self-test",
+      "kind": "self",
+      "script": "scripts/memory-consolidate.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/memory/memory-consolidate.md",
+      "id": "AC-2",
+      "title": "A gated class is annotated gated:true; an ungated one shows live risk",
+      "command": "observe: memory-consolidated.md tiering",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/memory/memory-merge-protocol.md",
+      "id": "AC-1",
+      "title": "Staging status lists unmerged files (or none)",
+      "command": "node scripts/memory-staging-status.mjs",
+      "kind": "cli",
+      "script": "scripts/memory-staging-status.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/memory/memory-merge-protocol.md",
+      "id": "AC-2",
+      "title": "--json emits a valid files[] array",
+      "command": "node scripts/memory-staging-status.mjs --json",
+      "kind": "cli",
+      "script": "scripts/memory-staging-status.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/memory/retro-memory-extractor.md",
+      "id": "AC-1",
+      "title": "--dry prints an extraction count and sample without writing",
+      "command": "node scripts/extract-retro-memory.mjs --dry",
+      "kind": "cli",
+      "script": "scripts/extract-retro-memory.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/memory/retro-memory-extractor.md",
+      "id": "AC-2",
+      "title": "Identical retro content yields the same content-hash filename (deterministic)",
+      "command": "observe: stable hash in staging filename",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/memory/specs-to-memory-extractor.md",
+      "id": "AC-1",
+      "title": "--dry prints spec/entity/relation counts without writing",
+      "command": "node scripts/sync-specs-to-memory.mjs --dry",
+      "kind": "cli",
+      "script": "scripts/sync-specs-to-memory.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/memory/specs-to-memory-extractor.md",
+      "id": "AC-2",
+      "title": "A dangling depends_on is warned and produces no relation",
+      "command": "fixture: unknown depends_on → warning",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/meta-engine/meta-audit-engine.md",
+      "id": "AC-1",
+      "title": "Engine test passes",
+      "command": "node --test scripts/__tests__/meta-audit.test.mjs",
+      "kind": "engine",
+      "script": "scripts/__tests__/meta-audit.test.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/meta-engine/meta-audit-engine.md",
+      "id": "AC-2",
+      "title": "Empty ledger exits 0",
+      "command": "node scripts/meta-audit.mjs",
+      "kind": "cli",
+      "script": "scripts/meta-audit.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/meta-engine/meta-audit-engine.md",
+      "id": "AC-3",
+      "title": "A gate whose mechanism file is missing is flagged, exit 1",
+      "command": "covered by meta-audit.test.mjs",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/meta-engine/meta-gate-registry.md",
+      "id": "AC-1",
+      "title": "Self-test passes",
+      "command": "node scripts/meta-remedies.mjs --self-test",
+      "kind": "self",
+      "script": "scripts/meta-remedies.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/meta-engine/meta-gate-registry.md",
+      "id": "AC-2",
+      "title": "Every entry mechanism points to a file on disk",
+      "command": "checked by meta-audit broken-gate rule",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/meta-engine/meta-mistake-ledger.md",
+      "id": "AC-1",
+      "title": "Engine test passes",
+      "command": "node --test scripts/__tests__/meta-lib.test.mjs",
+      "kind": "engine",
+      "script": "scripts/__tests__/meta-lib.test.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/meta-engine/meta-mistake-ledger.md",
+      "id": "AC-2",
+      "title": "meta-log appends one valid JSON line",
+      "command": "node scripts/meta-log.mjs test-class \"claimed\" \"real\" user",
+      "kind": "cli",
+      "script": "scripts/meta-log.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/meta-engine/meta-mistake-ledger.md",
+      "id": "AC-3",
+      "title": "loadLedger returns [] when the file is absent (no crash)",
+      "command": "covered by meta-lib.test.mjs",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/meta-engine/prompt-evolution-system.md",
+      "id": "AC-1",
+      "title": "Self-test passes",
+      "command": "node scripts/prompt-evolution.mjs --self-test",
+      "kind": "self",
+      "script": "scripts/prompt-evolution.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/meta-engine/prompt-evolution-system.md",
+      "id": "AC-2",
+      "title": "isImprovement returns false if any passing case regresses",
+      "command": "covered by prompt-evolution --self-test",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/meta-engine/red-team.md",
+      "id": "AC-1",
+      "title": "Self-test passes (deterministic attack catalog self-verifies)",
+      "command": "node scripts/red-team.mjs --self-test",
+      "kind": "self",
+      "script": "scripts/red-team.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/meta-engine/red-team.md",
+      "id": "AC-2",
+      "title": "Attacks against policy-enforce-hook protected paths fail cleanly",
+      "command": "node scripts/policy-enforce-hook.mjs --self-test",
+      "kind": "self",
+      "script": "scripts/policy-enforce-hook.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/observability/compute-cost.md",
+      "id": "AC-1",
+      "title": "--dry prints per-wave estimates without writing",
+      "command": "node scripts/compute-cost.mjs --dry",
+      "kind": "cli",
+      "script": "scripts/compute-cost.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/observability/compute-cost.md",
+      "id": "AC-2",
+      "title": "A wave cost >3x the 10-wave median emits a cost_anomaly event",
+      "command": "fixture: spike wave → cost_anomaly",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/observability/compute-dora.md",
+      "id": "AC-1",
+      "title": "--dry prints per-metric values without writing",
+      "command": "node scripts/compute-dora.mjs --dry",
+      "kind": "cli",
+      "script": "scripts/compute-dora.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/observability/compute-dora.md",
+      "id": "AC-2",
+      "title": "A halt that resumes with no follow-up fix does not count as a change-fail (anti-gaming)",
+      "command": "fixture: halt+resume, no R2 commit → no change-fail event",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/observability/dashboard-collectors.md",
+      "id": "AC-1",
+      "title": "Self-test passes (pure-summarizer checks)",
+      "command": "node scripts/dashboard/collectors.mjs --self-test",
+      "kind": "self",
+      "script": "scripts/dashboard/collectors.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/observability/dashboard-collectors.md",
+      "id": "AC-2",
+      "title": "collectProject returns the four keys even with no artifact streams",
+      "command": "covered by --self-test (graceful degrade)",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/observability/gdoc-export.md",
+      "id": "AC-1",
+      "title": "snapshotMarkdown returns a heading and a tasks section",
+      "command": "node scripts/dashboard/serve.mjs --self-test (gdoc export self-check)",
+      "kind": "cli",
+      "script": "scripts/dashboard/serve.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/observability/gdoc-export.md",
+      "id": "AC-2",
+      "title": "Output escapes <, >, & from user data (XSS-safe)",
+      "command": "covered by dashboard self-test",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/orchestration/agent-roster.md",
+      "id": "AC-1",
+      "title": "Every agent charter in .claude/agents/ has a roster row",
+      "command": "audit: diff .claude/agents/*.md basenames vs AGENT_ROSTER.md rows",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/orchestration/agent-roster.md",
+      "id": "AC-2",
+      "title": "Every roster row carries a Line: annotation",
+      "command": "grep: no roster agent row missing Line:",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/orchestration/cross-line-dispatch-guard.md",
+      "id": "AC-1",
+      "title": "A cross-line dispatch without override blocks in hard mode (exit 1)",
+      "command": "node scripts/check-cross-line-dispatch.mjs --self-check",
+      "kind": "cli",
+      "script": "scripts/check-cross-line-dispatch.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/orchestration/cross-line-dispatch-guard.md",
+      "id": "AC-2",
+      "title": "An override with empty approver is rejected (anonymous bypass blocked)",
+      "command": "fixture: crossLineOverride.approver=\"\" → exit 1",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/orchestration/cross-line-dispatch-guard.md",
+      "id": "AC-3",
+      "title": "A valid override appends a WARN record and exits 0",
+      "command": "fixture: named approver+reason → exit 0, jsonl grows",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/orchestration/raci-governance.md",
+      "id": "AC-1",
+      "title": "A valid matrix validates with 0 violations",
+      "command": "node scripts/validate-raci.mjs",
+      "kind": "cli",
+      "script": "scripts/validate-raci.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/orchestration/raci-governance.md",
+      "id": "AC-2",
+      "title": "An accountable that is an agent slug (not human:) is a violation, exit 1",
+      "command": "fixture: accountable=agent → exit 1",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/orchestration/raci-governance.md",
+      "id": "AC-3",
+      "title": "--emit-md regenerates raci.md from raci.json",
+      "command": "node scripts/validate-raci.mjs --emit-md",
+      "kind": "cli",
+      "script": "scripts/validate-raci.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/orchestration/wave-lifecycle.md",
+      "id": "AC-1",
+      "title": "Run-state self-test passes",
+      "command": "node scripts/run-state.mjs --self-test",
+      "kind": "self",
+      "script": "scripts/run-state.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/orchestration/wave-lifecycle.md",
+      "id": "AC-2",
+      "title": "--init creates state.json at phase=init, status=pending",
+      "command": "node scripts/run-state.mjs --init selftest --task '{\"risk\":\"low\"}'",
+      "kind": "cli",
+      "script": "scripts/run-state.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/orchestration/wave-lifecycle.md",
+      "id": "AC-3",
+      "title": "--resume after a reset names the last phase and next step",
+      "command": "node scripts/run-state.mjs --resume selftest",
+      "kind": "cli",
+      "script": "scripts/run-state.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/andon-halt-system.md",
+      "id": "AC-1",
+      "title": "writeHaltState creates .sdd-halt-state.json with wave, agent, reason populated",
+      "command": "behavior: writeHaltState() → .sdd-halt-state.json present with active fields",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/andon-halt-system.md",
+      "id": "AC-2",
+      "title": "Each halt appends exactly one line to halt-events.jsonl (append-only)",
+      "command": "audit: docs/audits/halt-events.jsonl line count increments by 1 per halt",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/andon-halt-system.md",
+      "id": "AC-3",
+      "title": "The TLA+ model of the halt invariant checks without violation",
+      "command": "node scripts/run-tla.mjs",
+      "kind": "cli",
+      "script": "scripts/run-tla.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/bundle-perf-gate.md",
+      "id": "AC-1",
+      "title": "No .next build → SKIP, exit 0",
+      "command": "node scripts/bundle-delta.mjs",
+      "kind": "cli",
+      "script": "scripts/bundle-delta.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/bundle-perf-gate.md",
+      "id": "AC-2",
+      "title": "A route growing >50 KB → exit 1 naming the route",
+      "command": "fixture: manifest with +60 KB route → exit 1",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/bundle-perf-gate.md",
+      "id": "AC-3",
+      "title": "--update rewrites the baseline without blocking",
+      "command": "node scripts/bundle-size-check.mjs --update",
+      "kind": "cli",
+      "script": "scripts/bundle-size-check.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/constitutional-drift-monitor.md",
+      "id": "AC-1",
+      "title": "Fewer than 5 events for a Q → no alert (N<5 guard)",
+      "command": "node scripts/detect-constitutional-drift.mjs",
+      "kind": "cli",
+      "script": "scripts/detect-constitutional-drift.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/constitutional-drift-monitor.md",
+      "id": "AC-2",
+      "title": "Soft mode exits 0 even when an alert fires",
+      "command": "config: constitutionalDrift.hardBlockEnabled=false → exit 0",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/constitutional-drift-monitor.md",
+      "id": "AC-3",
+      "title": "Hard mode crossing 2σ calls writeHaltState and exits 42",
+      "command": "config: hardBlockEnabled=true + breach fixture → exit 42",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/coverage-gate.md",
+      "id": "AC-1",
+      "title": "Absent coverage/lcov.info → SKIP, exit 0 (graceful)",
+      "command": "node scripts/coverage-delta.mjs",
+      "kind": "cli",
+      "script": "scripts/coverage-delta.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/coverage-gate.md",
+      "id": "AC-2",
+      "title": "A file dropping >5% → FAIL row, exit 1",
+      "command": "fixture: lcov with a 6% drop → exit 1",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/coverage-gate.md",
+      "id": "AC-3",
+      "title": "An empty baseline initialises from current coverage, exit 0",
+      "command": "fixture: empty baseline → first-run init",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/meta-process-audit.md",
+      "id": "AC-1",
+      "title": "No recurrence → prints PASS, exit 0",
+      "command": "node scripts/audit-meta-process.mjs",
+      "kind": "cli",
+      "script": "scripts/audit-meta-process.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/meta-process-audit.md",
+      "id": "AC-2",
+      "title": "A slug recurring in 2 retros → REGRESSION_DETECTED, exit 1",
+      "command": "fixture: two retros sharing a slug → exit 1",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/meta-process-audit.md",
+      "id": "AC-3",
+      "title": "A retro citing a fixed file that no longer exists → REGRESSION_DETECTED",
+      "command": "fixture: retro cites missing enforcement file → exit 1",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/verification-pipeline.md",
+      "id": "AC-1",
+      "title": "A dry run at low effort skips Tier 3 and exits 0",
+      "command": "node scripts/run-verification-pipeline.mjs --wave selftest --effort S --dry-run",
+      "kind": "cli",
+      "script": "scripts/run-verification-pipeline.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/verification-pipeline.md",
+      "id": "AC-2",
+      "title": "An active andon halt with andonCord.enabled blocks before any tier (exit 42)",
+      "command": "manual: set .sdd-halt-state.json active → run-verification-pipeline exits 42",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/quality-gates/verification-pipeline.md",
+      "id": "AC-3",
+      "title": "A constitutional VIOLATION in Tier 2 appends to docs/audits/cross-line-verdicts.jsonl",
+      "command": "audit: docs/audits/cross-line-verdicts.jsonl grows on violation",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/ac-coverage-mapper.md",
+      "id": "AC-1",
+      "title": "--dry prints Total/Covered/Uncovered AC counts",
+      "command": "node scripts/map-ac-coverage.mjs --dry",
+      "kind": "cli",
+      "script": "scripts/map-ac-coverage.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/ac-coverage-mapper.md",
+      "id": "AC-2",
+      "title": "A bare // AC-1 without a wave qualifier does not count as coverage",
+      "command": "fixture: untagged AC comment → uncovered",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/cascade-regenerate.md",
+      "id": "AC-1",
+      "title": "--dry lists would-update children without writing",
+      "command": "node scripts/cascade-regenerate.mjs --root docs/CONSTITUTION.md --dry",
+      "kind": "cli",
+      "script": "scripts/cascade-regenerate.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/cascade-regenerate.md",
+      "id": "AC-2",
+      "title": "A root with breaking_change_in_v makes no changes (warns)",
+      "command": "fixture: root with breaking flag → no writes",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/cascade-validate.md",
+      "id": "AC-1",
+      "title": "A root with up-to-date children prints a verdict table, exit 0",
+      "command": "node scripts/cascade-validate.mjs --root docs/CONSTITUTION.md --level L1",
+      "kind": "cli",
+      "script": "scripts/cascade-validate.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/cascade-validate.md",
+      "id": "AC-2",
+      "title": "A child on an older major version is INCOMPATIBLE",
+      "command": "fixture: child major behind → INCOMPATIBLE row",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/coverage-reporter.md",
+      "id": "AC-1",
+      "title": "--dry prints a coverage summary without writing",
+      "command": "node scripts/regenerate-coverage-report.mjs --dry",
+      "kind": "cli",
+      "script": "scripts/regenerate-coverage-report.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/coverage-reporter.md",
+      "id": "AC-2",
+      "title": "An L2/L3 spec with no parents[] is flagged ORPHAN",
+      "command": "observe: per-level ORPHAN notes",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/get-spec-context.md",
+      "id": "AC-1",
+      "title": "A real feature prints the ancestry chain",
+      "command": "node scripts/get-spec-context.mjs --feature spec",
+      "kind": "cli",
+      "script": "scripts/get-spec-context.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/get-spec-context.md",
+      "id": "AC-2",
+      "title": "A miss exits 0 with a not-found message and logs the run",
+      "command": "node scripts/get-spec-context.mjs --feature __nope__",
+      "kind": "cli",
+      "script": "scripts/get-spec-context.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/lineage-graph-builder.md",
+      "id": "AC-1",
+      "title": "Emits a Mermaid graph TD block and an orphan/missing-meta summary",
+      "command": "node scripts/build-lineage-graph.mjs",
+      "kind": "cli",
+      "script": "scripts/build-lineage-graph.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/lineage-graph-builder.md",
+      "id": "AC-2",
+      "title": "--json emits valid JSON with nodes[] and edges[]",
+      "command": "node scripts/build-lineage-graph.mjs --json",
+      "kind": "cli",
+      "script": "scripts/build-lineage-graph.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/lineage-graph-builder.md",
+      "id": "AC-3",
+      "title": "A spec with no edges is listed as ORPHAN",
+      "command": "observe: orphan count in stdout",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/spec-drift-checker.md",
+      "id": "AC-1",
+      "title": "Self-test passes (26 pure-logic assertions)",
+      "command": "node scripts/spec-drift-check.mjs --self-test",
+      "kind": "self",
+      "script": "scripts/spec-drift-check.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/spec-drift-checker.md",
+      "id": "AC-2",
+      "title": "A reference to a nonexistent file is reported",
+      "command": "observe: ⚠ finding for missing ref",
+      "kind": "manual",
+      "script": null,
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/spec-drift-checker.md",
+      "id": "AC-3",
+      "title": "--hard exits 1 on any high-severity finding",
+      "command": "node scripts/spec-drift-check.mjs --hard",
+      "kind": "cli",
+      "script": "scripts/spec-drift-check.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/spec-index-generator.md",
+      "id": "AC-1",
+      "title": "--dry prints the table without writing",
+      "command": "node scripts/regenerate-specs-index.mjs --dry",
+      "kind": "cli",
+      "script": "scripts/regenerate-specs-index.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/spec-size-check.md",
+      "id": "AC-1",
+      "title": "Self-test passes (8 assertions)",
+      "command": "node scripts/spec-size-check.mjs --self-test",
+      "kind": "self",
+      "script": "scripts/spec-size-check.mjs",
+      "wired": true
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/spec-size-check.md",
+      "id": "AC-2",
+      "title": "A spec at threshold passes; one over fails",
+      "command": "node scripts/spec-size-check.mjs --metrics '{\"objectives\":9}'",
+      "kind": "cli",
+      "script": "scripts/spec-size-check.mjs",
+      "wired": true
+    }
+  ],
+  "runResults": []
+}

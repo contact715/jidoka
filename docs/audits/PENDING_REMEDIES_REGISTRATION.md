@@ -1,4 +1,4 @@
-# Pending: register 2 gates in the L0 remedy registry (human-only edit)
+# Pending: register 4 gates in the L0 remedy registry (human-only edit)
 
 `scripts/meta-remedies.mjs` is an L0 gate-registry. `policy-enforce-hook` blocks agent edits **by
 design** — an agent must not be able to register its own gate (that is the reward-hacking surface the
@@ -39,7 +39,40 @@ Both mechanisms are already **built and proven**:
   },
 ```
 
+## Added 2026-06-05 (spec-tree-overhaul) — two more classes meta-audit now flags
+
+Both mechanisms are already **built and proven**:
+- `gate-bypass` → `scripts/policy-enforce-hook.mjs` (REUSE, hardened this session). Blocks Write/Edit AND Bash side-channels (`>`, `>>`, `tee`, `sed -i`, `node fs.writeFileSync`, `cp/mv`) to L0/secret paths, case-insensitively; owner-grant for L0 docs is audited and never covers secrets/.git/registries. 25 self-tests including the exact red-team finds (bash side-channel, case-variant).
+- `ledger-pollution` → `scripts/meta-honesty.mjs` (REUSE). Flags self-confirming / garbage ledger rows (rows lacking claimed/real/caught_by) and BLOCKS; it caught both ledger-pollution incidents.
+
+```js
+  'gate-bypass': {
+    since: '2026-06-05',
+    mechanism: 'scripts/policy-enforce-hook.mjs',
+    family: ['l0-write-sidechannel', 'case-variant-bypass', 'protected-path-write'],
+    premortem: {
+      risk: /\b(write|edit|append|sed -i|tee|cp|mv|writeFileSync)\b.*\b(CONSTITUTION|MISSION|NORTH_STAR|\.secrets|\.env|meta-remedies|baseline)\b/i,
+      clears: /\b(policy-enforce|owner-grant|blocked|self-test|PreToolUse)\b/i,
+      advise: 'L0/secret writes go through policy-enforce-hook; agents never write meta-remedies/baselines/secrets, and L0 docs only under an audited owner grant',
+    },
+    gate:
+      'A write to an L0/secret path (Write/Edit OR a Bash side-channel) must be blocked by policy-enforce-hook unless an audited owner grant covers an L0 DOC (never a secret/registry/.git). 25 self-tests cover the side-channel and case-variant red-team finds.',
+  },
+  'ledger-pollution': {
+    since: '2026-06-05',
+    mechanism: 'scripts/meta-honesty.mjs',
+    family: ['self-confirming-row', 'telemetry-in-ledger', 'garbage-in-ledger'],
+    premortem: {
+      risk: /\b(append|log|write|emit)\b.*\b(meta-mistakes|ledger|run1|run2)\b/i,
+      clears: /\b(claimed|real|caught_by|meta-honesty|separate stream|telemetry file)\b/i,
+      advise: 'the mistake ledger takes only real incidents (class/claimed/real/caught_by); test telemetry goes to its own stream, not meta-mistakes.jsonl',
+    },
+    gate:
+      'A row in meta-mistakes.jsonl must carry claimed/real/caught_by (a real incident), not run1/run2 test telemetry. meta-honesty flags self-confirming/garbage rows and BLOCKS commit until they are removed or rewritten.',
+  },
+```
+
 ## After pasting, verify the loop closed:
 ```bash
-node scripts/meta-audit.mjs   # both classes should move from "⚠ ungated" to "🟢 GATED — holding"; exit 0
+node scripts/meta-audit.mjs   # all four classes should read "🟢 GATED — holding"; exit 0
 ```

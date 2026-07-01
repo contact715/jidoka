@@ -358,7 +358,7 @@
     {
       "id": "spec:docs/audits/PENDING_REMEDIES_REGISTRATION.md",
       "kind": "spec",
-      "label": "Pending: register 2 gates in the L0 remedy registry (human-only edit)",
+      "label": "Pending: register 4 gates in the L0 remedy registry (human-only edit)",
       "resolved": true,
       "level": null,
       "version": null,
@@ -500,86 +500,6 @@
       "level": null,
       "version": null,
       "path": "docs/quality/stride-template.md",
-      "revisions": []
-    },
-    {
-      "id": "spec:docs/runs/wave-cost-ledger/STATE.md",
-      "kind": "spec",
-      "label": "Run state — wave-cost-ledger",
-      "resolved": true,
-      "level": null,
-      "version": null,
-      "path": "docs/runs/wave-cost-ledger/STATE.md",
-      "revisions": []
-    },
-    {
-      "id": "spec:docs/runs/wave-cost-ledger/discovery.md",
-      "kind": "spec",
-      "label": "Discovery — wave-cost-ledger",
-      "resolved": true,
-      "level": null,
-      "version": null,
-      "path": "docs/runs/wave-cost-ledger/discovery.md",
-      "revisions": []
-    },
-    {
-      "id": "spec:docs/runs/wave-dashboard/STATE.md",
-      "kind": "spec",
-      "label": "Run state — wave-dashboard",
-      "resolved": true,
-      "level": null,
-      "version": null,
-      "path": "docs/runs/wave-dashboard/STATE.md",
-      "revisions": []
-    },
-    {
-      "id": "spec:docs/runs/wave-gsd-merge/STATE.md",
-      "kind": "spec",
-      "label": "Run state — wave-gsd-merge",
-      "resolved": true,
-      "level": null,
-      "version": null,
-      "path": "docs/runs/wave-gsd-merge/STATE.md",
-      "revisions": []
-    },
-    {
-      "id": "spec:docs/runs/wave-judge-debias/STATE.md",
-      "kind": "spec",
-      "label": "Run state — wave-judge-debias",
-      "resolved": true,
-      "level": null,
-      "version": null,
-      "path": "docs/runs/wave-judge-debias/STATE.md",
-      "revisions": []
-    },
-    {
-      "id": "spec:docs/runs/wave-meta-gates/STATE.md",
-      "kind": "spec",
-      "label": "Run state — wave-meta-gates",
-      "resolved": true,
-      "level": null,
-      "version": null,
-      "path": "docs/runs/wave-meta-gates/STATE.md",
-      "revisions": []
-    },
-    {
-      "id": "spec:docs/runs/wave-tui-live/STATE.md",
-      "kind": "spec",
-      "label": "Run state — wave-tui-live",
-      "resolved": true,
-      "level": null,
-      "version": null,
-      "path": "docs/runs/wave-tui-live/STATE.md",
-      "revisions": []
-    },
-    {
-      "id": "spec:docs/runs/wave-tui-top/STATE.md",
-      "kind": "spec",
-      "label": "Run state — wave-tui-top",
-      "resolved": true,
-      "level": null,
-      "version": null,
-      "path": "docs/runs/wave-tui-top/STATE.md",
       "revisions": []
     },
     {
@@ -1707,7 +1627,7 @@
   ],
   "meta": {
     "_do_not_edit": true,
-    "built_at": "2026-06-06T05:23:29.202Z",
+    "built_at": "2026-06-06T05:42:20.796Z",
     "wave_id_scheme": "wave-NNN (3-digit zero-padded)",
     "r2_normalization": "wave-NNN.R2 collapsed to wave-NNN base ID; revision labels stored in revisions[]",
     "mcp_boundary": "This graph does not mirror live MCP entities. It covers only file-accessible governance surfaces: specs, ADRs, anti-patterns, waves, files. Memory snapshot staleness bound: last npm run memory:snapshot run."

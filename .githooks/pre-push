@@ -24,4 +24,15 @@ if [ $rc -ne 0 ]; then
 else
   echo "✓ pre-push · meta-audit: no ungated recurrences"
 fi
+
+# spec-structural-gate: RATCHET — BLOCKS if the push would INCREASE broken refs /
+# orphans / missing-meta above the committed ceiling. Old debt stays soft; new
+# breakage is hard-blocked. Auto-tightens the ceiling when debt is paid down.
+out=$(node "$ROOT/scripts/spec-structural-gate.mjs" 2>&1); rc=$?
+if [ $rc -ne 0 ]; then
+  echo "$out"
+  echo "✗ pre-push BLOCKED by spec-structural-gate (new spec-tree breakage — see above)."
+  exit 1
+fi
+echo "✓ pre-push · spec-structural-gate: no new spec-tree breakage"
 exit 0
