@@ -36,6 +36,7 @@
 
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { resolve, dirname, join, relative, basename, isAbsolute } from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 // Extensions we treat as "a reference to a real project file". A backtick token that
 // ends in one of these (or contains a path separator) is a candidate; anything else
@@ -51,7 +52,7 @@ const SKIP_DIRS = new Set([
 // Spec scanning skips archived material: docs/archive/** is read-only history whose
 // references are EXPECTED to be stale (e.g. imported product docs). The existence
 // index (walkIndex) still sees archive files, so references TO the archive resolve.
-const SPEC_SKIP_DIRS = new Set([...SKIP_DIRS, 'archive']);
+const SPEC_SKIP_DIRS = new Set([...SKIP_DIRS, 'archive', 'runs']);
 
 // ── pure: is this backtick/link token a plausible local file reference? ──────────
 export function looksLikeFileRef(raw) {
@@ -138,6 +139,19 @@ export function analyzeSpec(specRel, content, has, names) {
   return findings;
 }
 
+// ── pure: drop findings whose target is a gitignored runtime artifact ─────────────
+// A reference to a runtime-generated, gitignored path (e.g. docs/audits/*-events.jsonl,
+// docs/CURRENT_WAVE.md) is NOT spec drift: that file legitimately does not exist in a
+// clean checkout and is recreated at runtime. Counting it makes the metric flap between
+// a fresh checkout (target absent → "broken") and a warmed tree (target present →
+// "resolved"). `ignored` is the set of root-relative paths matched by committed
+// .gitignore patterns — pattern membership is independent of what exists on disk, so
+// the verdict is identical in CI and locally.
+export function excludeIgnored(findings, ignored) {
+  if (!ignored || !ignored.size) return findings;
+  return findings.filter(f => !(f.tries || []).some(t => ignored.has(t)));
+}
+
 // ── FS helpers (impure, CLI only) ────────────────────────────────────────────────
 function walkIndex(root) {
   const rel = new Set();         // relative paths from root
@@ -153,6 +167,25 @@ function walkIndex(root) {
   return { rel, names };
 }
 
+// The DETERMINISTIC existence oracle: tracked files only (git ls-files). A clean checkout
+// (what CI scans) contains exactly the tracked files; a warmed local tree additionally holds
+// runtime artifacts (telemetry journals under docs/audits/, generated docs). Resolving refs
+// against the WORKING tree therefore flaps between the two — a ref to a not-yet-generated
+// journal reads as "broken" in CI but "resolved" locally. Resolving against the COMMITTED
+// tree removes that flap entirely: the answer is the same everywhere. Returns null when git
+// is unavailable / not a repo, so the caller falls back to the filesystem walk (portable).
+function trackedIndex(root) {
+  try {
+    const out = execFileSync('git', ['-C', root, 'ls-files', '-z'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    const files = out.split('\0').filter(Boolean);
+    if (!files.length) return null;
+    const rel = new Set();
+    const names = new Set();
+    for (const f of files) { const p = f.replace(/\\/g, '/'); rel.add(p); names.add(basename(p)); }
+    return { rel, names };
+  } catch { return null; }
+}
+
 function listSpecs(root, specPaths) {
   // specPaths entries may be a concrete file, a directory, or a "dir/**.md"-ish hint.
   const out = new Set();
@@ -161,7 +194,9 @@ function listSpecs(root, specPaths) {
     const abs = join(root, d); let entries; try { entries = readdirSync(abs, { withFileTypes: true }); } catch { return; }
     for (const e of entries) {
       if (e.isDirectory()) { if (!SPEC_SKIP_DIRS.has(e.name)) addDir(join(d, e.name)); }
-      else if (e.name.endsWith('.md')) out.add(join(d, e.name).replace(/\\/g, '/'));
+      // Skip generated graph artifacts (e.g. _LINEAGE.md): they are rewritten by
+      // build-lineage-graph, not authored specs — scanning them is a self-reference.
+      else if (e.name.endsWith('.md') && e.name !== '_LINEAGE.md') out.add(join(d, e.name).replace(/\\/g, '/'));
     }
   };
   for (const raw of specPaths) {
@@ -175,6 +210,27 @@ function listSpecs(root, specPaths) {
 
 function readConfig(configPath) {
   try { return JSON.parse(readFileSync(configPath, 'utf8'))?.driftDetection ?? {}; } catch { return {}; }
+}
+
+// ── impure: which of these root-relative paths are gitignored (pattern-based)? ────
+// Uses `git check-ignore` so the answer depends only on committed .gitignore patterns,
+// not on which runtime files happen to exist on disk → deterministic across checkouts.
+// Guarded: if git is absent or this is not a repo, returns an empty set (no exclusion,
+// preserving the zero-dep portable behaviour on non-git trees).
+function gitIgnoredPaths(root, paths) {
+  const ignored = new Set();
+  const list = [...new Set(paths)].filter(Boolean);
+  if (!list.length) return ignored;
+  const collect = (out) => { for (const line of String(out).split('\n')) { const t = line.trim(); if (t) ignored.add(t); } };
+  try {
+    // exit 0 → some paths matched (printed to stdout); exit 1 → none matched (throws, stdout empty)
+    collect(execFileSync('git', ['-C', root, 'check-ignore', '--stdin'],
+      { input: list.join('\n'), encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] }));
+  } catch (e) {
+    if (e && typeof e.stdout === 'string') collect(e.stdout);
+    // any other failure (git missing / not a repo) → ignored stays empty → no exclusion
+  }
+  return ignored;
 }
 
 // ── self-test (pure logic, injected oracles — no real FS) ────────────────────────
@@ -221,6 +277,15 @@ function selfTest() {
     ['a missing module ref is caught (high)', fBad.some(f => f.kind === 'missing-ref' && f.ref === 'src/missing_module.py')],
     ['noise (flag/method/command) produces no finding', !fBad.some(f => ['--check', 'brain.draft', 'npm run build'].includes(f.ref))],
     ['exactly the two real misses are found', fBad.length === 2],
+    ['excludeIgnored drops a finding whose target is gitignored', (() => {
+      const fs2 = [
+        { spec: 'a.md', ref: 'docs/audits/x-events.jsonl', kind: 'missing-ref', tries: ['docs/audits/x-events.jsonl'] },
+        { spec: 'a.md', ref: 'src/real.py', kind: 'missing-ref', tries: ['src/real.py'] },
+      ];
+      const kept = excludeIgnored(fs2, new Set(['docs/audits/x-events.jsonl']));
+      return kept.length === 1 && kept[0].ref === 'src/real.py';
+    })()],
+    ['excludeIgnored is a no-op when nothing is ignored', excludeIgnored([{ ref: 'x', tries: ['x'] }], new Set()).length === 1],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
@@ -243,20 +308,31 @@ const DEFAULT_SPEC_PATHS = ['docs', 'whatsapp_agent', 'specs', 'SPEC.md', 'READM
 const specPaths = arg('--specs') ? arg('--specs').split(',').map(s => s.trim())
   : (Array.isArray(cfg.specPaths) && cfg.specPaths.length ? cfg.specPaths : DEFAULT_SPEC_PATHS);
 
-const { rel, names } = walkIndex(root);
+// Prefer the committed tree (deterministic across CI / local); fall back to a filesystem
+// walk on non-git trees so the portable script still works outside a repo.
+const { rel, names } = trackedIndex(root) || walkIndex(root);
 const has = (p) => rel.has(p);
-const specs = listSpecs(root, specPaths);
+// Scan only specs that exist in the same (committed, when available) tree the oracle uses,
+// so a runtime-generated doc on disk (e.g. docs/CURRENT_WAVE.md) is never scanned in a warm
+// tree but skipped in CI — same set of specs scanned everywhere.
+const specs = listSpecs(root, specPaths).filter(s => rel.has(s));
 
 if (specs.length === 0) {
   console.log(`\x1b[2mspec-drift-check: no spec files found under ${specPaths.join(', ')} (root: ${relative(process.cwd(), root) || '.'}) — nothing to check.\x1b[0m`);
   process.exit(0);
 }
 
-const findings = [];
+const rawFindings = [];
 for (const s of specs) {
   let content; try { content = readFileSync(join(root, s), 'utf8'); } catch { continue; }
-  findings.push(...analyzeSpec(s, content, has, names));
+  rawFindings.push(...analyzeSpec(s, content, has, names));
 }
+
+// Deterministic exclusion: a reference to a gitignored runtime artifact is not drift —
+// see excludeIgnored. Evaluated against committed .gitignore patterns so the count is
+// identical in a fresh CI checkout and a warmed local tree (the bug this gate had).
+const ignored = gitIgnoredPaths(root, rawFindings.flatMap(f => f.tries || []));
+const findings = excludeIgnored(rawFindings, ignored);
 
 const high = findings.filter(f => f.severity === 'high');
 if (!quiet) {

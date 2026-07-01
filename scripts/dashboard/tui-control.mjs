@@ -6,10 +6,12 @@
 //   ctx = { waves: snapshot.waves, halt: boolean }   (plain data, supplied by the shell)
 //   effects: {type:'quit'|'refresh'} | {type:'resumeHalt',wave,reason}
 //          | {type:'advance',wave,phase,status,note} | {type:'openTerminal',command}
-//          | {type:'loadLog'} | {type:'loadCost'}
+//          | {type:'loadLog'} | {type:'loadCost'} | {type:'focusSession',terminalId,topic}
 // renderOverlay(ui, cols) → string[]  — confirm / input / log / cost boxes + status msg.
 //
 // Side effects live in tui-actions.mjs; stdin/stdout wiring lives in tui-top.mjs.
+
+import { needsYouSessions } from './tui-render.mjs';   // shared "waiting on the owner" predicate (pure)
 
 const R = '\x1b[0m', G = '\x1b[32m', A = '\x1b[33m', X = '\x1b[31m', D = '\x1b[90m', I = '\x1b[7m';
 const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
@@ -68,6 +70,15 @@ function boardKey(ui, key, ctx) {
   }
   if (key === 'l') return { ui: { ...u, mode: 'log', logScroll: 0 }, effects: [{ type: 'loadLog' }] };
   if (key === '$' || key === 'm') return { ui: { ...u, mode: 'cost' }, effects: [{ type: 'loadCost' }] };
+  if (key === 'f') {
+    // jump to the session waiting on the owner (first needs-you row); the action layer focuses its
+    // recorded terminal via focus.mjs, or prints an honest hint when that window can't be switched.
+    const ny = needsYouSessions(ctx.sessions);
+    if (!ny.length) return { ui: { ...u, msg: 'нет сессий, ждущих ответа' }, effects: [] };
+    const t = ny[0];
+    return { ui: { ...u, msg: `перехожу к сессии: ${(t.topic || t.prompt || 'сессия').slice(0, 40)}` },
+      effects: [{ type: 'focusSession', terminalId: t.terminalId || null, topic: t.topic || t.prompt || '' }] };
+  }
   if (key === '?' || key === 'h') return { ui: { ...u, mode: 'help' }, effects: [] };
   return { ui, effects: [] };
 }
@@ -82,6 +93,7 @@ export const HELP_LINES = [
   'p      пропустить застрявший этап (с пометкой, кто и что пропустил)',
   'l      живой лог: последние реплики агента, не выходя из панели',
   '$      деньги и время: сколько волна шла, сколько токенов съела, во что ≈обходится',
+  'f      перейти к сессии, которая ждёт твоего ответа (прыжок в её окно терминала)',
   'r      обновить · q выход · Esc закрыть это окно',
 ];
 
@@ -271,6 +283,21 @@ function selfTest() {
   ok('help: legend covers all controls', ['снять СТОП', 'живой лог', 'деньги и время', 'новая волна', 'перезапустить', 'пропустить'].every((t) => hov.some((l) => l.includes(t))));
   hp = reduce(hp.ui, '\x1b', ctx);
   ok('help: Esc returns to board', hp.ui.mode === 'board');
+
+  // ported: f jumps to the session waiting on the owner → focusSession effect with its terminalId
+  const fCtx = { ...ctx, sessions: [
+    { state: 'working', topic: 'идёт сборка', sessionId: 'a' },
+    { state: 'waiting', topic: 'нужен код из Telegram', terminalId: 'tty:/dev/ttys017', sessionId: 'b' },
+  ] };
+  const f1 = reduce(initialUi(), 'f', fCtx);
+  ok('f: emits focusSession for the waiting session', f1.effects[0]?.type === 'focusSession' && f1.effects[0].terminalId === 'tty:/dev/ttys017');
+  ok('f: carries the session topic + status msg', f1.effects[0]?.topic.includes('код') && f1.ui.msg.includes('перехожу'));
+  const f2 = reduce(initialUi(), 'f', { ...ctx, sessions: [{ state: 'working', topic: 'работаю', question: 'Подтвердить деплой?', terminalId: 'tmux:%2' }] });
+  ok('f: a question (not just waiting) also counts as needs-you', f2.effects[0]?.type === 'focusSession' && f2.effects[0].terminalId === 'tmux:%2');
+  const f3 = reduce(initialUi(), 'f', { ...ctx, sessions: [{ state: 'working', topic: 'a' }, { state: 'done', topic: 'b' }] });
+  ok('f: no waiting session → message, no effect', f3.effects.length === 0 && f3.ui.msg.includes('ждущих'));
+  const f4 = reduce(initialUi(), 'f', { ...ctx, sessions: [] });
+  ok('f: empty sessions → safe no-op message', f4.effects.length === 0 && f4.ui.mode === 'board');
 
   // AC-10 purity: no fs/Date.now/process.stdout above selfTest
   const src = SRC_FOR_PURITY;
