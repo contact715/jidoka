@@ -81,11 +81,15 @@ node scripts/task-queue.mjs done <id>       # then pull the next one
 node scripts/task-queue.mjs fail <id> "why"
 ```
 
-Autonomous loop for a worker session:
+Autonomous loop for a worker session — **the default behaviour, no reminder needed**
+(set 2026-07-02): while working autonomously and the queue has waiting items, drive it.
 
 ```
 next → (blocked? stop) → do the task fully → verify → safe-commit → done <id> → next
 ```
+
+The session-start digest surfaces `очередь задач: N ждут · в работе: …` so the standing
+queue is always visible at the top of every session.
 
 The app's "Suggested task" cards can be routed into this queue (by you or by Claude via
 `add`). If the app later gains the ability to launch cards itself, they still flow through
