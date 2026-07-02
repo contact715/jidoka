@@ -28,8 +28,9 @@
 //                                [--target main] [--no-push] [--dry-run] [--wait 120]
 
 import { execSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { acquire, release } from './commit-lock.mjs';
 
@@ -109,7 +110,10 @@ async function run(opts) {
   if (facts.dirty) {
     if (!opts.message) { say('✗ refusing: --message is required when there are changes.'); return { ok: false, cls, log }; }
     sh('git add -A', facts.root);
-    sh(`git commit -m ${JSON.stringify(opts.message)}`, facts.root);
+    // via a message file so multi-line messages keep their newlines (‑m would literalise them)
+    const msgFile = join(tmpdir(), `safe-commit-${process.pid}.txt`);
+    writeFileSync(msgFile, opts.message);
+    try { sh(`git commit -F ${JSON.stringify(msgFile)}`, facts.root); } finally { try { unlinkSync(msgFile); } catch {} }
     say('✓ committed locally');
   }
   if (!plan.push) { say(`⚠ NOT pushing (${plan.reason}). Work is committed locally.`); return { ok: true, cls, committed: facts.dirty, pushed: false, log }; }
