@@ -1,0 +1,13 @@
+{
+  "_doc": "Push policy for safe-commit.mjs. Matched against `git remote get-url origin` by substring. own → push allowed (incl. fast-forward to main per the owner's standing rule). readOnly → NEVER push (external/shared production, Engineering-Discipline rule 11): local commit only, loud message. Unknown remote → SAFE DEFAULT: commit locally, do NOT push, warn. Edit this list as repos are added.",
+  "own": [
+    "contact715/jidoka",
+    "projectx-app",
+    "mzaichenkov",
+    "mityamit"
+  ],
+  "readOnly": [
+    "nicel3d/castells",
+    "castells-calls"
+  ]
+}
