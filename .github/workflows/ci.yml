@@ -80,6 +80,18 @@ jobs:
       - name: AC-as-tests (execute every L3 self/engine acceptance check)
         run: node scripts/ac-verify-map.mjs --run --strict
 
+      # ── 2026-W27 enrichment mechanisms: run each new self-test in CI (not dead tests) ──
+      - name: reasoning-bank self-test (contrast-signal capture)
+        run: node scripts/test-reasoning-bank.mjs
+      - name: dag-schedule self-test (dependency DAG + critical path)
+        run: node scripts/dag-schedule.mjs --self-test
+      - name: standards-mine self-test (de-facto convention mining)
+        run: node scripts/standards-mine.mjs --self-test
+      - name: memory-vector self-test (RRF fusion + honest DORMANT)
+        run: node scripts/memory-vector.mjs --self-test
+      - name: memory-guard self-test (write-time author != judge + dedup)
+        run: node scripts/memory-guard.mjs --self-test
+
       # ── Gate self-checks: verification-by-execution + the gate map (catches a ghost gate) ──
       - name: execution-gate self-test
         run: node scripts/execution-gate.mjs --self-test

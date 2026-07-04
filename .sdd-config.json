@@ -25,6 +25,10 @@
     "_comment": "wave-165: hardBlockEnabled=true causes detect-injection.mjs to call writeHaltState and exit 42. Default false = soft-flag (event emitted, dispatch continues).",
     "hardBlockEnabled": false
   },
+  "memoryGuard": {
+    "_comment": "2026-W27 rank 4: scripts/memory-guard.mjs is a PreToolUse write-time gate on memory (author != admitter, default-reject no-verdict, TF-IDF dedup). Kept SOFT (not wired as a hard PreToolUse hook) until its precondition holds: memory-writers emit author+verdict AND >=2 judges are calibrated. gate-graduation tracks readiness; do NOT flip to a blocking hook before then.",
+    "hardBlockEnabled": false
+  },
   "constitutionalDrift": {
     "_comment": "wave-166: hardBlockEnabled=true causes detect-constitutional-drift.mjs to call writeHaltState and exit 42. Default false = soft-flag (event emitted, script exits 0).",
     "hardBlockEnabled": false
