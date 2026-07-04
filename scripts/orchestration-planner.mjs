@@ -37,7 +37,10 @@ const PHASE_SKILLS = {
 // the gates/checks each phase runs — the graph itself is now the per-phase coverage map, not CI/prose.
 // Every gate maps to a real scripts/<name>.mjs (the self-test enforces 0 ghosts in this map).
 const PHASE_GATES = {
-  spec: ['spec-size-check', 'plan-check'],
+  // 'map-ac-coverage' (rank-3 quick win): surface requirements/ACs with NO covering task/test
+  // at SPEC time — before coding — reusing the existing (previously unwired, its own D6) AC
+  // coverage auditor instead of a duplicate orphan-requirement checker. Informational.
+  spec: ['spec-size-check', 'plan-check', 'map-ac-coverage'],
   build: ['resource-guard', 'precision-guard', 'cross-layer-dup'],
   gate: ['contract-check', 'dead-code', 'type-coverage', 'mutation-test', 'property-test', 'dependency-audit', 'coverage-gate', 'load-test-gate', 'e2e-run-gate'],
   debug: ['verify-goal-backward'],
@@ -55,7 +58,7 @@ export const KNOWN_GATES = [
   'spec-size-check', 'plan-check', 'resource-guard', 'precision-guard', 'cross-layer-dup',
   'contract-check', 'dead-code', 'type-coverage', 'mutation-test', 'property-test',
   'dependency-audit', 'coverage-gate', 'load-test-gate', 'e2e-run-gate', 'verify-goal-backward',
-  'canary-gate', 'req-trace', 'prod-harvest',
+  'canary-gate', 'req-trace', 'prod-harvest', 'map-ac-coverage',
 ];
 const enrichPhases = (phases) => phases.map((p) => ({ ...p, skills: PHASE_SKILLS[p.phase] || [], gates: PHASE_GATES[p.phase] || [] }));
 
@@ -165,6 +168,8 @@ if (process.argv.includes('--self-test')) {
     ['DAG orders schema→api→ui by dependency (backend+frontend+data)', (() => { const dag = plan({ risk: 'critical', surfaces: ['backend', 'frontend', 'data'] }).phases.find(p => p.phase === 'build').dag; const o = dag.schedule.order; return o.indexOf('data-schema') < o.indexOf('api') && o.indexOf('api') < o.indexOf('ui'); })()],
     ['DAG critical path is the longest chain (data→schema→api→ui, len 4)', (() => { const dag = plan({ risk: 'critical', surfaces: ['backend', 'frontend', 'data'] }).phases.find(p => p.phase === 'build').dag; return dag.schedule.criticalPath.length === 4; })()],
     ['DAG: independent UI leaf (frontend-only) is not blocked by a backend it lacks', (() => { const dag = plan({ risk: 'normal', surfaces: ['frontend'] }).phases.find(p => p.phase === 'build').dag; const ui = dag.nodes.find(n => n.id === 'ui'); return ui && ui.dependsOn.includes('lead') && !ui.dependsOn.includes('api'); })()],
+    // ── AC-coverage wired into the spec phase (rank-3 quick win) ──
+    ['spec phase surfaces AC coverage BEFORE coding (map-ac-coverage wired, not duplicated)', critical.phases.find(p => p.phase === 'spec')?.gates?.includes('map-ac-coverage')],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
