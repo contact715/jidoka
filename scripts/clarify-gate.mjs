@@ -26,6 +26,21 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { screenQuestions } from './clarify-question-quality.mjs';
+
+/** Pull question lines (containing '?') from a spec's ## Clarifications section. */
+export function questionLines(md = '') {
+  const lines = String(md).split('\n');
+  const start = lines.findIndex((l) => /^#{1,4}\s+clarification/i.test(l));
+  if (start === -1) return [];
+  const out = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^#{1,4}\s/.test(lines[i])) break; // next heading ends the section
+    const t = lines[i].replace(/^[-*>\s]+/, '').trim();
+    if (t.includes('?')) out.push(t);
+  }
+  return out;
+}
 
 const slug = (f) => String(f).toLowerCase().replace(/[^a-z0-9.-]+/g, '-').replace(/^-+|-+$/g, '');
 
@@ -98,6 +113,13 @@ function main() {
     const cov = coverageComplete(`docs/audits/clarify/${feature}.json`);
     const fresh = recentTrace(feature, windowMs);
     if (!cov.complete || !fresh) failures.push({ spec, feature, why: !cov.complete ? cov.reason : `no clarify run within ${since}` });
+
+    // Question-quality WARN (2026-W27): screen the spec's own recorded clarification questions
+    // for interviewer-errors (leading / double-barrelled / hypothetical / …). Never blocks.
+    try {
+      const bad = screenQuestions(questionLines(readFileSync(spec, 'utf8')));
+      for (const b of bad) console.warn(`  ⚠ clarify-question-quality [${b.score}] "${b.question}" — ${b.errors.join(', ')}`);
+    } catch { /* best-effort — question-quality is advisory */ }
   }
 
   if (failures.length === 0) {

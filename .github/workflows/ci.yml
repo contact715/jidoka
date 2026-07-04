@@ -95,6 +95,8 @@ jobs:
         run: node scripts/reasoning-distill.mjs --self-test
       - name: sleep-consolidate self-test (between-wave consolidation plan)
         run: node scripts/sleep-consolidate.mjs --self-test
+      - name: clarify-question-quality self-test (interviewer-error + Grice rubric)
+        run: node scripts/clarify-question-quality.mjs --self-test
 
       # ── Gate self-checks: verification-by-execution + the gate map (catches a ghost gate) ──
       - name: execution-gate self-test
