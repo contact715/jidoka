@@ -17,6 +17,7 @@
 
 import { shouldDebate } from './debate-trigger.mjs';
 import { planN } from './adaptive-verify.mjs';
+import { scheduleDAG } from './dag-schedule.mjs';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -58,6 +59,27 @@ export const KNOWN_GATES = [
 ];
 const enrichPhases = (phases) => phases.map((p) => ({ ...p, skills: PHASE_SKILLS[p.phase] || [], gates: PHASE_GATES[p.phase] || [] }));
 
+// buildDag — derive the build phase's sub-task DAG from the task surfaces. The edges encode
+// the real ordering constraints the flat agent list hides: the DB schema precedes the API,
+// the API contract precedes the UI, the data pipeline follows the schema. Independent leaves
+// (e.g. UI when there is no backend) fall out as parallel. Every node.agent is one of the
+// build-phase agents, so the DAG can never name an agent the phase does not dispatch.
+export function buildDag(task = {}) {
+  const has = (s) => (task.surfaces || []).includes(s);
+  const nodes = [{ id: 'lead', agent: 'engineering-lead', dependsOn: [] }];
+  if (has('data')) {
+    nodes.push({ id: 'data-schema', agent: 'data-engineer', dependsOn: ['lead'] });
+    nodes.push({ id: 'data-pipeline', agent: 'data-lead', dependsOn: ['data-schema'] });
+  }
+  if (has('backend')) {
+    nodes.push({ id: 'api', agent: 'backend-agent', dependsOn: [has('data') ? 'data-schema' : 'lead'] });
+  }
+  if (has('frontend')) {
+    nodes.push({ id: 'ui', agent: 'frontend-agent', dependsOn: [has('backend') ? 'api' : 'lead'] });
+  }
+  return nodes;
+}
+
 export function plan(task = {}) {
   const { risk = 'normal', surfaces = [] } = task;
   const has = (s) => surfaces.includes(s);
@@ -81,7 +103,11 @@ export function plan(task = {}) {
   if (has('backend')) build.push('backend-agent');
   if (has('frontend')) build.push('frontend-agent');
   if (has('data')) build.push('data-engineer', 'data-lead');
-  phases.push({ phase: 'build', agents: build });
+  // Attach the dependency-aware sub-task DAG: independent leaves parallelise, the API waits
+  // for the schema, the UI for the API contract, and the longest chain is emitted first so it
+  // bounds — not tails — the build's wall-clock. The flat agents[] stays for back-compat.
+  const dagNodes = buildDag(task);
+  phases.push({ phase: 'build', agents: build, dag: { nodes: dagNodes, schedule: scheduleDAG(dagNodes) } });
 
   const gates = ['reflexion-critic', 'constitutional-reviewer', 'coverage-auditor', 'budget-gate', 'policy-sandbox'];
   if (has('backend')) gates.push('security-scanner');
@@ -133,6 +159,12 @@ if (process.argv.includes('--self-test')) {
     ['memory phase carries req-trace + prod-harvest', (() => { const g = critical.phases.find(p => p.phase === 'memory')?.gates || []; return g.includes('req-trace') && g.includes('prod-harvest'); })()],
     ['ANTI-GHOST (typo): every phase-gate is a canonical KNOWN_GATES name', Object.values(PHASE_GATES).flat().every(g => KNOWN_GATES.includes(g))],
     ['ANTI-GHOST (framework): every known gate has a real script here', !IS_FRAMEWORK || missingHere.length === 0],
+    // ── DAG task-scheduler (rank 5) ──
+    ['build phase carries a dependency DAG', (() => { const b = critical.phases.find(p => p.phase === 'build'); return !!b?.dag?.schedule?.ok; })()],
+    ['DAG ANTI-GHOST: every dag node resolves to a real build-phase agent', (() => { const b = critical.phases.find(p => p.phase === 'build'); const agents = new Set(b.agents); return b.dag.nodes.every(n => agents.has(n.agent)); })()],
+    ['DAG orders schema→api→ui by dependency (backend+frontend+data)', (() => { const dag = plan({ risk: 'critical', surfaces: ['backend', 'frontend', 'data'] }).phases.find(p => p.phase === 'build').dag; const o = dag.schedule.order; return o.indexOf('data-schema') < o.indexOf('api') && o.indexOf('api') < o.indexOf('ui'); })()],
+    ['DAG critical path is the longest chain (data→schema→api→ui, len 4)', (() => { const dag = plan({ risk: 'critical', surfaces: ['backend', 'frontend', 'data'] }).phases.find(p => p.phase === 'build').dag; return dag.schedule.criticalPath.length === 4; })()],
+    ['DAG: independent UI leaf (frontend-only) is not blocked by a backend it lacks', (() => { const dag = plan({ risk: 'normal', surfaces: ['frontend'] }).phases.find(p => p.phase === 'build').dag; const ui = dag.nodes.find(n => n.id === 'ui'); return ui && ui.dependsOn.includes('lead') && !ui.dependsOn.includes('api'); })()],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
