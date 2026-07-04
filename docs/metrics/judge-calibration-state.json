@@ -1,0 +1,42 @@
+{
+  "generated": "derived from docs/evals/<slug>/{golden-cases,calibration}.json",
+  "measuredJudges": 0,
+  "total": 7,
+  "judges": [
+    {
+      "slug": "constitutional-reviewer",
+      "calibratable": true,
+      "status": "dormant"
+    },
+    {
+      "slug": "debate-judge",
+      "calibratable": true,
+      "status": "dormant"
+    },
+    {
+      "slug": "debate-prosecutor",
+      "calibratable": true,
+      "status": "dormant"
+    },
+    {
+      "slug": "debate-defender",
+      "calibratable": true,
+      "status": "dormant"
+    },
+    {
+      "slug": "best-of-N-judge",
+      "calibratable": true,
+      "status": "dormant"
+    },
+    {
+      "slug": "reflexion-critic",
+      "calibratable": true,
+      "status": "dormant"
+    },
+    {
+      "slug": "self-improvement-reviewer",
+      "calibratable": false,
+      "status": "no-dataset"
+    }
+  ]
+}

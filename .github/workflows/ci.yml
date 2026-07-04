@@ -97,6 +97,10 @@ jobs:
         run: node scripts/sleep-consolidate.mjs --self-test
       - name: clarify-question-quality self-test (interviewer-error + Grice rubric)
         run: node scripts/clarify-question-quality.mjs --self-test
+      - name: judge-calibration-state self-test (honest per-judge calibration marker)
+        run: node scripts/judge-calibration-state.mjs --self-test
+      - name: judge-calibration-state report (regenerate the marker, dry)
+        run: node scripts/judge-calibration-state.mjs --dry
 
       # ── Gate self-checks: verification-by-execution + the gate map (catches a ghost gate) ──
       - name: execution-gate self-test
