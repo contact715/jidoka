@@ -160,6 +160,7 @@ const SPEC_EXCLUDE_PREFIXES = [
   'retros',
   'runs',          // transient per-wave run-state journals (STATE.md), not governance specs
   'memory',        // reasoning-bank capture + its README — runtime memory, not governance specs
+  'standards',     // standards-mine generated de-facto conventions — mined from code, not specs
   'checklists',
   'runbooks',
   'specs/briefs',

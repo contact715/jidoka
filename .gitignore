@@ -9,6 +9,8 @@ worktrees/
 # (meta-mistakes.jsonl is the engine's INPUT ledger and stays versioned.)
 # reasoning-bank.jsonl is raw captured trajectories (runtime); docs/memory/README.md is tracked.
 docs/memory/reasoning-bank.jsonl
+# standards-mine writes generated de-facto conventions here on --write; regenerated, not source.
+docs/standards/
 docs/audits/*-events.jsonl
 docs/audits/*-verdicts.jsonl
 docs/audits/gate-trips.jsonl

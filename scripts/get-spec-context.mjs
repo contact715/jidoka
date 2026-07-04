@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { retrieve } from './memory-retrieve.mjs';
+import { mineDir, relevantConventions } from './standards-mine.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -326,6 +327,18 @@ function main() {
     process.stdout.write(formatJson(featureName, matchedSpec, ancestry) + '\n');
   } else {
     process.stdout.write(formatText(matchedSpec, ancestry) + '\n');
+
+    // Bottom-up conventions (research rank 6): before writing new code for this feature,
+    // surface the repo's DE-FACTO conventions relevant to it — "clone the sibling, don't
+    // re-author". Best-effort: never block the spec read on it, cap to the top few.
+    try {
+      const conv = relevantConventions(mineDir('scripts'), featureName, 4);
+      if (conv.length) {
+        process.stdout.write(`\n## Repo conventions (de-facto — match these, do not re-author)\n\n`);
+        for (const c of conv) process.stdout.write(`- **${c.dimension}** (${c.prevalence}%): ${c.dominant}\n`);
+        process.stdout.write('\n');
+      }
+    } catch { /* best-effort; the spec context is complete without it */ }
 
     if (matches.length > 1) {
       process.stderr.write(`[get-spec-context] note: ${matches.length - 1} additional match(es) found — showing first\n`);
