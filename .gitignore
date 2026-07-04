@@ -53,3 +53,7 @@ docs/audits/lesson-utility.json
 # local install/test artifacts — engine tests are zero-dep by design; products own their lockfiles
 package-lock.json
 test-results/
+# Kaizen engine generated weekly artifacts (created by the weekly task in the clone)
+docs/research/weekly/_DASHBOARD.md
+docs/research/weekly/_KAIZEN_LEDGER.jsonl
+docs/research/weekly/_REJECTED.jsonl

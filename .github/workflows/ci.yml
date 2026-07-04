@@ -112,6 +112,20 @@ jobs:
       - name: judge-calibration-state report (regenerate the marker, dry)
         run: node scripts/judge-calibration-state.mjs --dry
 
+      # ── Kaizen engine (autonomous weekly self-improvement machinery) ──
+      - name: kaizen-ledger self-test (outcome memory)
+        run: node scripts/kaizen-ledger.mjs --self-test
+      - name: kaizen-audit self-test (deterministic shipped/open/regressed)
+        run: node scripts/kaizen-audit.mjs --self-test
+      - name: kaizen-scorecard self-test (analytics + trend)
+        run: node scripts/kaizen-scorecard.mjs --self-test
+      - name: kaizen-critique self-test (completeness gate)
+        run: node scripts/kaizen-critique.mjs --self-test
+      - name: kaizen-rank self-test (ROI ranking + REGRESSING auto-prioritise)
+        run: node scripts/kaizen-rank.mjs --self-test
+      - name: kaizen-engine self-test (orchestration + dashboard, anti-ghost)
+        run: node scripts/kaizen-engine.mjs --self-test
+
       # ── Gate self-checks: verification-by-execution + the gate map (catches a ghost gate) ──
       - name: execution-gate self-test
         run: node scripts/execution-gate.mjs --self-test

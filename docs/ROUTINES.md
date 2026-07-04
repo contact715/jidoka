@@ -85,6 +85,10 @@ The weekly PROCESS itself is a closed, self-measuring loop (not a fresh report e
 - **ROI ranking** — order by impact/effort; a REGRESSING `meta-trend` verdict forces gate
   strengthening above new features.
 
+This is real machinery, not prose: `scripts/kaizen-{ledger,audit,scorecard,critique,rank,engine}.mjs`
+(zero-dep, each with a `--self-test` run in CI). `kaizen-engine.mjs --dashboard` composes
+audit→scorecard→rank→critique and renders the dashboard. Design: `docs/KAIZEN_ENGINE.md`.
+
 - Engine: `.claude/workflows/jidoka-enrichment.js` (recon current state → research 8 domains →
   adversarial verify → debates → ranked synthesis). Phase 0 reads the live jidoka state so it never
   re-proposes what is already shipped. Session review + killer-feature synthesis are run by the task
