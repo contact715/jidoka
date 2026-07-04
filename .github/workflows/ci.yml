@@ -35,6 +35,16 @@ jobs:
         run: node scripts/meta-audit.mjs || echo "::warning::meta-audit flagged unresolved process debt (advisory, non-blocking — see log above)"
       - name: meta-honesty (ledger signal quality)
         run: node scripts/meta-honesty.mjs
+      # ledger-pollution regression (2026-07-04): a judge-calibration/debias run streams
+      # position-sensitivity telemetry — it must land in its sidecar, NEVER in the mistake ledger.
+      # Prove it: run the debias-writing self-tests, assert the ledger is byte-unchanged, then that
+      # meta-honesty still passes. A regression here means telemetry leaked back into meta-mistakes.jsonl.
+      - name: ledger-pollution regression (debias telemetry must not touch the mistake ledger)
+        run: |
+          node scripts/judge-panel.mjs --self-test >/dev/null
+          node scripts/debate-engine.mjs --self-test >/dev/null
+          git diff --exit-code docs/audits/meta-mistakes.jsonl
+          node scripts/meta-honesty.mjs
 
       # ── Engine unit tests (zero-dep node:test — runs without npm install) ───
       - name: engine unit tests

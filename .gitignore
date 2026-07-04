@@ -14,6 +14,9 @@ docs/standards/
 docs/audits/*-events.jsonl
 docs/audits/*-verdicts.jsonl
 docs/audits/gate-trips.jsonl
+# judge position-sensitivity telemetry (debate-engine debiasedVerdict) — a validator-regenerated
+# stream, NOT the mistake ledger. Kept out of docs/audits/meta-mistakes.jsonl on purpose (ledger-pollution, 2026-07-04).
+docs/audits/judge-debias-telemetry.jsonl
 
 # OS / editor
 .DS_Store

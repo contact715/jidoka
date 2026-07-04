@@ -38,6 +38,14 @@ const NEGATIVE_MARKERS = ['went wrong', 'missed', 'mistake', 'failed', 'failure'
 
 export const words = s => new Set(String(s).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 3));
 
+// A ledger row is a logged MISTAKE only if it carries the mistake schema — a `claimed` or a `real`
+// field. A row with neither (e.g. misfiled telemetry {ts,wave,class,run1,run2}) carries no honesty
+// signal: auditing it would flag it "self-confirming" and BLOCK on something that is not a mistake.
+// Defence-in-depth against ledger-pollution (debias telemetry leaked in twice; root-caused 2026-07-04).
+// This is NOT a bypass hole: flattery needs a claimed≈real pair, which by definition HAS both fields,
+// so any self-praising row is still audited — only content-less rows are skipped.
+export const isMistakeRow = r => r != null && (('claimed' in r) || ('real' in r));
+
 // A real mistake's `real` must say something the `claim` did not. If it introduces
 // fewer than 2 novel content words, it's restating the claim — a tautology, not a finding.
 export function contradicts(claimed, real) {
@@ -61,20 +69,25 @@ export function classifyRow(r) {
   };
 }
 
-// aggregate signal indicators over the whole ledger (pure)
+// aggregate signal indicators over the whole ledger (pure). Non-mistake rows (no claimed/real) carry
+// no honesty signal and are excluded — both from the counts and from the ratio denominator — so
+// misfiled telemetry can neither trip garbage-in nor dilute the real signal.
 export function auditRows(rows) {
+  const mistakeRows = rows.filter(isMistakeRow);
   let selfConfirming = 0, inflated = 0, selfReported = 0;
-  for (const r of rows) {
+  for (const r of mistakeRows) {
     const c = classifyRow(r);
     if (c.selfConfirming) selfConfirming++;
     if (c.inflated) inflated++;
     if (c.selfReported) selfReported++;
   }
-  const n = rows.length || 1;
+  const m = mistakeRows.length, n = m || 1;
   return {
     selfConfirming, inflated, selfReported,
-    externalRatio: Math.round((100 * (rows.length - selfReported)) / n),
-    contraRatio: Math.round((100 * (rows.length - selfConfirming)) / n),
+    nonMistake: rows.length - m,
+    mistakeCount: m,
+    externalRatio: Math.round((100 * (m - selfReported)) / n),
+    contraRatio: Math.round((100 * (m - selfConfirming)) / n),
     inflatedRate: Math.round((100 * inflated) / n),
   };
 }
@@ -114,6 +127,15 @@ function selfTest() {
 
   ok('auditRows: ratio denominator is the row count (2 rows, 1 external → 50%)', auditRows([{ claimed: 'a done', real: 'real reason it broke in prod clearly', caught_by: 'user' }, { claimed: 'b done', real: 'another distinct failure cause found here', caught_by: 'self' }]).externalRatio === 50);
 
+  // ledger-pollution regression (2026-07-04): a debias telemetry row (no claimed/real) is NOT a mistake.
+  // It must not register as garbage-in, must not compromise the verdict, and must not dilute real ratios.
+  const telemetry = { ts: '2026-07-04T00:00:00Z', wave: 'wave-judge-debias', class: 'position-sensitive', run1: 'PASS', run2: 'BLOCK' };
+  ok('isMistakeRow: telemetry row (no claimed/real) → false', isMistakeRow(telemetry) === false);
+  ok('isMistakeRow: a real mistake row → true', isMistakeRow({ claimed: 'x', real: 'y' }) === true);
+  ok('auditRows: lone telemetry row → 0 self-confirming (not garbage-in)', auditRows([telemetry]).selfConfirming === 0);
+  ok('verdictOf: a ledger of only telemetry rows is NOT COMPROMISED', verdictOf(auditRows([telemetry])) !== 'COMPROMISED');
+  ok('auditRows: telemetry does not dilute a real mistake (1 real, external → 100%, 1 skipped)', (() => { const a = auditRows([telemetry, { claimed: 'a done', real: 'real reason it broke in prod clearly', caught_by: 'user' }]); return a.externalRatio === 100 && a.contraRatio === 100 && a.nonMistake === 1 && a.mistakeCount === 1; })());
+
   if (fails.length) { console.log(`\n\x1b[31mmeta-honesty self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ meta-honesty: contradicts + classify + verdict logic correct\x1b[0m');
   process.exit(0);
@@ -128,6 +150,10 @@ if (isMain) {
 
   console.log(`meta-honesty: auditing signal quality of ${rows.length} ledger entry(ies)\n`);
   for (const r of rows) {
+    if (!isMistakeRow(r)) {
+      console.log(`\x1b[33m🟡 non-mistake row (misfiled telemetry?): ${r.date || r.ts || '∅'} [${r.class || '∅'}] — no claimed/real fields; skipped from the honesty audit (belongs in a telemetry sidecar, not the ledger).\x1b[0m`);
+      continue;
+    }
     const c = classifyRow(r);
     if (c.selfConfirming) {
       console.log(`\x1b[31m🔴 self-confirming (garbage-in): ${r.date} [${r.class}]\x1b[0m`);
@@ -154,10 +180,12 @@ if (isMain) {
 
   // ---- indicators ----
   const ind = auditRows(rows);
+  const m = ind.mistakeCount;
   console.log('\n\x1b[1m  signal indicators\x1b[0m');
-  console.log(`    external-catch ratio ... ${ind.externalRatio}% (${rows.length - ind.selfReported}/${rows.length} caught externally, not self)   want ↑`);
-  console.log(`    contra-evidence ratio .. ${ind.contraRatio}% (${rows.length - ind.selfConfirming}/${rows.length} entries whose real contradicts the claim)   want ↑`);
-  console.log(`    inflated-claim rate .... ${ind.inflatedRate}% (${ind.inflated}/${rows.length} claims use unverifiable booster words)   want ↓`);
+  if (ind.nonMistake) console.log(`    non-mistake rows ....... ${ind.nonMistake} skipped (no claimed/real — telemetry misfiled into the ledger)`);
+  console.log(`    external-catch ratio ... ${ind.externalRatio}% (${m - ind.selfReported}/${m} caught externally, not self)   want ↑`);
+  console.log(`    contra-evidence ratio .. ${ind.contraRatio}% (${m - ind.selfConfirming}/${m} entries whose real contradicts the claim)   want ↑`);
+  console.log(`    inflated-claim rate .... ${ind.inflatedRate}% (${ind.inflated}/${m} claims use unverifiable booster words)   want ↓`);
   if (retroTotal) console.log(`    retro honesty .......... ${retroTotal - retroFlags}/${retroTotal} retros carry an honest negative`);
 
   // ---- verdict ----

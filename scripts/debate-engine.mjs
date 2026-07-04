@@ -40,13 +40,23 @@ export function positionSwap(plan) {
 
 const WEIGHT = { PASS: 0, REVISE: 1, BLOCK: 2, DEADLOCK: 3 };
 
+// Position-sensitivity telemetry is NOT a logged mistake — it carries {ts,wave,class,run1,run2},
+// with no claimed/real/caught_by, so it MUST NEVER be written to the mistake ledger
+// (docs/audits/meta-mistakes.jsonl): meta-honesty would read it as a self-confirming "garbage-in"
+// entry and BLOCK the pre-commit/pre-push gate. It streams to its own sidecar, which is a
+// validator-regenerated telemetry file (gitignored, like gate-trips.jsonl), not source. Writing to
+// the ledger here caused ledger-pollution twice (2026-06-06, recurred same day; root-caused 2026-07-04:
+// the sidecar was created but the default write-path was never repointed). Env-overridable so the
+// self-test suite can redirect it.
+export const DEBIAS_LOG = process.env.JIDOKA_DEBIAS_LOG || 'docs/audits/judge-debias-telemetry.jsonl';
+
 // AC-2..5,9: merge two judge verdicts (normal + swapped runs). Conservative: stricter wins.
 // _testLogPath redirects the jsonl write to a tmp file during tests.
 export function debiasedVerdict(run1, run2, { threshold = 1, _testLogPath = null } = {}) {
   const w1 = WEIGHT[run1] ?? 0, w2 = WEIGHT[run2] ?? 0;
   const positionSensitive = Math.abs(w1 - w2) >= threshold;
   if (positionSensitive) {
-    const path = _testLogPath ?? 'docs/audits/meta-mistakes.jsonl';
+    const path = _testLogPath ?? DEBIAS_LOG;
     try { appendFileSync(path, JSON.stringify({ ts: new Date().toISOString(), wave: 'wave-judge-debias', class: 'position-sensitive', run1, run2 }) + '\n'); } catch (_) {}
   }
   return { verdict: w1 >= w2 ? run1 : run2, positionSensitive, run1, run2 };
@@ -81,6 +91,10 @@ async function selfTest() {
     ['AC-5: PASS+REVISE → sensitive:true,REVISE', debiasedVerdict('PASS','REVISE',{_testLogPath:'/dev/null'}).positionSensitive===true && debiasedVerdict('PASS','REVISE',{_testLogPath:'/dev/null'}).verdict==='REVISE'],
     ['AC-9: positionSensitive logs jsonl entry',  ac9],
     ['AC-10: finalVerdict compat (string return)', finalVerdict('PASS')==='PASS' && finalVerdict('PASS',{unrefutedBlocker:true})==='BLOCK'],
+    // ledger-pollution regression (2026-07-04): the DEFAULT telemetry sink must never be the mistake
+    // ledger — a position-sensitive row has no claimed/real and would trip meta-honesty (garbage-in).
+    ['REGRESSION: DEBIAS_LOG default is NOT the mistake ledger', !/meta-mistakes/.test(DEBIAS_LOG)],
+    ['REGRESSION: DEBIAS_LOG default is the debias sidecar',     /judge-debias/.test(DEBIAS_LOG)],
   ];
   let fails=0;
   for (const [n,ok] of T) { if(!ok)fails++; console.log(`  ${ok?'\x1b[32m✓\x1b[0m':'\x1b[31m✗\x1b[0m'} ${n}`); }
