@@ -1,5 +1,5 @@
 {
-  "brokenRefs": 167,
+  "brokenRefs": 164,
   "orphans": 49,
   "missingMeta": 53,
   "_note": "Spec-tree structural ceiling. Lower is better; the gate blocks any increase. Auto-tightens when a metric drops."
