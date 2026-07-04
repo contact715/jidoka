@@ -93,6 +93,8 @@ jobs:
         run: node scripts/memory-guard.mjs --self-test
       - name: reasoning-distill self-test (contrast -> gated strategy records)
         run: node scripts/reasoning-distill.mjs --self-test
+      - name: sleep-consolidate self-test (between-wave consolidation plan)
+        run: node scripts/sleep-consolidate.mjs --self-test
 
       # ── Gate self-checks: verification-by-execution + the gate map (catches a ghost gate) ──
       - name: execution-gate self-test

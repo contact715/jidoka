@@ -17,6 +17,24 @@ Output: `docs/audit-reports/routine-weekly-YYYY-WNN.md`
 
 Diff against prior week's report to see deltas. Action delta-worthy findings before new wave work.
 
+### Between-wave sleep-time — `npm run routine:sleep`
+
+After Letta's sleep-time idea (2026-W27): a wave closes, the agent is idle for a moment, so use
+that moment to turn the wave's raw episodic traces into learned context that is READY before the
+next session-start, instead of paying that cost on the next session's critical path.
+
+It composes two existing scripts (no new memory logic):
+
+1. **Consolidate** (`scripts/memory-consolidate.mjs`) — rebuild the consolidated lessons digest
+   (memory-consolidated.md, written to the global engine dir) from the cross-project mistake
+   ledger (recency-weighted, decayed).
+2. **Distill** (`scripts/reasoning-distill.mjs`) — turn captured best-of-N / reflexion contrast
+   into gated strategy candidates (private until ≥2 judges are calibrated, then shared through
+   memory-guard's dedup).
+
+Best-effort: a failing step is reported, never fatal — a sleep routine must not block the wave
+that triggered it. Safe to call at wave close (`node scripts/sleep-consolidate.mjs`) or manually.
+
 ### Monthly — `npm run routine:monthly`
 
 Heavier audit (~15-30 min including agent dispatches the orchestrator picks up from the report):

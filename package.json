@@ -106,6 +106,7 @@
 		"wave:status": "node scripts/current-wave-status.mjs",
 		"routine:weekly": "bash scripts/routine-weekly.sh",
 		"routine:monthly": "bash scripts/routine-monthly.sh",
+		"routine:sleep": "node scripts/sleep-consolidate.mjs",
 		"check:bundle": "node scripts/bundle-size-check.mjs",
 		"create-tool": "node scripts/create-tool.mjs",
 		"audit:meta-process": "node scripts/audit-meta-process.mjs",
