@@ -20,7 +20,8 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const has = (v) => v != null && v !== '';
-const isGateStrengthening = (r) =>
+// exported so kaizen-rank reuses the exact same "is this a gate-strengthening rec" notion.
+export const isGateStrengthening = (r) =>
   (Array.isArray(r.tags) && r.tags.some((t) => /gate|strengthen|harden|coverage/i.test(t))) ||
   /gate|strengthen|harden|coverage|leak/i.test(`${r.title || ''} ${r.what || ''}`);
 
