@@ -38,6 +38,9 @@ export const KERNEL = [
   // run-state derives phases from the planner, which routes debate via debate-trigger — both must be
   // in the kernel so even --profile=core is import-closed (no run-state without its planner).
   'orchestration-planner.mjs', 'debate-trigger.mjs', 'adaptive-verify.mjs',
+  // dag-schedule — orchestration-planner (KERNEL) imports it for the build-phase task DAG; a leaf
+  // (no relative imports) so core stays import-closed. (2026-W27 rank 5.)
+  'dag-schedule.mjs',
 ];
 const COMMON = [ // standard adds the everyday gates
   'northstar-check.mjs', 'charter-check.mjs', 'kaizen-loop.mjs', 'spec-drift-check.mjs',
@@ -49,6 +52,11 @@ const COMMON = [ // standard adds the everyday gates
   // that log; it also offers a semantic fallback for an unknown --feature, so it imports
   // memory-retrieve (→ meta-lib KERNEL + memory-consolidate); ship both to keep import-closure green.
   'get-spec-context.mjs', 'spec-first-gate.mjs', 'memory-retrieve.mjs', 'memory-consolidate.mjs',
+  // get-spec-context (above) now also imports memory-vector (RRF semantic recall) and standards-mine
+  // (de-facto convention injection); standards-mine imports code-map. Ship all three so standard stays
+  // import-closed. memory-vector→memory-retrieve (here); standards-mine→code-map (here)+memory-retrieve;
+  // code-map is a leaf. code-map MOVED here from HEAVY (a COMMON script now depends on it). (2026-W27.)
+  'memory-vector.mjs', 'standards-mine.mjs', 'code-map.mjs',
   // spec-tree integrity trio (born 2026-06-05 from the projectx spec-tree audit: 99 false-INCOMPATIBLE
   // specs + 30 invisible wave specs accumulated because templates existed but nothing validated
   // instances, and drift was detected but never forced an amendment). All zero-dep leaf scripts.
@@ -75,7 +83,8 @@ const COMMON = [ // standard adds the everyday gates
   'verify-goal-backward.mjs', 'canary-gate.mjs', 'req-trace.mjs', 'prod-harvest.mjs',
 ];
 const HEAVY = [ // full adds the deeper adversarial / analysis tools
-  'gate-graduation.mjs', 'debate-engine.mjs', 'agent-trace.mjs', 'code-map.mjs', 'approval-queue.mjs',
+  // code-map MOVED to COMMON (standards-mine, a COMMON script, imports it).
+  'gate-graduation.mjs', 'debate-engine.mjs', 'agent-trace.mjs', 'approval-queue.mjs',
 ];
 export const CORE = [...KERNEL, ...COMMON, ...HEAVY];
 export const PROFILES = { core: KERNEL, standard: [...KERNEL, ...COMMON], full: CORE };
