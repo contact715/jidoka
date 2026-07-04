@@ -58,9 +58,23 @@ debates) to find new repos, methods and technologies that would strengthen jidok
 ranked improvement plan. Mode: PROPOSE only — it never implements code, it surfaces a plan for the
 owner to approve.
 
+Two mandatory dimensions beyond the GitHub research (added 2026-07-04):
+- **Session review** — the task analyses the last ~10 dev sessions for real errors, rework, and
+  recurring mistake classes, grounded in DATA not impressions: session-log MCP when available, else
+  the engine's own deterministic records (`meta-trend` verdict + ungated classes, `meta-audit`,
+  `memory-consolidate`, the mistake ledger). Every finding becomes a concrete FIX proposal AND a
+  dev-environment mechanism that closes the class for good (a hook/gate/lint-rule/agent), not a
+  one-off. It heeds a REGRESSING `meta-trend` verdict — strengthen leaking/missing gates before
+  adding new mechanisms.
+- **Killer features** — 1–3 leverage moves per week that strengthen BOTH jidoka AND the Claude
+  Code dev environment through jidoka (a forcing-function / gate / self-improvement loop /
+  automation that makes EVERY project on the engine better), each tagged where it lands (jidoka repo
+  and/or global `~/.claude`).
+
 - Engine: `.claude/workflows/jidoka-enrichment.js` (recon current state → research 8 domains →
   adversarial verify → debates → ranked synthesis). Phase 0 reads the live jidoka state so it never
-  re-proposes what is already shipped.
+  re-proposes what is already shipped. Session review + killer-feature synthesis are run by the task
+  agent around the workflow (see the scheduled task's SKILL.md for the exact steps).
 - The task clones a clean `main` into `~/.jidoka-weekly`, runs the workflow there, writes
   `docs/research/weekly/jidoka-enrichment-YYYY-WNN.md`, commits + pushes to `main`, and notifies.
 - Manage it from the Claude Code "Scheduled" sidebar, or `list_scheduled_tasks` /
