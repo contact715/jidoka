@@ -71,6 +71,20 @@ Two mandatory dimensions beyond the GitHub research (added 2026-07-04):
   automation that makes EVERY project on the engine better), each tagged where it lands (jidoka repo
   and/or global `~/.claude`).
 
+The weekly PROCESS itself is a closed, self-measuring loop (not a fresh report each week):
+- **Closed-loop outcome tracking** — each run first audits the previous week's plan (shipped /
+  open / rejected / regressed) against the live repo and maintains a persistent Kaizen ledger
+  (a \_KAIZEN\_LEDGER json-lines file under the weekly research folder), so the process is
+  accountable for its own past proposals.
+- **Kaizen scorecard (analytics)** — week-over-week metrics: recs/week, adoption rate, mean
+  time-to-implement, mistake-class closure, regression rate — trend, not a one-off number.
+- **Cross-week rejection memory** — a rejected-candidates json-lines file in the same folder feeds
+  the AI-war so the same rejected candidates aren't re-litigated every week.
+- **Self-critique / completeness gate** — after synthesis the process critiques its own output
+  (empty domains, source-less recs, session-review gaps) and lists what it couldn't close.
+- **ROI ranking** — order by impact/effort; a REGRESSING `meta-trend` verdict forces gate
+  strengthening above new features.
+
 - Engine: `.claude/workflows/jidoka-enrichment.js` (recon current state → research 8 domains →
   adversarial verify → debates → ranked synthesis). Phase 0 reads the live jidoka state so it never
   re-proposes what is already shipped. Session review + killer-feature synthesis are run by the task
