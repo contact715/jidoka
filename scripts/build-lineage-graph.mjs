@@ -159,6 +159,7 @@ function sanitiseNodeId(relPath) {
 const SPEC_EXCLUDE_PREFIXES = [
   'retros',
   'runs',          // transient per-wave run-state journals (STATE.md), not governance specs
+  'memory',        // reasoning-bank capture + its README — runtime memory, not governance specs
   'checklists',
   'runbooks',
   'specs/briefs',

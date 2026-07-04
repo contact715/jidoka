@@ -19,6 +19,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { persistArtifact } from './reasoning-bank.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const QUEUE = path.resolve(__dirname, '..', '.claude', 'reflexion-queue');
@@ -60,7 +61,20 @@ for (const sha of reviewed) {
   const short = sha.slice(0, 7);
   const match = items.find((f) => f.startsWith(short) || f.replace('.md', '') === sha);
   if (match) {
-    fs.unlinkSync(path.join(QUEUE, match));
+    const full = path.join(QUEUE, match);
+    // reasoning-bank (Part A): keep the reviewed reflexion artifact before its queue
+    // marker is unlinked — the reviewed trajectory is otherwise unrecoverable.
+    try {
+      const content = fs.readFileSync(full, 'utf8');
+      persistArtifact({
+        source: 'reflexion',
+        kind: 'reviewed',
+        key: match.replace('.md', ''),
+        content,
+        meta: { queueFile: match },
+      });
+    } catch { /* best-effort — never block the dequeue on a memory write */ }
+    fs.unlinkSync(full);
     console.log(`[reflexion] dequeued ${match.replace('.md', '')} (reviewed).`);
     removed++;
   } else {

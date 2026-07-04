@@ -19,6 +19,7 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { persistArtifact } from './reasoning-bank.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -271,10 +272,31 @@ fs.writeFileSync(bestofNPath, bestofNContent, 'utf8');
 console.log(`[PARALLEL] best-of-N comparison written to ${bestofNPath}`);
 
 // Clean up worktrees for non-winning attempts.
-console.log(`\n[PARALLEL] Worktree cleanup (losers archived, winner stays):`);
+// reasoning-bank (Part A): capture each attempt's diff BEFORE the worktree is
+// force-removed — once it is gone the trajectory is unrecoverable. We store every
+// attempt keyed by wave (the winner named in ${bestofNPath} is the positive of the
+// contrastive set; the rest are the negatives) so a later distill step can mine it.
+const baseBranch = getCurrentBranch();
+console.log(`\n[PARALLEL] Worktree cleanup (attempts captured to reasoning-bank, then removed):`);
 for (const branch of branchList) {
   const wtp = path.join(ROOT, '.claude', 'worktrees', branch);
   if (fs.existsSync(wtp)) {
+    if (!dryRun) {
+      // Prefer the committed branch diff; fall back to uncommitted worktree changes.
+      const diffR = run(`git diff ${baseBranch}...${branch}`);
+      let diff = diffR.ok ? diffR.stdout : '';
+      if (!diff || !diff.trim()) {
+        const wtDiff = run(`git -C ${wtp} diff`);
+        diff = wtDiff.ok ? wtDiff.stdout : '';
+      }
+      persistArtifact({
+        source: 'best-of-N',
+        kind: 'attempt',
+        key: waveId,
+        content: diff,
+        meta: { branch, bestofN: path.relative(ROOT, bestofNPath) },
+      });
+    }
     console.log(`  Removing worktree for ${branch} (Orchestrator merges winner manually)`);
     run(`git worktree remove ${wtp} --force 2>/dev/null || true`);
   }
