@@ -256,7 +256,9 @@ if (isMain) {
   const now = Date.now();
   const elapsed = st.ts ? now - st.ts : null;
   // gentle "still working" nudge at 15m, re-armed every 15m; fire-and-forget, never delays render
-  if (shouldNudge(st, now)) {
+  // sound is opt-in (JIDOKA_NUDGE_SOUND=1): owner policy 2026-07-04 — audible pings only for
+  // "question to the owner" and "task fully done"; the 15m still-working nudge stays silent
+  if (shouldNudge(st, now) && process.env.JIDOKA_NUDGE_SOUND === '1') {
     try {
       spawn('afplay', [join(process.env.HOME || '', '.claude', 'sounds', 'nudge.wav')], { detached: true, stdio: 'ignore' }).unref();
       writeFileSync(join(process.env.HOME || '', '.claude', 'session-env', `state-${ctx.session_id}.json`), JSON.stringify({ ...st, nudgedAt: now }), 'utf8');
