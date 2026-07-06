@@ -53,7 +53,7 @@ docs/audits/lesson-utility.json
 # local install/test artifacts — engine tests are zero-dep by design; products own their lockfiles
 package-lock.json
 test-results/
-# Kaizen engine generated weekly artifacts (created by the weekly task in the clone)
+# Kaizen engine: _DASHBOARD.md is a regenerable render (local only). The two registries
+# below are the accountability backbone and ARE committed with each weekly report — the
+# design doc (KAIZEN_ENGINE.md) and the weekly task require it, so they are NOT ignored.
 docs/research/weekly/_DASHBOARD.md
-docs/research/weekly/_KAIZEN_LEDGER.jsonl
-docs/research/weekly/_REJECTED.jsonl
