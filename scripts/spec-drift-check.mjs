@@ -52,7 +52,11 @@ const SKIP_DIRS = new Set([
 // Spec scanning skips archived material: docs/archive/** is read-only history whose
 // references are EXPECTED to be stale (e.g. imported product docs). The existence
 // index (walkIndex) still sees archive files, so references TO the archive resolve.
-const SPEC_SKIP_DIRS = new Set([...SKIP_DIRS, 'archive', 'runs']);
+// docs/research/** is weekly GitHub-enrichment / Kaizen prose: it is FULL of repo names
+// and proposed-script paths (e.g. "ruvnet/ruflo", "scripts/ace-curator.mjs") that are NOT
+// local spec references — scanning it as a spec source counted every mention as a false
+// broken ref, inflating the ratchet each week. The existence index still sees the files.
+const SPEC_SKIP_DIRS = new Set([...SKIP_DIRS, 'archive', 'runs', 'research']);
 
 // ── pure: is this backtick/link token a plausible local file reference? ──────────
 export function looksLikeFileRef(raw) {

@@ -161,6 +161,7 @@ const SPEC_EXCLUDE_PREFIXES = [
   'runs',          // transient per-wave run-state journals (STATE.md), not governance specs
   'memory',        // reasoning-bank capture + its README — runtime memory, not governance specs
   'standards',     // standards-mine generated de-facto conventions — mined from code, not specs
+  'research',      // weekly GitHub-enrichment / Kaizen reports — research prose, not governance specs
   'checklists',
   'runbooks',
   'specs/briefs',
