@@ -30,7 +30,11 @@ export function check(tier, used, policy) {
   return { ok: breaches.length === 0, breaches, limit: lim };
 }
 
-const DEFAULT_POLICY = { tiers: {
+// Exported so the est_tokens caps are a single source of truth: the token-meter in
+// shard-story-bundle reads the SAME tier caps to report a bundle as a % of budget
+// (the "thermometer" under this "thermostat" — before, nothing computed est_tokens
+// from real text, so the cap had no live feeder).
+export const DEFAULT_POLICY = { tiers: {
   trivial:  { tool_calls: 50,   est_tokens: 200000,  solo_agent_cap: 30 },
   normal:   { tool_calls: 300,  est_tokens: 1500000, solo_agent_cap: 120 },
   critical: { tool_calls: 1000, est_tokens: 6000000, solo_agent_cap: 300 },

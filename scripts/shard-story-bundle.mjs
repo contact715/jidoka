@@ -26,9 +26,29 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { dirname, resolve, basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { DEFAULT_POLICY } from './budget-gate.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const slug = (f) => String(f).toLowerCase().replace(/[^a-z0-9.-]+/g, '-').replace(/^-+|-+$/g, '');
+
+// estimateTokens — the missing THERMOMETER under budget-gate's thermostat. Nothing in the
+// engine computed est_tokens from real text, so budget-gate's est_tokens cap had no live
+// feeder. This is a zero-dep heuristic: ~4 chars per token is the widely-used rough figure
+// for English + code (a real BPE tokenizer would be a dependency — rejected). It is an
+// ESTIMATE, labelled "~", never presented as exact. Pure and deterministic.
+export function estimateTokens(text = '') {
+  const chars = String(text).length;
+  return chars === 0 ? 0 : Math.ceil(chars / 4);
+}
+
+// contextBudgetLine — render "~T tokens (U% of <tier>-tier context budget)" from a token
+// count, reading the SAME est_tokens caps budget-gate enforces (single source of truth).
+export function contextBudgetLine(tokens, tier = 'normal', policy = DEFAULT_POLICY) {
+  const cap = policy?.tiers?.[tier]?.est_tokens;
+  if (!cap) return `~${tokens.toLocaleString('en-US')} tokens`;
+  const pct = Math.round((tokens / cap) * 1000) / 10; // 0.1% resolution
+  return `~${tokens.toLocaleString('en-US')} tokens (${pct}% of ${tier}-tier budget)`;
+}
 
 export function featureFromSpec(specPath) {
   return slug(basename(specPath).replace(/\.md$/i, '').replace(/_?master_?spec$/i, '').replace(/[_-]+$/g, ''));
@@ -119,7 +139,9 @@ function main() {
   if (args.includes('--print')) { process.stdout.write(story + '\n'); return; }
   mkdirSync(resolve(ROOT, outDir), { recursive: true });
   writeFileSync(resolve(ROOT, outPath), story);
-  console.log(`shard-story-bundle: wrote ${outPath} (spec + ${ancestry.length} ancestor(s) + ${acs.length} AC) inlined`);
+  const tier = arg(args, '--tier') || 'normal';
+  const meter = contextBudgetLine(estimateTokens(story), tier);
+  console.log(`shard-story-bundle: wrote ${outPath} (spec + ${ancestry.length} ancestor(s) + ${acs.length} AC) inlined · ${meter}`);
 }
 
 function selfTest() {
@@ -148,6 +170,16 @@ function selfTest() {
   ok(story.includes('ANCESTOR-BODY'), 'inlines the ancestry body (not just a pointer)');
   ok(story.includes('- [ ] the page loads under 1s'), 'renders ACs as a checklist');
   ok(story.includes('Self-contained'), 'tells the implementer not to re-derive');
+
+  // token-meter (R6): the thermometer under budget-gate
+  ok(estimateTokens('') === 0, 'estimateTokens: empty text → 0 tokens');
+  ok(estimateTokens('abcd') === 1, 'estimateTokens: 4 chars → 1 token (chars/4)');
+  ok(estimateTokens('a'.repeat(400)) === 100, 'estimateTokens: 400 chars → 100 tokens');
+  ok(estimateTokens('a'.repeat(4000)) > estimateTokens('a'.repeat(400)), 'estimateTokens: monotonic in length');
+  ok(/~100 tokens/.test(contextBudgetLine(100, 'normal')), 'contextBudgetLine: shows the token count');
+  ok(/% of normal-tier budget/.test(contextBudgetLine(100, 'normal')), 'contextBudgetLine: shows % of the tier cap (reuses budget-gate caps)');
+  ok(contextBudgetLine(750000, 'normal').includes('50%'), 'contextBudgetLine: 750k of normal 1.5M cap → 50%');
+  ok(!/%/.test(contextBudgetLine(100, 'nonesuch')), 'contextBudgetLine: unknown tier → count only, no bogus %');
 
   console.log(fail === 0 ? '\nshard-story-bundle: all self-tests passed' : `\nshard-story-bundle: ${fail} self-test(s) FAILED`);
   process.exit(fail === 0 ? 0 : 1);
