@@ -120,6 +120,30 @@ export function retrieveFused(items, taskText, k = 5, opts = {}) {
   return { results, relevanceDriven: true, vectorActive: true, mode: 'RRF(lexical, vector)' };
 }
 
+/**
+ * Adaptive-depth recall — closes the fixed-top-k open loop (W28-R5). The one live caller
+ * (get-spec-context) retrieved a HARDCODED top-3 single-shot: it cut off a 4th genuinely
+ * relevant lesson, and padded with irrelevant recency filler when the query overlapped little.
+ * This pulls the fused ranking to `max`, then keeps every result that CLEARS the relevance
+ * floor (relevance > 0 = the query genuinely overlaps it), clamped to [min, max]. So a spec
+ * with many relevant lessons injects more of them; one that overlaps nothing injects only
+ * `min` recency items instead of filler. Deterministic, zero-dep, works on today's lexical
+ * path and auto-upgrades with the vector layer (results without a relevance field are kept).
+ * @returns {{results, relevanceDriven, vectorActive, mode, adaptiveK}}
+ */
+export function retrieveAdaptive(items, taskText, { min = 2, max = 6, embed } = {}) {
+  const fused = retrieveFused(items, taskText, max, embed ? { embed } : {});
+  const all = fused.results || [];
+  // A result with no `relevance` field (vector path) can't be thresholded → keep it.
+  const cleared = all.filter((r) => r.relevance === undefined || r.relevance > 0);
+  // query overlaps nothing → don't flood the spec read with irrelevant filler, just `min`
+  // recency items. relevance-driven → keep every result that clears the floor, [min, max].
+  const picked = !fused.relevanceDriven
+    ? all.slice(0, min)
+    : (cleared.length >= min ? cleared : all).slice(0, max);
+  return { ...fused, results: picked, adaptiveK: picked.length };
+}
+
 // ── self-test ──────────────────────────────────────────────────────────────
 function selfTest() {
   let fail = 0;
@@ -167,6 +191,26 @@ function selfTest() {
   const viaFused = retrieveFused(items, 'react hooks', 2);
   ok(JSON.stringify(viaBase.results.map((r) => r.id)) === JSON.stringify(viaFused.results.map((r) => r.id)),
     'DORMANT retrieveFused matches the lexical retrieve() contract exactly');
+
+  // retrieveAdaptive (R5): adaptive depth by relevance, not a fixed k.
+  const many = [
+    { id: 'm1', kind: 'lesson', title: 't1', text: 'alpha beta gamma', recency: 0.1 },
+    { id: 'm2', kind: 'lesson', title: 't2', text: 'alpha beta delta', recency: 0.1 },
+    { id: 'm3', kind: 'lesson', title: 't3', text: 'alpha epsilon zeta', recency: 0.1 },
+    { id: 'm4', kind: 'lesson', title: 't4', text: 'nothing in common here', recency: 5.0 },
+    { id: 'm5', kind: 'lesson', title: 't5', text: 'unrelated words only', recency: 6.0 },
+  ];
+  const adaptMany = retrieveAdaptive(many, 'alpha beta gamma', { min: 2, max: 6 });
+  ok(adaptMany.results.every((r) => r.relevance > 0), 'adaptive: drops the irrelevant recency-padding tail');
+  ok(adaptMany.results.length >= 3, 'adaptive: keeps MORE than a fixed-3 when >3 lessons are relevant');
+  ok(adaptMany.adaptiveK === adaptMany.results.length, 'adaptive: reports adaptiveK = result count');
+
+  const adaptFew = retrieveAdaptive(many, 'alpha', { min: 2, max: 6 });
+  ok(adaptFew.results.length >= 2, 'adaptive: honours the floor (min) even if fewer clear it');
+
+  const adaptNone = retrieveAdaptive(many, 'quuxword noalpha', { min: 2, max: 6 });
+  ok(adaptNone.results.length === 2 && !adaptNone.relevanceDriven, 'adaptive: nothing relevant → exactly min recency items, not padded');
+  ok(retrieveAdaptive(many, 'alpha beta', { min: 2, max: 3 }).results.length <= 3, 'adaptive: never exceeds max');
 
   console.log(fail === 0 ? '\n\x1b[32m✓ memory-vector: RRF fusion + honest DORMANT fallback correct\x1b[0m' : `\n\x1b[31m${fail} self-test(s) FAILED\x1b[0m`);
   process.exit(fail === 0 ? 0 : 1);

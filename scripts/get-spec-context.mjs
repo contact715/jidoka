@@ -19,7 +19,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { retrieveFused } from './memory-vector.mjs';
+import { retrieveAdaptive } from './memory-vector.mjs';
 import { mineDir, relevantConventions } from './standards-mine.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -306,9 +306,11 @@ function main() {
         id: s.relPath, kind: 'doc', title: s.relPath,
         text: `${s.title || ''} ${s.relPath} ${s.tldr || s.summary || ''}`, recency: 0,
       }));
-      // retrieveFused = lexical today (vector layer DORMANT until an embedder is wired), then
-      // auto-upgrades to RRF(lexical, vector) with no caller change (rank 2 swap-point).
-      const { results, relevanceDriven } = retrieveFused(items, featureName, 3);
+      // retrieveAdaptive (W28-R5): adaptive depth instead of a fixed top-3 — inject every
+      // genuinely-relevant lesson (up to a cap), and only `min` recency items when the query
+      // overlaps nothing (no irrelevant padding). Lexical today; auto-upgrades to RRF when the
+      // vector layer is wired, with no caller change.
+      const { results, relevanceDriven, adaptiveK } = retrieveAdaptive(items, featureName, { min: 2, max: 6 });
       if (relevanceDriven && results.length) {
         process.stderr.write(`[semantic] nearest specs by meaning:\n`);
         for (const r of results) process.stderr.write(`  • ${r.title}${r.relevance ? ` (rel ${r.relevance.toFixed(2)})` : ''}\n`);
