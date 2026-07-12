@@ -62,7 +62,7 @@ const PROOF_CMD =
   /\b(vitest|jest|pytest|unittest|mocha|tsc\b|eslint|playwright|next build|npm (run |exec )?\S*(test|build|lint|check)|pnpm \S*(test|build|lint|check)|yarn \S*(test|build|lint|check)|node(\s+--\S+)*\s+\S+\.(mjs|cjs|js|ts)|python3?\s+\S+\.py|--self-test|go test|cargo (test|check|build)|make (test|check)|bash \S+\.sh|sh \S+\.sh|zsh \S+\.sh)\b/i;
 // Browser verification also proves observable behaviour (same set as browser-verify-gate).
 const BROWSER_TOOL =
-  /(playwright__browser_|(^|_)preview_(start|screenshot|navigate|snapshot|inspect|click|fill|eval|logs|console)|claude-in-chrome__|computer-use__screenshot|__screenshot|browser_take_screenshot|browser_snapshot|browser_navigate)/i;
+  /(claude_browser__|playwright__browser_|(^|_)preview_(start|screenshot|navigate|snapshot|inspect|click|fill|eval|logs|console)|claude-in-chrome__|computer-use__screenshot|__screenshot|browser_take_screenshot|browser_snapshot|browser_navigate)/i;
 
 // pure: given the ordered tool uses of a session, does it need the proof nudge?
 // Rule: a proof (executed command / browser look) must occur AFTER the LAST code edit —
@@ -161,6 +161,8 @@ function selfTest() {
     ["md-only edit → pass", needsProof([edit("docs/NOTES.md")]).block === false],
     ["json config edit → pass", needsProof([edit("settings.json")]).block === false],
     ["browser look counts as proof", needsProof([edit("app/page.tsx"), { name: "mcp__playwright__browser_take_screenshot", input: {} }]).block === false],
+    ["built-in Claude Browser counts as proof", needsProof([edit("app/page.tsx"), { name: "mcp__Claude_Browser__computer", input: { action: "screenshot" } }]).block === false],
+    ["built-in Claude Browser read_page counts", needsProof([edit("app/page.tsx"), { name: "mcp__Claude_Browser__read_page", input: {} }]).block === false],
     ["read-only bash is NOT proof", needsProof([edit("src/a.ts"), bash("cat src/a.ts"), bash("git diff")]).block === true],
     ["node_modules edit ignored", needsProof([edit("node_modules/x/index.js")]).block === false],
     [".d.ts edit ignored", needsProof([edit("src/types.d.ts")]).block === false],

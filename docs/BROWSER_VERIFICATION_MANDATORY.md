@@ -12,7 +12,7 @@ children: []
 breaking_change_in_v: null
 created: 2026-07-02
 last_validated_against_parents: 2026-07-02
-last_updated: 2026-07-02
+last_updated: 2026-07-12
 ---
 
 # Browser Verification is Mandatory (dev-engine forcing function)
@@ -34,7 +34,9 @@ LOGIC; the browser proves it LOOKS and BEHAVES right. Both are required to ship.
 
 Workflow every time observable UI is edited:
 
-1. Drive a browser — the harness preview tools, Playwright, or claude-in-chrome. Navigate
+1. Drive a browser — the BUILT-IN Claude Code browser first (mcp__Claude_Browser__* /
+   preview tools; owner's standing choice 2026-07-12). Playwright or claude-in-chrome are
+   fallbacks only (headless runs, or the user's real logged-in Chrome). Navigate
    to the exact affected screen.
 2. Screenshot and READ it (spatial-design Q7: "designed, or bolted on?"). Check the states
    you touched: empty, long text, narrow, dark.

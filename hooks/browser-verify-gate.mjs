@@ -8,7 +8,7 @@
  *
  * Behaviour: on Stop, scan this session's transcript. If the session EDITED observable
  * UI source (*.tsx/*.jsx/*.css/*.scss under app/ or components/, excluding tests) but
- * NEVER called a browser verification tool (playwright / preview_* / claude-in-chrome /
+ * NEVER called a browser verification tool (Claude_Browser / preview_* / playwright / claude-in-chrome /
  * computer-use screenshot), block the stop ONCE with a reason telling Claude to verify.
  *
  * Safety:
@@ -50,7 +50,7 @@ const UI_PATH = /(^|\/)(app|components|src|pages|widgets|ui)\//i;
 const EXCLUDE = /(__tests__|\.test\.|\.spec\.|\.stories\.|\.d\.ts$|\/(scripts|docs|node_modules|\.next|dist|build)\/)/i;
 // Any tool that means "a browser was actually driven / a screen was captured".
 const BROWSER_TOOL =
-  /(playwright__browser_|(^|_)preview_(start|screenshot|navigate|snapshot|inspect|click|fill|eval|logs|console)|claude-in-chrome__|computer-use__screenshot|__screenshot|browser_take_screenshot|browser_snapshot|browser_navigate)/i;
+  /(claude_browser__|playwright__browser_|(^|_)preview_(start|screenshot|navigate|snapshot|inspect|click|fill|eval|logs|console)|claude-in-chrome__|computer-use__screenshot|__screenshot|browser_take_screenshot|browser_snapshot|browser_navigate)/i;
 
 function main() {
   const raw = readStdin();
@@ -120,7 +120,7 @@ function main() {
   const reason =
     "BROWSER-VERIFY-GATE: this session edited observable UI (" +
     files +
-    ") but never opened a browser to LOOK. Rule ~/.claude/rules/browser-verification-mandatory.md: for ANY visible change, open Playwright (or the preview tools), navigate to the affected screen, screenshot it, and confirm with your eyes before finishing. " +
+    ") but never opened a browser to LOOK. Rule ~/.claude/rules/browser-verification-mandatory.md: for ANY visible change, open the BUILT-IN Claude Code browser (mcp__Claude_Browser__* / preview_* tools — owner's standing choice 2026-07-12; Playwright only as fallback when the Browser pane is unavailable), navigate to the affected screen, screenshot it, and confirm with your eyes before finishing. " +
     "If the normal screen has no data (backend down / mocks off), render the component on a throwaway route or in an isolated worktree and screenshot THAT — missing data is not a reason to skip. " +
     "Do the browser check now, then finish. If it is genuinely not observable in any browser (non-web change), say so explicitly in your final message.";
 
