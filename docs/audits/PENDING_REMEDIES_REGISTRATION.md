@@ -42,7 +42,7 @@ Both mechanisms are already **built and proven**:
 ## Added 2026-06-05 (spec-tree-overhaul) — two more classes meta-audit now flags
 
 Both mechanisms are already **built and proven**:
-- `gate-bypass` → `scripts/policy-enforce-hook.mjs` (REUSE, hardened this session). Blocks Write/Edit AND Bash side-channels (`>`, `>>`, `tee`, `sed -i`, `node fs.writeFileSync`, `cp/mv`) to L0/secret paths, case-insensitively; owner-grant for L0 docs is audited and never covers secrets/.git/registries. 25 self-tests including the exact red-team finds (bash side-channel, case-variant).
+- `gate-bypass` → `scripts/policy-enforce-hook.mjs` (REUSE, hardened this session). Blocks Write/Edit AND Bash side-channels (`>`, `>>`, `tee`, `sed -i`, `node fs.writeFileSync`, `cp/mv`) to L0/secret paths, case-insensitively; owner-grant for L0 docs is audited and never covers secrets/.git/registries. 25 self-tests including the exact red-team finds (bash side-channel, case-variant). **UPDATED 2026-07-12**: the hook is now also ROUTED for Bash in `~/.claude/settings.json` (until then only Write|Edit|MultiEdit|NotebookEdit received traffic — the side-channel logic existed but nothing called it), and `gate-audit.mjs verifyPreToolUse()` fails the audit on built-but-unrouted PreToolUse gates. Use the refreshed entry in `docs/proposals/meta-remedies.proposed.mjs` (since: 2026-07-12), not the snippet below.
 - `ledger-pollution` → **SUPERSEDED 2026-07-12**: the mechanism is now `scripts/ledger-schema-gate.mjs` (reject-at-write + commit/CI hard-block), not meta-honesty (detect-after). Use the newer entry in `docs/proposals/ledger-pollution-remedy.proposed.md` instead of the snippet below.
 
 ```js

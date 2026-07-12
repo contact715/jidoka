@@ -1,10 +1,27 @@
+---
+status: Proposed
+version: 1.0.0
+level: L1
+type: core-arch
+owner_role: platform
+parents:
+  - path: docs/NORTH_STAR.md
+    version: 1.0.0
+    relationship: implements
+children: []
+breaking_change_in_v: null
+created: 2026-07-12
+last_validated_against_parents: 2026-07-12
+last_updated: 2026-07-12
+---
+
 # Proposal: register `ledger-pollution` in the gate registry (owner-only apply)
 
 Date: 2026-07-12. Status: **awaiting explicit owner approval**.
 
 `scripts/meta-remedies.mjs` is ALWAYS_PROTECTED (an agent must not register its own gate), so
 this entry is applied by the owner, same flow as the 2026-07-12 registration (recorded in
-`l0-write-audit.jsonl`).
+the L0 write-audit log at ~/.claude/hooks/, file l0-write-audit.jsonl).
 
 ## Why
 
@@ -17,7 +34,7 @@ downstream by meta-honesty).
 
 The remedy moved from detect-after to **reject-at-write** — three layers off one shared
 validator (`validateLedgerEntry` in `scripts/meta-lib.mjs`; required fields
-`date/class/claimed/real/caught_by`, all non-empty, ISO date):
+`date`, `class`, `claimed`, `real`, `caught_by` — all non-empty, ISO date):
 
 1. `scripts/meta-log.mjs` — the legit append path validates BEFORE appending; a garbage row
    exits 2 and never touches the ledger.
@@ -65,4 +82,5 @@ node scripts/gate-audit.mjs        # ledger-schema-gate: CI/hard, verified prese
 ```
 
 Then mirror the registry change into the installed copy (`~/.claude/jidoka/scripts/meta-remedies.mjs`,
-absolute mechanism path per the install convention) and record the apply in `l0-write-audit.jsonl`.
+absolute mechanism path per the install convention) and record the apply in the L0 write-audit log
+(l0-write-audit.jsonl under ~/.claude/hooks/).
