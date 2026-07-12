@@ -1,12 +1,19 @@
-// PROPOSED meta-remedies.mjs — registers the two ungated recurring classes (reward-hacking,
-// self-test-blindspot) that meta-audit keeps flagging. meta-remedies.mjs is L0 (the gate registry);
-// policy-enforce-hook refuses agent writes to it by design, so this proposal is applied by a HUMAN:
+// PROPOSED meta-remedies.mjs (2026-07-12) — supersedes the 2026-06-06 proposal (which was never
+// applied) and adds two changes on top of it:
+//   1. NEW class 'browser-verification-skipped' — its gate (browser-verify-gate.mjs Stop hook) has
+//      been live since 2026-07-02 but was never registered, so memory-consolidate kept reporting
+//      it as "ungated — live risk".
+//   2. 'declaration-over-implementation' — now ALSO enforced by the proof-of-work-gate Stop hook
+//      (hooks/proof-of-work-gate.mjs, wired in ~/.claude/settings.json hooks.Stop since 2026-07-12):
+//      a session that edited source code but executed nothing after the last edit is blocked once.
+//      Previously the mechanism (proof-gate.mjs) was invocable-only — a paper gate.
+//
+// meta-remedies.mjs is L0 (the gate registry); policy-enforce-hook refuses agent writes to it by
+// design, so this proposal is applied under explicit OWNER approval:
 //
 //     cp docs/proposals/meta-remedies.proposed.mjs scripts/meta-remedies.mjs
-//     node scripts/meta-audit.mjs    # both classes now read "gated & holding", not "ungated recurring"
+//     node scripts/meta-audit.mjs    # new classes read "gated & holding", not "ungated recurring"
 //     node scripts/eval-suite.mjs    # expect green
-//
-// (Only the two new blocks — 'reward-hacking' and 'self-test-blindspot' — differ from the live file.)
 
 // Single source of truth for the meta-mistake gate registry.
 //
@@ -34,9 +41,14 @@
 
 export const REMEDIES = {
   'declaration-over-implementation': {
-    since: '2026-05-29',
-    mechanism: 'scripts/proof-gate.mjs',
-    family: ['claim-without-test', 'fixed-without-rerun', 'wired-without-trace'],
+    // 2026-06-06 regression (wave-meta-gates: commit said selftest-reality registered, registry got
+    // mutation-test; gate built but unwired). Strengthened: gate-audit.mjs now blocks ORPHAN gate:*
+    // scripts (no workflow/hook/installer caller) — "wired" is verified mechanically, not claimed.
+    // 2026-07-12: enforcement closed — proof-of-work-gate.mjs (Stop hook) now watches what the
+    // session DID: source edited + nothing executed after the last edit → the stop is blocked once.
+    since: '2026-06-06',
+    mechanism: 'hooks/proof-of-work-gate.mjs',
+    family: ['claim-without-test', 'fixed-without-rerun', 'wired-without-trace', 'orphaned-gate', 'code-edited-nothing-run'],
     premortem: {
       risk: /\b(done|implemented|fixed|wired|works|working|complete[d]?|ready|finished|mechanical(?:ly)?)\b/i,
       clears: /\b(test|spec|passes|passing|exit code|output shown|proof|verified by running|\.test\.|\.spec\.)\b/i,
@@ -45,7 +57,30 @@ export const REMEDIES = {
     gate:
       'A claim of "implemented / wired / mechanical / fixed / done" MUST ship an EXECUTABLE proof in the same turn: ' +
       'a test that passes, a hook that blocks, or a command whose output is shown. No proof artifact in the turn → ' +
-      'status is NOT done. Enforce as a done-gate; do not rely on the agent recalling verification-before-completion.',
+      'status is NOT done. Enforced two ways: proof-of-work-gate.mjs (Stop hook, wired in ~/.claude/settings.json ' +
+      'hooks.Stop since 2026-07-12) blocks a session stop once when code was edited but nothing was executed after ' +
+      'the last edit; proof-gate.mjs remains the invocable typed-proof runner (a UI claim needs a browser proof, ' +
+      'a data-removal claim needs a history scan).',
+  },
+  'browser-verification-skipped': {
+    // Owner escalation 2026-07-02 ("в каждой сессии ты не делаешь проверку в браузере и
+    // пропускаешь!"): tsc+tests green was treated as "UI change done" session after session.
+    // The gate went live the same day but was never registered here, so memory-consolidate
+    // kept reporting the class as ungated. This entry closes the registry, not the gate.
+    since: '2026-07-02',
+    mechanism: 'hooks/browser-verify-gate.mjs',
+    family: ['ui-done-without-look', 'tsc-green-as-ui-proof', 'screenshot-skipped'],
+    premortem: {
+      risk: /\b(ui|css|layout|render(s|ed|ing)?|component|screen|visual|tsx|jsx)\b|экран|вёрстк|компонент|стил/i,
+      clears: /\b(screenshot|playwright|browser|preview_|headed|claude-in-chrome|computer-use)\b|скрин|браузер/i,
+      advise: 'open a real browser, navigate to the affected screen, screenshot it and LOOK before saying done — tsc/tests prove logic, only the browser proves it looks and behaves right',
+    },
+    gate:
+      'Editing observable UI is complete ONLY after a real browser look (navigate + screenshot + read the ' +
+      'screenshot). Enforced by browser-verify-gate.mjs (Stop hook, wired in ~/.claude/settings.json hooks.Stop ' +
+      'since 2026-07-02): a session that edited UI source but never called a browser tool is blocked once. ' +
+      '"No data / server down" is not an excuse — render the state on a throwaway route and screenshot that. ' +
+      'Rule text: ~/.claude/rules/browser-verification-mandatory.md + docs/BROWSER_VERIFICATION_MANDATORY.md.',
   },
   'tree-not-history': {
     since: '2026-05-29',
@@ -74,7 +109,7 @@ export const REMEDIES = {
   },
   'self-test-blindspot': {
     since: '2026-06-02',
-    mechanism: 'scripts/mutation-test.mjs',
+    mechanism: 'scripts/selftest-reality.mjs',
     family: ['threshold-untested', 'boundary-case-missed', 'near-target-untested', 'happy-path-only'],
     premortem: {
       risk: /\b(self-test|unit test|self-tested|passes|green|tested|covered|all cases)\b/i,
@@ -82,10 +117,10 @@ export const REMEDIES = {
       advise: 'test BOUNDARY/near-target cases, not just convenient ones; back the self-test with mutation-test (kills un-asserted code) + property-test (random inputs surface threshold bugs)',
     },
     gate:
-      'A self-test must cover boundary and near-target cases, not only convenient ones (a kaizen trend at 96→99 ' +
-      'toward 100; a metric exactly at its threshold). Back every self-test with mutation-test (scripts/mutation-test.mjs, ' +
-      'kills code no assertion catches) and property-test (scripts/property-test.mjs, random inputs find the threshold ' +
-      'bug the hand-picked cases miss). Real data surfacing a self-test gap = this class.',
+      'A self-test must actually run and assert (selftest-reality.mjs blocks exit-0-with-no-assertion-output, ' +
+      'the "never ran" fingerprint) AND cover boundary/near-target cases, not only convenient ones. Back it with ' +
+      'mutation-test (scripts/mutation-test.mjs, kills code no assertion catches) and property-test ' +
+      '(scripts/property-test.mjs, random inputs find the threshold bug). Real data surfacing a self-test gap = this class.',
   },
   'scope-narrowed-silently': {
     since: '2026-05-29',
