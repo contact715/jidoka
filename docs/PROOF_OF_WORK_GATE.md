@@ -1,3 +1,20 @@
+---
+status: Active
+version: 1.0.0
+level: L1
+type: core-arch
+owner_role: platform
+parents:
+  - path: docs/NORTH_STAR.md
+    version: 1.0.0
+    relationship: implements
+children: []
+breaking_change_in_v: null
+created: 2026-07-12
+last_validated_against_parents: 2026-07-12
+last_updated: 2026-07-12
+---
+
 # Proof-of-Work Gate — no "done" without something EXECUTED
 
 **Status**: Active (Stop hook, wired 2026-07-12)
@@ -20,8 +37,8 @@ had no caller (which is itself the `orphaned-gate` pattern).
 On every session Stop it scans the transcript's tool uses — what the session **did**, not what
 it **said**:
 
-- The session **edited source code** (`.ts/.tsx/.js/.mjs/.py/.sh/...`; docs, markdown, and
-  JSON/YAML config are deliberately excluded — precision over recall), **and**
+- The session **edited source code** (ts, tsx, js, mjs, py, sh and other executable kinds;
+  docs, markdown, and JSON/YAML config are deliberately excluded — precision over recall), **and**
 - **nothing was executed after the last code edit**: no test / typecheck / build / script run
   via Bash, no browser verification tool
 
