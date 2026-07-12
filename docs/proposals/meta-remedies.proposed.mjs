@@ -115,23 +115,6 @@ export const REMEDIES = {
       'fails the audit when a PreToolUse gate is built but not routed. 25 hook self-tests + the red-team ' +
       'catalog (bash side-channel, sed -i, tee, case-variant) attack it continuously.',
   },
-  'ledger-pollution': {
-    // 2 incidents 2026-06-06, BOTH caught live by meta-honesty (self-confirming rows blocked, then a
-    // same-day recurrence of the telemetry writer). The gate existed and worked — it was only never
-    // registered here, so meta-audit kept escalating the class as ungated. since = the day the gate
-    // demonstrably caught and blocked the incidents.
-    since: '2026-06-06',
-    mechanism: 'scripts/meta-honesty.mjs',
-    family: ['self-confirming-row', 'telemetry-in-ledger', 'garbage-in-ledger'],
-    premortem: {
-      risk: /\b(append|log|write|emit)\b.*\b(meta-mistakes|ledger|run1|run2)\b/i,
-      clears: /\b(claimed|real|caught_by|meta-honesty|separate stream|telemetry file)\b/i,
-      advise: 'the mistake ledger takes only real incidents (class/claimed/real/caught_by); test telemetry goes to its own stream, not meta-mistakes.jsonl',
-    },
-    gate:
-      'A row in meta-mistakes.jsonl must carry claimed/real/caught_by (a real incident), not run1/run2 test ' +
-      'telemetry. meta-honesty flags self-confirming/garbage rows and BLOCKS commit until they are removed or rewritten.',
-  },
   'tree-not-history': {
     since: '2026-05-29',
     mechanism: 'scripts/pre-publish-guard.mjs',

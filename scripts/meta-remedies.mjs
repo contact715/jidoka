@@ -1,18 +1,26 @@
-// PROPOSED meta-remedies.mjs (2026-07-12) — supersedes the 2026-06-06 proposal (which was never
-// applied) and adds two changes on top of it:
-//   1. NEW class 'browser-verification-skipped' — its gate (browser-verify-gate.mjs Stop hook) has
-//      been live since 2026-07-02 but was never registered, so memory-consolidate kept reporting
-//      it as "ungated — live risk".
-//   2. 'declaration-over-implementation' — now ALSO enforced by the proof-of-work-gate Stop hook
-//      (hooks/proof-of-work-gate.mjs, wired in ~/.claude/settings.json hooks.Stop since 2026-07-12):
-//      a session that edited source code but executed nothing after the last edit is blocked once.
-//      Previously the mechanism (proof-gate.mjs) was invocable-only — a paper gate.
+// PROPOSED meta-remedies.mjs (2026-07-12, evening) — supersedes the morning 2026-07-12 proposal
+// (already applied: declaration-over-implementation + browser-verification-skipped are in the live
+// registry). This one adds ONE class:
+//
+//   NEW class 'gate-bypass' (3 incidents: 2026-06-02 Bash side-channel, 2026-06-06 red-team ×2).
+//   The mechanism (policy-enforce-hook.mjs) has been built and red-team-proven since 2026-06-05,
+//   but TWO gaps kept the class open: (a) it was never registered here, and (b) until 2026-07-12
+//   ~/.claude/settings.json routed the hook only on Write|Edit|MultiEdit|NotebookEdit — the Bash
+//   side-channel the hook's own bashWriteTargets() was written to catch never received traffic.
+//   Closed 2026-07-12: hook added to the Bash matcher; gate-audit.mjs verifyPreToolUse() now
+//   mechanically fails when a PreToolUse gate is built but not routed.
+//
+// NOT included here: 'ledger-pollution' (the other ungated recurring class) — a parallel session is
+// building a dedicated mechanism for it right now (scripts/ledger-schema-gate.mjs + CI wiring);
+// registering it with a different mechanism from this session would collide. It gets its own
+// proposal when that gate lands.
 //
 // meta-remedies.mjs is L0 (the gate registry); policy-enforce-hook refuses agent writes to it by
 // design, so this proposal is applied under explicit OWNER approval:
 //
 //     cp docs/proposals/meta-remedies.proposed.mjs scripts/meta-remedies.mjs
-//     node scripts/meta-audit.mjs    # new classes read "gated & holding", not "ungated recurring"
+//     node scripts/meta-audit.mjs    # expect: gate-bypass "GATED — holding"; ledger-pollution still
+//                                    # ungated (exit 1) until its own gate + registration land
 //     node scripts/eval-suite.mjs    # expect green
 
 // Single source of truth for the meta-mistake gate registry.
@@ -81,6 +89,31 @@ export const REMEDIES = {
       'since 2026-07-02): a session that edited UI source but never called a browser tool is blocked once. ' +
       '"No data / server down" is not an excuse — render the state on a throwaway route and screenshot that. ' +
       'Rule text: ~/.claude/rules/browser-verification-mandatory.md + docs/BROWSER_VERIFICATION_MANDATORY.md.',
+  },
+  'gate-bypass': {
+    // 3 incidents: 2026-06-02 (Bash file-writes >>, sed -i, node fs.writeFileSync to L0 paths were
+    // unchecked — side-channel found by self), 2026-06-06 ×2 (red-team: unprotected CONSTITUTION
+    // write + case-variant bypass). The hook logic closed all three attack shapes by 2026-06-05
+    // (25 self-tests, red-team catalog), but the class stayed honestly OPEN until 2026-07-12
+    // because the Bash side-channel was never ROUTED: ~/.claude/settings.json ran the hook only on
+    // Write|Edit|MultiEdit|NotebookEdit. since = 2026-07-12, the day the last channel closed
+    // (hook on the Bash matcher) and routing became mechanically verified (gate-audit
+    // verifyPreToolUse fails on built-but-unrouted PreToolUse gates).
+    since: '2026-07-12',
+    mechanism: 'scripts/policy-enforce-hook.mjs',
+    family: ['l0-write-sidechannel', 'case-variant-bypass', 'protected-path-write', 'hook-built-not-routed'],
+    premortem: {
+      risk: /\b(write|edit|append|sed -i|tee|cp|mv|writeFileSync)\b.*\b(CONSTITUTION|MISSION|NORTH_STAR|\.secrets|\.env|meta-remedies|baseline)\b/i,
+      clears: /\b(policy-enforce|owner-grant|blocked|self-test|PreToolUse)\b/i,
+      advise: 'L0/secret writes go through policy-enforce-hook; agents never write meta-remedies/baselines/secrets, and L0 docs only under an audited owner grant',
+    },
+    gate:
+      'A write to an L0/secret path (Write/Edit OR a Bash side-channel: >, >>, tee, sed -i, cp/mv, ' +
+      'node fs-writers) must be blocked by policy-enforce-hook unless an audited owner grant covers an L0 DOC ' +
+      '(never a secret/registry/.git). Routed in ~/.claude/settings.json PreToolUse on BOTH matchers — ' +
+      'Write|Edit|MultiEdit|NotebookEdit AND Bash (Bash since 2026-07-12); gate-audit.mjs verifyPreToolUse() ' +
+      'fails the audit when a PreToolUse gate is built but not routed. 25 hook self-tests + the red-team ' +
+      'catalog (bash side-channel, sed -i, tee, case-variant) attack it continuously.',
   },
   'tree-not-history': {
     since: '2026-05-29',
