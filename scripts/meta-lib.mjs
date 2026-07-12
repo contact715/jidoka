@@ -59,3 +59,22 @@ export function recurrencesAfter(items, since) {
   if (!since) return [];
   return items.filter(it => it.date > since).sort((a, b) => a.date.localeCompare(b.date));
 }
+
+// ── Ledger row schema (ledger-pollution write-path gate) ─────────────────────
+// A ledger row is a REAL INCIDENT only if it carries all five fields. Telemetry rows
+// ({ts,wave,run1,run2}) leaked into the ledger twice on 2026-06-06 and were only caught
+// downstream by meta-honesty; this schema rejects them AT WRITE TIME (meta-log) and at
+// commit/CI (ledger-schema-gate). One function, shared by both, so the layers can't drift.
+export const LEDGER_REQUIRED = ['date', 'class', 'claimed', 'real', 'caught_by'];
+export function validateLedgerEntry(e) {
+  if (e === null || typeof e !== 'object' || Array.isArray(e)) return ['row is not an object'];
+  const problems = [];
+  for (const k of LEDGER_REQUIRED) {
+    if (!(k in e)) problems.push(`missing required field "${k}"`);
+    else if (typeof e[k] !== 'string' || e[k].trim() === '') problems.push(`field "${k}" must be a non-empty string`);
+  }
+  if (typeof e.date === 'string' && e.date.trim() !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(e.date)) {
+    problems.push(`field "date" must be ISO YYYY-MM-DD (got "${e.date}")`);
+  }
+  return problems;
+}

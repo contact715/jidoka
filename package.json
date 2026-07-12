@@ -73,6 +73,7 @@
 		"trace:reqs": "node scripts/req-trace.mjs",
 		"gate:e2e": "node scripts/e2e-run-gate.mjs",
 		"gate:selftest": "node scripts/selftest-reality.mjs",
+		"gate:ledger-schema": "node scripts/ledger-schema-gate.mjs",
 		"red:team": "node scripts/red-team.mjs",
 		"eval:trajectory": "node scripts/trajectory-eval.mjs",
 		"harvest:prod": "node scripts/prod-harvest.mjs",

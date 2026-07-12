@@ -35,6 +35,11 @@ jobs:
         run: node scripts/meta-audit.mjs || echo "::warning::meta-audit flagged unresolved process debt (advisory, non-blocking — see log above)"
       - name: meta-honesty (ledger signal quality)
         run: node scripts/meta-honesty.mjs
+      # HARD schema gate (2026-W28-G3): every ledger row must carry the full mistake schema
+      # (date/class/claimed/real/caught_by). Catches direct-append side channels that bypass
+      # meta-log — the exact path of the 2026-06-06 ledger-pollution incidents.
+      - name: ledger-schema-gate (ledger rows must carry the full mistake schema)
+        run: npm run gate:ledger-schema
       # ledger-pollution regression (2026-07-04): a judge-calibration/debias run streams
       # position-sensitivity telemetry — it must land in its sidecar, NEVER in the mistake ledger.
       # Prove it: run the debias-writing self-tests, assert the ledger is byte-unchanged, then that

@@ -13,7 +13,7 @@
 
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, basename } from 'node:path';
-import { LEDGER } from './meta-lib.mjs';
+import { LEDGER, validateLedgerEntry } from './meta-lib.mjs';
 
 const [, , cls, claimed, real, caught = 'user'] = process.argv;
 if (!cls || !claimed || !real) {
@@ -24,6 +24,17 @@ if (!cls || !claimed || !real) {
 const date = new Date().toISOString().slice(0, 10);
 const project = basename(process.cwd());
 const entry = { date, class: cls, claimed, real, caught_by: caught, project };
+
+// ledger-pollution write-path guard: a row that does not carry the full mistake schema
+// (date/class/claimed/real/caught_by, all non-empty) is rejected HERE, not caught later
+// by meta-honesty. Telemetry belongs in its own sidecar stream, never in this ledger.
+const problems = validateLedgerEntry(entry);
+if (problems.length) {
+  console.error('meta-log: REJECTED — row violates the ledger schema (ledger-pollution guard):');
+  for (const p of problems) console.error(`  ✗ ${p}`);
+  process.exit(2);
+}
+
 mkdirSync(dirname(LEDGER), { recursive: true });
 appendFileSync(LEDGER, JSON.stringify(entry) + '\n');
 console.log(`logged [${cls}] from project "${project}" → ${LEDGER} — run meta-audit to check for recurrence`);

@@ -43,7 +43,7 @@ Both mechanisms are already **built and proven**:
 
 Both mechanisms are already **built and proven**:
 - `gate-bypass` → `scripts/policy-enforce-hook.mjs` (REUSE, hardened this session). Blocks Write/Edit AND Bash side-channels (`>`, `>>`, `tee`, `sed -i`, `node fs.writeFileSync`, `cp/mv`) to L0/secret paths, case-insensitively; owner-grant for L0 docs is audited and never covers secrets/.git/registries. 25 self-tests including the exact red-team finds (bash side-channel, case-variant).
-- `ledger-pollution` → `scripts/meta-honesty.mjs` (REUSE). Flags self-confirming / garbage ledger rows (rows lacking claimed/real/caught_by) and BLOCKS; it caught both ledger-pollution incidents.
+- `ledger-pollution` → **SUPERSEDED 2026-07-12**: the mechanism is now `scripts/ledger-schema-gate.mjs` (reject-at-write + commit/CI hard-block), not meta-honesty (detect-after). Use the newer entry in `docs/proposals/ledger-pollution-remedy.proposed.md` instead of the snippet below.
 
 ```js
   'gate-bypass': {

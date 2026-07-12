@@ -9,6 +9,16 @@
 # for the full report any time: `node scripts/meta-honesty.mjs`.
 ROOT="$(git rev-parse --show-toplevel)"
 
+# ledger-schema-gate: BLOCKS if any ledger row lacks the mistake schema (date/class/
+# claimed/real/caught_by) — telemetry/garbage is rejected at the ledger, not found later.
+out=$(node "$ROOT/scripts/ledger-schema-gate.mjs" 2>&1); rc=$?
+if [ $rc -ne 0 ]; then
+  echo "$out"
+  echo "✗ pre-commit BLOCKED by ledger-schema-gate (ledger-pollution — see rows above)."
+  exit 1
+fi
+echo "✓ pre-commit · ledger-schema-gate: ledger schema OK"
+
 out=$(node "$ROOT/scripts/meta-honesty.mjs" 2>&1); rc=$?
 if [ $rc -ne 0 ]; then
   echo "$out"

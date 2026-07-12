@@ -33,7 +33,7 @@ const HERE = dirname(dirname(fileURLToPath(import.meta.url))); // framework root
 // GSD with more files). standard = kernel + everyday gates; full = everything.
 export const KERNEL = [
   'meta-lib.mjs', 'meta-remedies.mjs', 'meta-audit.mjs', 'meta-honesty.mjs', 'meta-trend.mjs',
-  'meta-premortem.mjs', 'meta-log.mjs', 'proof-gate.mjs', 'pre-publish-guard.mjs',
+  'meta-premortem.mjs', 'meta-log.mjs', 'ledger-schema-gate.mjs', 'proof-gate.mjs', 'pre-publish-guard.mjs',
   'sandbox-run.mjs', 'run-state.mjs',
   // run-state derives phases from the planner, which routes debate via debate-trigger — both must be
   // in the kernel so even --profile=core is import-closed (no run-state without its planner).
@@ -225,6 +225,7 @@ if (!isGit) {
   // SILENTLY DISABLE the project's own dev-flow — refuse and print the integration steps.
   log(`  \x1b[33m• target already has hooks (${hasHusky ? '.husky' : 'core.hooksPath=' + existingHooksPath}) — NOT overriding (would disable them).`);
   log('    Integrate by adding to the existing pre-commit hook:');
+  log('      node "$(git rev-parse --show-toplevel)/.jidoka/scripts/ledger-schema-gate.mjs" || exit 1');
   log('      node "$(git rev-parse --show-toplevel)/.jidoka/scripts/meta-honesty.mjs" || exit 1');
   log('      node "$(git rev-parse --show-toplevel)/.jidoka/scripts/meta-audit.mjs"   || exit 1');
   log('    and to pre-push: node "$(git rev-parse --show-toplevel)/.jidoka/scripts/pre-publish-guard.mjs" || exit 1');
@@ -234,8 +235,9 @@ if (!isGit) {
 } else {
   mkdirSync(T('.githooks'), { recursive: true });
   const preCommit = `#!/bin/sh
-# jidoka pre-commit — signal honesty + recurrence/regression gate (both pass on empty ledger).
+# jidoka pre-commit — ledger schema + signal honesty + recurrence/regression gate (all pass on empty ledger).
 ROOT="$(git rev-parse --show-toplevel)"
+node "$ROOT/.jidoka/scripts/ledger-schema-gate.mjs" || exit 1
 node "$ROOT/.jidoka/scripts/meta-honesty.mjs" || exit 1
 node "$ROOT/.jidoka/scripts/meta-audit.mjs"   || exit 1
 node "$ROOT/.jidoka/scripts/spec-drift-check.mjs" --root "$ROOT" || exit 1

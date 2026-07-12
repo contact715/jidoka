@@ -16,6 +16,7 @@ export const GATES = [
   // CI — run on every push/PR, hard-block
   { id: 'meta-audit', layer: 'CI', mode: 'hard', token: 'meta-audit.mjs' },
   { id: 'meta-honesty', layer: 'CI', mode: 'hard', token: 'meta-honesty.mjs' },
+  { id: 'ledger-schema-gate', layer: 'CI', mode: 'hard', token: 'gate:ledger-schema' },
   { id: 'test:engine', layer: 'CI', mode: 'hard', token: 'test:engine' },
   { id: 'eval-suite', layer: 'CI', mode: 'hard', token: 'npm run eval' },
   { id: 'check:structural', layer: 'CI', mode: 'hard', token: 'check:structural' },
@@ -107,6 +108,27 @@ export function findOrphanGateScripts(pkg, callersText) {
   });
 }
 
+// PreToolUse gates are "wired" only if the GLOBAL hook config actually routes the right tools
+// through them. Incident 2026-07-12 (gate-bypass): policy-enforce-hook handled Bash side-channels
+// in code (self-tested, red-team-proven) but ~/.claude/settings.json ran it only on Write|Edit —
+// the Bash write channel to L0 paths stayed open for weeks. Same anti-ghost idea as verifyCI:
+// "enforced" must mean a standing caller routes the traffic, not that the logic exists.
+export function verifyPreToolUse(settingsText) {
+  let cfg; try { cfg = JSON.parse(String(settingsText)); } catch { return { checked: false, missing: [] }; }
+  const groups = cfg?.hooks?.PreToolUse;
+  if (!Array.isArray(groups)) return { checked: false, missing: [] };
+  const routed = (tool, token) => groups.some(g => {
+    const m = String(g.matcher ?? '');
+    return (m === '*' || m.split('|').includes(tool)) && (g.hooks || []).some(h => String(h.command || '').includes(token));
+  });
+  const missing = [];
+  for (const tool of ['Write', 'Edit', 'Bash']) {
+    if (!routed(tool, 'policy-enforce-hook')) missing.push(`policy-enforce-hook not routed for ${tool} (the ${tool === 'Bash' ? 'side-channel' : 'write'} path is open)`);
+  }
+  if (!routed('Bash', 'jidoka-guard')) missing.push('jidoka-guard not routed for Bash (secret-guard on push/commit is open)');
+  return { checked: true, missing };
+}
+
 function workflowsText(root = process.cwd()) {
   const dir = join(root, '.github', 'workflows');
   if (!existsSync(dir)) return '';
@@ -132,6 +154,19 @@ function selfTest() {
     ['gate:* called by name (CI/hook) is NOT an orphan', findOrphanGateScripts({ scripts: { 'gate:x': 'node scripts/x.mjs' } }, 'run: npm run gate:x').length === 0],
     ['gate:* whose FILE ships via installer is NOT an orphan', findOrphanGateScripts({ scripts: { 'gate:x': 'node scripts/x.mjs' } }, "payload: 'x.mjs',").length === 0],
     ['no gate:* scripts → no orphans', findOrphanGateScripts({ scripts: { test: 'vitest' } }, '').length === 0],
+    // verifyPreToolUse — the 2026-07-12 gate-bypass incident: hook logic fine, routing absent
+    ['fully-routed PreToolUse config → no missing', verifyPreToolUse(JSON.stringify({ hooks: { PreToolUse: [
+      { matcher: 'Bash', hooks: [{ command: 'jidoka-guard.sh' }, { command: 'node policy-enforce-hook.mjs' }] },
+      { matcher: 'Write|Edit|MultiEdit|NotebookEdit', hooks: [{ command: 'node policy-enforce-hook.mjs' }] },
+    ] } })).missing.length === 0],
+    ['policy-enforce-hook absent from Bash matcher is caught (2026-07-12 incident)', verifyPreToolUse(JSON.stringify({ hooks: { PreToolUse: [
+      { matcher: 'Bash', hooks: [{ command: 'jidoka-guard.sh' }] },
+      { matcher: 'Write|Edit|MultiEdit|NotebookEdit', hooks: [{ command: 'node policy-enforce-hook.mjs' }] },
+    ] } })).missing.some(m => m.includes('policy-enforce-hook not routed for Bash'))],
+    ['a "*" matcher counts as routing every tool', verifyPreToolUse(JSON.stringify({ hooks: { PreToolUse: [
+      { matcher: '*', hooks: [{ command: 'node policy-enforce-hook.mjs' }, { command: 'jidoka-guard.sh' }] },
+    ] } })).missing.length === 0],
+    ['malformed settings → checked:false, not a crash or a false alarm', verifyPreToolUse('{oops').checked === false],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
@@ -175,5 +210,18 @@ if (isMain) {
   const orphans = findOrphanGateScripts(pkg, wf + '\n' + hooksText + '\n' + installerText);
   if (orphans.length) { console.error(`\n\x1b[31m✗ ${orphans.length} gate script(s) built but UNWIRED (no workflow / git-hook caller — an orphan enforces nothing): ${orphans.join(', ')}\x1b[0m`); process.exit(1); }
   console.log('  \x1b[32m✓ every gate:* script has a standing caller (no orphan gate).\x1b[0m');
+  // PreToolUse routing check: only meaningful on a machine with a global hook config (skipped in CI)
+  const settingsPath = join(process.env.HOME || '', '.claude', 'settings.json');
+  if (existsSync(settingsPath)) {
+    const ptu = verifyPreToolUse(readFileSync(settingsPath, 'utf8'));
+    if (ptu.checked && ptu.missing.length) {
+      console.error(`\n\x1b[31m✗ PreToolUse gate(s) built but NOT ROUTED in ~/.claude/settings.json:\x1b[0m`);
+      for (const m of ptu.missing) console.error(`    ${m}`);
+      process.exit(1);
+    }
+    console.log('  \x1b[32m✓ PreToolUse hooks are routed for Write/Edit AND Bash (no unwired side-channel).\x1b[0m');
+  } else {
+    console.log('  \x1b[33mℹ no ~/.claude/settings.json here (CI) — PreToolUse routing not checkable, skipped honestly.\x1b[0m');
+  }
   process.exit(0);
 }
