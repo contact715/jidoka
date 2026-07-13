@@ -72,6 +72,39 @@ export function coverageComplete(coveragePath, readFn = readFileSync, existsFn =
   return { complete, reason: complete ? 'ok' : 'categories still missing/partial' };
 }
 
+// ── JTBD-frame check (W29-R5, idea from JTBD-Mapper — deterministic slice only, NO LLM judge) ──
+// The 'problem' answer should frame a JOB-TO-BE-DONE as an outcome — canonically "When [situation],
+// I want [motivation], so that [outcome]" — not name a solution ("нужна кнопка экспорта"). A job
+// framed as situation→outcome converts cleanly into an EARS acceptance criterion; a solution noun
+// does not. jtbdFrame reports which of the three slots the answer is missing. Language-tolerant
+// (RU + EN). Advisory only (this gate is a forcing function, not proof) — same posture as the
+// clarify-question-quality WARN. Partial mechanical antidote to reactive-literal-execution.
+// NOTE: no \b word boundaries — JS \b is ASCII-only and does NOT fire around Cyrillic letters, so
+// \bхочу would never match. The markers are distinctive enough that plain substring (case-insensitive)
+// matching is safe for an advisory check.
+const JTBD_SLOTS = {
+  situation: /(когда|в ситуац|в случае|в момент|when |whenever)/i,
+  motivation: /(хочу|хочет|хотел|нужно|нужен|нужна|need|want|so i can)/i,
+  outcome: /(чтобы|для того|ради того|so that|so-that|in order to|в результате)/i,
+};
+export function jtbdFrame(text = '') {
+  const t = String(text);
+  const missing = Object.keys(JTBD_SLOTS).filter((slot) => !JTBD_SLOTS[slot].test(t));
+  return { framed: missing.length === 0, missing };
+}
+
+// Warnings for a coverage object: the high-impact 'problem' answer must carry the JTBD frame.
+export function jtbdCoverage(cov) {
+  const cats = cov?.categories || {};
+  const warns = [];
+  const problem = cats.problem;
+  if (problem && (problem.state === 'clear' || problem.state === 'partial') && problem.answer) {
+    const f = jtbdFrame(problem.answer);
+    if (!f.framed) warns.push(`problem answer is not framed as a job-to-be-done (missing: ${f.missing.join(', ')}) — restate as "When <situation>, I want <motivation>, so that <outcome>"`);
+  }
+  return warns;
+}
+
 function recentTrace(feature, windowMs) {
   const LOG = 'docs/audits/clarify-runs.jsonl';
   if (!existsSync(LOG)) return false;
@@ -110,9 +143,17 @@ function main() {
   const failures = [];
   for (const spec of specs) {
     const feature = featureFromSpecPath(spec);
-    const cov = coverageComplete(`docs/audits/clarify/${feature}.json`);
+    const covPath = `docs/audits/clarify/${feature}.json`;
+    const cov = coverageComplete(covPath);
     const fresh = recentTrace(feature, windowMs);
     if (!cov.complete || !fresh) failures.push({ spec, feature, why: !cov.complete ? cov.reason : `no clarify run within ${since}` });
+
+    // JTBD-frame WARN (2026-W29-R5): the job-to-be-done answer should be framed as an outcome, not a
+    // solution. Advisory — never blocks, like the question-quality WARN above.
+    try {
+      const covObj = JSON.parse(readFileSync(covPath, 'utf8'));
+      for (const w of jtbdCoverage(covObj)) console.warn(`  ⚠ jtbd-frame ${feature}: ${w}`);
+    } catch { /* best-effort — jtbd-frame is advisory */ }
 
     // Question-quality WARN (2026-W27): screen the spec's own recorded clarification questions
     // for interviewer-errors (leading / double-barrelled / hypothetical / …). Never blocks.
@@ -161,6 +202,15 @@ function selfTest() {
   ok(!coverageComplete('x', rd(part), () => true).complete, 'a missing category → incomplete');
   ok(!coverageComplete('x', rd(defNoReason), () => true).complete, 'deferred without reason → incomplete');
   ok(!coverageComplete('x', () => '', () => false).complete, 'no coverage file → incomplete');
+
+  // JTBD-frame (W29-R5)
+  ok(jtbdFrame('Когда менеджер закрывает сделку, он хочет отчёт, чтобы увидеть маржу').framed, 'RU situation+motivation+outcome → framed');
+  ok(jtbdFrame('When a rep closes a deal, they want a report so that margin is visible').framed, 'EN situation+motivation+outcome → framed');
+  ok(!jtbdFrame('нужна кнопка экспорта в PDF').framed, 'bare solution noun → not framed');
+  ok(jtbdFrame('нужна кнопка экспорта').missing.includes('situation') && jtbdFrame('нужна кнопка экспорта').missing.includes('outcome'), 'solution noun is missing situation + outcome slots');
+  ok(jtbdCoverage({ categories: { problem: { state: 'clear', answer: 'просто фича без рамки' } } }).length === 1, 'jtbdCoverage warns on an unframed clear problem answer');
+  ok(jtbdCoverage({ categories: { problem: { state: 'clear', answer: 'Когда X, я хочу Y, чтобы Z' } } }).length === 0, 'jtbdCoverage silent on a framed answer');
+  ok(jtbdCoverage({ categories: { problem: { state: 'missing', answer: '' } } }).length === 0, 'jtbdCoverage skips a missing/unanswered problem (no false warn)');
 
   console.log(fail === 0 ? '\nclarify-gate: all self-tests passed' : `\nclarify-gate: ${fail} self-test(s) FAILED`);
   process.exit(fail === 0 ? 0 : 1);
