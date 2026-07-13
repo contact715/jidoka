@@ -83,12 +83,31 @@ export function nearestDuplicate(record, existingItems = [], threshold = 0.6) {
 }
 
 /**
+ * Merge gain (W29-R4, mem0 UPDATE branch): when the newcomer overlaps an existing item, is it a
+ * near-identical DUP (append = bloat) or a richer SUPERSET (the newcomer covers what the existing
+ * says AND adds materially new content)? Returns { coversExisting, newFraction } as token fractions.
+ * coversExisting = share of the existing item's tokens present in the newcomer; newFraction = share
+ * of the newcomer's tokens absent from the existing item. Pure.
+ */
+export function mergeGain(record, existingItem) {
+  const nu = new Set(tokenize(`${record.title} ${record.text}`));
+  const ex = new Set(tokenize(`${existingItem?.title ?? ''} ${existingItem?.text ?? ''}`));
+  if (nu.size === 0 || ex.size === 0) return { coversExisting: 0, newFraction: 0 };
+  let covered = 0; for (const t of ex) if (nu.has(t)) covered++;
+  let fresh = 0; for (const t of nu) if (!ex.has(t)) fresh++;
+  return { coversExisting: covered / ex.size, newFraction: fresh / nu.size };
+}
+
+/**
  * The admit decision. Pure — the gate is the admitter, structurally separate from record.author.
- * @returns {{admit:boolean, reason:string, verdict:string|null, duplicateOf?:string}}
+ * @returns {{admit:boolean, reason:string, verdict:string|null, duplicateOf?:string, merge?:boolean, mergeInto?:string}}
  */
 export function judgeMemoryWrite(record, existingItems = [], opts = {}) {
   const admitter = opts.admitter || ADMITTER;
   const threshold = opts.threshold ?? 0.6;
+  // A superset must cover most of the existing item AND add materially new content.
+  const coverMin = opts.mergeCoverMin ?? 0.7;
+  const freshMin = opts.mergeFreshMin ?? 0.25;
   const verdict = record.verdict && VERDICTS.has(record.verdict) ? record.verdict : null;
 
   if (!verdict) return { admit: false, reason: 'no verdict (shared|private|discard) — default reject', verdict: null };
@@ -98,6 +117,23 @@ export function judgeMemoryWrite(record, existingItems = [], opts = {}) {
     return { admit: false, reason: `author == admitter (${admitter}) — self-admission blocked (author ≠ judge)`, verdict };
 
   if (verdict === 'shared') {
+    // Third verdict (mem0 UPDATE) FIRST: a richer superset is neither appended (bloat) nor discarded
+    // (lossy) — it signals a consolidation: rewrite the existing item into the superset (an
+    // edit-in-context with a user-reviewable diff, MEMORY_MERGE step 5.5). The superset check is
+    // coverage-based, NOT the TF-IDF ratio gate: a rich superset dilutes its own overlap ratio below
+    // threshold (the extra content lowers the normalised score), so nearestDuplicate would miss it.
+    let sup = null;
+    for (const it of existingItems) {
+      const g = mergeGain(record, it);
+      if (g.coversExisting >= coverMin && g.newFraction >= freshMin && (!sup || g.coversExisting > sup.g.coversExisting)) {
+        sup = { it, g };
+      }
+    }
+    if (sup) {
+      const into = sup.it.title || sup.it.id || '(existing)';
+      return { admit: false, merge: true, mergeInto: into, verdict,
+        reason: `richer superset of "${into}" (covers ${sup.g.coversExisting.toFixed(2)}, adds ${sup.g.newFraction.toFixed(2)} new) — UPDATE: rewrite existing into the consolidated superset, do not append (bloat) or discard (lossy)` };
+    }
     const dup = nearestDuplicate(record, existingItems, threshold);
     if (dup) return { admit: false, reason: `near-duplicate of "${dup.dupOf}" (overlap ${dup.ratio.toFixed(2)} ≥ ${threshold}) — addition is not free`, verdict, duplicateOf: dup.dupOf };
   }
@@ -152,6 +188,18 @@ function selfTest() {
   ok('ADMIT: novel shared lesson, real author, not a dup', judgeMemoryWrite({ author: 'extract-retro', verdict: 'shared', title: 'flaky-timeout', text: 'integration test flakes on a 200ms network timeout under load' }, existing).admit === true);
   // ADMIT — private memory skips the dedup gate.
   ok('ADMIT: private lesson (no dedup gate)', judgeMemoryWrite({ author: 'extract-retro', verdict: 'private', title: 'secret-leak', text: 'git history still leaked private tokens before publish' }, existing).admit === true);
+
+  // Rule 6 (W29-R4) — a richer SUPERSET of an existing item is a MERGE, not a plain block.
+  const superset = judgeMemoryWrite({ author: 'extract-retro', verdict: 'shared', title: 'secret-leak',
+    text: 'git history still leaked private tokens before publish; the fix is to scan the full git history with pre-publish-guard and rotate any exposed credential immediately before pushing' }, existing);
+  ok('MERGE: richer superset of existing → merge:true, not a plain block', superset.admit === false && superset.merge === true && superset.mergeInto === 'secret-leak');
+  ok('MERGE: a near-identical dup stays a plain block (not a merge)',
+    judgeMemoryWrite({ author: 'extract-retro', verdict: 'shared', title: 'secret-leak', text: 'git history still leaked private tokens before publish' }, existing).merge === undefined);
+  // mergeGain math
+  ok('mergeGain: superset covers existing and adds new tokens',
+    (() => { const g = mergeGain({ title: 'x', text: 'alpha beta gamma delta epsilon' }, { title: 'x', text: 'alpha beta' }); return g.coversExisting === 1 && g.newFraction > 0.4; })());
+  ok('mergeGain: near-identical → high cover, ~zero fresh',
+    (() => { const g = mergeGain({ title: 'x', text: 'alpha beta gamma' }, { title: 'x', text: 'alpha beta gamma' }); return g.coversExisting === 1 && g.newFraction === 0; })());
 
   ok('nearestDuplicate finds the twin', nearestDuplicate({ title: 'secret-leak', text: 'git history leaked private tokens before publish' }, existing)?.dupOf === 'secret-leak');
   ok('nearestDuplicate returns null for a novel record', nearestDuplicate({ title: 'zzz', text: 'completely orthogonal quantum zebra content' }, existing) === null);
