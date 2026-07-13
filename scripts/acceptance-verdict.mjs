@@ -23,27 +23,61 @@
 //   node scripts/acceptance-verdict.mjs <wave>            # uses docs/runs/<wave>/acceptance.json
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { execSync } from 'node:child_process';
+// REUSE the EARS/AC label primitives (do not reimplement the parser). ac-coverage-check owns the
+// "AC label -> test" axis; this script adds the complementary "declared AC -> proof present" axis.
+import { extractAcLabels, testReferencesLabel } from './ac-coverage-check.mjs';
+
+// ── AC-completeness (W29-R1) ───────────────────────────────────────
+// The gap: buildVerdict only ever runs the ACs LISTED in acceptance.json. If the spec DECLARES an
+// acceptance criterion (an EARS/AC label) but it is silently dropped from acceptance.json, every
+// remaining proof exits 0 and the verdict is green — declaration-over-implementation at the verdict
+// layer. completenessGaps returns the declared labels that have NO matching proof in acs[]: a label
+// is "covered" when it appears (as a token: AC-x, [x], EARS-3) in an AC's id or note. Pure + injectable.
+export function completenessGaps(declaredLabels, acs) {
+  const list = Array.isArray(acs) ? acs : [];
+  const decl = Array.isArray(declaredLabels) ? [...new Set(declaredLabels)] : [];
+  return decl.filter(label => !list.some(ac => testReferencesLabel(`${ac?.id ?? ''} ${ac?.note ?? ''}`, label)));
+}
 
 // ── pure core ──────────────────────────────────────────────────────
 // Build a verdict from a list of ACs and an injectable runner (command -> { exitCode, output }).
-// `now` is injected so the verdict is deterministic in tests.
+// `now` is injected so the verdict is deterministic in tests. `spec.declaredAcs` (optional) is the
+// set of AC labels the SPEC declares must be proven; any declared label with no matching proof in
+// acs[] forces pass=false (recorded as verdict.missingDeclaredAcs) — a wave cannot go green while a
+// declared criterion is silently absent from the evidence set.
 export function buildVerdict(wave, spec, runner, now) {
   const acs = Array.isArray(spec?.acs) ? spec.acs : [];
   const results = acs.map(ac => {
     const r = runner(ac.command) || { exitCode: 1, output: 'runner returned nothing' };
     return { id: ac.id ?? '?', command: ac.command ?? '', exitCode: r.exitCode, executedAt: now, output: String(r.output ?? '').slice(-1500) };
   });
+  const missingDeclaredAcs = completenessGaps(spec?.declaredAcs, acs);
   let pass;
   if (results.length === 0) {
     pass = spec?.allowEmpty === true && typeof spec?.emptyJustification === 'string' && spec.emptyJustification.length > 0;
   } else {
     pass = results.every(r => r.exitCode === 0);
   }
+  if (missingDeclaredAcs.length > 0) pass = false; // declared-but-unproven AC blocks the verdict
   const verdict = { wave, pass, acs: results, producedBy: 'acceptance-verdict', executedAt: now };
+  if (missingDeclaredAcs.length > 0) verdict.missingDeclaredAcs = missingDeclaredAcs;
   if (results.length === 0 && spec?.allowEmpty) verdict.emptyJustification = spec.emptyJustification;
   return verdict;
+}
+
+// Load the AC labels DECLARED in a wave's spec file(s). acceptance.json may carry
+// `specPath` (string) or `specPaths` (string[]) — the spec(s) its ACs are derived from. Returns the
+// deduped label set; missing/unreadable files are skipped (the check simply has nothing to enforce).
+export function loadDeclaredAcs(root, spec) {
+  const paths = spec?.specPaths ?? (spec?.specPath ? [spec.specPath] : []);
+  const labels = new Set();
+  for (const p of paths) {
+    try { for (const l of extractAcLabels(readFileSync(resolve(root, p), 'utf8'))) labels.add(l); }
+    catch { /* unreadable spec → nothing to enforce from it */ }
+  }
+  return [...labels];
 }
 
 // ── real shell runner ──────────────────────────────────────────────
@@ -86,6 +120,20 @@ function selfTest() {
   ok('output is truncated to a tail, not unbounded', buildVerdict('wv', { acs: [{ id: 'A', command: 'true' }] }, () => ({ exitCode: 0, output: 'x'.repeat(5000) }), now).acs[0].output.length === 1500);
   ok('deterministic executedAt from injected now', allGreen.executedAt === now && allGreen.acs[0].executedAt === now);
 
+  // ── AC-completeness (W29-R1): a declared AC absent from the proof set blocks a green verdict ──
+  ok('completenessGaps: declared label with a matching AC id → no gap',
+    completenessGaps(['EARS-3'], [{ id: 'EARS-3', command: 'true' }]).length === 0);
+  ok('completenessGaps: declared label matched via note token → no gap',
+    completenessGaps(['A1'], [{ id: 'AC2', command: 'true', note: 'covers AC-A1' }]).length === 0);
+  ok('completenessGaps: declared label with NO matching proof → reported as a gap',
+    JSON.stringify(completenessGaps(['EARS-3', 'A1'], [{ id: 'A1', command: 'true' }])) === '["EARS-3"]');
+  const dropped = buildVerdict('wv', { acs: [{ id: 'A1', command: 'true' }], declaredAcs: ['A1', 'EARS-9'] }, runner, now);
+  ok('all proofs green BUT a declared AC is silently dropped → pass false', dropped.pass === false);
+  ok('dropped declared AC is named in verdict.missingDeclaredAcs', JSON.stringify(dropped.missingDeclaredAcs) === '["EARS-9"]');
+  const fullyCovered = buildVerdict('wv', { acs: [{ id: 'A1', command: 'true' }, { id: 'EARS-9', command: 'true x' }], declaredAcs: ['A1', 'EARS-9'] }, runner, now);
+  ok('every declared AC has a green proof → pass true, no missing list', fullyCovered.pass === true && fullyCovered.missingDeclaredAcs === undefined);
+  ok('no declaredAcs field → completeness is a no-op (back-compat)', buildVerdict('wv', { acs: [{ id: 'A', command: 'true' }] }, runner, now).pass === true);
+
   // real runner smoke: a true/false command actually round-trips through the shell
   const real = shellRunner(process.cwd());
   ok('real runner: `true` → exit 0', real('true').exitCode === 0);
@@ -116,12 +164,20 @@ if (isMain) {
   try { spec = JSON.parse(readFileSync(accFile, 'utf8')); }
   catch (e) { console.error(`✗ ${wave}: acceptance.json is not valid JSON — ${e.message}`); process.exit(1); }
 
+  // W29-R1: pull the AC labels the spec DECLARES (from spec.specPath[s]) so a declared-but-dropped
+  // criterion cannot pass. When no specPath is declared this is a no-op — additive, never retroactive.
+  const declaredAcs = loadDeclaredAcs(ROOT, spec);
+  if (declaredAcs.length > 0) console.log(`  · completeness: ${declaredAcs.length} AC label(s) declared in spec — checking all are proven`);
+
   console.log(`▶ acceptance-verdict ${wave}: re-running ${spec.acs?.length ?? 0} proof command(s) in a fresh check…`);
-  const verdict = buildVerdict(wave, spec, shellRunner(ROOT), new Date().toISOString());
+  const verdict = buildVerdict(wave, { ...spec, declaredAcs }, shellRunner(ROOT), new Date().toISOString());
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'verdict.json'), JSON.stringify(verdict, null, 2) + '\n');
 
   for (const ac of verdict.acs) console.log(`  ${ac.exitCode === 0 ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${ac.id} · exit ${ac.exitCode} · ${ac.command}`);
+  if (verdict.missingDeclaredAcs?.length) {
+    console.log(`  \x1b[31m✗ declared but NOT proven: ${verdict.missingDeclaredAcs.join(', ')}\x1b[0m — add a proof command for each, or the wave stays open.`);
+  }
   if (verdict.pass) {
     console.log(`\n\x1b[32m✓ ${wave}: PASS — verdict.json written. The wave may now be closed.\x1b[0m`);
     process.exit(0);
