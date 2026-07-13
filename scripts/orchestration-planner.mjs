@@ -18,6 +18,7 @@
 import { shouldDebate } from './debate-trigger.mjs';
 import { planN } from './adaptive-verify.mjs';
 import { scheduleDAG } from './dag-schedule.mjs';
+import { replan as replanLedger } from './replan-ledger.mjs';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -126,6 +127,21 @@ export function plan(task = {}) {
   if (has('deploy') || task.deploy) phases.push({ phase: 'launch', agents: ['devops-lead', 'release-engineer'] });
   phases.push({ phase: 'memory', agents: ['skill-extractor', 'data-analyst', 'kaizen-officer'] });
   return { task, phases: enrichPhases(phases), postWaveEval: POST_WAVE_EVAL };
+}
+
+// replanPhase (W29-R3) — the runtime recovery step the static plan() cannot express. When a build
+// stalls (stuck-detector.detect trips) or the wave's core property shows scaffold-substitution, feed
+// the wave ledger + diagnosis here: the two-registry controller (replan-ledger) decides halt vs
+// re-plan, and on 'replan' the new step list is re-scheduled through the SAME scheduleDAG the static
+// plan uses — so recovery inherits critical-path ordering for free. This is the live caller that
+// keeps replan-ledger wired (never an orphan gate).
+export function replanPhase(ledger, diagnosis = {}, evidenceText = '') {
+  const decision = replanLedger(ledger, diagnosis, evidenceText);
+  if (decision.action === 'replan') {
+    const nodes = decision.plan.map((step, i) => ({ id: step, dependsOn: i === 0 ? [] : [decision.plan[i - 1]] }));
+    return { ...decision, schedule: scheduleDAG(nodes) };
+  }
+  return decision;
 }
 
 const agentsIn = (g) => new Set(g.phases.flatMap(p => p.agents));

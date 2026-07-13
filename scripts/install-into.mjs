@@ -41,6 +41,9 @@ export const KERNEL = [
   // dag-schedule — orchestration-planner (KERNEL) imports it for the build-phase task DAG; a leaf
   // (no relative imports) so core stays import-closed. (2026-W27 rank 5.)
   'dag-schedule.mjs',
+  // replan-ledger — orchestration-planner (KERNEL) imports it for replanPhase (runtime stall/core-
+  // property recovery). A leaf (node builtins only) so core stays import-closed. (2026-W29 R3.)
+  'replan-ledger.mjs',
 ];
 const COMMON = [ // standard adds the everyday gates
   'northstar-check.mjs', 'charter-check.mjs', 'kaizen-loop.mjs', 'spec-drift-check.mjs',
