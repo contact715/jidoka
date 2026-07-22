@@ -30,6 +30,19 @@ The pipeline counterpart lives in the dev-pipeline skill (communication callout 
 
 Communication quality depends on context quality. Before designing or coding in any spec-carrying repo, the worker reads the ancestry chain of the touched area (L0 mission → L1 architecture → L2 domain → L3 module → L4 wave) via `scripts/get-spec-context.mjs --feature <x>` or the `parents[]` frontmatter. A wave implemented from its L4 spec alone loses the meaning that lives up the chain. Binding rule recorded in `HIERARCHICAL_SPEC_SYSTEM.md` §3 and the dev-pipeline skill. Set by the user on 2026-06-05.
 
+## Messages to clients — simple, warm, in the user's own voice (set 2026-07-22)
+
+When drafting ANY message the user will send to a client, partner, or other outside person (Telegram, WhatsApp, email), write it so it reads like the USER wrote it himself, for a non-technical reader:
+
+- Plain everyday language, zero unexplained technical terms. If a service or account must be named, explain in one line what it is and why it matters to the recipient.
+- Friendly and warm, like writing to a person you know. Short sentences, natural flow, no corporate tone.
+- No bold headers, no tidy parallel structure, no formatted-document look. A simple numbered list of actions is fine.
+- Every ask is concrete and doable by a non-technical person: which site, which button, what it costs, how long it takes, and why.
+- Urgency is stated directly but kindly, never with pressure or guilt.
+- Match the user's own chat style — the recipient should not sense an AI wrote it.
+
+Origin: Career Reset 2026-07-22 — a request list for the client sat unanswered for a month because it was written in technical language she could not parse. Active-enforcement twin: `~/.claude/CLAUDE.md` §"Messages to CLIENTS".
+
 ## Where this is enforced
 
 - Active enforcement, every session and every project: `~/.claude/CLAUDE.md` (loaded globally).
