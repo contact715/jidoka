@@ -115,6 +115,30 @@ export const REMEDIES = {
       'fails the audit when a PreToolUse gate is built but not routed. 25 hook self-tests + the red-team ' +
       'catalog (bash side-channel, sed -i, tee, case-variant) attack it continuously.',
   },
+  'ledger-pollution': {
+    // 2× on 2026-06-06 (meta-mistakes.jsonl carried 8 wave-judge-debias/telemetry rows with no
+    // claimed/real/caught_by — meta-honesty flagged them self-confirming and BLOCKED; a same-day
+    // recurrence proved the writer was still appending run1/run2 telemetry into the mistake ledger).
+    // The header comment (2026-07-12) deferred registration because a parallel session was still
+    // building the mechanism and a different-mechanism entry would collide. The mechanism landed and
+    // was wired that day: ledger-schema-gate.mjs validateLedgerEntry() is called on the write path in
+    // meta-log.mjs AND run in .githooks/pre-commit; gate-audit.mjs treats it as a real gate (no orphan).
+    // since = 2026-07-12, the day the gate went live and routing became mechanically verified.
+    since: '2026-07-12',
+    mechanism: 'scripts/ledger-schema-gate.mjs',
+    family: ['telemetry-row-in-ledger', 'self-confirming-ledger-row', 'ledger-schema-missing-fields'],
+    premortem: {
+      risk: /\b(meta-mistakes|meta-log|ledger|jsonl|telemetry|run1|run2|append(ed|ing)?)\b/i,
+      clears: /\b(claimed|real|caught_by|validateLedgerEntry|ledger-schema-gate|schema)\b/i,
+      advise: 'every meta-mistakes.jsonl row needs claimed/real/caught_by; telemetry/measurement rows go to their own file, never the mistake ledger — the write path runs validateLedgerEntry',
+    },
+    gate:
+      'Every row appended to meta-mistakes.jsonl MUST carry claimed/real/caught_by fields describing a real ' +
+      'logged mistake; telemetry/measurement rows (judge-debias run1/run2, position-sensitivity, test signals) ' +
+      'are rejected and routed to their own file. Enforced by ledger-schema-gate.mjs validateLedgerEntry(): ' +
+      'called on the write path in scripts/meta-log.mjs and run in .githooks/pre-commit; gate-audit.mjs confirms ' +
+      'it is wired (not an orphan). Self-confirming or schema-incomplete rows never enter the learning signal.',
+  },
   'tree-not-history': {
     since: '2026-05-29',
     mechanism: 'scripts/pre-publish-guard.mjs',
