@@ -151,8 +151,19 @@ async function stop(payload) {
 
   const sessionId = payload.session_id || path.basename(transcriptPath);
   const markerDir = path.join(os.tmpdir(), "outbound-claims-gate");
-  const marker = path.join(markerDir, `${sessionId}.fired`);
-  if (fs.existsSync(marker)) process.exit(0);
+  const marker = path.join(markerDir, `${sessionId}.json`);
+
+  // Book-keeping is per ADDRESS, not per session. A once-per-session gate lets the
+  // SECOND invented address sail through — which is exactly what happened on
+  // 2026-07-24: the gate fired on mosco.ai/auth/thumbtack/callback, then stayed silent
+  // when `staging.mosco.ai` was invented two turns later. Each new fabricated address
+  // gets its own block; ones already reported stay quiet so the gate cannot loop.
+  let reported = new Set();
+  try {
+    reported = new Set(JSON.parse(fs.readFileSync(marker, "utf8")).reported || []);
+  } catch {
+    /* first run this session */
+  }
 
   const text = collectAssistantText(transcriptPath);
   if (!text.trim()) process.exit(0);
@@ -161,14 +172,17 @@ async function stop(payload) {
   if (!verdict || verdict.ok) process.exit(0);
 
   // Drop the ones this very message already disclosed as dead — reporting a broken
-  // address is the fix, not the defect.
-  const asserted = verdict.dead.filter((d) => !isReportedAsDead(text, d.value));
+  // address is the fix, not the defect — and the ones already blocked on earlier.
+  const asserted = verdict.dead.filter(
+    (d) => !isReportedAsDead(text, d.value) && !reported.has(d.value)
+  );
   if (!asserted.length) process.exit(0);
   verdict.dead = asserted;
 
   try {
     fs.mkdirSync(markerDir, { recursive: true });
-    fs.writeFileSync(marker, new Date().toISOString());
+    for (const d of asserted) reported.add(d.value);
+    fs.writeFileSync(marker, JSON.stringify({ reported: [...reported] }));
   } catch {
     process.exit(0);
   }
