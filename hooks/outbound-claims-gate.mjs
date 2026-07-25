@@ -96,6 +96,26 @@ async function runVerifier(text, ownedOnly) {
   }
 }
 
+/**
+ * An address REPORTED as dead is not a fabricated claim — it is the correction itself.
+ * Without this, the Stop mode fires on the very message that says "this address does not
+ * exist", which is exactly the honest behaviour we want to encourage. (Found on the gate's
+ * first live firing, 2026-07-24: it flagged the message that disclosed both dead hosts.)
+ */
+const DEAD_MARKER =
+  /(404|410|does not exist|doesn't exist|no DNS|dead|DEAD|invented|fabricat|не существу|несуществ|мёртв|мертв|выдум|не поднят|отсутству|нет DNS|не резолв)/i;
+
+function isReportedAsDead(text, value) {
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].includes(value)) continue;
+    // The verdict often sits on the neighbouring line (a table row, a bullet, a note).
+    const context = [lines[i - 1] || "", lines[i], lines[i + 1] || "", lines[i + 2] || ""].join(" ");
+    if (!DEAD_MARKER.test(context)) return false; // at least one bare mention → still a claim
+  }
+  return true;
+}
+
 function describe(dead) {
   return dead
     .map((d) => `  - ${d.value}\n      ${d.notes.filter(Boolean).join("\n      ")}`)
@@ -139,6 +159,12 @@ async function stop(payload) {
 
   const verdict = await runVerifier(text, true);
   if (!verdict || verdict.ok) process.exit(0);
+
+  // Drop the ones this very message already disclosed as dead — reporting a broken
+  // address is the fix, not the defect.
+  const asserted = verdict.dead.filter((d) => !isReportedAsDead(text, d.value));
+  if (!asserted.length) process.exit(0);
+  verdict.dead = asserted;
 
   try {
     fs.mkdirSync(markerDir, { recursive: true });
