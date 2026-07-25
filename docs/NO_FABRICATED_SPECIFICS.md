@@ -90,6 +90,14 @@ fail — a flaky link must not block honest work.
 Fail-open throughout: missing verifier, no transcript, no network → exit 0. The Stop mode
 checks owned domains only, so quoting third-party links in chat stays quiet.
 
+**One refinement, found on the gate's first live firing:** it blocked the very message that
+honestly disclosed both dead hosts. An address *reported as dead* is the correction, not the
+defect. Stop mode now drops a finding when **every** mention of that address sits next to a
+dead-marker (`404`, `no DNS`, "does not exist", "выдуман", "не поднят", …). A single bare
+mention re-arms the block, so "admit it's dead, then put it in the form anyway" still fails.
+PreToolUse is deliberately untouched: a dead address never leaves the machine, framed
+however.
+
 Owned domains: `~/.claude/owned-domains.json` (plain array). A domain absent from that list
 is not policed as ours — keep it current when a product gets a new domain.
 
