@@ -51,6 +51,14 @@ function collectStrings(node, out, depth = 0) {
   for (const v of Array.isArray(node) ? node : Object.values(node)) collectStrings(v, out, depth + 1);
 }
 
+/**
+ * Assistant text written in the CURRENT turn — everything after the last user message.
+ *
+ * Scoping matters. Scanning the whole transcript makes the gate re-litigate addresses
+ * that were already disclosed and corrected turns ago, and a session resume drops the
+ * "already reported" marker so they resurface as if new. The question this gate asks is
+ * "did I just state an invented address", so only the newest output can answer it.
+ */
 function collectAssistantText(transcriptPath) {
   let lines = [];
   try {
@@ -58,14 +66,27 @@ function collectAssistantText(transcriptPath) {
   } catch {
     return "";
   }
-  const chunks = [];
+
+  const parsed = [];
   for (const line of lines) {
-    let obj;
     try {
-      obj = JSON.parse(line);
+      parsed.push(JSON.parse(line));
     } catch {
-      continue;
+      /* skip unparseable line */
     }
+  }
+
+  let start = 0;
+  for (let i = parsed.length - 1; i >= 0; i--) {
+    const role = parsed[i] && parsed[i].message && parsed[i].message.role;
+    if (role === "user") {
+      start = i + 1;
+      break;
+    }
+  }
+
+  const chunks = [];
+  for (const obj of parsed.slice(start)) {
     const msg = obj && obj.message;
     if (!msg || msg.role !== "assistant") continue;
     const content = msg.content;
