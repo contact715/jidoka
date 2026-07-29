@@ -84,3 +84,25 @@ During ANY multi-step task (3+ steps — not only formal dev-pipeline waves), EV
 **`Пайплайн [2/4]: диагноз ✓ → правка ● → проверка → пуш`**
 
 ✓ = done, ● = current; stage names in plain Russian, derived from the ACTUAL plan of this task. When a formal dev-pipeline wave runs, phases come from the SAME plan as run-state.mjs (discovery | spec | tests | build | gate | debug | memory) — single source of truth; if the planner trimmed the graph, show only the planned phases. The progress bar (section above) tracks steps INSIDE a stage and appears at completed milestones; this line tracks the stage among all and appears at the TOP of every response. Single-step / conversational replies are exempt. Set 2026-06-05; strengthened the same day after the owner observed zero sessions doing it. Mirrors `~/.claude/CLAUDE.md`.
+
+## The humanizer pass is an ACTION, not a memory (set 2026-07-28)
+
+Every human-facing text runs through `Skill "humanizer"` **before** it is sent or published.
+Every time, including short texts and including a recurring format you have already sent
+many times. Knowing the anti-AI rules and running the pass are two different things, and it
+is the pass that catches what memory skipped.
+
+**"The previous version had it, so keep it for consistency" is not a valid exemption.** This
+is the rationalization that defeats the rule from the inside: the format is judged against
+yesterday's artifact instead of against the rule, and one override quietly becomes the new
+default. When an old artifact violates the rule, the correct move is to fix the old artifact,
+not to inherit the violation.
+
+Origin: Project 192, 2026-07-28. Em dashes went into a published channel post because the
+previous day's post had them and I decided consistency outweighed the rule. The owner caught
+it: «убери аи паттерны с текста, и всегда прогоняй через хуманайзер, человек никогда не
+ставит такие длинные тире». Four published posts were then cleaned. Class in the meta-ledger:
+`anti-ai-rule-overridden-for-consistency`.
+
+Concrete for Russian text: no em dash (—) and no en dash (–). Labelled list items take a
+colon («Завтрак: овсянка»), numeric ranges take a hyphen («45-60 минут»).
