@@ -256,6 +256,20 @@ function main() {
     const title = extractTitle(content) ?? relPath;
     const nodeId = sanitiseNodeId(relPath);
 
+    // Проза — не сломанная спека, а просто не спека.
+    //
+    // 2026-07-29: любой файл в docs/ становился узлом дерева спек, поэтому
+    // каждый новый справочник (руководство, разбор, памятка) прибавлял по
+    // сироте и по «нет метаданных» — и собственный структурный гейт
+    // блокировал пуш за то, что фреймворк пополнил свою документацию.
+    // Под docs/specs/ правило прежнее: там отсутствие метаданных — дефект.
+    // Снаружи узлом становится только файл с признаком спеки: блок YAML с
+    // level, version или parents.
+    const подСпеками = relPath.startsWith(`docs${path.sep}specs${path.sep}`)
+      || relPath.startsWith('docs/specs/');
+    const естьПризнакСпеки = Boolean(level || version || (parents && parents.length));
+    if (!подСпеками && !естьПризнакСпеки) continue;
+
     specMap.set(relPath, { nodeId, title, level, version, parents, filePath });
   }
 

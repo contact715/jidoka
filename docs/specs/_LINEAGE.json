@@ -31,6 +31,24 @@
       "revisions": []
     },
     {
+      "id": "spec:docs/BROWSER_VERIFICATION_MANDATORY.md",
+      "kind": "spec",
+      "label": "Browser Verification is Mandatory (dev-engine forcing function)",
+      "resolved": true,
+      "level": "L1",
+      "version": "1.0.0",
+      "path": "docs/BROWSER_VERIFICATION_MANDATORY.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/NORTH_STAR.md",
+      "kind": "spec",
+      "label": "docs/NORTH_STAR.md",
+      "resolved": true,
+      "path": "docs/NORTH_STAR.md",
+      "revisions": []
+    },
+    {
       "id": "spec:docs/CLI_APPEARANCE.md",
       "kind": "spec",
       "label": "CLI Appearance — внешний вид Claude Code",
@@ -71,21 +89,13 @@
       "revisions": []
     },
     {
-      "id": "spec:docs/NORTH_STAR.md",
+      "id": "spec:docs/CORE_PROPERTY_GATE.md",
       "kind": "spec",
-      "label": "docs/NORTH_STAR.md",
+      "label": "Core-Property Gate — «завершено» проверяется против несущего свойства запроса",
       "resolved": true,
-      "path": "docs/NORTH_STAR.md",
-      "revisions": []
-    },
-    {
-      "id": "spec:docs/CURRENT_WAVE.md",
-      "kind": "spec",
-      "label": "Current Wave Status",
-      "resolved": true,
-      "level": null,
-      "version": null,
-      "path": "docs/CURRENT_WAVE.md",
+      "level": "L1",
+      "version": "1.0.0",
+      "path": "docs/CORE_PROPERTY_GATE.md",
       "revisions": []
     },
     {
@@ -149,6 +159,16 @@
       "revisions": []
     },
     {
+      "id": "spec:docs/GATES_MUST_SCALE_WITH_THE_CHANGE.md",
+      "kind": "spec",
+      "label": "Гейт проверяет ИЗМЕНЕНИЕ, а не весь репозиторий",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/GATES_MUST_SCALE_WITH_THE_CHANGE.md",
+      "revisions": []
+    },
+    {
       "id": "spec:docs/GROUNDING_CONTRACT.md",
       "kind": "spec",
       "label": "Grounding Contract — Source Citation Requirements",
@@ -163,6 +183,16 @@
       "kind": "wave",
       "label": "wave-163",
       "resolved": true,
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/HEAVY_CHECKS_BELONG_TO_THE_COORDINATOR.md",
+      "kind": "spec",
+      "label": "Тяжёлую проверку делает координатор, один раз — не каждый агент",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/HEAVY_CHECKS_BELONG_TO_THE_COORDINATOR.md",
       "revisions": []
     },
     {
@@ -186,6 +216,46 @@
       "revisions": []
     },
     {
+      "id": "spec:docs/IN_SESSION_KAIZEN_PROTOCOL.md",
+      "kind": "spec",
+      "label": "In-Session Kaizen Protocol",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/IN_SESSION_KAIZEN_PROTOCOL.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/KAIZEN_ENGINE.md",
+      "kind": "spec",
+      "label": "Kaizen Engine — the autonomous weekly self-improvement system",
+      "resolved": true,
+      "level": "L1",
+      "version": "1.0.0",
+      "path": "docs/KAIZEN_ENGINE.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/LOCAL_RELAY_PROTOCOL.md",
+      "kind": "spec",
+      "label": "Local Relay Protocol",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/LOCAL_RELAY_PROTOCOL.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/MACHINE_RESOURCE_HYGIENE.md",
+      "kind": "spec",
+      "label": "Гигиена ресурсов машины — почему Claude Code «жрёт оперативу»",
+      "resolved": true,
+      "level": "L1",
+      "version": "1.0.0",
+      "path": "docs/MACHINE_RESOURCE_HYGIENE.md",
+      "revisions": []
+    },
+    {
       "id": "spec:docs/MEMORY_MERGE_PROTOCOL.md",
       "kind": "spec",
       "label": "Memory MCP merge protocol",
@@ -203,6 +273,16 @@
       "level": "L0",
       "version": "1.0.0",
       "path": "docs/MISSION.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/MODEL_ROUTING_PROTOCOL.md",
+      "kind": "spec",
+      "label": "Model Routing Protocol",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/MODEL_ROUTING_PROTOCOL.md",
       "revisions": []
     },
     {
@@ -236,6 +316,26 @@
       "revisions": []
     },
     {
+      "id": "spec:docs/NO_FABRICATED_SPECIFICS.md",
+      "kind": "spec",
+      "label": "No Fabricated Specifics — verify the checkable detail before you state it",
+      "resolved": true,
+      "level": "L1",
+      "version": "1.0.0",
+      "path": "docs/NO_FABRICATED_SPECIFICS.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/PARALLEL_SESSIONS_PROTOCOL.md",
+      "kind": "spec",
+      "label": "Parallel Sessions Protocol — one folder, one session; commits by turns; work serial",
+      "resolved": true,
+      "level": "L1",
+      "version": "1.0.0",
+      "path": "docs/PARALLEL_SESSIONS_PROTOCOL.md",
+      "revisions": []
+    },
+    {
       "id": "spec:docs/PROACTIVE_HOLISTIC_ANALYSIS_TRIGGER.md",
       "kind": "spec",
       "label": "Mandatory: Proactive Holistic Analysis Trigger",
@@ -263,6 +363,36 @@
       "level": "L0",
       "version": null,
       "path": "docs/PROJECT_CHARTER_TEMPLATE.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/PROOF_OF_WORK_GATE.md",
+      "kind": "spec",
+      "label": "Proof-of-Work Gate — no \"done\" without something EXECUTED",
+      "resolved": true,
+      "level": "L1",
+      "version": "1.0.0",
+      "path": "docs/PROOF_OF_WORK_GATE.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/PUSH_GATE_GOTCHAS.md",
+      "kind": "spec",
+      "label": "Push-gate gotchas — long pre-push gates and the SSH idle-drop",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/PUSH_GATE_GOTCHAS.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/RESEARCH_COVERAGE_SELF_AUDIT.md",
+      "kind": "spec",
+      "label": "Ресёрч не сдаётся без собственного аудита покрытия",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/RESEARCH_COVERAGE_SELF_AUDIT.md",
       "revisions": []
     },
     {
@@ -346,6 +476,16 @@
       "revisions": []
     },
     {
+      "id": "spec:docs/UI_ARCHITECTURE_AXES.md",
+      "kind": "spec",
+      "label": "Десять осей интерфейса: что решается АРХИТЕКТУРНО, до первого экрана",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/UI_ARCHITECTURE_AXES.md",
+      "revisions": []
+    },
+    {
       "id": "spec:docs/WEB_STANDARDS.md",
       "kind": "spec",
       "label": "Web Standards",
@@ -363,16 +503,6 @@
       "level": null,
       "version": null,
       "path": "docs/audits/PENDING_REMEDIES_REGISTRATION.md",
-      "revisions": []
-    },
-    {
-      "id": "spec:docs/dashboard-snapshot.md",
-      "kind": "spec",
-      "label": "claude-code-dev-framework — jidoka snapshot",
-      "resolved": true,
-      "level": null,
-      "version": null,
-      "path": "docs/dashboard-snapshot.md",
       "revisions": []
     },
     {
@@ -453,6 +583,46 @@
       "level": null,
       "version": null,
       "path": "docs/memory-waves.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/plans/2026-06-10-claim-wave-id.md",
+      "kind": "spec",
+      "label": "claim-wave-id — Implementation Plan",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/plans/2026-06-10-claim-wave-id.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/proposals/external-tools-pilots.proposed.md",
+      "kind": "spec",
+      "label": "Proposal (PILOT-only, not adopted): external tools that need a sandbox/product first",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/proposals/external-tools-pilots.proposed.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/proposals/ledger-pollution-remedy.proposed.md",
+      "kind": "spec",
+      "label": "Proposal: register `ledger-pollution` in the gate registry (owner-only apply)",
+      "resolved": true,
+      "level": "L1",
+      "version": "1.0.0",
+      "path": "docs/proposals/ledger-pollution-remedy.proposed.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/proposals/night-shift.proposed.md",
+      "kind": "spec",
+      "label": "Proposal (DEFERRED, not built): Night Shift — one autonomous wave while you sleep",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/proposals/night-shift.proposed.md",
       "revisions": []
     },
     {
@@ -971,6 +1141,16 @@
       "revisions": []
     },
     {
+      "id": "spec:docs/specs/wave-claim-wave-id_MASTER_SPEC.md",
+      "kind": "spec",
+      "label": "wave-claim-wave-id — Master Spec",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.1.0",
+      "path": "docs/specs/wave-claim-wave-id_MASTER_SPEC.md",
+      "revisions": []
+    },
+    {
       "id": "spec:docs/specs/wave-cost-ledger_MASTER_SPEC.md",
       "kind": "spec",
       "label": "wave-cost-ledger Master Spec — running token-cost ledger + daily-limit alert",
@@ -1001,23 +1181,61 @@
       "revisions": []
     },
     {
+      "id": "spec:docs/specs/wave-memory-validity_MASTER_SPEC.md",
+      "kind": "spec",
+      "label": "wave-memory-validity — Master Spec",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/wave-memory-validity_MASTER_SPEC.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/wave-tui-control_MASTER_SPEC.md",
+      "kind": "spec",
+      "label": "wave-tui-control Master Spec — `jidoka top` becomes a control panel",
+      "resolved": true,
+      "level": "L4",
+      "version": "1.0.0",
+      "path": "docs/specs/wave-tui-control_MASTER_SPEC.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/specs/wave-tui-interactive_MASTER_SPEC.md",
+      "kind": "spec",
+      "label": "wave-tui-interactive Master Spec — Make `jidoka top` an interactive dispatcher",
+      "resolved": true,
+      "level": "L3",
+      "version": "1.0.0",
+      "path": "docs/specs/wave-tui-interactive_MASTER_SPEC.md",
+      "revisions": []
+    },
+    {
       "id": "spec:docs/specs/wave-tui-top_MASTER_SPEC.md",
       "kind": "spec",
-      "label": "wave-tui-top Master Spec — Terminal Pipeline Dashboard (`jidoka top`)",
+      "label": "docs/specs/wave-tui-top_MASTER_SPEC.md",
       "resolved": true,
-      "level": null,
-      "version": null,
       "path": "docs/specs/wave-tui-top_MASTER_SPEC.md",
       "revisions": []
     },
     {
-      "id": "spec:docs/surfacing-concerns-current.md",
+      "id": "spec:docs/templates/FABLE_HANDOFF.md",
       "kind": "spec",
-      "label": "Proactive Surfacing — No Concerns Found",
+      "label": "Fable Handoff",
       "resolved": true,
       "level": null,
       "version": null,
-      "path": "docs/surfacing-concerns-current.md",
+      "path": "docs/templates/FABLE_HANDOFF.md",
+      "revisions": []
+    },
+    {
+      "id": "spec:docs/templates/FABLE_REVIEW.md",
+      "kind": "spec",
+      "label": "Fable Review",
+      "resolved": true,
+      "level": null,
+      "version": null,
+      "path": "docs/templates/FABLE_REVIEW.md",
       "revisions": []
     },
     {
@@ -1093,7 +1311,21 @@
   ],
   "edges": [
     {
+      "src": "spec:docs/BROWSER_VERIFICATION_MANDATORY.md",
+      "rel": "implements",
+      "dst": "spec:docs/NORTH_STAR.md",
+      "wave": null,
+      "agent": null
+    },
+    {
       "src": "spec:docs/CONSTITUTION.md",
+      "rel": "implements",
+      "dst": "spec:docs/NORTH_STAR.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/CORE_PROPERTY_GATE.md",
       "rel": "implements",
       "dst": "spec:docs/NORTH_STAR.md",
       "wave": null,
@@ -1121,6 +1353,20 @@
       "agent": null
     },
     {
+      "src": "spec:docs/KAIZEN_ENGINE.md",
+      "rel": "implements",
+      "dst": "spec:docs/NORTH_STAR.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/MACHINE_RESOURCE_HYGIENE.md",
+      "rel": "implements",
+      "dst": "spec:docs/NORTH_STAR.md",
+      "wave": null,
+      "agent": null
+    },
+    {
       "src": "spec:docs/MODULE_SPEC_SYSTEM.md",
       "rel": "implements",
       "dst": "spec:docs/NORTH_STAR.md",
@@ -1145,6 +1391,20 @@
       "src": "spec:docs/MULTI_LEVEL_VERIFICATION.md",
       "rel": "refines",
       "dst": "spec:docs/CONSTITUTION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/NO_FABRICATED_SPECIFICS.md",
+      "rel": "implements",
+      "dst": "spec:docs/NORTH_STAR.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/PARALLEL_SESSIONS_PROTOCOL.md",
+      "rel": "implements",
+      "dst": "spec:docs/NORTH_STAR.md",
       "wave": null,
       "agent": null
     },
@@ -1177,6 +1437,13 @@
       "agent": null
     },
     {
+      "src": "spec:docs/PROOF_OF_WORK_GATE.md",
+      "rel": "implements",
+      "dst": "spec:docs/NORTH_STAR.md",
+      "wave": null,
+      "agent": null
+    },
+    {
       "src": "spec:docs/TOYOTA_WAY.md",
       "rel": "implements",
       "dst": "spec:docs/NORTH_STAR.md",
@@ -1187,6 +1454,13 @@
       "src": "spec:docs/TOYOTA_WAY.md",
       "rel": "refines",
       "dst": "spec:docs/CONSTITUTION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/proposals/ledger-pollution-remedy.proposed.md",
+      "rel": "implements",
+      "dst": "spec:docs/NORTH_STAR.md",
       "wave": null,
       "agent": null
     },
@@ -1562,6 +1836,20 @@
       "agent": null
     },
     {
+      "src": "spec:docs/specs/wave-claim-wave-id_MASTER_SPEC.md",
+      "rel": "governs",
+      "dst": "spec:docs/NORTH_STAR.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/wave-claim-wave-id_MASTER_SPEC.md",
+      "rel": "constraints",
+      "dst": "spec:docs/CONSTITUTION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
       "src": "spec:docs/specs/wave-judge-debias_MASTER_SPEC.md",
       "rel": "governs",
       "dst": "spec:docs/NORTH_STAR.md",
@@ -1572,6 +1860,41 @@
       "src": "spec:docs/specs/wave-judge-debias_MASTER_SPEC.md",
       "rel": "constraints",
       "dst": "spec:docs/CONSTITUTION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/wave-memory-validity_MASTER_SPEC.md",
+      "rel": "governs",
+      "dst": "spec:docs/NORTH_STAR.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/wave-memory-validity_MASTER_SPEC.md",
+      "rel": "constraints",
+      "dst": "spec:docs/CONSTITUTION.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/wave-memory-validity_MASTER_SPEC.md",
+      "rel": "extends",
+      "dst": "spec:docs/MEMORY_MERGE_PROTOCOL.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/wave-tui-control_MASTER_SPEC.md",
+      "rel": "implements",
+      "dst": "spec:docs/specs/domains/observability.md",
+      "wave": null,
+      "agent": null
+    },
+    {
+      "src": "spec:docs/specs/wave-tui-interactive_MASTER_SPEC.md",
+      "rel": "extends",
+      "dst": "spec:docs/specs/wave-tui-top_MASTER_SPEC.md",
       "wave": null,
       "agent": null
     },
@@ -1627,7 +1950,7 @@
   ],
   "meta": {
     "_do_not_edit": true,
-    "built_at": "2026-06-06T05:42:20.796Z",
+    "built_at": "2026-07-29T19:01:02.524Z",
     "wave_id_scheme": "wave-NNN (3-digit zero-padded)",
     "r2_normalization": "wave-NNN.R2 collapsed to wave-NNN base ID; revision labels stored in revisions[]",
     "mcp_boundary": "This graph does not mirror live MCP entities. It covers only file-accessible governance surfaces: specs, ADRs, anti-patterns, waves, files. Memory snapshot staleness bound: last npm run memory:snapshot run."
