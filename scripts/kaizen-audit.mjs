@@ -27,18 +27,43 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const looksLikePath = (poi) => /[\\/]/.test(poi) || /\.[a-z0-9]+$/i.test(poi);
 
+// probe-form-point-of-integration (2026-W32-R5) — a bare file path proves NOTHING about a
+// recommendation that EDITS that file: the file already exists, so the audit stamps "shipped"
+// the moment the recommendation is written down. Measured on 2026-08-03: 19 freshly-proposed
+// W32 entries carrying real file paths flipped 14 to "shipped" instantly and pushed the
+// dashboard from 28% to 39% with zero lines of code written. The opposite form (a bare
+// sentinel word) fails the other way: 33 of 59 ledger entries used it and NOT ONE could ever
+// resolve, so 32 were locked in "open" forever and one was falsely reported "regressed".
+//
+// The fix is the third form: "path/to/file.ext#anchor". The file must exist AND literally
+// contain the anchor string. The anchor is a CONTRACT — whoever implements the recommendation
+// leaves that exact marker (a comment, an identifier, a line of prose) in the file, so the
+// audit checks the capability rather than the container.
+export function splitPoi(poi = '') {
+  const i = poi.indexOf('#');
+  return i === -1 ? { path: poi, anchor: '' } : { path: poi.slice(0, i), anchor: poi.slice(i + 1) };
+}
+
 /**
  * Decide whether a point-of-integration is present in the repo.
  * @param {string} poi
- * @param {{exists:(rel:string)=>boolean, ciText?:string}} probes
+ * @param {{exists:(rel:string)=>boolean, read?:(rel:string)=>string|null, ciText?:string}} probes
  */
 export function isPresent(poi, probes) {
   if (!poi) return false;
   const exists = probes.exists || (() => false);
+  const read = probes.read || (() => null);
   const ciText = probes.ciText || '';
-  if (looksLikePath(poi)) return exists(poi);
+  const { path: file, anchor } = splitPoi(poi);
+  if (anchor) {
+    // capability anchor: the container must exist AND carry the marker
+    if (!exists(file)) return false;
+    const body = read(file);
+    return typeof body === 'string' && body.includes(anchor);
+  }
+  if (looksLikePath(file)) return exists(file);
   // bare token → a gate/rule name: referenced in CI, or backed by a same-named script
-  return ciText.includes(poi) || exists(`scripts/${poi}.mjs`);
+  return ciText.includes(file) || exists(`scripts/${file}.mjs`);
 }
 
 /**
@@ -71,7 +96,9 @@ function selfTest() {
 
   const exists = (p) => p === 'scripts/dag-schedule.mjs' || p === 'scripts/map-ac-coverage.mjs';
   const ciText = 'run: node scripts/dag-schedule.mjs --self-test\n- name: button-has-type gate';
-  const probes = { exists, ciText };
+  const FILES = { 'scripts/dag-schedule.mjs': 'export function buildDag() {} // critical-path-edges' };
+  const read = (p) => (p in FILES ? FILES[p] : null);
+  const probes = { exists, read, ciText };
   const W = '2026-W28';
 
   // present by path → shipped, stamps shippedWeek
@@ -113,6 +140,29 @@ function selfTest() {
   // audited entries still validate against the ledger schema (compose with upsert)
   ok('audited entry round-trips through upsert', (() => { try { upsert([], { ...a }); return true; } catch { return false; } })());
 
+  // ── probe form: path#anchor (2026-W32-R5) ────────────────────────────────
+  ok('splitPoi separates container from anchor',
+    splitPoi('scripts/x.mjs#cap-a').path === 'scripts/x.mjs' && splitPoi('scripts/x.mjs#cap-a').anchor === 'cap-a');
+  ok('splitPoi leaves a plain path untouched', splitPoi('scripts/x.mjs').anchor === '');
+
+  // THE case the old auditor got wrong: the file exists, the capability does not.
+  const h = auditEntry({ id: 'r9', week: '2026-W32', title: 't', pointOfIntegration: 'scripts/dag-schedule.mjs#union-ledger-read', status: 'proposed', shippedWeek: null }, probes, W);
+  ok('anchor absent in an EXISTING file → open, not shipped', h.status === 'open');
+
+  // anchor present → really shipped
+  const i2 = auditEntry({ id: 'r10', week: '2026-W32', title: 't', pointOfIntegration: 'scripts/dag-schedule.mjs#critical-path-edges', status: 'proposed', shippedWeek: null }, probes, W);
+  ok('anchor present in the file → shipped', i2.status === 'shipped');
+
+  // missing container with an anchor → open (never a crash)
+  const j = auditEntry({ id: 'r11', week: '2026-W32', title: 't', pointOfIntegration: 'scripts/ghost.mjs#whatever', status: 'proposed', shippedWeek: null }, probes, W);
+  ok('anchor on a missing file → open', j.status === 'open');
+
+  // an anchor form whose container has no slash and a non-ascii tail must NOT fall through to token mode
+  ok('anchor form is decided before the path heuristic',
+    isPresent('README.md#224 скрипта', { exists: (p) => p === 'README.md', read: () => 'блаблабла 224 скрипта тут', ciText: '' }) === true);
+  ok('same container, wrong anchor → absent',
+    isPresent('README.md#224 скрипта', { exists: (p) => p === 'README.md', read: () => '223 скрипта', ciText: '' }) === false);
+
   if (fails) { console.log('\n\x1b[31mkaizen-audit self-test FAILED\x1b[0m'); process.exit(1); }
   console.log('\n\x1b[32m✓ kaizen-audit: deterministic shipped/open/regressed detection correct\x1b[0m');
   process.exit(0);
@@ -125,11 +175,12 @@ if (isMain) {
   const file = arg('--file') || DEFAULT_LEDGER;
   const week = arg('--week') || isoWeek(new Date());
   const exists = (rel) => fs.existsSync(path.join(ROOT, rel));
+  const read = (rel) => { try { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch { return null; } };
   let ciText = '';
   try { ciText = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8'); } catch { /* no CI file */ }
 
   const before = readLedger(file);
-  const after = auditLedger(before, { exists, ciText }, week);
+  const after = auditLedger(before, { exists, read, ciText }, week);
   const changed = after.filter((e, i) => e.status !== before[i].status).length;
   console.log(`[kaizen-audit] ${after.length} entrie(s) audited @ ${week} — ${changed} status change(s):`);
   for (const e of after) console.log(`  ${e.status.padEnd(9)} ${e.id}  ${e.pointOfIntegration || ''}`);

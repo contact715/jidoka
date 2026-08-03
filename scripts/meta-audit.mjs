@@ -24,10 +24,10 @@
 
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { loadLedger, groupByClass, daysBetween, todayISO, recurrencesAfter } from './meta-lib.mjs';
+import { loadLedgerUnion, groupByClass, daysBetween, todayISO, recurrencesAfter } from './meta-lib.mjs';
 import { REMEDIES } from './meta-remedies.mjs'; // single source of truth for gates
 
-const rows = loadLedger();
+const rows = loadLedgerUnion(); // union-ledger-read: both addresses, deduped (2026-W32-R2)
 if (rows.length === 0) { console.log('meta-audit: ledger empty — nothing to analyze.'); process.exit(0); }
 
 const classes = Object.entries(groupByClass(rows)).sort((a, b) => b[1].length - a[1].length);

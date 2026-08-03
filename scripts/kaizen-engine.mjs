@@ -108,10 +108,13 @@ if (isMain) {
 
   if (process.argv.includes('--dashboard')) {
     const exists = (rel) => fs.existsSync(path.join(ROOT, rel));
+    // read: required by the path#anchor probe form (2026-W32-R5). Without it every anchored
+    // point-of-integration resolves false, and an entry that was shipped flips to regressed.
+    const read = (rel) => { try { return fs.readFileSync(path.join(ROOT, rel), "utf8"); } catch { return null; } };
     let ciText = ''; try { ciText = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8'); } catch { /* none */ }
     let metaTrendText = ''; try { metaTrendText = execFileSync('node', [path.join(ROOT, 'scripts', 'meta-trend.mjs')], { cwd: ROOT, encoding: 'utf8' }); } catch { /* best-effort */ }
     const entries = readLedger(file);
-    const audited = auditLedger(entries, { exists, ciText }, week);
+    const audited = auditLedger(entries, { exists, read, ciText }, week);
     const card = scorecard(audited, { metaTrendText });
     const outDir = path.join(ROOT, 'docs', 'research', 'weekly');
     fs.mkdirSync(outDir, { recursive: true });

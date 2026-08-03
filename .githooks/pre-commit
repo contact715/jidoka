@@ -27,14 +27,22 @@ if [ $rc -ne 0 ]; then
 fi
 echo "✓ pre-commit · meta-honesty: ledger signal OK"
 
-# instantiation-audit is informational — stay silent unless it actually finds ghosts.
-out=$(node "$ROOT/scripts/instantiation-audit.mjs" --warn 2>&1)
-if echo "$out" | grep -qE 'ghosts: [1-9]'; then
+# instantiation-audit-hard (2026-W32-R1) — SAME SEVERITY AS CI, deliberately.
+# It used to run here with --warn while .github/workflows/ci.yml runs it hard. That is a
+# structural guarantee of a red main: every commit passes locally and fails on the server.
+# It happened exactly that way — main went red on 2026-07-29 and stayed red through
+# 2026-08-03 (four CI failures plus a failed weekly self-audit) over a one-line README
+# script count, with four commits landing on top of the red, two days after the same defect
+# had been "fixed". A gate that is soft where you work and hard where you publish does not
+# protect you, it just moves the failure somewhere you are not looking.
+out=$(node "$ROOT/scripts/instantiation-audit.mjs" 2>&1); rc=$?
+if [ $rc -ne 0 ]; then
   echo "$out"
-  echo "↑ instantiation-audit: ghost(s) flagged (informational, not blocking)."
-else
-  echo "✓ pre-commit · instantiation-audit: no ghosts"
+  echo "✗ pre-commit BLOCKED by instantiation-audit (ghost: something is declared but not on disk — see above)."
+  echo "  CI runs this exact check at this exact severity, so committing would only move the failure."
+  exit 1
 fi
+echo "✓ pre-commit · instantiation-audit: no ghosts"
 
 # clarify-gate — WARN by default: a staged master spec must have complete business-question
 # coverage (clarify-engine). Soft trial; promote to --block via gate-graduation once stable.

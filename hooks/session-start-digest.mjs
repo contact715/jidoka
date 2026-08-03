@@ -41,6 +41,48 @@ export function freshClaims(root, ttlHours = 24, now = Date.now()) {
   return out;
 }
 
+// ungated-and-ci-verdict (2026-W32-R3) ──────────────────────────────────────
+// The digest used to read ONLY the "🔴 Active" section of memory-consolidated.md. But the
+// ACTIVE threshold in memory-consolidate.mjs is score >= 1.5, and a fresh single incident
+// scores exactly 1.0 (weight halves every 30 days), so a class must recur at least twice
+// within a month before it can reach that tier. Measured 2026-08-03: the file carried
+// sixteen classes marked "ungated — still a live risk", four of them younger than three
+// days, and the digest printed "активных уроков нет". The instrument built to prevent
+// repetition only spoke AFTER the repetition.
+//
+// So: read every tier except the demoted 🟪 one, and surface the ungated classes whatever
+// their score. Newest/highest-scoring first, capped so the block stays a digest.
+export function ungatedFrom(md = '', cap = 6) {
+  const live = md.split('## 🟪')[0]; // drop the decayed/demoted tail, keep 🔴 and 🟡
+  const out = [];
+  for (const m of live.matchAll(/^### ([^\n·]+)·[^\n]*\n([^\n]*)/gm)) {
+    if (/✓ gated/.test(m[2])) continue;
+    out.push(m[1].trim());
+  }
+  return { shown: out.slice(0, cap), total: out.length };
+}
+
+export function hotFrom(md = '') {
+  const hot = md.split('## 🟡')[0];
+  return [...hot.matchAll(/^### ([^\n·]+)·[^\n]*$/gm)].map(m => m[1].trim());
+}
+
+// CI truth. The engine's own main branch sat red for five days in a row (2026-07-29 →
+// 2026-08-03) with four commits landing on top, and nothing in the environment read the
+// result: grep for `gh run` / `workflow_run` across scripts/ and hooks/ returned zero.
+// Cached with a TTL so a session start never pays for the network twice in half an hour,
+// and every failure path is silent.
+export function ciLine(run) {
+  if (!run || !run.conclusion) return '';
+  if (run.conclusion === 'success') return '';           // green needs no words
+  const when = String(run.createdAt || '').slice(0, 10);
+  return `🔴 CI на main: ${run.conclusion}${when ? ` (${when})` : ''}. Почини прежде чем класть новое сверху`;
+}
+
+export function cacheFresh(cache, now = Date.now(), ttlMs = 30 * 60e3) {
+  return !!cache && typeof cache.at === 'number' && now - cache.at < ttlMs;
+}
+
 function selfTest() {
   const fails = [];
   const ok = (name, cond) => {
@@ -81,6 +123,48 @@ function selfTest() {
     const empty = join(tmp, 'empty');
     mkdirSync(empty);
     ok('вне git/без реестра — пусто и без ошибок', freshClaims(empty, 24, now).length === 0);
+
+    // ── ungated lessons across tiers (2026-W32-R3) ────────────────────────
+    // The exact shape of memory-consolidated.md, including the case that broke it:
+    // no 🔴 section at all, so everything lived under 🟡 and the old parser saw nothing.
+    const MD = [
+      '# Consolidated memory',
+      '',
+      '## 🟡 Watch — recurring but lower-pressure',
+      '',
+      '### declaration-over-implementation  ·  score 1.2  ·  seen 5×',
+      '✓ gated by `hooks/proof-of-work-gate.mjs`',
+      '  - detail line',
+      '',
+      '### stopped-mid-queue-reported-instead  ·  score 1  ·  seen 1×',
+      '⚠ **ungated — still a live risk**',
+      '',
+      '### toggle-loses-to-default-specificity  ·  score 0.9  ·  seen 1×',
+      '⚠ **ungated — still a live risk**',
+      '',
+      '## 🟪 Decayed — demoted (old / one-off)',
+      '',
+      '### ancient-one-off  ·  score 0.1  ·  seen 1×',
+      '⚠ **ungated — still a live risk**',
+    ].join('\n');
+
+    const u = ungatedFrom(MD);
+    ok('ungated найдены и вне 🔴-секции (это и был дефект)', u.total === 2);
+    ok('ungated перечислены поимённо', u.shown.join() === 'stopped-mid-queue-reported-instead,toggle-loses-to-default-specificity');
+    ok('gated класс не попадает в живые риски', !u.shown.includes('declaration-over-implementation'));
+    ok('демотированная 🟪-секция исключена', !u.shown.includes('ancient-one-off'));
+    ok('список подрезается до cap, но total считает всё', ungatedFrom(MD, 1).shown.length === 1 && ungatedFrom(MD, 1).total === 2);
+    ok('файл без 🔴-секции больше не даёт пустоту', ungatedFrom(MD).shown.length > 0);
+    ok('старый разбор 🔴 остаётся рабочим', hotFrom('## 🔴 Active\n\n### x  ·  score 2\n✓ gated by `y`\n\n## 🟡 Watch\n\n### z  ·  score 1\n').join() === 'x');
+    ok('пустой документ не роняет разбор', ungatedFrom('').total === 0 && hotFrom('').length === 0);
+
+    // ── CI verdict line ───────────────────────────────────────────────────
+    ok('красный CI объявляется', /🔴 CI на main: failure \(2026-08-01\)/.test(ciLine({ conclusion: 'failure', createdAt: '2026-08-01T05:40:33Z' })));
+    ok('зелёный CI молчит', ciLine({ conclusion: 'success', createdAt: '2026-08-01' }) === '');
+    ok('нет данных о CI — молчит, а не врёт', ciLine(null) === '' && ciLine({}) === '');
+    ok('кеш моложе TTL считается свежим', cacheFresh({ at: 1000 }, 1000 + 60e3) === true);
+    ok('кеш старше TTL считается протухшим', cacheFresh({ at: 1000 }, 1000 + 31 * 60e3) === false);
+    ok('отсутствующий кеш не свежий', cacheFresh(null) === false);
   } catch (e) {
     fails.push(`crash: ${e.message}`);
     console.log(`  \x1b[31m✗ self-test crashed: ${e.message}\x1b[0m`);
@@ -116,34 +200,57 @@ try {
     } catch { /* keep default */ }
   }
 
-  // 3) active lessons — names + gating only, not the full bodies
+  // 3) lessons — hot ones by name, and EVERY ungated class regardless of tier (2026-W32-R3)
   const md = readFileSync(join(jidoka, 'memory-consolidated.md'), 'utf8');
-  const active = md.split('## 🟡')[0];
-  const lessons = [...active.matchAll(/^### ([^\n·]+)·[^\n]*$/gm)].map(m => m[1].trim());
-  const ungated = [...active.matchAll(/^### ([^\n·]+)·[^\n]*\n(?!✓ gated)/gm)].map(m => m[1].trim());
+  const lessons = hotFrom(md);
+  const live = ungatedFrom(md);
 
   // 4) чужие свежие клеймы wave-id в проекте этой сессии (cwd хука = корень проекта)
   let claims = [];
   try { claims = freshClaims(sh('git rev-parse --show-toplevel', process.cwd())); } catch { /* не git-репо */ }
 
-  // 5) In-Session Kaizen enforcement: unresolved recurring patterns (≥2× in a
-  //    session, never resolved) resurface here so the loop can't be dropped.
-  let iskLine = '';
+  // 5) serial task-queue — remind to work it one at a time (autonomous default)
+  let queueLine = '';
   try {
-    const rep = execSync(`node ${join(jidoka, 'scripts', 'session-pattern-log.mjs')} report --all`, { encoding: 'utf8', timeout: 3000 });
-    if (/🔴/.test(rep)) {
-      const found = [...rep.matchAll(/• (\S+) — (\d+)×/g)].map(m => `${m[1]} (${m[2]}×)`);
-      if (found.length) iskLine = `🔴 неразобранные паттерны (In-Session Kaizen): ${found.join(', ')} — разобрать и закрыть (resolve)`;
+    const qp = join(homedir(), '.jidoka', 'task-queue', 'queue.jsonl');
+    if (existsSync(qp)) {
+      const items = readFileSync(qp, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
+      const waiting = items.filter(t => t.status === 'queued').length;
+      const activeTask = items.find(t => t.status === 'in_progress');
+      if (waiting || activeTask) {
+        queueLine = `очередь задач: ${waiting} ждут${activeTask ? ` · в работе: ${activeTask.title}` : ''} — веди по одной (task-queue.mjs next → сделал → safe-commit → done)`;
+      }
     }
-  } catch { /* tool optional */ }
+  } catch { /* no queue */ }
+
+  // 6) real CI verdict for the engine's own main branch, cached 30 min, silent on any failure
+  let ci = '';
+  try {
+    const cachePath = join(jidoka, '.ci-verdict-cache.json');
+    let cache = null;
+    try { cache = JSON.parse(readFileSync(cachePath, 'utf8')); } catch { /* no cache yet */ }
+    if (!cacheFresh(cache)) {
+      const repoDir = join(homedir(), 'jidoka-framework');
+      const slug = existsSync(repoDir)
+        ? (sh('git remote get-url origin', repoDir).match(/[:/]([^/:]+\/[^/]+?)(?:\.git)?$/) || [])[1]
+        : null;
+      if (slug) {
+        const raw = sh(`gh run list -R ${slug} --workflow=ci.yml --branch=main --limit 1 --json conclusion,createdAt`, repoDir);
+        cache = { at: Date.now(), run: JSON.parse(raw)[0] || null };
+        try { writeFileSync(cachePath, JSON.stringify(cache)); } catch { /* cache is best-effort */ }
+      }
+    }
+    ci = ciLine(cache && cache.run);
+  } catch { /* no gh / no network / no repo → say nothing rather than guess */ }
 
   const out = [
     '[session-start digest]',
     `jidoka: ${health}`,
-    lessons.length ? `активные уроки (🔴): ${lessons.join(', ')}` : 'активных уроков нет',
-    ungated.length ? `БЕЗ гейта (живой риск): ${ungated.join(', ')}` : '',
+    ci,
+    queueLine,
+    lessons.length ? `активные уроки (🔴): ${lessons.join(', ')}` : '',
+    live.total ? `БЕЗ гейта (живой риск, ${live.total}): ${live.shown.join(', ')}${live.total > live.shown.length ? ` и ещё ${live.total - live.shown.length}` : ''}` : '',
     claims.length ? `⚠️ занятые wave-id (клеймы <24ч): ${claims.join(', ')} — свой номер бери через claim-wave-id.mjs` : '',
-    iskLine,
     'полный дайджест: ~/.claude/jidoka/memory-consolidated.md',
   ].filter(Boolean).join('\n');
   process.stdout.write(out);

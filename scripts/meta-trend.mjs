@@ -16,10 +16,10 @@
 // Usage: node scripts/meta-trend.mjs        (META_LEDGER overrides the ledger path)
 
 import { readFileSync, existsSync } from 'node:fs';
-import { loadLedger, groupByClass, daysBetween, todayISO, monthOf, recurrencesAfter } from './meta-lib.mjs';
+import { loadLedgerUnion, groupByClass, daysBetween, todayISO, monthOf, recurrencesAfter } from './meta-lib.mjs';
 import { REMEDIES } from './meta-remedies.mjs';
 
-const rows = loadLedger();
+const rows = loadLedgerUnion(); // union-ledger-read: both addresses, deduped (2026-W32-R2)
 if (rows.length === 0) { console.log('meta-trend: ledger empty — no curve to plot yet.'); process.exit(0); }
 
 const byClass = groupByClass(rows);

@@ -17,6 +17,30 @@ if [ $rc -ne 0 ]; then
 fi
 echo "✓ pre-push · pre-publish-guard: no secrets/PII"
 
+# ledger-sync-gate: BLOCKS if the committed learning ledger is behind the live cross-project
+# inbox — otherwise every verdict downstream (meta-trend, meta-audit, the weekly scorecard)
+# is computed on the optimistic half of the history. Reports n/a and passes where only one
+# ledger address exists (CI, fresh clone, no global install).
+out=$(node "$ROOT/scripts/ledger-sync-gate.mjs" 2>&1); rc=$?
+if [ $rc -ne 0 ]; then
+  echo "$out"
+  echo "✗ pre-push BLOCKED by ledger-sync-gate (committed ledger is behind the live one — see above)."
+  exit 1
+fi
+echo "✓ pre-push · ledger-sync-gate: learning ledger is one source of truth"
+
+# settings-integrity: BLOCKS if a hook in ~/.claude/settings.json points at a script that is
+# not on disk, or is registered twice on the same event+matcher. A hook that cannot run still
+# LOOKS like a protection in the settings file — that is the failure this catches. Reports n/a
+# where there is no settings file (CI, fresh machine).
+out=$(node "$ROOT/scripts/settings-integrity.mjs" 2>&1); rc=$?
+if [ $rc -ne 0 ]; then
+  echo "$out"
+  echo "✗ pre-push BLOCKED by settings-integrity (a forcing function is wired to nothing — see above)."
+  exit 1
+fi
+echo "✓ pre-push · settings-integrity: every hook resolves"
+
 out=$(node "$ROOT/scripts/meta-audit.mjs" 2>&1); rc=$?
 if [ $rc -ne 0 ]; then
   echo "$out"

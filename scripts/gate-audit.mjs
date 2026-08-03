@@ -37,6 +37,10 @@ export const GATES = [
   { id: 'mutation-test', layer: 'CI', mode: 'hard', token: 'mutation-test' },
   { id: 'red-team', layer: 'CI', mode: 'hard', token: 'red-team.mjs' },
   { id: 'selftest-reality', layer: 'CI', mode: 'hard', token: 'gate:selftest' },
+  // local pre-push — enforced on the machine that publishes (not checkable in CI: they compare
+  // the repo against the LIVE install, which does not exist on a runner)
+  { id: "ledger-sync-gate", layer: "local", mode: "hard", token: null },
+  { id: "settings-integrity", layer: "local", mode: "hard", token: null },
   // PreToolUse — real-time, hard-block
   { id: 'policy-enforce-hook', layer: 'PreToolUse', mode: 'hard', token: null },
   { id: 'jidoka-guard', layer: 'PreToolUse', mode: 'hard', token: null },
@@ -129,6 +133,48 @@ export function verifyPreToolUse(settingsText) {
   return { checked: true, missing };
 }
 
+// gate-severity-parity (2026-W32-R1) — the same checker must be equally strict where you
+// COMMIT and where you PUBLISH. When a script runs with a softening flag in .githooks/* but
+// hard in .github/workflows/*, every commit passes locally and the failure surfaces only on
+// the server, where nobody is watching. Not hypothetical: instantiation-audit ran --warn in
+// .githooks/pre-commit and hard in ci.yml, main went red on 2026-07-29 over a one-line README
+// count and stayed red five days while four more commits landed on top of it.
+//
+// A local gate MAY be stricter than CI. It may never be looser.
+export const SOFTENING_FLAGS = ['--warn', '--soft', '--dry-run', '--advisory', '--no-fail'];
+
+// Map script filename → is EVERY invocation of it softened? (a script invoked twice, once hard,
+// counts as hard). --self-test invocations are skipped: they verify logic, they do not enforce.
+function invocationSeverity(text) {
+  const out = new Map();
+  for (const line of String(text).split('\n')) {
+    const m = line.match(/scripts\/([\w.-]+\.mjs)(.*)$/);
+    if (!m) continue;
+    const script = m[1];
+    const rest = m[2] || '';
+    if (rest.includes('--self-test')) continue;
+    const soft = SOFTENING_FLAGS.some(fl => rest.includes(fl));
+    const prev = out.get(script);
+    out.set(script, prev === undefined ? soft : prev && soft);
+  }
+  return out;
+}
+
+/**
+ * Scripts that are SOFT locally but HARD in CI. Pure — takes the concatenated text of the
+ * git hooks and of the workflows.
+ */
+export function findSeverityMismatches(hooksText = '', workflowsText = '') {
+  const local = invocationSeverity(hooksText);
+  const ci = invocationSeverity(workflowsText);
+  const out = [];
+  for (const [script, localSoft] of local) {
+    if (!ci.has(script)) continue;          // not a shared checker — nothing to compare
+    if (localSoft && !ci.get(script)) out.push(script);
+  }
+  return out.sort();
+}
+
 function workflowsText(root = process.cwd()) {
   const dir = join(root, '.github', 'workflows');
   if (!existsSync(dir)) return '';
@@ -167,6 +213,23 @@ function selfTest() {
       { matcher: '*', hooks: [{ command: 'node policy-enforce-hook.mjs' }, { command: 'jidoka-guard.sh' }] },
     ] } })).missing.length === 0],
     ['malformed settings → checked:false, not a crash or a false alarm', verifyPreToolUse('{oops').checked === false],
+    // findSeverityMismatches — the 2026-07-29 red-main incident: soft locally, hard in CI
+    ['soft locally + hard in CI is caught (the exact incident shape)',
+      findSeverityMismatches(
+        'out=$(node "$ROOT/scripts/instantiation-audit.mjs" --warn 2>&1)',
+        '      - run: node scripts/instantiation-audit.mjs',
+      ).join() === 'instantiation-audit.mjs'],
+    ['same severity both sides → clean',
+      findSeverityMismatches('node "$ROOT/scripts/instantiation-audit.mjs"', '- run: node scripts/instantiation-audit.mjs').length === 0],
+    ['stricter locally than CI is allowed, not flagged',
+      findSeverityMismatches('node "$ROOT/scripts/x.mjs"', '- run: node scripts/x.mjs --warn').length === 0],
+    ['a checker CI does not run at all is not a mismatch',
+      findSeverityMismatches('node "$ROOT/scripts/local-only.mjs" --warn', '- run: node scripts/other.mjs').length === 0],
+    ['--self-test invocations are ignored (logic check, not enforcement)',
+      findSeverityMismatches('node "$ROOT/scripts/y.mjs" --warn', '- run: node scripts/y.mjs --self-test').length === 0],
+    ['a second HARD local invocation clears the softened one',
+      findSeverityMismatches('node "$ROOT/scripts/z.mjs" --warn\nnode "$ROOT/scripts/z.mjs"', '- run: node scripts/z.mjs').length === 0],
+    ['empty inputs → no findings, no crash', findSeverityMismatches('', '').length === 0],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
@@ -210,6 +273,15 @@ if (isMain) {
   const orphans = findOrphanGateScripts(pkg, wf + '\n' + hooksText + '\n' + installerText);
   if (orphans.length) { console.error(`\n\x1b[31m✗ ${orphans.length} gate script(s) built but UNWIRED (no workflow / git-hook caller — an orphan enforces nothing): ${orphans.join(', ')}\x1b[0m`); process.exit(1); }
   console.log('  \x1b[32m✓ every gate:* script has a standing caller (no orphan gate).\x1b[0m');
+  // severity parity: a checker that is soft locally and hard in CI guarantees a red server
+  const mismatches = findSeverityMismatches(hooksText, wf);
+  if (mismatches.length) {
+    console.error(`\n\x1b[31m✗ ${mismatches.length} checker(s) SOFT in .githooks but HARD in CI: ${mismatches.join(', ')}\x1b[0m`);
+    console.error('    Every commit passes locally and fails on the server. Match the severities');
+    console.error('    (drop the softening flag locally, or soften CI deliberately and say why).');
+    process.exit(1);
+  }
+  console.log('  \x1b[32m✓ no checker is softer locally than in CI (severity parity).\x1b[0m');
   // PreToolUse routing check: only meaningful on a machine with a global hook config (skipped in CI)
   const settingsPath = join(process.env.HOME || '', '.claude', 'settings.json');
   if (existsSync(settingsPath)) {

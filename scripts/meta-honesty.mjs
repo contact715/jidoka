@@ -36,7 +36,19 @@ const DONE_SYNONYMS = new Set(['done', 'finished', 'completed', 'complete', 'acc
 const EXTERNAL = new Set(['user', 'reviewer', 'review', 'test', 'tests', 'hook', 'ci', 'human', 'qa', 'gate', 'auditor', 'lint']);
 const NEGATIVE_MARKERS = ['went wrong', 'missed', 'mistake', 'failed', 'failure', 'gap', 'should have', 'regression', 'bug', 'broke', 'wrong', 'didn\'t', 'did not', 'overlooked', 'forgot'];
 
-export const words = s => new Set(String(s).toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(w => w.length > 3));
+// UNICODE-AWARE, and that is load-bearing. The tokenizer used to strip everything outside
+// [a-z0-9 ], which silently DELETED every Cyrillic word — so a Russian-language row produced an
+// empty word set, `novel` came out 0, and contradicts() returned false. Every honestly-written
+// Russian incident was therefore classified "self-confirming (garbage-in)". It stayed invisible
+// only because those rows lived in the un-versioned global ledger; the moment they were merged
+// into the canon on 2026-08-03, meta-honesty went COMPROMISED on 9 rows that are in fact some of
+// the best-written entries in the file ("тест типов упал, значит ошибки типов" vs "tsc гонялся с
+// живым dev-сервером, прямой прогон давал ноль"). The gate was not detecting dishonesty, it was
+// detecting a language it could not read.
+//
+// REMAINING LIMIT, stated rather than hidden: DONE_SYNONYMS below is still English-only, so a
+// synonym-pile written in Russian is not caught yet. Strictly better than erasing the text.
+export const words = s => new Set(String(s).toLowerCase().replace(/[^\p{L}\p{N} ]/gu, ' ').split(/\s+/).filter(w => w.length > 3));
 
 // A ledger row is a logged MISTAKE only if it carries the mistake schema — a `claimed` or a `real`
 // field. A row with neither (e.g. misfiled telemetry {ts,wave,class,run1,run2}) carries no honesty
@@ -109,6 +121,30 @@ function selfTest() {
   ok('contradicts: short real (<8 chars) → false', contradicts('all tests pass', 'yep ok') === false);
   ok('contradicts: synonym-pile (all novel words are done-synonyms) → false', contradicts('all tests pass', 'all tests passing verified confirmed successfully') === false);
   ok('contradicts: only 1 novel content word → false', contradicts('the gate is wired and working', 'the gate is wired') === false);
+
+  // Cyrillic — the 2026-08-03 blindspot. These two are VERBATIM from the live ledger
+  // (docs/audits/meta-mistakes.jsonl, class gate-depends-on-live-rebuild-artifacts and
+  // toggle-loses-to-default-specificity). With the old [a-z0-9] tokenizer both produced an
+  // empty word set and were reported "self-confirming (garbage-in)".
+  ok('contradicts: real Russian ledger row is recognised as contradicting',
+    contradicts(
+      'тест типов упал — значит в коде ошибки типов',
+      'tsc проверял каталог, который живой dev-сервер пересоздавал в тот же момент; прямой прогон давал 0 ошибок, падение было гонкой, а не дефектом',
+    ) === true);
+  ok('contradicts: second real Russian row also recognised',
+    contradicts(
+      'правило в CSS есть и селектор совпадает — значит переключатель работает',
+      'вес селектора переключателя (0,2,0) ниже веса объявления по умолчанию (0,3,1), правило не применялось никогда',
+    ) === true);
+  ok('words(): Cyrillic survives tokenization', words('проверка типов упала').size === 3);
+  // NB the >3-char filter applies to every alphabet, so "tsc" is dropped as a stop-word-length
+  // token in both the old and the new tokenizer. That is existing behaviour, not a regression.
+  ok('words(): mixed-script row keeps both alphabets',
+    words('webpack проверял каталог').has('webpack') && words('webpack проверял каталог').has('проверял'));
+  ok('words(): tokens of 3 chars or fewer are still dropped, in any alphabet',
+    !words('tsc код').has('tsc') && !words('tsc код').has('код'));
+  ok('contradicts: a Russian restatement is still NOT a contradiction',
+    contradicts('гейт подключён и работает', 'гейт подключён') === false);
   // words — content-word tokenizer (keeps >3-char words)
   ok('words: keeps >3-char words, drops ≤3-char', words('the cat ran faster').has('faster') && !words('the cat').has('cat'));
   // classifyRow — per-entry flags
