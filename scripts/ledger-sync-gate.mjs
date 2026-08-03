@@ -36,7 +36,7 @@ import {
  * @param {object[]|null} canon  rows of the committed ledger (null = file absent)
  * @param {object[]|null} inbox  rows of the global cross-project ledger (null = file absent)
  */
-export function verdict(canon, inbox) {
+export function syncVerdict(canon, inbox) {
   if (!Array.isArray(canon) || !Array.isArray(inbox)) {
     return { status: 'na', reason: 'only one ledger address exists here — nothing to compare', missing: [], invalid: [] };
   }
@@ -77,16 +77,16 @@ function selfTest() {
   ok('missingFrom is directional, not symmetric', missingFrom([a, b], [a]).length === 0);
 
   // verdict
-  ok('canon behind the inbox → behind', verdict([a], [a, b, c]).status === 'behind');
-  ok('behind names how many are missing', /missing 2 incident/.test(verdict([a], [a, b, c]).reason));
-  ok('canon complete → ok', verdict([a, b], [a, b]).status === 'ok');
-  ok('canon ahead of the inbox is NOT a failure', verdict([a, b, c], [a]).status === 'ok');
-  ok('one address missing → n/a, never a false red', verdict([a], null).status === 'na');
-  ok('both addresses missing → n/a', verdict(null, null).status === 'na');
+  ok('canon behind the inbox → behind', syncVerdict([a], [a, b, c]).status === 'behind');
+  ok('behind names how many are missing', /missing 2 incident/.test(syncVerdict([a], [a, b, c]).reason));
+  ok('canon complete → ok', syncVerdict([a, b], [a, b]).status === 'ok');
+  ok('canon ahead of the inbox is NOT a failure', syncVerdict([a, b, c], [a]).status === 'ok');
+  ok('one address missing → n/a, never a false red', syncVerdict([a], null).status === 'na');
+  ok('both addresses missing → n/a', syncVerdict(null, null).status === 'na');
 
   // schema safety — a malformed inbox row must never be absorbed into the canon
   const junk = { ts: 1, wave: 7 }; // the 2026-06-06 telemetry-row shape
-  ok('malformed inbox row is flagged invalid', verdict([], [junk]).invalid.length === 1);
+  ok('malformed inbox row is flagged invalid', syncVerdict([], [junk]).invalid.length === 1);
   ok('malformed row is NOT absorbable', absorbable([], [junk]).length === 0);
   ok('valid rows remain absorbable alongside a malformed one', absorbable([], [a, junk]).length === 1);
 
@@ -101,7 +101,7 @@ if (isMain) {
 
   const canon = existsSync(REPO_LEDGER) ? loadLedger(REPO_LEDGER) : null;
   const inbox = existsSync(GLOBAL_LEDGER) ? loadLedger(GLOBAL_LEDGER) : null;
-  const v = verdict(canon, inbox);
+  const v = syncVerdict(canon, inbox);
 
   if (v.status === 'na') {
     console.log(`\x1b[2m○ ledger-sync-gate: n/a — ${v.reason}\x1b[0m`);
