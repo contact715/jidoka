@@ -5,25 +5,33 @@
 // the engine in ALL projects). Each entry is tagged with the project it came
 // from (cwd basename), so the global ledger stays attributable.
 //
-// Usage: node scripts/meta-log.mjs <class> <claimed> <real> [caught_by]
+// Usage: node scripts/meta-log.mjs <class> <claimed> <real> [caught_by] [kind]
 //   class    — short kebab-case mistake class (e.g. declaration-over-implementation)
 //   claimed  — what was asserted as done/true
 //   real     — what was actually the case
 //   caught_by — who/what caught it (default: user)
+//   kind     — incident | remediation (default: incident)
+//
+// `kind` is required by the ledger schema (validateLedgerEntry). It defaults to
+// "incident" because that is what this CLI logs: a mistake that happened. A
+// remediation row (the fix that closed a class) is written by the remedy path,
+// which passes kind explicitly. Without this default the writer and the validator
+// disagree and every plain 4-arg call is rejected — the exact drift that broke CI
+// on 2026-08-04.
 
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, basename } from 'node:path';
 import { LEDGER, validateLedgerEntry } from './meta-lib.mjs';
 
-const [, , cls, claimed, real, caught = 'user'] = process.argv;
+const [, , cls, claimed, real, caught = 'user', kind = 'incident'] = process.argv;
 if (!cls || !claimed || !real) {
-  console.error('usage: meta-log.mjs <class> <claimed> <real> [caught_by]');
+  console.error('usage: meta-log.mjs <class> <claimed> <real> [caught_by] [kind]');
   process.exit(2);
 }
 
 const date = new Date().toISOString().slice(0, 10);
 const project = basename(process.cwd());
-const entry = { date, class: cls, claimed, real, caught_by: caught, project };
+const entry = { date, class: cls, claimed, real, caught_by: caught, project, kind };
 
 // ledger-pollution write-path guard: a row that does not carry the full mistake schema
 // (date/class/claimed/real/caught_by, all non-empty) is rejected HERE, not caught later
