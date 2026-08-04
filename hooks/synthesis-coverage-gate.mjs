@@ -89,7 +89,7 @@ export function isSynthesisDoc(filePath) {
   return SYNTHESIS_NAME.test(base);
 }
 
-/** Запуск инструмента сверки покрытия. */
+/** Механическая сверка: запуск инструмента покрытия. */
 export function isCoverageAudit(tool) {
   if (tool.name !== "Bash") return false;
   const cmd = String(tool.input?.command || "");
@@ -97,8 +97,30 @@ export function isCoverageAudit(tool) {
 }
 
 /**
+ * Смысловая сверка: субагент, читающий источники против документа.
+ * Ловит то, что механика пропускает (клиент сказал X → следует требование Y).
+ * Признак: вызов Agent/Task, в промпте которого есть и документ, и намерение сверки.
+ */
+export function isSemanticReview(tool) {
+  if (!/^(Agent|Task)$/.test(tool.name)) return false;
+  const text = JSON.stringify(tool.input || {}).toLowerCase();
+  const mentionsSources = /источник|source|транскрипт|бриф|созвон/.test(text);
+  const mentionsGap = /не отражен|непокрыт|пропуск|упущен|missing|not reflected|gap/.test(text);
+  return mentionsSources && mentionsGap;
+}
+
+/**
  * Главное решение: писали синтез и не сверяли его после этого?
- * Возвращает { shouldBlock, docs }.
+ *
+ * Сверка засчитывается, если после последней правки документа была хотя бы ОДНА из двух:
+ *  - механическая (synthesis-coverage-audit): ловит пропавшие сущности
+ *  - смысловая (субагент против источников): ловит пропавшие следствия
+ *
+ * Требовать обе жёстко нельзя: на коротком документе смысловая избыточна, и гейт,
+ * который срабатывает всегда, начинают обходить. Поэтому одна обязательна, вторая
+ * рекомендуется в тексте блокировки.
+ *
+ * Возвращает { shouldBlock, docs, hadMechanical, hadSemantic }.
  */
 export function decide(tools) {
   let lastSynthesisIdx = -1;
@@ -113,10 +135,20 @@ export function decide(tools) {
     }
   });
 
-  if (lastSynthesisIdx < 0) return { shouldBlock: false, docs: [] };
+  if (lastSynthesisIdx < 0) {
+    return { shouldBlock: false, docs: [], hadMechanical: false, hadSemantic: false };
+  }
 
-  const auditedAfter = tools.slice(lastSynthesisIdx + 1).some(isCoverageAudit);
-  return { shouldBlock: !auditedAfter, docs: [...docs] };
+  const after = tools.slice(lastSynthesisIdx + 1);
+  const hadMechanical = after.some(isCoverageAudit);
+  const hadSemantic = after.some(isSemanticReview);
+
+  return {
+    shouldBlock: !hadMechanical && !hadSemantic,
+    docs: [...docs],
+    hadMechanical,
+    hadSemantic,
+  };
 }
 
 function markerPath(sessionId) {
@@ -148,12 +180,23 @@ function selfTest() {
   const audit = { name: "Bash", input: { command: "node ~/.claude/jidoka/scripts/synthesis-coverage-audit.mjs --doc a --sources b" } };
   const other = { name: "Bash", input: { command: "ls -la" } };
 
+  const semantic = {
+    name: "Agent",
+    input: { prompt: "Прочитай источники и документ, найди что не отражено в ТЗ, пропуски" },
+  };
+
   ok("синтез без сверки блокируется", decide([write("/x/ТЗ.md")]).shouldBlock === true);
-  ok("синтез со сверкой после не блокируется", decide([write("/x/ТЗ.md"), audit]).shouldBlock === false);
+  ok("синтез с механической сверкой проходит", decide([write("/x/ТЗ.md"), audit]).shouldBlock === false);
+  ok("синтез со смысловой сверкой проходит", decide([write("/x/ТЗ.md"), semantic]).shouldBlock === false);
   ok("сверка ДО правки не засчитывается", decide([audit, write("/x/ТЗ.md")]).shouldBlock === true);
   ok("без синтеза не блокируется", decide([write("/x/app.tsx"), other]).shouldBlock === false);
   ok("пустой список не блокируется", decide([]).shouldBlock === false);
   ok("имя документа попадает в отчёт", decide([write("/x/Смета.md")]).docs.includes("Смета.md"));
+  ok("флаги сверок возвращаются", decide([write("/x/ТЗ.md"), audit]).hadMechanical === true);
+  ok(
+    "посторонний субагент не засчитывается как сверка",
+    decide([write("/x/ТЗ.md"), { name: "Agent", input: { prompt: "напиши тесты" } }]).shouldBlock === true
+  );
 
   // повторная правка после сверки снова требует сверки
   ok(
@@ -210,13 +253,19 @@ function main() {
   process.stderr.write(
     `СТОП: документ-синтез сдаётся без сверки с источниками.\n\n` +
       `Изменено: ${list}\n\n` +
-      `Это документ, собранный из внешних источников (созвон, переписка, анкета, документация).\n` +
-      `Прежде чем отдавать его, сверь механически, что ничего не потеряно:\n\n` +
-      `  node ~/.claude/jidoka/scripts/synthesis-coverage-audit.mjs \\\n` +
-      `    --doc "<путь к документу>" --sources "<папка или файлы источников>"\n\n` +
-      `Инструмент покажет сущности, которые есть в источниках, но отсутствуют в документе,\n` +
-      `отсортированные по частоте упоминания. Каждую проверь глазами: это пропуск или шум.\n` +
-      `Затем в ответе владельцу отдельно скажи, что проверено и чего проверить нельзя.\n`
+      `Это выжимка из внешних источников (созвон, переписка, анкета, документация).\n` +
+      `Прежде чем отдавать, проверь, что ничего не потеряно. Два разных типа пропусков:\n\n` +
+      `1. МЕХАНИЧЕСКИЙ — сущность есть в источнике, нет в документе (имя, сумма, название):\n\n` +
+      `   node ~/.claude/jidoka/scripts/synthesis-coverage-audit.mjs \\\n` +
+      `     --doc "<документ>" --sources "<папка источников>"\n\n` +
+      `2. СМЫСЛОВОЙ — из слов клиента следует требование, которого в документе нет.\n` +
+      `   Механика его не видит. Запусти навык synthesis-review: четыре субагента\n` +
+      `   с разными рамками (деньги, техника, риски, невысказанное) читают источники\n` +
+      `   против документа и возвращают непокрытые следствия.\n\n` +
+      `Для короткого документа хватит первого. Для ТЗ, сметы и всего, что уходит\n` +
+      `клиенту, нужны оба: они ловят разное.\n\n` +
+      `Затем в ответе владельцу отдельно скажи: что проверено, что нашли,\n` +
+      `и чего проверить нельзя.\n`
   );
   process.exit(2);
 }
