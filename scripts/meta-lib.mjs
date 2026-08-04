@@ -87,7 +87,101 @@ export const todayISO = () => process.env.META_TODAY || new Date().toISOString()
 export const daysBetween = (a, b) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 export const monthOf = iso => iso.slice(0, 7); // YYYY-MM
 
+// normalized-class-key (2026-W32-R7) — the recurrence detector groups incidents by EXACT
+// string equality of `class`, and the recurring threshold in meta-audit is exactly 2. Measured
+// 2026-08-03 on the merged canon: 45 classes, 37 of them singletons. Two pairs were the same
+// defect wearing two names, so the detector could never fire on them:
+//
+//   gate-block-not-enforced (2026-06-07)   "hard block active, commit refused" but the commit landed
+//   gate-claims-block-but-passes (2026-06-10)  the hook does not propagate its exit code
+//
+//   gate-casing-bypass (2026-05-31)   case-variant path slipped past the protected-path regex
+//   gate-bypass (2026-06-06 row)      "protected path via case-variant (lowercase), red-team find 2026-05-31"
+//
+// DESIGN CHOICE, and it is deliberate: no fuzzy auto-merge. Edit-distance or Jaccard clustering
+// would silently fuse classes that merely SOUND alike, and a wrong merge destroys signal in the
+// one registry the engine learns from. So:
+//   1. a deterministic textual normalization (case, separators, stop-words, token order),
+//   2. an explicit alias map, each entry justified by reading BOTH incidents,
+//   3. a suggester that PRINTS near-duplicate candidates for a human to confirm, and merges nothing.
+// Every merge that does happen is printed, never silent.
+
+const CLASS_STOPWORDS = new Set(['the', 'a', 'an', 'is', 'was', 'be', 'to', 'of', 'in', 'on', 'by', 'and', 'or']);
+
+/** Deterministic textual key: case, separators, stop-words and token order stop mattering. Pure. */
+export function normalizeClassKey(cls = '') {
+  return String(cls)
+    .toLowerCase()
+    .replace(/[^a-z0-9а-яё]+/gi, ' ')
+    .split(/\s+/)
+    .filter(w => w && !CLASS_STOPWORDS.has(w))
+    .sort()
+    .join('-');
+}
+
+// Curated aliases: canonical <- duplicate. Each pair was confirmed by reading both incidents,
+// not by string similarity. Add here only with that evidence.
+export const CLASS_ALIASES = {
+  'gate-block-not-enforced': 'gate-claims-block-but-passes',
+  'gate-casing-bypass': 'gate-bypass',
+};
+
+/** The key a row is actually grouped under. Pure. */
+export function classKeyOf(cls = '') {
+  const canonical = CLASS_ALIASES[cls] || cls;
+  return normalizeClassKey(canonical);
+}
+
+/**
+ * Near-duplicate candidates: class pairs sharing >= minShared meaningful tokens that are NOT
+ * already aliased. Reported, never merged. Pure.
+ */
+export function suggestClassMerges(classes = [], minShared = 2) {
+  const list = [...new Set(classes)].sort();
+  const tokens = (c) => new Set(normalizeClassKey(c).split('-').filter(Boolean));
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      if (classKeyOf(list[i]) === classKeyOf(list[j])) continue; // already one class
+      const a = tokens(list[i]), b = tokens(list[j]);
+      const shared = [...a].filter(t => b.has(t));
+      if (shared.length >= minShared) out.push({ a: list[i], b: list[j], shared });
+    }
+  }
+  return out;
+}
+
+
+/**
+ * Group rows by class, merging aliased and textually-identical spellings. The returned keys are
+ * the most frequent ORIGINAL spelling in each group, so reports stay readable; `mergedPairs` on
+ * the returned object records every spelling that was folded in, so no merge is silent.
+ */
 export function groupByClass(rows) {
+  const buckets = new Map(); // normalized key -> { rows, spellings: Map<string, count> }
+  for (const r of rows) {
+    const k = classKeyOf(r.class);
+    if (!buckets.has(k)) buckets.set(k, { rows: [], spellings: new Map() });
+    const b = buckets.get(k);
+    b.rows.push(r);
+    b.spellings.set(r.class, (b.spellings.get(r.class) || 0) + 1);
+  }
+  const by = {};
+  const mergedPairs = [];
+  for (const b of buckets.values()) {
+    const spellings = [...b.spellings.entries()].sort((x, y) => y[1] - x[1] || String(x[0]).localeCompare(String(y[0])));
+    // prefer the spelling the alias map declares canonical; otherwise the most frequent one
+    const aliasTarget = spellings.map(([n]) => CLASS_ALIASES[n]).find(Boolean);
+    const display = (aliasTarget && spellings.some(([n]) => n === aliasTarget)) ? aliasTarget : spellings[0][0];
+    by[display] = b.rows;
+    for (const [name] of spellings) if (name !== display) mergedPairs.push({ folded: name, into: display });
+  }
+  Object.defineProperty(by, "mergedPairs", { value: mergedPairs, enumerable: false });
+  return by;
+}
+
+// kept for callers that want the raw, unmerged view (e.g. a migration or an audit of the merge)
+export function groupByClassExact(rows) {
   const by = {};
   for (const r of rows) (by[r.class] ??= []).push(r);
   return by;
@@ -105,6 +199,83 @@ export function recurrencesAfter(items, since) {
 // ({ts,wave,run1,run2}) leaked into the ledger twice on 2026-06-06 and were only caught
 // downstream by meta-honesty; this schema rejects them AT WRITE TIME (meta-log) and at
 // commit/CI (ledger-schema-gate). One function, shared by both, so the layers can't drift.
+// mast-modes-and-entry-kind (2026-W32-R8) — two fields the ledger was missing.
+//
+// (A) `kind`. A row saying "recurred 1x within one session -> systemic fix: added X" is a
+// RECORD OF THE REPAIR, not a second mistake. 9 of 59 rows in the canon are that shape, and
+// because nothing distinguished them, meta-audit counted them as recurrences: both classes it
+// reported as "recurring, ungated" (reactive-literal-execution, peer-restyle-instead-of-clone)
+// were single incidents whose repair note doubled the count. The engine was alarming itself
+// with its own fixes.
+//
+// (B) `mastMode`. Our 43 classes are entirely self-invented, so the ledger cannot know what it
+// never thought to look for. MAST is an EXTERNAL, empirically-derived taxonomy of multi-agent
+// failure, 14 modes in 3 categories, built from 150+ annotated traces.
+//
+// Source, read from the paper itself (arxiv 2503.13657, "Why Do Multi-Agent LLM Systems
+// Fail?"), NOT from a summary: mode ids, names and per-mode shares are verbatim from the
+// taxonomy figure. The CATEGORY shares are derived by summing the modes, because the figure's
+// layout puts the category percentages next to the wrong labels: 11.8+1.5+15.7+2.8+12.4 = 44.2
+// for System Design Issues, 2.2+6.8+7.4+0.8+1.9+13.2 = 32.3 for Inter-Agent Misalignment,
+// 6.2+8.2+9.1 = 23.5 for Task Verification. (A research summary of this paper circulated the
+// figures as 42/37/21; that is wrong, and it is why the numbers below were re-derived.)
+//
+// The field is OPTIONAL on purpose. Labelling all 59 historical rows by hand, alone, would be
+// inventing data to fill a column. Rows get a mode only where the mapping is unambiguous from
+// the recorded text; coverage is printed rather than assumed.
+export const MAST_MODES = [
+  { id: 'FM-1.1', name: 'Disobey Task Specification', category: 'System Design Issues', share: 11.8 },
+  { id: 'FM-1.2', name: 'Disobey Role Specification', category: 'System Design Issues', share: 1.5 },
+  { id: 'FM-1.3', name: 'Step Repetition', category: 'System Design Issues', share: 15.7 },
+  { id: 'FM-1.4', name: 'Loss of Conversation History', category: 'System Design Issues', share: 2.8 },
+  { id: 'FM-1.5', name: 'Unaware of Termination Conditions', category: 'System Design Issues', share: 12.4 },
+  { id: 'FM-2.1', name: 'Conversation Reset', category: 'Inter-Agent Misalignment', share: 2.2 },
+  { id: 'FM-2.2', name: 'Fail to Ask for Clarification', category: 'Inter-Agent Misalignment', share: 6.8 },
+  { id: 'FM-2.3', name: 'Task Derailment', category: 'Inter-Agent Misalignment', share: 7.4 },
+  { id: 'FM-2.4', name: 'Information Withholding', category: 'Inter-Agent Misalignment', share: 0.8 },
+  { id: 'FM-2.5', name: "Ignored Other Agent's Input", category: 'Inter-Agent Misalignment', share: 1.9 },
+  { id: 'FM-2.6', name: 'Reasoning-Action Mismatch', category: 'Inter-Agent Misalignment', share: 13.2 },
+  { id: 'FM-3.1', name: 'Premature Termination', category: 'Task Verification', share: 6.2 },
+  { id: 'FM-3.2', name: 'No or Incomplete Verification', category: 'Task Verification', share: 8.2 },
+  { id: 'FM-3.3', name: 'Incorrect Verification', category: 'Task Verification', share: 9.1 },
+];
+
+export const MAST_IDS = new Set(MAST_MODES.map(m => m.id));
+export const MAST_CATEGORY_SHARE = { 'System Design Issues': 44.2, 'Inter-Agent Misalignment': 32.3, 'Task Verification': 23.5 };
+export const LEDGER_KINDS = new Set(['incident', 'remediation']);
+
+/** Category of a mode id, or null. Pure. */
+export const mastCategoryOf = (id) => (MAST_MODES.find(m => m.id === id) || {}).category || null;
+
+/** Only rows that record an actual mistake. Pure. */
+export const incidentsOnly = (rows = []) => rows.filter(r => (r.kind || 'incident') === 'incident');
+
+/**
+ * Our distribution over MAST categories vs the published one, computed ONLY over labelled rows.
+ * Returns coverage so a reader can see how much of the ledger the comparison actually speaks for.
+ * Pure.
+ */
+export function mastDistribution(rows = []) {
+  const incidents = incidentsOnly(rows);
+  const labelled = incidents.filter(r => r.mastMode && MAST_IDS.has(r.mastMode));
+  const ours = {};
+  for (const cat of Object.keys(MAST_CATEGORY_SHARE)) ours[cat] = 0;
+  for (const r of labelled) {
+    const cat = mastCategoryOf(r.mastMode);
+    if (cat) ours[cat] += 1;
+  }
+  const pct = {};
+  for (const [cat, n] of Object.entries(ours)) pct[cat] = labelled.length ? Math.round((n / labelled.length) * 1000) / 10 : 0;
+  return {
+    incidents: incidents.length,
+    labelled: labelled.length,
+    coverage: incidents.length ? Math.round((labelled.length / incidents.length) * 100) : 0,
+    counts: ours,
+    ours: pct,
+    published: MAST_CATEGORY_SHARE,
+  };
+}
+
 export const LEDGER_REQUIRED = ['date', 'class', 'claimed', 'real', 'caught_by'];
 export function validateLedgerEntry(e) {
   if (e === null || typeof e !== 'object' || Array.isArray(e)) return ['row is not an object'];
@@ -115,6 +286,13 @@ export function validateLedgerEntry(e) {
   }
   if (typeof e.date === 'string' && e.date.trim() !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(e.date)) {
     problems.push(`field "date" must be ISO YYYY-MM-DD (got "${e.date}")`);
+  }
+  // kind: required, so a repair note can never again be counted as a second mistake (W32-R8)
+  if (!('kind' in e)) problems.push('missing required field "kind" (incident | remediation)');
+  else if (!LEDGER_KINDS.has(e.kind)) problems.push(`field "kind" must be one of ${[...LEDGER_KINDS].join(' | ')} (got "${e.kind}")`);
+  // mastMode: optional second axis, but if present it must be a real MAST id, not an invention
+  if ('mastMode' in e && e.mastMode !== null && !MAST_IDS.has(e.mastMode)) {
+    problems.push(`field "mastMode" must be a MAST id (FM-1.1 … FM-3.3) or null (got "${e.mastMode}")`);
   }
   return problems;
 }

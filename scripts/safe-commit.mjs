@@ -28,13 +28,76 @@
 //                                [--target main] [--no-push] [--dry-run] [--wait 120]
 
 import { execSync } from 'node:child_process';
-import { readFileSync, existsSync, writeFileSync, unlinkSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, unlinkSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { acquire, release } from './commit-lock.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+
+// only-staged-flag (2026-W32-S1) — safe-commit used to run `git add -A` unconditionally.
+// That is right for a lone session ("commit everything I did") and dangerous the moment a
+// second session holds unfinished work in the same tree. 2026-07-31: an agent staged five
+// text files explicitly, called safe-commit, and `git add -A` swept in 66+ files belonging to
+// a parallel session, including a 140 MB webpack cache. Nothing in the engine noticed; the
+// push failed only because GitHub rejects files that large. History was saved by an external
+// size limit, not by us.
+//
+// Two changes, both here:
+//   --only-staged   commit exactly what the caller staged, never widen the selection
+//   sweep guard     before a wide `git add -A`, look at what would be swept and REFUSE when it
+//                   carries the fingerprints of someone else's working tree
+//
+// The guard is deliberately about SHAPE, not about count alone: a build artifact or a huge
+// file in an unstaged tree is the signal that this tree is not exclusively yours.
+
+export const ARTIFACT_PATTERNS = [
+  /(^|\/)node_modules\//, /(^|\/)\.next(-[\w-]+)?\//, /(^|\/)dist\//, /(^|\/)build\//,
+  /(^|\/)\.turbo\//, /(^|\/)coverage\//, /(^|\/)\.cache\//, /(^|\/)target\//,
+  /(^|\/)__pycache__\//, /\.log$/,
+];
+
+export const SWEEP_FILE_LIMIT = 25;          // files
+export const SWEEP_SIZE_LIMIT = 25 * 1024 * 1024; // bytes, well under GitHub's 100 MB refusal
+
+/** Parse `git status --porcelain` into {path, staged} rows. Pure. */
+export function parseStatus(porcelain = '') {
+  const out = [];
+  for (const line of String(porcelain).split('\n')) {
+    if (line.length < 4) continue;
+    const x = line[0], y = line[1];
+    let path = line.slice(3).trim();
+    if (path.includes(' -> ')) path = path.split(' -> ').pop().trim();     // rename
+    if (path.startsWith('"') && path.endsWith('"')) path = path.slice(1, -1); // quoted path
+    out.push({ path, staged: x !== ' ' && x !== '?', untracked: x === '?' && y === '?' });
+  }
+  return out;
+}
+
+/**
+ * Would a wide `git add -A` sweep in someone else's work? Pure.
+ * @param {string} porcelain   output of `git status --porcelain`
+ * @param {(p:string)=>number} sizeOf  bytes on disk for a path (0 when unknown)
+ */
+export function sweepRisk(porcelain, sizeOf = () => 0) {
+  const rows = parseStatus(porcelain);
+  const unstaged = rows.filter(r => !r.staged);
+  const reasons = [];
+
+  const artifacts = unstaged.filter(r => ARTIFACT_PATTERNS.some(re => re.test(r.path)));
+  if (artifacts.length) {
+    reasons.push(`${artifacts.length} build-artifact path(s) would be swept in, e.g. ${artifacts[0].path}`);
+  }
+  const huge = unstaged.map(r => ({ ...r, size: sizeOf(r.path) })).filter(r => r.size > SWEEP_SIZE_LIMIT);
+  if (huge.length) {
+    reasons.push(`${huge.length} file(s) over ${Math.round(SWEEP_SIZE_LIMIT / 1024 / 1024)} MB, e.g. ${huge[0].path} (${Math.round(huge[0].size / 1024 / 1024)} MB)`);
+  }
+  if (unstaged.length > SWEEP_FILE_LIMIT) {
+    reasons.push(`${unstaged.length} unstaged path(s), over the ${SWEEP_FILE_LIMIT}-file limit, which looks like a second session's tree`);
+  }
+  return { risky: reasons.length > 0, reasons, unstagedCount: unstaged.length, stagedCount: rows.length - unstaged.length };
+}
 
 // ---- pure decision logic (self-tested) ----
 
@@ -109,7 +172,26 @@ async function run(opts) {
   // 1. local commit, only if there are uncommitted changes
   if (facts.dirty) {
     if (!opts.message) { say('✗ refusing: --message is required when there are changes.'); return { ok: false, cls, log }; }
-    sh('git add -A', facts.root);
+    // only-staged-flag: never widen the caller's selection when they asked for precision,
+    // and refuse a wide sweep that carries another session's tree with it.
+    if (opts.onlyStaged) {
+      const staged = sh('git diff --cached --name-only', facts.root).trim();
+      if (!staged) { say('✗ refusing: --only-staged given but the index is empty. Stage the paths you mean first.'); return { ok: false, cls, log }; }
+      say(`--only-staged: committing ${staged.split('\n').length} staged path(s), leaving the rest of the tree alone`);
+    } else {
+      const porcelain = sh('git status --porcelain', facts.root);
+      const sizeOf = (p) => { try { return statSync(join(facts.root, p)).size; } catch { return 0; } };
+      const risk = sweepRisk(porcelain, sizeOf);
+      if (risk.risky && !opts.forceSweep) {
+        say('✗ refusing to `git add -A`: this tree does not look exclusively yours.');
+        for (const r of risk.reasons) say(`    ${r}`);
+        say('    Stage exactly what you mean and re-run with --only-staged, or pass --force-sweep');
+        say('    if you are certain every unstaged change is yours. (2026-07-31: an unconditional');
+        say('    add -A swept 66 files and a 140 MB cache from a parallel session into one commit.)');
+        return { ok: false, cls, log };
+      }
+      sh('git add -A', facts.root);
+    }
     // via a message file so multi-line messages keep their newlines (‑m would literalise them)
     const msgFile = join(tmpdir(), `safe-commit-${process.pid}.txt`);
     writeFileSync(msgFile, opts.message);
@@ -165,6 +247,47 @@ function selfTest() {
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
+  const ok = (name, cond) => { if (!cond) fails++; console.log(`  ${cond ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); };
+
+  // ── sweep guard (2026-W32-S1) — the 2026-07-31 incident shape ────────────
+  {
+    // git status --porcelain as it looked that night: five staged text files of mine,
+    // plus a parallel session's tree including a webpack cache.
+    const mine = ['M  docs/a.md', 'M  docs/b.md', 'A  docs/c.md', 'M  docs/d.md', 'M  docs/e.md'];
+    const theirs = [' M app/x.tsx', '?? .next-mocks/cache/0.pack', ' M lib/y.ts'];
+    const porcelain = [...mine, ...theirs].join('\n');
+
+    const rows = parseStatus(porcelain);
+    ok('parseStatus splits staged from unstaged', rows.filter(r => r.staged).length === 5 && rows.filter(r => !r.staged).length === 3);
+    ok('parseStatus handles a rename arrow', parseStatus('R  old.md -> new.md')[0].path === 'new.md');
+    ok('parseStatus handles a quoted path', parseStatus('?? "with space.md"')[0].path === 'with space.md');
+    ok('parseStatus ignores blank/short lines', parseStatus('\n\nM  a.md\n').length === 1);
+
+    const big = (p) => (p.includes('.next-mocks') ? 140 * 1024 * 1024 : 1024);
+    const risk = sweepRisk(porcelain, big);
+    ok('sweep guard fires on the real incident shape', risk.risky === true);
+    ok('sweep guard names the build artifact', risk.reasons.join(' ').includes('.next-mocks'));
+    ok('sweep guard names the 140 MB file', risk.reasons.join(' ').includes('140 MB'));
+    ok('sweep guard counts staged vs unstaged', risk.stagedCount === 5 && risk.unstagedCount === 3);
+
+    // a lone session with ordinary unstaged work is NOT blocked
+    const solo = ['M  a.md', ' M b.md', ' M c.md'].join('\n');
+    ok('ordinary solo tree is not flagged', sweepRisk(solo, () => 1024).risky === false);
+
+    // each trigger fires on its own
+    ok('artifact path alone triggers', sweepRisk(' M node_modules/x/index.js', () => 10).risky === true);
+    ok('oversize file alone triggers', sweepRisk(' M data.bin', () => 30 * 1024 * 1024).risky === true);
+    ok('many unstaged files alone triggers',
+      sweepRisk(Array.from({ length: 30 }, (_, i) => ` M f${i}.ts`).join('\n'), () => 10).risky === true);
+    ok('exactly at the file limit is NOT flagged (strict >)',
+      sweepRisk(Array.from({ length: 25 }, (_, i) => ` M f${i}.ts`).join('\n'), () => 10).risky === false);
+
+    // a STAGED artifact is the caller's own decision, not a foreign sweep
+    ok('a staged build artifact is not treated as someone else\'s tree',
+      sweepRisk('A  dist/bundle.js', () => 10).risky === false);
+    ok('empty status → no risk', sweepRisk('', () => 0).risky === false);
+  }
+
   if (fails) { console.log('\n\x1b[31msafe-commit self-test FAILED\x1b[0m'); process.exit(1); }
   console.log('\n\x1b[32m✓ safe-commit: policy + push-decision correct\x1b[0m');
   process.exit(0);
@@ -179,6 +302,7 @@ else {
   const r = await run({
     repo: arg('--repo'), message: arg('--message') || arg('-m'), session: arg('--session'),
     target: arg('--target'), noPush: has('--no-push'), dryRun: has('--dry-run'), wait: Number(arg('--wait')) || 120,
+    onlyStaged: has('--only-staged'), forceSweep: has('--force-sweep'),
   });
   process.exit(r.ok ? 0 : 1);
 }

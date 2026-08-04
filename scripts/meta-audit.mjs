@@ -30,7 +30,13 @@ import { REMEDIES } from './meta-remedies.mjs'; // single source of truth for ga
 const rows = loadLedgerUnion(); // union-ledger-read: both addresses, deduped (2026-W32-R2)
 if (rows.length === 0) { console.log('meta-audit: ledger empty — nothing to analyze.'); process.exit(0); }
 
-const classes = Object.entries(groupByClass(rows)).sort((a, b) => b[1].length - a[1].length);
+const grouped = groupByClass(rows);
+// normalized-class-key: no merge is silent. Print every spelling folded into another.
+if (grouped.mergedPairs && grouped.mergedPairs.length) {
+  console.log("\n  class spellings merged (normalized-class-key):");
+  for (const p of grouped.mergedPairs) console.log(`    ${p.folded} -> ${p.into}`);
+}
+const classes = Object.entries(grouped).sort((a, b) => b[1].length - a[1].length);
 console.log(`meta-audit: ${rows.length} logged mistakes across ${classes.length} class(es)\n`);
 
 const today = todayISO();
