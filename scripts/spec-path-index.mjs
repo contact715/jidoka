@@ -64,6 +64,34 @@ export function lookup(idx = {}, codePath = '') {
   return hits && hits.length ? hits[0] : null;
 }
 
+// reverse-drift-unrequested (2026-W31-R16) — the drift daemon only ever walks spec → code:
+// "is everything the spec asked for present?" The other direction is never asked: "is anything
+// here that nobody asked for?" Code with no governing spec is maintained forever, tested
+// forever, and reasoned about forever, on nobody's authority.
+//
+// THE PRECONDITION WAS ONLY PARTLY MET, so this reports and never blocks. The judge gated this
+// on requirement ids existing. They now do — ac-coverage extracts 32 criteria after the W31-R5b
+// fix — but only from 2 specs of 67, and the path index covers 46 of 236 engine scripts. Most of
+// the uncovered 190 predate the spec tree entirely. Calling all of them "unrequested" would be a
+// false alarm at scale, which is how a detector teaches people to ignore it.
+//
+// So the signal is narrowed to where it MEANS something: code written recently, with no spec
+// naming it. Old unspecced code is history; new unspecced code is a decision nobody recorded.
+
+/**
+ * Files with no governing spec, newest first. Pure — takes the index and a {path: ageDays} map.
+ * `recentDays` is the window where absence of a spec is a real signal rather than archaeology.
+ */
+export function unrequested(idx = {}, ages = {}, recentDays = 30) {
+  const out = [];
+  for (const [file, ageDays] of Object.entries(ages)) {
+    if (idx[file] && idx[file].length) continue;
+    out.push({ file, ageDays, recent: typeof ageDays === 'number' && ageDays <= recentDays });
+  }
+  out.sort((a, b) => (a.ageDays ?? 1e9) - (b.ageDays ?? 1e9));
+  return { all: out, recent: out.filter((r) => r.recent) };
+}
+
 /** One short line for a hook to inject. Pure — returns '' when there is nothing to say. */
 export function injectionLine(idx = {}, codePath = '') {
   const hit = lookup(idx, codePath);
@@ -101,6 +129,17 @@ function selfTest() {
   ok('для неизвестного файла вставлять нечего', injectionLine(idx, 'scripts/ghost.mjs') === '');
   ok('строка молчит на пустом индексе', injectionLine({}, 'scripts/a.mjs') === '');
 
+  // reverse axis (2026-W31-R16)
+  const ages = { 'scripts/run-state.mjs': 100, 'scripts/brand-new.mjs': 2, 'scripts/old-orphan.mjs': 400 };
+  const rev = unrequested(idx, ages, 30);
+  ok('файл под спекой не считается непрошеным', !rev.all.some((r) => r.file === 'scripts/run-state.mjs'));
+  ok('файл без спеки попадает в список', rev.all.some((r) => r.file === 'scripts/brand-new.mjs'));
+  ok('свежий без спеки помечен как свежий', rev.recent.length === 1 && rev.recent[0].file === 'scripts/brand-new.mjs');
+  ok('старый без спеки в списке есть, но не в свежих', rev.all.some((r) => r.file === 'scripts/old-orphan.mjs') && !rev.recent.some((r) => r.file === 'scripts/old-orphan.mjs'));
+  ok('сортировка от самого свежего', rev.all[0].file === 'scripts/brand-new.mjs');
+  ok('окно настраивается', unrequested(idx, ages, 500).recent.length === 2);
+  ok('пустой возраст не роняет', unrequested(idx, {}, 30).all.length === 0);
+
   if (fails) { console.log(`\n\x1b[31mspec-path-index self-test FAILED (${fails})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ spec-path-index: индекс выводится из упоминаний, одиночное упоминание не считается\x1b[0m');
   process.exit(0);
@@ -128,6 +167,44 @@ if (isMain) {
     writeFileSync(INDEX, `${JSON.stringify(idx, null, 2)}\n`);
     const files = Object.keys(idx).length;
     console.log(`spec-path-index: ${Object.keys(specs).length} спек → ${files} файл(ов) под спекой → ${path.relative(ROOT, INDEX)}`);
+    process.exit(0);
+  }
+
+  if (argv.includes('--reverse')) {
+    if (!existsSync(INDEX)) { console.error('индекс не построен: --build'); process.exit(2); }
+    const idx = JSON.parse(readFileSync(INDEX, 'utf8'));
+    const { execFileSync } = await import('node:child_process');
+    const ages = {};
+    for (const dir of ['scripts', 'hooks']) {
+      let names = [];
+      try { names = readdirSync(path.join(ROOT, dir)); } catch { continue; }
+      for (const n of names) {
+        if (!/\.(mjs|js|sh)$/.test(n)) continue;
+        const rel = `${dir}/${n}`;
+        let days = null;
+        try {
+          const iso = execFileSync('git', ['log', '-1', '--format=%cI', '--', rel], { cwd: ROOT, encoding: 'utf8', timeout: 4000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+          if (iso) days = Math.floor((Date.now() - Date.parse(iso)) / 86400000);
+        } catch { /* untracked or no git: leave null */ }
+        ages[rel] = days;
+      }
+    }
+    const winIdx = argv.indexOf('--days');
+    const win = winIdx !== -1 ? Number(argv[winIdx + 1]) : 30;
+    const rev = unrequested(idx, ages, win);
+    console.log('обратная ось: код, который ни одна спека не называет');
+    console.log('');
+    console.log('  всего файлов движка: ' + Object.keys(ages).length + ', под спекой: ' + Object.keys(idx).length + ', без спеки: ' + rev.all.length);
+    console.log('  из них написаны за последние ' + win + ' дней: ' + rev.recent.length);
+    if (rev.recent.length) {
+      console.log('');
+      for (const r of rev.recent.slice(0, 20)) {
+        console.log('    ' + String(r.ageDays).padStart(3) + 'д  ' + r.file);
+      }
+    }
+    console.log('');
+    console.log('  Это отчёт, а не приговор. Старый код без спеки это история движка;');
+    console.log('  свежий код без спеки это решение, которое никто не записал.');
     process.exit(0);
   }
 
