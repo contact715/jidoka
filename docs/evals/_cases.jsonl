@@ -78,7 +78,7 @@
 {"id":"canary-gate/self-test","cmd":"node scripts/canary-gate.mjs --self-test","assert":{"exit":0,"contains":["promote/hold/rollback decision correct"]}}
 {"id":"precision-guard/self-test","cmd":"node scripts/precision-guard.mjs --self-test","assert":{"exit":0,"contains":["float-on-money/quantity detection correct"]}}
 {"id":"cross-layer-dup/self-test","cmd":"node scripts/cross-layer-dup.mjs --self-test","assert":{"exit":0,"contains":["fingerprint dedup across BE/FE layers correct"]}}
-{"id":"req-trace/self-test","cmd":"node scripts/req-trace.mjs --self-test","assert":{"exit":0,"contains":["requirement traceability chain correct"]}}
+{"id":"req-trace/self-test","cmd":"node scripts/req-trace.mjs --self-test","assert":{"exit":0,"contains":["an empty register cannot be green"]}}
 {"id":"e2e-run-gate/self-test","cmd":"node scripts/e2e-run-gate.mjs --self-test","assert":{"exit":0,"contains":["E2E flow scoring correct"]}}
 {"id":"prod-harvest/self-test","cmd":"node scripts/prod-harvest.mjs --self-test","assert":{"exit":0,"contains":["incident → benchmark task conversion correct"]}}
 {"id":"skill-coverage/self-test","cmd":"node scripts/skill-coverage.mjs --self-test","assert":{"exit":0,"contains":["superpowers coverage audit correct"]}}
@@ -90,3 +90,5 @@
 {"id":"ledger-schema-gate/missing-caught-by-blocks","cmd":"node scripts/ledger-schema-gate.mjs","env":{"META_TRIP_LOG":"/dev/null"},"ledger":[{"date":"2026-07-12","class":"some-class","claimed":"a thing was claimed done","real":"it was actually not done at all"}],"assert":{"exit":1,"contains":["missing required field \"caught_by\""]}}
 {"id":"meta-log/whitespace-field-rejected","cmd":"node scripts/meta-log.mjs test-class '   ' 'the real state was different'","env":{"META_TRIP_LOG":"/dev/null"},"ledger":[],"assert":{"exit":2,"contains":["REJECTED","ledger-pollution guard"]}}
 {"id":"meta-log/valid-row-accepted","cmd":"node scripts/meta-log.mjs test-class 'claimed the gate was wired' 'no caller existed anywhere' reviewer","env":{"META_TRIP_LOG":"/dev/null"},"ledger":[],"assert":{"exit":0,"contains":["logged [test-class]"]}}
+{"id":"memory-eval/five-competencies","cmd":"node scripts/memory-eval.mjs","env":{},"ledger":[],"assert":{"exit":0,"contains":["abstention"]}}
+{"id":"memory-eval/abstention-is-scored","cmd":"node scripts/memory-eval.mjs","env":{},"ledger":[],"assert":{"exit":0,"contains":["воздержался"]}}
