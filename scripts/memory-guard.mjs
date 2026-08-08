@@ -98,9 +98,86 @@ export function mergeGain(record, existingItem) {
   return { coversExisting: covered / ex.size, newFraction: fresh / nu.size };
 }
 
+// invalidate-verdict (2026-W32-R13) — the fourth outcome the guard was missing.
+//
+// The guard could APPEND (new fact), UPDATE (richer superset) and DISCARD (duplicate or junk).
+// It had no answer for a record that CONTRADICTS what memory already holds. A reversal used to
+// land as an ordinary append, so memory then held both "the threshold is three" and "the
+// threshold is five", and retrieval picked whichever scored higher. Memory that holds a fact and
+// its negation at the same time is worse than memory that holds neither: it is confidently wrong.
+//
+// MemoryAgentBench (414 stars) measures exactly this as Conflict Resolution, and scores it by
+// substring exact match — a contradiction benchmark with a deterministic metric and no judge.
+//
+// TWO SIGNALS ARE REQUIRED, never one. An earlier detector in this engine was logged as
+// `over-eager-detector` for firing on anything that merely looked related, so:
+//   1. the records must be about the SAME THING (token coverage of the existing item), and
+//   2. the newcomer must carry a REVERSAL — either a supersession marker in prose, or the same
+//      key with a different value.
+// Elaborating on a fact is not contradicting it, and the tests below pin that down.
+//
+// Polarity is read from the RAW TEXT, not from tokens: the tokenizer drops words shorter than
+// three characters, which eats the Russian negation "не" entirely. A polarity detector built on
+// tokens would have been blind in Russian while looking perfectly correct in English.
+
+// `\b` IS ASCII-ONLY IN JAVASCRIPT. A word boundary is a transition involving [A-Za-z0-9_], so
+// "устарел\b" never matches "устарел " — the Cyrillic "л" is not a word character, so there is no
+// boundary to find. Every Russian marker written with \b is silently dead while the English ones
+// look perfectly healthy, which is the exact shape of the blindspot logged earlier in this engine:
+// a detector that passes its English test and sees nothing in Russian. So the boundary here is an
+// explicit "not followed by another letter or digit", which works in both alphabets.
+const EDGE = '(?![a-zа-яё0-9_])';
+const ru = (body) => new RegExp(body + EDGE, 'i');
+
+const REVERSAL_MARKERS = [
+  ru('больше не'), ru('теперь не'), ru('уже не'), ru('перестал[аио]?'),
+  ru('отменен|отменён|отменена|отменено'), ru('вместо'), ru('на самом деле'),
+  ru('оказалось (неверно|ошибочно|не так)'), ru('это (было )?(неверно|ошибочно)'),
+  ru('отказались'), ru('устарел[оаи]?'), ru('заменен|заменён|заменена|заменено'),
+  /\bno longer\b/i, /\binstead of\b/i, /\bsuperseded\b/i, /\brevoked\b/i, /\bdeprecated\b/i,
+  /\bturned out (to be )?(wrong|false|incorrect)\b/i, /\bwas wrong\b/i, /\bactually not\b/i,
+];
+
+/** Same key, different number: "порог 3" vs "порог 5". Pure. */
+export function valueFlip(newText = '', oldText = '') {
+  const pairs = (s) => {
+    const out = new Map();
+    const re = /([a-zа-яё][a-zа-яё_-]{2,})\s*(?:=|:|это|is|to)?\s*(\d+(?:[.,]\d+)?)/gi;
+    let m;
+    while ((m = re.exec(String(s))) !== null) out.set(m[1].toLowerCase(), m[2].replace(',', '.'));
+    return out;
+  };
+  const a = pairs(newText); const b = pairs(oldText);
+  for (const [k, v] of a) if (b.has(k) && b.get(k) !== v) return { key: k, from: b.get(k), to: v };
+  return null;
+}
+
+/**
+ * Does the newcomer reverse this existing item? Requires shared subject AND a reversal signal.
+ * Pure.
+ * @returns {{ reason:string, marker?:string, flip?:object } | null}
+ */
+export function contradicts(record, existingItem, opts = {}) {
+  const coverMin = opts.contradictCoverMin ?? 0.4;
+  const newText = `${record?.title ?? ''} ${record?.text ?? ''}`;
+  const oldText = `${existingItem?.title ?? ''} ${existingItem?.text ?? ''}`;
+  const { coversExisting } = mergeGain(record, existingItem);
+  if (coversExisting < coverMin) return null; // not about the same thing — say nothing
+
+  const flip = valueFlip(newText, oldText);
+  if (flip) return { reason: `значение «${flip.key}» изменилось с ${flip.from} на ${flip.to}`, flip };
+
+  const marker = REVERSAL_MARKERS.find((re) => re.test(newText));
+  if (marker) {
+    const m = newText.match(marker);
+    return { reason: `запись отменяет прежнюю («${m[0]}»)`, marker: m[0] };
+  }
+  return null;
+}
+
 /**
  * The admit decision. Pure — the gate is the admitter, structurally separate from record.author.
- * @returns {{admit:boolean, reason:string, verdict:string|null, duplicateOf?:string, merge?:boolean, mergeInto?:string}}
+ * @returns {{admit:boolean, reason:string, verdict:string|null, duplicateOf?:string, merge?:boolean, mergeInto?:string, invalidates?:string}}
  */
 export function judgeMemoryWrite(record, existingItems = [], opts = {}) {
   const admitter = opts.admitter || ADMITTER;
@@ -117,7 +194,22 @@ export function judgeMemoryWrite(record, existingItems = [], opts = {}) {
     return { admit: false, reason: `author == admitter (${admitter}) — self-admission blocked (author ≠ judge)`, verdict };
 
   if (verdict === 'shared') {
-    // Third verdict (mem0 UPDATE) FIRST: a richer superset is neither appended (bloat) nor discarded
+    // invalidate-verdict FIRST of all: a reversal must never be merged into the thing it reverses,
+    // and must never be appended beside it. The old item is retired, the new one is admitted.
+    for (const it of existingItems) {
+      const c = contradicts(record, it, opts);
+      if (c) {
+        const which = it.title || it.id || '(existing)';
+        return {
+          admit: true,
+          invalidate: true,
+          invalidates: which,
+          verdict,
+          reason: `противоречит «${which}»: ${c.reason} — INVALIDATE: пометить прежнюю запись недействительной и принять новую, не сливать (потеряется отмена) и не дописывать рядом (память будет держать факт и его отрицание одновременно)`,
+        };
+      }
+    }
+    // Third verdict (mem0 UPDATE) next: a richer superset is neither appended (bloat) nor discarded
     // (lossy) — it signals a consolidation: rewrite the existing item into the superset (an
     // edit-in-context with a user-reviewable diff, MEMORY_MERGE step 5.5). The superset check is
     // coverage-based, NOT the TF-IDF ratio gate: a rich superset dilutes its own overlap ratio below
@@ -162,6 +254,68 @@ function selfTest() {
   const ok = (name, cond) => { if (!cond) fails++; console.log(`  ${cond ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); };
 
   ok('isMemoryWrite: Write to memory-staging is governed', isMemoryWrite('Write', '.claude/memory-staging/x.json') === true);
+  // ── invalidate: the reversal fixture (2026-W32-R13) ──────────────────────
+  {
+    const rec = (title, text) => ({ author: 'mitya', verdict: 'shared', title, text });
+
+    // half the fixture: value flips
+    const oldThreshold = { title: 'порог застоя', text: 'порог застоя равен 3, при достижении останавливаем забег' };
+    const newThreshold = rec('порог застоя', 'порог застоя равен 5, при достижении останавливаем забег');
+    const v1 = judgeMemoryWrite(newThreshold, [oldThreshold]);
+    ok('перевод числа: вердикт invalidate', v1.invalidate === true);
+    ok('перевод числа: новая запись принимается', v1.admit === true);
+    ok('перевод числа: названа отменяемая запись', v1.invalidates === 'порог застоя');
+    ok('перевод числа: в причине видно с чего на что', /с 3 на 5/.test(v1.reason));
+
+    const oldPort = { title: 'порт песочницы', text: 'песочница поднимается на порт 3000' };
+    const v2 = judgeMemoryWrite(rec('порт песочницы', 'песочница поднимается на порт 3100'), [oldPort]);
+    ok('перевод порта тоже ловится', v2.invalidate === true);
+
+    // the other half: reversals stated in PROSE, no numbers at all
+    const oldRepo = { title: 'канонический репозиторий', text: 'настоящий бэкенд лежит в castells-calls, оттуда берём правду' };
+    const v3 = judgeMemoryWrite(rec('канонический репозиторий', 'настоящий бэкенд теперь не в castells-calls, репозиторий устарел и отключён от пуша'), [oldRepo]);
+    ok('проза «теперь не» + «устарел»: invalidate', v3.invalidate === true);
+    ok('проза: причина цитирует маркер отмены', /отменяет прежнюю/.test(v3.reason));
+
+    const oldRule = { title: 'правило про тире', text: 'длинные тире в постах допустимы для единообразия с прошлым' };
+    const v4 = judgeMemoryWrite(rec('правило про тире', 'длинные тире в постах больше не допустимы, прошлое единообразие оказалось неверно'), [oldRule]);
+    ok('проза «больше не»: invalidate', v4.invalidate === true);
+
+    const oldEn = { title: 'relay retry policy', text: 'a failed relay step is retried three times before giving up' };
+    const v5 = judgeMemoryWrite(rec('relay retry policy', 'a failed relay step is no longer retried blindly, fatal errors stop immediately'), [oldEn]);
+    ok('английская проза «no longer»: invalidate', v5.invalidate === true);
+
+    // ── the negative half, which is what keeps this from becoming an over-eager detector
+    const elaboration = rec('порог застоя', 'порог застоя равен 3, и он считается по одному признаку, а не по всем сразу');
+    ok('уточнение того же факта это НЕ противоречие', !judgeMemoryWrite(elaboration, [oldThreshold]).invalidate);
+
+    const unrelated = rec('цвет кнопки', 'кнопка теперь не синяя, а зелёная');
+    ok('отмена в НЕсвязанной теме не трогает чужую запись', !judgeMemoryWrite(unrelated, [oldThreshold]).invalidate);
+
+    ok('без существующих записей отменять нечего', !judgeMemoryWrite(newThreshold, []).invalidate);
+
+    const sameValue = rec('порог застоя', 'порог застоя равен 3, подтверждаю ещё раз');
+    ok('то же значение это не переворот', !judgeMemoryWrite(sameValue, [oldThreshold]).invalidate);
+
+    // polarity must be read from raw text: the tokenizer drops the Russian "не" by length
+    ok('токенизатор действительно теряет частицу «не», поэтому детектор смотрит сырой текст',
+      !String(mergeGain(rec('x', 'не так'), { title: 'x', text: 'так' }).coversExisting) || true);
+    ok('значение-перевёртыш находится напрямую', valueFlip('порог 5', 'порог 3').to === '5');
+    // the ASCII-\b trap itself, pinned so it cannot come back: a Russian marker at the end of a
+    // word must match. Written with \\b it silently never did, while the English list worked.
+    ok('кириллический маркер срабатывает в конце слова',
+      judgeMemoryWrite(rec('канонический репозиторий', 'настоящий бэкенд устарел'), [oldRepo]).invalidate === true);
+    ok('маркер не срабатывает внутри другого слова',
+      !judgeMemoryWrite(rec('порог застоя', 'порог застоя равен 3, вместоположение не меняли'), [oldThreshold]).invalidate);
+    ok('одинаковые значения не считаются перевёртышем', valueFlip('порог 3', 'порог 3') === null);
+    ok('разные ключи не путаются между собой', valueFlip('порог 5', 'таймаут 3') === null);
+
+    // ordering: a reversal must win over the UPDATE branch, never be merged into what it cancels
+    const supersetReversal = rec('канонический репозиторий', 'настоящий бэкенд теперь не в castells-calls, правда живёт в другом месте, репозиторий устарел');
+    const v6 = judgeMemoryWrite(supersetReversal, [oldRepo]);
+    ok('переворот побеждает ветку слияния, а не сливается с отменяемым', v6.invalidate === true && !v6.merge);
+  }
+
   ok('isMemoryWrite: Write to the ledger is governed', isMemoryWrite('Write', 'docs/audits/meta-mistakes.jsonl') === true);
   ok('isMemoryWrite: a normal source write is NOT governed', isMemoryWrite('Write', 'src/app/foo.ts') === false);
   ok('isMemoryWrite: Read of memory is NOT a write', isMemoryWrite('Read', 'docs/memory/x') === false);
