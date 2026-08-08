@@ -165,6 +165,7 @@ const SPEC_EXCLUDE_PREFIXES = [
   'checklists',
   'runbooks',
   'specs/briefs',
+  'specs/clarifications', // записи опроса бизнес-вопросов, порождаются clarify-engine: это свидетельство, а не спека
   'specs/_LEVEL_TEMPLATES',
   'archive',
   'blog',

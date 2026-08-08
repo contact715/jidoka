@@ -56,7 +56,9 @@ const SKIP_DIRS = new Set([
 // and proposed-script paths (e.g. "ruvnet/ruflo", "scripts/ace-curator.mjs") that are NOT
 // local spec references — scanning it as a spec source counted every mention as a false
 // broken ref, inflating the ratchet each week. The existence index still sees the files.
-const SPEC_SKIP_DIRS = new Set([...SKIP_DIRS, 'archive', 'runs', 'research']);
+// clarifications/** are clarify-engine elicitation records: generated evidence of the questions
+// asked, not governance specs. Scanning them as specs made every generated record an orphan.
+const SPEC_SKIP_DIRS = new Set([...SKIP_DIRS, 'archive', 'runs', 'research', 'clarifications']);
 
 // ── pure: is this backtick/link token a plausible local file reference? ──────────
 export function looksLikeFileRef(raw) {
