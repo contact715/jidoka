@@ -59,7 +59,7 @@ export function absorbable(canon, inbox) {
 function selfTest() {
   let fails = 0;
   const ok = (name, cond) => { if (!cond) fails++; console.log(`  ${cond ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); };
-  const row = (date, cls, claimed = 'c') => ({ date, class: cls, claimed, real: 'r', caught_by: 'owner' });
+  const row = (date, cls, claimed = 'c') => ({ date, class: cls, claimed, real: 'r', caught_by: 'owner', kind: 'incident' });
 
   const a = row('2026-08-01', 'x');
   const b = row('2026-08-02', 'y');

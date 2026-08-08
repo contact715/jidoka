@@ -5,7 +5,7 @@
 // {ts,wave,run1,run2} landed in meta-mistakes.jsonl masquerading as logged mistakes; both
 // were only caught DOWNSTREAM by meta-honesty). This gate moves the rejection to the
 // ledger itself: every row must be valid JSON carrying the full mistake schema
-// (date/class/claimed/real/caught_by — see validateLedgerEntry in meta-lib). Anything
+// (date/class/claimed/real/caught_by/kind — see validateLedgerEntry in meta-lib). Anything
 // else blocks the commit/CI run until the row is removed or rewritten.
 //
 // Layered with, not replacing:
@@ -41,7 +41,7 @@ export function auditLedgerText(text) {
 function selfTest() {
   const fails = [];
   const ok = (n, c) => { if (!c) fails.push(n); console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };
-  const valid = { date: '2026-06-06', class: 'ledger-pollution', claimed: 'telemetry writer fixed', real: 'it still appended run1/run2 rows into the ledger', caught_by: 'meta-honesty', project: 'jidoka' };
+  const valid = { date: '2026-06-06', class: 'ledger-pollution', claimed: 'telemetry writer fixed', real: 'it still appended run1/run2 rows into the ledger', caught_by: 'meta-honesty', kind: 'incident', project: 'jidoka' };
   const telemetry = { ts: '2026-06-06T05:26:00Z', wave: 'wave-judge-debias', class: 'position-sensitive', run1: 'PASS', run2: 'BLOCK' };
 
   ok('valid row passes', validateLedgerEntry(valid).length === 0);
@@ -85,7 +85,7 @@ if (isMain) {
     console.error(`  line ${b.line}${b.class ? ` [${b.class}]` : ''}:`);
     for (const p of b.problems) console.error(`    ✗ ${p}`);
   }
-  console.error('\nA ledger row is a real incident: date/class/claimed/real/caught_by, all non-empty.');
+  console.error('\nA ledger row is a real incident: date/class/claimed/real/caught_by/kind, all non-empty.');
   console.error('Telemetry/test output goes to its own sidecar file (e.g. judge-debias-telemetry.jsonl), never here.');
   console.error('Remove or rewrite the offending row(s), then re-run.');
   process.exit(1);
