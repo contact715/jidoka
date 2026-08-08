@@ -77,13 +77,81 @@ export function vectorRanking(items, taskText, embed) {
     .map((x) => x.id);
 }
 
+
+// keyless-hashing-embedder (2026-W31-R14) — the vector layer had been asleep since W29 because
+// getEmbedder() honestly returned null: there was no embedder inside the engine boundary.
+//
+// WHAT WAS REJECTED AND WHY. The recommendation pointed at model2vec (static distilled
+// embeddings, one fixed vector per token). Its vectors are genuinely semantic and it needs no
+// GPU, but it does need the distilled model file — tens of megabytes of safetensors weights,
+// fetched from a model host. That is a heavy binary dependency and a network fetch in an engine
+// whose whole discipline is zero dependencies, so the weights are not vendored.
+//
+// WHAT IS HERE INSTEAD, described exactly. A hashing embedder over character 3-grams: no model
+// file, no key, no network, deterministic. It captures ORTHOGRAPHIC closeness, not meaning:
+// "порог", "пороги" and "порогом" land near each other because they share trigrams, which is
+// precisely what the TF-IDF layer misses in a heavily inflected language — those are three
+// different tokens to it. It will NOT connect "порог" to "предел". Calling this semantic would
+// be a lie; it is morphological robustness, and that is worth having on its own.
+//
+// It is fused, never substituted: RRF combines it with the lexical channel, so a case the
+// lexical layer already answers cannot be made worse by a weak vector.
+
+const EMBED_DIM = 256;
+
+/** Character trigrams of a normalised string. Pure. */
+export function trigrams(text = '') {
+  const s = ` ${String(text).toLowerCase().replace(/\s+/g, ' ').trim()} `;
+  const out = [];
+  for (let i = 0; i + 3 <= s.length; i++) out.push(s.slice(i, i + 3));
+  return out;
+}
+
+/** FNV-1a of a short string, folded into [0, dim). Pure. */
+function bucket(gram, dim) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < gram.length; i++) { h ^= gram.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h % dim;
+}
+
+/**
+ * Deterministic, keyless, dependency-free embedding. L2-normalised so cosine is a dot product.
+ * Pure.
+ */
+export function hashingEmbed(text = '', dim = EMBED_DIM) {
+  const v = new Array(dim).fill(0);
+  const grams = trigrams(text);
+  if (!grams.length) return v;
+  for (const g of grams) {
+    const i = bucket(g, dim);
+    // sign from the last character keeps unrelated grams from always adding up
+    v[i] += (g.charCodeAt(g.length - 1) % 2 === 0 ? 1 : -1);
+  }
+  let norm = 0;
+  for (const x of v) norm += x * x;
+  norm = Math.sqrt(norm) || 1;
+  return v.map((x) => x / norm);
+}
+
 /**
  * Availability check for an embedding source inside the engine boundary.
  * Returns a function embed(text)->number[] or null. DEFAULT null (DORMANT) — there is no
  * keyless/daemonless embedder here yet. Wiring one (or passing opts.embed) activates RRF.
  */
 export function getEmbedder() {
-  // Intentionally null until a real, keyless in-boundary embedder exists. Honest, not faked.
+  // STILL NULL, and now for a MEASURED reason rather than for lack of an embedder.
+  //
+  // hashingEmbed above is real, keyless and dependency-free, so the vector layer CAN be woken.
+  // It was measured against the golden set before being switched on, and it lost: on the four
+  // cases where the two channels disagreed, lexical retrieval answered correctly and the fused
+  // ranking did not. 4 of 4. Trigram similarity is dense and noisy — every document shares some
+  // trigrams with every query — so it dilutes a clean lexical hit instead of rescuing a missed one.
+  //
+  // So it stays opt-in: pass opts.embed explicitly if you want it, and beat
+  //   node scripts/memory-eval.mjs --embed
+  // before making it the default. Waking a layer that measurably degrades recall would be a
+  // capability on paper and a regression in practice.
+  if (process.env.JIDOKA_VECTOR_EMBED === 'hashing') return hashingEmbed;
   return null;
 }
 

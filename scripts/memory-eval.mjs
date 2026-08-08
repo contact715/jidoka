@@ -40,10 +40,13 @@ export function judgeCase(c, ranked) {
   if (exp.abstain) {
     // The only honest answer to a question the corpus cannot answer is "I have nothing".
     // Anything with zero lexical overlap is not an answer, it is the most recent note.
-    const abstained = !top || top.relevance === 0;
+    // a fused/vector result carries no `relevance` field; treat an absent score as "no lexical
+    // overlap", which is what abstention means here, rather than crashing on it.
+    const rel = typeof top?.relevance === 'number' ? top.relevance : null;
+    const abstained = !top || rel === 0 || rel === null;
     return {
       pass: abstained,
-      got: abstained ? '(воздержался)' : `${top.title} (релевантность ${top.relevance.toFixed(3)})`,
+      got: abstained ? '(воздержался)' : `${top.title} (релевантность ${rel.toFixed(3)})`,
       why: abstained ? 'нет пересечения с корпусом, ответа не дано' : 'выдан ответ на вопрос, которого нет в памяти',
     };
   }
@@ -118,6 +121,34 @@ if (isMain) {
   if (!existsSync(file)) { console.error(`memory-eval: нет файла случаев ${file}`); process.exit(2); }
 
   // the first line is a _meta record (it carries the point-of-integration anchor), not a case
+  // --embed re-runs the same golden set through the fused lexical+vector channel. This exists so
+  // the decision to keep the vector layer asleep stays CHECKABLE: anyone proposing to wake it can
+  // run this and show it wins, instead of arguing that it should.
+  if (argv.includes('--embed')) {
+    const { retrieveFused, hashingEmbed } = await import('./memory-vector.mjs');
+    const cases2 = readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((c) => !c._meta);
+    let lex = 0; let fus = 0; const diffs = [];
+    for (const c of cases2) {
+      const l = judgeCase(c, retrieve(c.corpus || [], c.query || '', 5).results);
+      const v = judgeCase(c, retrieveFused(c.corpus || [], c.query || '', 5, { embed: hashingEmbed }).results);
+      if (l.pass) lex++;
+      if (v.pass) fus++;
+      if (l.pass !== v.pass) diffs.push(c.case_id + ': лексика ' + (l.pass ? 'верно' : 'мимо') + ', слитно ' + (v.pass ? 'верно' : 'мимо'));
+    }
+    console.log('сравнение каналов на том же золотом наборе');
+    console.log('  только лексика     : ' + lex + '/' + cases2.length);
+    console.log('  лексика + вектор   : ' + fus + '/' + cases2.length);
+    if (diffs.length) {
+      console.log('  расхождения:');
+      for (const d of diffs) console.log('    ' + d);
+    }
+    console.log('');
+    console.log(fus > lex
+      ? '  вектор выигрывает — можно обсуждать включение по умолчанию'
+      : '  вектор НЕ выигрывает — слой остаётся выключенным, включение по умолчанию было бы регрессом');
+    process.exit(0);
+  }
+
   const cases = readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((c) => !c._meta);
   const rows = cases.map((c) => {
     // retrieve() returns { results, relevanceDriven }, not a bare array. Getting this wrong made
