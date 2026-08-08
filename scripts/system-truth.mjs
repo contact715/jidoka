@@ -37,8 +37,11 @@ export const CACHE_TTL_MS = 30 * 60 * 1000;
 
 // ── pure core ────────────────────────────────────────────────────────────────
 
-/** Age in whole days between two ISO-ish timestamps. Pure. */
-export const daysBetween = (thenIso, nowMs) => {
+// Not meta-lib.daysBetween: that one takes two ISO strings and ROUNDS, which turns 18 hours ago
+// into 'yesterday'. An age shown to a human at session start must FLOOR — a doc touched this
+// morning is 0 days old, not 1. Different contract, so a separate name rather than a shared one.
+/** Whole days elapsed from an ISO timestamp to a moment in ms. Pure. */
+export const daysSince = (thenIso, nowMs) => {
   const t = Date.parse(thenIso);
   if (Number.isNaN(t)) return null;
   return Math.floor((nowMs - t) / 86400000);
@@ -81,7 +84,7 @@ function probeCi(nowMs) {
       ['run', 'list', '--workflow=ci.yml', '--branch=main', '--limit', '1', '--json', 'conclusion,createdAt,status'],
       { cwd: ROOT, encoding: 'utf8', timeout: 4000, stdio: ['ignore', 'pipe', 'ignore'] });
     const r = JSON.parse(out)[0];
-    if (r) ci = { conclusion: r.status === 'completed' ? r.conclusion : r.status, ageDays: daysBetween(r.createdAt, nowMs) };
+    if (r) ci = { conclusion: r.status === 'completed' ? r.conclusion : r.status, ageDays: daysSince(r.createdAt, nowMs) };
   } catch { ci = cache ? cache.ci : null; } // network/auth/timeout → last known, else unknown
   try { mkdirSync(path.dirname(CACHE), { recursive: true }); writeFileSync(CACHE, JSON.stringify({ probedAt: nowMs, ci })); } catch { /* cache is best-effort */ }
   return ci;
@@ -103,7 +106,7 @@ function ledgerAge(nowMs) {
       }
     } catch { /* skip unreadable */ }
   }
-  return newest ? daysBetween(`${newest}T00:00:00Z`, nowMs) : null;
+  return newest ? daysSince(`${newest}T00:00:00Z`, nowMs) : null;
 }
 
 function docAge(nowMs) {
@@ -112,7 +115,7 @@ function docAge(nowMs) {
   try {
     const iso = execFileSync('git', ['log', '-1', '--format=%cI', '--', 'docs/HONEST_SYSTEM_STATE.md'],
       { cwd: ROOT, encoding: 'utf8', timeout: 4000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-    if (iso) return daysBetween(iso, nowMs);
+    if (iso) return daysSince(iso, nowMs);
   } catch { /* fall back to mtime */ }
   try { return Math.floor((nowMs - statSync(p).mtimeMs) / 86400000); } catch { return null; }
 }
@@ -130,9 +133,9 @@ function selfTest() {
   const ok = (n, c) => { if (!c) fails++; console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };
   const NOW = Date.parse('2026-08-08T12:00:00Z');
 
-  ok('возраст в днях считается вниз', daysBetween('2026-08-05T12:00:00Z', NOW) === 3);
-  ok('сегодняшняя дата это 0 дней', daysBetween('2026-08-08T01:00:00Z', NOW) === 0);
-  ok('мусорная дата даёт null, а не NaN', daysBetween('не дата', NOW) === null);
+  ok('возраст в днях считается вниз', daysSince('2026-08-05T12:00:00Z', NOW) === 3);
+  ok('сегодняшняя дата это 0 дней', daysSince('2026-08-08T01:00:00Z', NOW) === 0);
+  ok('мусорная дата даёт null, а не NaN', daysSince('не дата', NOW) === null);
 
   ok('свежий кеш признаётся свежим', cacheFresh({ probedAt: NOW - 1000 }, NOW) === true);
   ok('протухший кеш не признаётся', cacheFresh({ probedAt: NOW - 40 * 60 * 1000 }, NOW) === false);
