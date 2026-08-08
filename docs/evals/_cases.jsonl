@@ -92,3 +92,4 @@
 {"id":"meta-log/valid-row-accepted","cmd":"node scripts/meta-log.mjs test-class 'claimed the gate was wired' 'no caller existed anywhere' reviewer","env":{"META_TRIP_LOG":"/dev/null"},"ledger":[],"assert":{"exit":0,"contains":["logged [test-class]"]}}
 {"id":"memory-eval/five-competencies","cmd":"node scripts/memory-eval.mjs","env":{},"ledger":[],"assert":{"exit":0,"contains":["abstention"]}}
 {"id":"memory-eval/abstention-is-scored","cmd":"node scripts/memory-eval.mjs","env":{},"ledger":[],"assert":{"exit":0,"contains":["воздержался"]}}
+{"id":"ac-coverage/real-artifact-not-blind","cmd":"node scripts/ac-coverage-check.mjs --real-artifact","env":{},"ledger":[],"assert":{"exit":0,"contains":["на реальных файлах гейт находит то же"]}}

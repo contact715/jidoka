@@ -50,8 +50,18 @@ const SKIP_DIRS = new Set(['.git', 'node_modules', 'venv', '.venv', 'dist', 'bui
 
 // ── AC extraction — SAME patterns as projectx sync-specs-to-memory.mjs AC_RE,
 // plus numbered EARS labels ([EARS-1]) which module specs use. Kept additive.
-export const AC_RE = /\*\*(AC-[\w]+|[A-Z]\d+)\*\*\s+\[(?:micro|macro|carto|synthesis)\][^\n]*|^\d+\.\s+\[(?:micro|macro|carto|synthesis)\][^\n]*/gm;
-export const AC_LABEL_RE = /\*\*(AC-[\w]+|[A-Z]\d+)\*\*/;
+// real-artifact-negative-case (2026-W31-R5b) — this pattern was copied from another project and
+// required a bracketed tag right after the label: `**AC-1** [micro] ...`. Specs in THIS repo are
+// written `- **AC-1.1** текст`, with no tag and with a dotted number. Measured on
+// docs/specs/wave-frontier_MASTER_SPEC.md: 27 acceptance criteria in the file, 0 matches. So
+// acceptance-verdict (shipped W29-R1) compared 0 declared against 0 covered and reported a green
+// verdict on every wave, forever. The gate was wired, self-tested, called, exit 0, and unable to
+// fail — the vacuum green no existing auditor can see.
+//
+// The fix is additive: the tagged form still matches, and the dotted, untagged form now matches
+// too. Labels may be AC-1, AC-1.1, AC-2b or a bare A1.
+export const AC_RE = /\*\*(AC-[\w.]+|[A-Z]\d+)\*\*\s+\[(?:micro|macro|carto|synthesis)\][^\n]*|^\s*[-*]?\s*\*\*(AC-[\w.]+|[A-Z]\d+)\*\*[^\n]*|^\d+\.\s+\[(?:micro|macro|carto|synthesis)\][^\n]*/gm;
+export const AC_LABEL_RE = /\*\*(AC-[\w.]+|[A-Z]\d+)\*\*/;
 export const EARS_RE = /\[(EARS-\d+)\]/g;
 
 export function extractAcLabels(content) {
@@ -160,6 +170,59 @@ function selfTest() {
   return pass === total ? 0 : 1;
 }
 
-if (process.argv[1] && process.argv[1].endsWith('ac-coverage-check.mjs')) {
-  process.exit(process.argv.includes('--self-test') ? selfTest() : run());
+// ── real-artifact check (2026-W31-R5b) ───────────────────────────────────────
+// A self-test proves the regex matches the fixture the same author wrote. It cannot prove the
+// regex matches the FILES THIS REPO ACTUALLY CONTAINS, and that is precisely where this gate
+// failed: 27 criteria in a real spec, 0 extracted, green verdict forever.
+//
+// So the gate now also answers a question no fixture can answer: on the real tree, does it find
+// what a human would find by eye? Zero findings where the raw text plainly contains criteria is
+// a BROKEN GATE, not a clean repo, and it exits non-zero saying so.
+function realArtifactCheck() {
+  const repoRoot = resolve(process.cwd());
+  const specDir = join(repoRoot, 'docs/specs');
+  const files = [];
+  (function walk(d) {
+    let entries;
+    try { entries = readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const p = join(d, e.name);
+      if (e.isDirectory()) { if (!e.name.startsWith('.') && !e.name.startsWith('_')) walk(p); continue; }
+      if (e.name.endsWith('.md')) files.push(p);
+    }
+  })(specDir);
+
+  let extracted = 0;
+  let byEye = 0;
+  const blind = [];
+  for (const p of files) {
+    let c;
+    try { c = readFileSync(p, 'utf8'); } catch { continue; }
+    const got = extractAcLabels(c).length;
+    const raw = (c.match(/\*\*AC-[\w.]+\*\*/g) || []).length;
+    extracted += got;
+    byEye += raw;
+    if (raw > 0 && got === 0) blind.push(p.replace(repoRoot + '/', '') + ': глазами ' + raw + ', гейтом 0');
+  }
+
+  console.log('[ac-coverage] реальное дерево: ' + files.length + ' спек, критериев глазами ' + byEye + ', извлечено гейтом ' + extracted);
+  if (blind.length) {
+    console.error('\x1b[31m✗ гейт слеп на настоящих файлах:\x1b[0m');
+    for (const b of blind) console.error('    ' + b);
+    console.error('  Это вакуумно-зелёный гейт: подключён, самотест зелёный, найти не может ничего.');
+    return 1;
+  }
+  if (byEye === 0) {
+    console.log('  (в дереве нет помеченных критериев — проверять нечего, и зелёным это не считается)');
+    return 0;
+  }
+  console.log('\x1b[32m✓ на реальных файлах гейт находит то же, что видно глазами\x1b[0m');
+  return 0;
 }
+
+if (process.argv[1] && process.argv[1].endsWith('ac-coverage-check.mjs')) {
+  if (process.argv.includes('--self-test')) process.exit(selfTest());
+  if (process.argv.includes('--real-artifact')) process.exit(realArtifactCheck());
+  process.exit(run());
+}
+
