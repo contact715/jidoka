@@ -60,7 +60,7 @@ export function judgeCase(c, ranked) {
 }
 
 /** Aggregate per competency. Pure. */
-export function summarize(rows) {
+export function summarizeCompetencies(rows) {
   const by = {};
   for (const r of rows) {
     const k = r.competency || '(без категории)';
@@ -95,7 +95,7 @@ function selfTest() {
   ok('recency tiebreak: stale on top fails', judgeCase({ expect: { topRecencyWins: true } }, [{ title: 'a', recency: 1 }, { title: 'a', recency: 10 }]).pass === false);
   ok('a case with no expectation cannot silently pass', judgeCase({ expect: {} }, [{ title: 'a', relevance: 1 }]).pass === false);
 
-  const s = summarize([
+  const s = summarizeCompetencies([
     { competency: 'abstention', pass: false }, { competency: 'abstention', pass: false },
     { competency: 'information-extraction', pass: true },
   ]);
@@ -127,7 +127,7 @@ if (isMain) {
     const v = judgeCase(c, ranked);
     return { case_id: c.case_id, competency: c.competency, ...v };
   });
-  const s = summarize(rows);
+  const s = summarizeCompetencies(rows);
 
   if (argv.includes('--json')) { console.log(JSON.stringify({ ...s, rows }, null, 2)); process.exit(s.passed === s.total ? 0 : 1); }
 
