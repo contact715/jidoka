@@ -195,11 +195,25 @@ try {
   }
   if (!health.startsWith('🔴')) {
     try {
-      const pct = Math.round(JSON.parse(readFileSync(join(jidoka, 'docs/evals/_baseline.json'), 'utf8')).pass_rate * 100);
+      // the installed copy does not carry docs/evals/_baseline.json, so this line said
+      // 'нет baseline' in every session while the number existed in the canon repo one
+      // directory away. Look there too before admitting ignorance.
+      const baselinePaths = [join(jidoka, 'docs/evals/_baseline.json'), join(homedir(), 'jidoka-framework/docs/evals/_baseline.json')];
+      const found = baselinePaths.find((p) => existsSync(p));
+      if (!found) throw new Error('no baseline anywhere');
+      const pct = Math.round(JSON.parse(readFileSync(found, 'utf8')).pass_rate * 100);
       health = pct === 100 ? `🟢 eval ${pct}%` : `🟡 eval ${pct}%`;
     } catch { /* keep default */ }
   }
 
+  // 2b) age of the signals (2026-W31-R2). The CI line above already exists and stays silent when
+  // green, by design. What was missing is whether the DATA is still fresh: a ledger that stopped
+  // receiving entries and an honest-state doc nobody touched both read as authority while stale.
+  // --ages does no network call, so session start pays nothing extra.
+  let ages = '';
+  try {
+    ages = execSync(`node ${join(jidoka, 'scripts', 'system-truth.mjs')} --ages`, { encoding: 'utf8', timeout: 6000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch { /* fail-open: no line rather than a hung session */ }
   // 3) lessons — hot ones by name, and EVERY ungated class regardless of tier (2026-W32-R3)
   const md = readFileSync(join(jidoka, 'memory-consolidated.md'), 'utf8');
   const lessons = hotFrom(md);
@@ -247,6 +261,7 @@ try {
     '[session-start digest]',
     `jidoka: ${health}`,
     ci,
+    ages,
     queueLine,
     lessons.length ? `активные уроки (🔴): ${lessons.join(', ')}` : '',
     live.total ? `БЕЗ гейта (живой риск, ${live.total}): ${live.shown.join(', ')}${live.total > live.shown.length ? ` и ещё ${live.total - live.shown.length}` : ''}` : '',
