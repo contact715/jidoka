@@ -31,7 +31,7 @@ import { readFileSync } from 'node:fs';
 
 // ── two-registry ledger ────────────────────────────────────────────
 export function newLedger({ wave = '?', coreProperty = '', facts = [], guesses = [], plan = [] } = {}) {
-  return { wave, coreProperty, facts: [...facts], guesses: [...guesses], plan: [...plan], stalls: [], replans: 0 };
+  return { wave, coreProperty, facts: [...facts], guesses: [...guesses], plan: [...plan], stalls: [], replans: 0, stallStreak: {} };
 }
 
 // ── deterministic scaffold-substitution signals (mechanizes CORE_PROPERTY_GATE.md §3) ──
@@ -52,10 +52,36 @@ export function coreSubstitutionSignals(coreProperty = '', evidenceText = '') {
   return [];
 }
 
+// stall-streak-reset (2026-W32-R10) — the halt rule used `lg.stalls.some(...)`, which looks at
+// the WHOLE history: a run that stalled, replanned, made real progress for twenty steps and
+// only much later hit the same pattern again was halted as a "no-progress loop", even though
+// the replan had demonstrably worked. A streak that RESETS on progress separates "stuck" from
+// "stumbled once, recovered, stumbled again".
+//
+// CALIBRATED, NOT ASSUMED. scripts/replan-replay.mjs replayed 186 real session transcripts,
+// 49821 assistant steps, 3041 stall events:
+//
+//   rule                          halts   premature
+//   current (any prior pattern)    2812      93.8%
+//   streak, threshold 2            1092      92.5%
+//   streak, threshold 3             623      92.0%
+//   streak, threshold 4             370      91.9%
+//
+// The streak removes 61-87% of the bogus halts, so it is a strict improvement and ships. But
+// the premature RATE barely moves: even at threshold 4, more than nine halts in ten would kill
+// a run that was still making progress. So the conclusion is not "now we can wire it" — it is
+// the opposite, and it is now a measured statement rather than a worry: this halt MUST NOT be
+// connected to a live hook. The next lever is the detector's sensitivity, not the counter.
+
+/** Any deterministic sign of progress clears every pattern streak. Pure. */
+export function noteProgress(ledger) {
+  return { ...ledger, stallStreak: {} };
+}
+
 // ── the decision ───────────────────────────────────────────────────
 // diagnosis = stuck-detector.detect() output { stuck, pattern, detail }.
 // evidenceText (optional) = the current proof/output for the core-property AC, checked for scaffold.
-export function replan(ledger, diagnosis = {}, evidenceText = '') {
+export function replan(ledger, diagnosis = {}, evidenceText = '', opts = {}) {
   const lg = { ...ledger, stalls: [...(ledger.stalls || [])], plan: [...(ledger.plan || [])], replans: ledger.replans || 0 };
   const subs = coreSubstitutionSignals(lg.coreProperty, evidenceText);
   if (subs.length) {
@@ -63,10 +89,14 @@ export function replan(ledger, diagnosis = {}, evidenceText = '') {
   }
   if (!diagnosis.stuck) return { action: 'continue', reason: 'no stall', ledger: lg };
 
-  const priorSamePattern = lg.stalls.some(s => s.pattern === diagnosis.pattern);
-  lg.stalls.push({ pattern: diagnosis.pattern, detail: diagnosis.detail });
-  if (priorSamePattern) {
-    return { action: 'halt', reason: `no-progress loop: stall pattern "${diagnosis.pattern}" recurred after a replan already addressed it (${diagnosis.detail})`, ledger: lg };
+  const threshold = Number(opts.stallThreshold ?? 2);
+  lg.stallStreak = { ...(lg.stallStreak || {}) };
+  const streak = (lg.stallStreak[diagnosis.pattern] || 0) + 1;
+  lg.stallStreak[diagnosis.pattern] = streak;
+  lg.stalls.push({ pattern: diagnosis.pattern, detail: diagnosis.detail, streak });
+  if (streak >= threshold) {
+    lg.stallStreak[diagnosis.pattern] = 0; // one loop is reported once, not on every later stall
+    return { action: 'halt', reason: `no-progress loop: stall pattern "${diagnosis.pattern}" hit ${streak}× with no progress in between (${diagnosis.detail})`, ledger: lg };
   }
   // recoverable: re-derive the plan — move the stalled step to the back, inject a step that
   // addresses the diagnosis so the next attempt is different, not a repeat.
@@ -109,6 +139,45 @@ function selfTest() {
 
   const drift = replan(newLedger({ coreProperty: 'must be non-deterministic', plan: ['s'] }), { stuck: false }, 'matched with a regex template, no model call');
   ok('core-property scaffold drift → halt even without a stall', drift.action === 'halt' && drift.substitutions.length === 1);
+
+  // ── stall streak with reset on progress (2026-W32-R10) ──────────────
+  {
+    const d = { stuck: true, pattern: 'repeated-error', detail: 'same error' };
+    let lg = newLedger({ wave: 'w', coreProperty: 'p', plan: ['a', 'b'] });
+
+    // first stall replans, second in a row halts — same strictness as before for a real loop
+    const r1 = replan(lg, d);
+    ok('first stall still replans', r1.action === 'replan');
+    const r2 = replan(r1.ledger, d);
+    ok('second stall of the same pattern with no progress → halt', r2.action === 'halt');
+    ok('halt names the streak count', /2×/.test(r2.reason));
+
+    // THE FIX: progress between two stalls means this is not a loop
+    const afterProgress = noteProgress(replan(lg, d).ledger);
+    ok('progress clears the streak', Object.values(afterProgress.stallStreak).every(v => !v));
+    const r3 = replan(afterProgress, d);
+    ok('same pattern AFTER progress replans instead of halting', r3.action === 'replan');
+
+    // and it is still recorded, so nothing is hidden
+    ok('the stall history keeps every occurrence', r3.ledger.stalls.length === 2);
+
+    // different patterns do not add up into a halt
+    const other = replan(replan(lg, d).ledger, { stuck: true, pattern: 'monologue', detail: 'x' });
+    ok('two different patterns do not halt', other.action === 'replan');
+
+    // configurable threshold
+    const t3a = replan(lg, d, '', { stallThreshold: 3 });
+    const t3b = replan(t3a.ledger, d, '', { stallThreshold: 3 });
+    ok('threshold 3: second stall still replans', t3b.action === 'replan');
+    const t3c = replan(t3b.ledger, d, '', { stallThreshold: 3 });
+    ok('threshold 3: third stall halts', t3c.action === 'halt');
+
+    // after a halt the streak restarts, so one loop is reported once
+    const afterHalt = replan(r2.ledger, d);
+    ok('the stall right after a halt replans, not halts again', afterHalt.action === 'replan');
+
+    ok('a fresh ledger starts with an empty streak', Object.keys(newLedger({ wave: 'w', coreProperty: 'p' }).stallStreak).length === 0);
+  }
 
   if (fails.length) { console.log(`\n\x1b[31mreplan-ledger self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ replan-ledger: two-registry replan + core-property scaffold halt correct\x1b[0m');
