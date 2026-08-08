@@ -1,0 +1,318 @@
+{
+  "scripts/phase-gate-runner.mjs": [
+    {
+      "spec": "docs/specs/JIDOKA_WAVE_EXECUTOR_SPEC.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/regenerate-coverage-report.mjs": [
+    {
+      "spec": "docs/specs/_COVERAGE.md",
+      "mentions": 2
+    },
+    {
+      "spec": "docs/specs/modules/spec-system/coverage-reporter.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/run-state.mjs": [
+    {
+      "spec": "docs/specs/wave-tui-top_MASTER_SPEC.md",
+      "mentions": 6
+    },
+    {
+      "spec": "docs/specs/modules/orchestration/wave-lifecycle.md",
+      "mentions": 4
+    },
+    {
+      "spec": "docs/specs/briefs/wave-tui-top_MICRO.md",
+      "mentions": 3
+    },
+    {
+      "spec": "docs/specs/briefs/wave-tui-top_SURFACES.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/tui-top.mjs": [
+    {
+      "spec": "docs/specs/wave-tui-interactive_MASTER_SPEC.md",
+      "mentions": 6
+    },
+    {
+      "spec": "docs/specs/wave-tui-top_MASTER_SPEC.md",
+      "mentions": 6
+    },
+    {
+      "spec": "docs/specs/briefs/wave-tui-top_MICRO.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/footprint-audit.mjs": [
+    {
+      "spec": "docs/specs/modules/installer-federation/footprint-audit.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/snapshot-global.mjs": [
+    {
+      "spec": "docs/specs/modules/installer-federation/global-snapshot.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/instantiation-audit.mjs": [
+    {
+      "spec": "docs/specs/modules/installer-federation/instantiation-audit.md",
+      "mentions": 3
+    }
+  ],
+  "scripts/install-into.mjs": [
+    {
+      "spec": "docs/specs/modules/installer-federation/project-installer.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/check-source-grounding.mjs": [
+    {
+      "spec": "docs/specs/modules/memory/grounding-contract.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/memory-consolidate.mjs": [
+    {
+      "spec": "docs/specs/wave-memory-validity_MASTER_SPEC.md",
+      "mentions": 9
+    },
+    {
+      "spec": "docs/specs/modules/memory/memory-consolidate.md",
+      "mentions": 2
+    },
+    {
+      "spec": "docs/specs/wave-frontier_MASTER_SPEC.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/memory-staging-status.mjs": [
+    {
+      "spec": "docs/specs/wave-memory-validity_MASTER_SPEC.md",
+      "mentions": 4
+    },
+    {
+      "spec": "docs/specs/modules/memory/memory-merge-protocol.md",
+      "mentions": 3
+    }
+  ],
+  "scripts/extract-retro-memory.mjs": [
+    {
+      "spec": "docs/specs/modules/memory/retro-memory-extractor.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/sync-specs-to-memory.mjs": [
+    {
+      "spec": "docs/specs/modules/memory/specs-to-memory-extractor.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/meta-audit.mjs": [
+    {
+      "spec": "docs/specs/modules/meta-engine/meta-audit-engine.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/meta-remedies.mjs": [
+    {
+      "spec": "docs/specs/modules/meta-engine/meta-gate-registry.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/meta-log.mjs": [
+    {
+      "spec": "docs/specs/modules/meta-engine/meta-mistake-ledger.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/prompt-evolution.mjs": [
+    {
+      "spec": "docs/specs/modules/meta-engine/prompt-evolution-system.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/red-team.mjs": [
+    {
+      "spec": "docs/specs/modules/meta-engine/red-team.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/compute-cost.mjs": [
+    {
+      "spec": "docs/specs/modules/observability/compute-cost.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/compute-dora.mjs": [
+    {
+      "spec": "docs/specs/modules/observability/compute-dora.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/check-cross-line-dispatch.mjs": [
+    {
+      "spec": "docs/specs/modules/orchestration/cross-line-dispatch-guard.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/validate-raci.mjs": [
+    {
+      "spec": "docs/specs/modules/orchestration/raci-governance.md",
+      "mentions": 3
+    }
+  ],
+  "scripts/bundle-size-check.mjs": [
+    {
+      "spec": "docs/specs/modules/quality-gates/bundle-perf-gate.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/bundle-delta.mjs": [
+    {
+      "spec": "docs/specs/modules/quality-gates/bundle-perf-gate.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/detect-constitutional-drift.mjs": [
+    {
+      "spec": "docs/specs/modules/quality-gates/constitutional-drift-monitor.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/coverage-delta.mjs": [
+    {
+      "spec": "docs/specs/modules/quality-gates/coverage-gate.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/audit-meta-process.mjs": [
+    {
+      "spec": "docs/specs/modules/quality-gates/meta-process-audit.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/run-verification-pipeline.mjs": [
+    {
+      "spec": "docs/specs/modules/quality-gates/verification-pipeline.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/map-ac-coverage.mjs": [
+    {
+      "spec": "docs/specs/modules/spec-system/ac-coverage-mapper.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/cascade-regenerate.mjs": [
+    {
+      "spec": "docs/specs/modules/spec-system/cascade-regenerate.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/cascade-validate.mjs": [
+    {
+      "spec": "docs/specs/modules/spec-system/cascade-validate.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/get-spec-context.mjs": [
+    {
+      "spec": "docs/specs/modules/spec-system/get-spec-context.md",
+      "mentions": 3
+    }
+  ],
+  "scripts/build-lineage-graph.mjs": [
+    {
+      "spec": "docs/specs/modules/spec-system/lineage-graph-builder.md",
+      "mentions": 3
+    }
+  ],
+  "scripts/spec-drift-check.mjs": [
+    {
+      "spec": "docs/specs/modules/spec-system/spec-drift-checker.md",
+      "mentions": 3
+    }
+  ],
+  "scripts/regenerate-specs-index.mjs": [
+    {
+      "spec": "docs/specs/modules/spec-system/spec-index-generator.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/spec-size-check.mjs": [
+    {
+      "spec": "docs/specs/modules/spec-system/spec-size-check.md",
+      "mentions": 3
+    }
+  ],
+  "scripts/judge-panel.mjs": [
+    {
+      "spec": "docs/specs/wave-judge-debias_MASTER_SPEC.md",
+      "mentions": 4
+    },
+    {
+      "spec": "docs/specs/wave-frontier_MASTER_SPEC.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/budget-gate.mjs": [
+    {
+      "spec": "docs/specs/wave-frontier_MASTER_SPEC.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/policy-sandbox.mjs": [
+    {
+      "spec": "docs/specs/wave-frontier_MASTER_SPEC.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/orchestration-planner.mjs": [
+    {
+      "spec": "docs/specs/wave-frontier_MASTER_SPEC.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/debate-engine.mjs": [
+    {
+      "spec": "docs/specs/wave-judge-debias_MASTER_SPEC.md",
+      "mentions": 4
+    }
+  ],
+  "hooks/session-start-digest.mjs": [
+    {
+      "spec": "docs/specs/wave-memory-validity_MASTER_SPEC.md",
+      "mentions": 3
+    }
+  ],
+  "scripts/memory-supersede-check.mjs": [
+    {
+      "spec": "docs/specs/wave-memory-validity_MASTER_SPEC.md",
+      "mentions": 21
+    }
+  ],
+  "scripts/tui-top-acceptance.mjs": [
+    {
+      "spec": "docs/specs/wave-tui-interactive_MASTER_SPEC.md",
+      "mentions": 6
+    }
+  ],
+  "hooks/session-state.mjs": [
+    {
+      "spec": "docs/specs/wave-tui-interactive_MASTER_SPEC.md",
+      "mentions": 8
+    }
+  ],
+  "scripts/statusline-jidoka.mjs": [
+    {
+      "spec": "docs/specs/wave-tui-top_MASTER_SPEC.md",
+      "mentions": 2
+    }
+  ]
+}
