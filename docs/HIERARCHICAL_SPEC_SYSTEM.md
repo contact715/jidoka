@@ -8,9 +8,11 @@ parents:
   - path: docs/NORTH_STAR.md
     version: 1.0.0
     relationship: implements
+    fingerprint: 0c898d66
   - path: docs/CONSTITUTION.md
     version: 2.0.0
     relationship: refines
+    fingerprint: 84ccc2fc
 children: []
 breaking_change_in_v: null
 created: 2026-05-27

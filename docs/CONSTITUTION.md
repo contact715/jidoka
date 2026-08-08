@@ -8,6 +8,7 @@ parents:
   - path: docs/NORTH_STAR.md
     version: 1.0.0
     relationship: implements
+    fingerprint: 0c898d66
 children: []
 breaking_change_in_v: 2.0.0
 created: 2026-05-25

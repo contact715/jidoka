@@ -8,6 +8,7 @@ parents:
   - path: docs/CONSTITUTION.md
     version: 2.0.0
     relationship: implements
+    fingerprint: 84ccc2fc
   - path: docs/MULTI_LEVEL_VERIFICATION.md
     version: 1.0.0
     relationship: refines

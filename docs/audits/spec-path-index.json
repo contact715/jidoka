@@ -15,6 +15,30 @@
       "mentions": 2
     }
   ],
+  "scripts/agent-error-policy.mjs": [
+    {
+      "spec": "docs/specs/agent-resilience_MASTER_SPEC.md",
+      "mentions": 3
+    }
+  ],
+  "scripts/jidoka-relay.mjs": [
+    {
+      "spec": "docs/specs/agent-resilience_MASTER_SPEC.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/replan-ledger.mjs": [
+    {
+      "spec": "docs/specs/agent-resilience_MASTER_SPEC.md",
+      "mentions": 2
+    }
+  ],
+  "scripts/replan-replay.mjs": [
+    {
+      "spec": "docs/specs/agent-resilience_MASTER_SPEC.md",
+      "mentions": 3
+    }
+  ],
   "scripts/run-state.mjs": [
     {
       "spec": "docs/specs/wave-tui-top_MASTER_SPEC.md",
@@ -45,6 +69,42 @@
     {
       "spec": "docs/specs/briefs/wave-tui-top_MICRO.md",
       "mentions": 2
+    }
+  ],
+  "scripts/permission-ledger.mjs": [
+    {
+      "spec": "docs/specs/governance-of-change_MASTER_SPEC.md",
+      "mentions": 2
+    }
+  ],
+  "hooks/permission-gate.mjs": [
+    {
+      "spec": "docs/specs/governance-of-change_MASTER_SPEC.md",
+      "mentions": 4
+    }
+  ],
+  "scripts/l0-content-guard.mjs": [
+    {
+      "spec": "docs/specs/governance-of-change_MASTER_SPEC.md",
+      "mentions": 3
+    }
+  ],
+  "hooks/compaction-trace.mjs": [
+    {
+      "spec": "docs/specs/governance-of-change_MASTER_SPEC.md",
+      "mentions": 3
+    }
+  ],
+  "scripts/kaizen-dispatch.mjs": [
+    {
+      "spec": "docs/specs/kaizen-dispatch-and-isolation_MASTER_SPEC.md",
+      "mentions": 3
+    }
+  ],
+  "scripts/worktree-session.mjs": [
+    {
+      "spec": "docs/specs/kaizen-dispatch-and-isolation_MASTER_SPEC.md",
+      "mentions": 3
     }
   ],
   "scripts/footprint-audit.mjs": [
@@ -251,6 +311,36 @@
       "mentions": 3
     }
   ],
+  "scripts/spec-path-index.mjs": [
+    {
+      "spec": "docs/specs/spec-reach-and-memory-evidence_MASTER_SPEC.md",
+      "mentions": 3
+    }
+  ],
+  "hooks/spec-push.mjs": [
+    {
+      "spec": "docs/specs/spec-reach-and-memory-evidence_MASTER_SPEC.md",
+      "mentions": 3
+    }
+  ],
+  "scripts/memory-eval.mjs": [
+    {
+      "spec": "docs/specs/spec-reach-and-memory-evidence_MASTER_SPEC.md",
+      "mentions": 4
+    }
+  ],
+  "scripts/system-truth.mjs": [
+    {
+      "spec": "docs/specs/system-truth-and-rework_MASTER_SPEC.md",
+      "mentions": 3
+    }
+  ],
+  "scripts/cc-stats.mjs": [
+    {
+      "spec": "docs/specs/system-truth-and-rework_MASTER_SPEC.md",
+      "mentions": 3
+    }
+  ],
   "scripts/judge-panel.mjs": [
     {
       "spec": "docs/specs/wave-judge-debias_MASTER_SPEC.md",
@@ -306,7 +396,7 @@
   "hooks/session-state.mjs": [
     {
       "spec": "docs/specs/wave-tui-interactive_MASTER_SPEC.md",
-      "mentions": 8
+      "mentions": 6
     }
   ],
   "scripts/statusline-jidoka.mjs": [

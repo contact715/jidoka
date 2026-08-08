@@ -9,9 +9,11 @@ parents:
   - path: docs/NORTH_STAR.md
     version: 1.0.0
     relationship: governs
+    fingerprint: 0c898d66
   - path: docs/CONSTITUTION.md
     version: 2.0.0
     relationship: constraints
+    fingerprint: 84ccc2fc
 complexity: non-trivial
 created: 2026-06-10
 last_updated: 2026-06-11

@@ -458,9 +458,13 @@ function main() {
       const m = text.match(entryRe);
       if (!m) continue;
       let entry = m[1];
+      // Indentation is TAKEN FROM THE SIBLING FIELDS, never hardcoded: a hardcoded six spaces
+      // made `fingerprint` look like a child of `relationship` instead of a peer of it. Malformed
+      // YAML that a regex still parses is the worst kind: nothing complains until a real parser reads it.
+      const indent = (entry.match(/\n(\s+)version:/) || entry.match(/\n(\s+)\w+:/) || [null, '    '])[1];
       entry = /fingerprint:\s*[a-f0-9]{8}/i.test(entry)
         ? entry.replace(/fingerprint:\s*[a-f0-9]{8}/i, `fingerprint: ${fp}`)
-        : `${entry.replace(/\s*$/, '')}\n      fingerprint: ${fp}`;
+        : `${entry.replace(/\s*$/, '')}\n${indent}fingerprint: ${fp}`;
       const next = text.slice(0, m.index) + entry + text.slice(m.index + m[1].length);
       if (next !== text) { fs.writeFileSync(abs, next); stamped++; }
     }
