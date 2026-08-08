@@ -12,7 +12,7 @@
 //
 // FULL & self-tested (pure helpers covered; streaming layer is I/O-thin).
 
-import { createReadStream, readdirSync, statSync } from 'node:fs';
+import { createReadStream, readdirSync, statSync, readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -59,6 +59,67 @@ export function modelFamily(id) {
 }
 
 // fold one usage record into the aggregate (mutates agg, returns it — testable)
+
+// parentuuid-chain (2026-W31-R13) — every transcript line carries `parentUuid`, and nothing in
+// the engine has ever read it. Read flat, a session looks like one straight line of turns. It is
+// not: rewinding, editing a prompt or re-running a step forks the chain, and the abandoned fork
+// stays in the file. So the flat view counts work that was thrown away as if it had shipped.
+//
+// The chain turns that into a number the dev-system actually cares about: how much of a session
+// was ABANDONED. A high abandoned share means the approach kept failing and being restarted,
+// which is the signal a token count cannot give — tokens go up either way.
+
+/** Build parent → children from raw transcript rows. Pure. */
+export function buildChain(rows = []) {
+  const nodes = new Map();
+  for (const r of rows) {
+    if (!r || !r.uuid) continue;
+    nodes.set(r.uuid, { uuid: r.uuid, parent: r.parentUuid || null, type: r.type || null });
+  }
+  const children = new Map();
+  for (const n of nodes.values()) {
+    if (!children.has(n.parent)) children.set(n.parent, []);
+    children.get(n.parent).push(n.uuid);
+  }
+  return { nodes, children };
+}
+
+/**
+ * The surviving conversation is the path to the LAST node in file order: everything else that
+ * hangs off the tree is work that was rewound away. Pure.
+ */
+export function chainStats(rows = []) {
+  const { nodes, children } = buildChain(rows);
+  if (nodes.size === 0) return { total: 0, live: 0, abandoned: 0, abandonedPct: 0, forks: 0 };
+
+  // last node that actually exists in the map, walking from the end of the file
+  let tail = null;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (rows[i] && rows[i].uuid && nodes.has(rows[i].uuid)) { tail = rows[i].uuid; break; }
+  }
+  const live = new Set();
+  let cur = tail;
+  const guard = new Set(); // a malformed file can point a node at itself
+  while (cur && nodes.has(cur) && !guard.has(cur)) {
+    guard.add(cur);
+    live.add(cur);
+    cur = nodes.get(cur).parent;
+  }
+  // a fork is any node with more than one child: the conversation went two ways from there
+  let forks = 0;
+  for (const kids of children.values()) if (kids.length > 1) forks++;
+
+  const total = nodes.size;
+  const abandoned = total - live.size;
+  return {
+    total,
+    live: live.size,
+    abandoned,
+    abandonedPct: total ? Math.round((abandoned / total) * 1000) / 10 : 0,
+    forks,
+  };
+}
+
 export function fold(agg, { day, project, model, out, inp, cacheRead }) {
   agg.days[day] = agg.days[day] || { out: 0, inp: 0 };
   agg.days[day].out += out; agg.days[day].inp += inp;
@@ -155,6 +216,20 @@ function draw(agg, files, days) {
 function selfTest() {
   const T = [
     ['fmtTok 1.2M', fmtTok(1234567) === '1.2M'],
+    // parentuuid-chain (2026-W31-R13)
+    ['прямая цепочка: брошенного нет',
+      chainStats([{uuid:'a',parentUuid:null},{uuid:'b',parentUuid:'a'},{uuid:'c',parentUuid:'b'}]).abandoned === 0],
+    ['перемотка оставляет брошенную ветку',
+      chainStats([{uuid:'a',parentUuid:null},{uuid:'b',parentUuid:'a'},{uuid:'c',parentUuid:'a'}]).abandoned === 1],
+    ['развилка считается развилкой',
+      chainStats([{uuid:'a',parentUuid:null},{uuid:'b',parentUuid:'a'},{uuid:'c',parentUuid:'a'}]).forks === 1],
+    ['доля брошенного считается в процентах',
+      chainStats([{uuid:'a',parentUuid:null},{uuid:'b',parentUuid:'a'},{uuid:'c',parentUuid:'a'},{uuid:'d',parentUuid:'c'}]).abandonedPct === 25],
+    ['выжившей считается ветка последней строки файла',
+      chainStats([{uuid:'a',parentUuid:null},{uuid:'x',parentUuid:'a'},{uuid:'y',parentUuid:'a'}]).live === 2],
+    ['пустой вход не делит на ноль', chainStats([]).abandonedPct === 0],
+    ['строки без uuid игнорируются', chainStats([{foo:1},{uuid:'a',parentUuid:null}]).total === 1],
+    ['самоссылка не зацикливает обход', chainStats([{uuid:'a',parentUuid:'a'}]).total === 1],
     ['fmtTok 46K', fmtTok(45600) === '46K'],
     ['fmtTok plain', fmtTok(320) === '320'],
     ['fmtTok 2.5B', fmtTok(2.5e9) === '2.5B'],
@@ -184,6 +259,43 @@ function selfTest() {
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
   if (process.argv.includes('--self-test')) selfTest();
+  // parentuuid-chain: --rework reads the causal chain instead of the token totals and reports
+  // how much of each session was rewound away. Tokens rise whether work shipped or was thrown
+  // out; this separates the two.
+  if (process.argv.includes('--rework')) {
+    const root = join(homedir(), '.claude', 'projects');
+    const rows = [];
+    let dirs = [];
+    try { dirs = readdirSync(root); } catch { /* none */ }
+    for (const d of dirs) {
+      const p = join(root, d);
+      let files = [];
+      try { if (!statSync(p).isDirectory()) continue; files = readdirSync(p).filter((x) => x.endsWith('.jsonl')); } catch { continue; }
+      for (const x of files) {
+        let raw;
+        try { raw = readFileSync(join(p, x), 'utf8'); } catch { continue; }
+        const parsed = raw.split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+        // subagent branches hang off the main chain by design and are NOT abandoned work, so
+        // they are excluded before measuring: counting them would inflate the number in exactly
+        // the sessions that used agents most.
+        const st = chainStats(parsed.filter((r) => !r.isSidechain));
+        if (st.total >= 50) rows.push({ session: x.slice(0, 8), ...st });
+      }
+    }
+    rows.sort((a, b) => b.abandonedPct - a.abandonedPct);
+    const totals = rows.reduce((a, r) => ({ total: a.total + r.total, abandoned: a.abandoned + r.abandoned }), { total: 0, abandoned: 0 });
+    console.log('переделка по причинной цепочке (сессии от 50 шагов)');
+    console.log('');
+    console.log('  сессия     шагов  брошено   доля  развилок');
+    for (const r of rows.slice(0, 15)) {
+      console.log('  ' + r.session + '  ' + String(r.total).padStart(6) + '  ' + String(r.abandoned).padStart(7) + '  ' + String(r.abandonedPct).padStart(5) + '%  ' + String(r.forks).padStart(8));
+    }
+    const pct = totals.total ? Math.round((totals.abandoned / totals.total) * 1000) / 10 : 0;
+    console.log('');
+    console.log('  всего: ' + rows.length + ' сессий, ' + totals.total + ' шагов, брошено ' + totals.abandoned + ' (' + pct + '%)');
+    console.log('  брошенное это работа, отменённая перемоткой: токены за неё потрачены, результата нет.');
+    process.exit(0);
+  }
   const di = process.argv.indexOf('--days');
   const days = di > -1 ? Math.max(1, parseInt(process.argv[di + 1], 10) || 14) : 14;
   const sinceMs = Date.now() - days * 86400000;
