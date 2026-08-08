@@ -11,6 +11,7 @@
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 
 export const GATES = [
   // CI — run on every push/PR, hard-block
@@ -112,6 +113,41 @@ export function findOrphanGateScripts(pkg, callersText) {
   });
 }
 
+
+// stop-layer-derived (2026-W31-R8) — the gate map called itself "the single map of every gate"
+// and had no Stop layer at all, while four Stop hooks were live in settings.json:
+// browser-verify-gate, proof-of-work-gate, outbound-claims-gate, synthesis-coverage-gate. A map
+// that omits a whole enforcement layer is worse than no map: it is consulted and believed.
+//
+// The Stop layer is DERIVED from the hook config rather than typed here, so it cannot drift the
+// way a hand-written list does. That is the same reason the README script counter kept going
+// stale: a number a human maintains, guarding a property a machine could read.
+//
+// REJECTED half of this recommendation, with evidence. It also asked to "drop the unbacked
+// measured claim for 10 judges". Checked on disk: all ten have docs/evals/<agent>/golden-cases.jsonl
+// AND a recorded run-*.jsonl. The claim is backed, so it stays. Removing it would have deleted a
+// true statement on the strength of a plausible-sounding report line.
+export function stopGatesFrom(settingsText) {
+  let cfg;
+  try { cfg = JSON.parse(String(settingsText)); } catch { return { checked: false, gates: [] }; }
+  const groups = cfg?.hooks?.Stop;
+  if (!Array.isArray(groups)) return { checked: false, gates: [] };
+  const gates = [];
+  const seen = new Set();
+  for (const g of groups) {
+    for (const h of g.hooks || []) {
+      const cmd = String(h.command || '');
+      const file = (cmd.match(/([\w-]+)\.mjs\b/) || [])[1];
+      if (!file || seen.has(file)) continue;
+      seen.add(file);
+      // a Stop hook that only records state is not a GATE; a gate is one that can block
+      if (/^(session-state)$/.test(file)) continue;
+      gates.push({ id: file, layer: 'Stop', mode: 'hard', token: `${file}.mjs` });
+    }
+  }
+  return { checked: true, gates };
+}
+
 // PreToolUse gates are "wired" only if the GLOBAL hook config actually routes the right tools
 // through them. Incident 2026-07-12 (gate-bypass): policy-enforce-hook handled Bash side-channels
 // in code (self-tested, red-team-proven) but ~/.claude/settings.json ran it only on Write|Edit —
@@ -201,6 +237,19 @@ function selfTest() {
     ['gate:* whose FILE ships via installer is NOT an orphan', findOrphanGateScripts({ scripts: { 'gate:x': 'node scripts/x.mjs' } }, "payload: 'x.mjs',").length === 0],
     ['no gate:* scripts → no orphans', findOrphanGateScripts({ scripts: { test: 'vitest' } }, '').length === 0],
     // verifyPreToolUse — the 2026-07-12 gate-bypass incident: hook logic fine, routing absent
+    // stop-layer-derived (2026-W31-R8)
+    ['Stop-гейты выводятся из живого конфига, а не из списка',
+      stopGatesFrom(JSON.stringify({ hooks: { Stop: [{ hooks: [{ command: 'node ~/.claude/hooks/browser-verify-gate.mjs' }] }] } })).gates.length === 1],
+    ['у выведенного гейта правильный слой',
+      stopGatesFrom(JSON.stringify({ hooks: { Stop: [{ hooks: [{ command: 'node x/proof-of-work-gate.mjs' }] }] } })).gates[0].layer === 'Stop'],
+    ['записыватель состояния не считается гейтом',
+      stopGatesFrom(JSON.stringify({ hooks: { Stop: [{ hooks: [{ command: 'node x/session-state.mjs Stop' }] }] } })).gates.length === 0],
+    ['не-mjs команда (звук) игнорируется',
+      stopGatesFrom(JSON.stringify({ hooks: { Stop: [{ hooks: [{ command: 'afplay done.wav' }] }] } })).gates.length === 0],
+    ['дубль одного хука в двух группах не удваивает карту',
+      stopGatesFrom(JSON.stringify({ hooks: { Stop: [{ hooks: [{ command: 'a/x-gate.mjs' }] }, { hooks: [{ command: 'b/x-gate.mjs' }] }] } })).gates.length === 1],
+    ['отсутствие Stop-секции это не проверено, а не пусто', stopGatesFrom(JSON.stringify({ hooks: {} })).checked === false],
+    ['битый конфиг не роняет аудит', stopGatesFrom('{не json').checked === false],
     ['fully-routed PreToolUse config → no missing', verifyPreToolUse(JSON.stringify({ hooks: { PreToolUse: [
       { matcher: 'Bash', hooks: [{ command: 'jidoka-guard.sh' }, { command: 'node policy-enforce-hook.mjs' }] },
       { matcher: 'Write|Edit|MultiEdit|NotebookEdit', hooks: [{ command: 'node policy-enforce-hook.mjs' }] },
@@ -244,8 +293,13 @@ if (isMain) {
   const wf = workflowsText();
   const ci = verifyCI(GATES, wf);
   const ghosts = ci.filter(c => !c.present);
+  // stop-layer-derived: the Stop gates come from the live hook config, never from a typed list.
+  let settingsRaw = '';
+  try { settingsRaw = readFileSync(join(homedir(), '.claude', 'settings.json'), 'utf8'); } catch { /* no global config */ }
+  const stop = stopGatesFrom(settingsRaw);
+  const ALL = [...GATES, ...stop.gates];
   const byLayer = {};
-  for (const g of GATES) (byLayer[g.layer] ??= []).push(g);
+  for (const g of ALL) (byLayer[g.layer] ??= []).push(g);
   console.log('gate-audit — map of all gates by enforcement layer\n');
   for (const [layer, gs] of Object.entries(byLayer)) {
     console.log(`  ${layer}:`);
@@ -255,8 +309,8 @@ if (isMain) {
       console.log(`    ${mark} ${g.id} (${g.mode})`);
     }
   }
-  const soft = GATES.filter(g => g.mode === 'soft').length;
-  console.log(`\n  ${GATES.length} gates · ${GATES.filter(g => g.layer === 'CI').length} in CI · ${soft} soft-trial · ${GATES.filter(g => g.mode === 'measured').length} measured-LLM`);
+  const soft = ALL.filter(g => g.mode === 'soft').length;
+  console.log(`\n  ${ALL.length} gates · ${ALL.filter(g => g.layer === 'CI').length} in CI · ${soft} soft-trial · ${ALL.filter(g => g.mode === 'measured').length} measured-LLM`);
   const selfTestOnly = ci.filter(c => c.selfTestOnly);
   if (selfTestOnly.length) console.log(`  \x1b[33mℹ ${selfTestOnly.length} CI gate(s) run ONLY as --self-test in CI (logic verified, NOT enforcing on repo code): ${selfTestOnly.map(g => g.id).join(', ')}\x1b[0m`);
   if (ghosts.length) { console.error(`\n\x1b[31m✗ ${ghosts.length} CI gate(s) declared but absent from workflows: ${ghosts.map(g => g.id).join(', ')}\x1b[0m`); process.exit(1); }
