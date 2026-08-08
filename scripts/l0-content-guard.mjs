@@ -45,7 +45,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REGISTRY = path.join(ROOT, 'docs/audits/l0-fingerprints.json');
 const AUDIT = path.join(ROOT, 'docs/audits/l0-stamp-log.jsonl');
 
-export const L0_DOCS = ['docs/CONSTITUTION.md', 'docs/MISSION.md', 'docs/NORTH_STAR.md'];
+export const L0_NORMATIVE_DOCS = ['docs/CONSTITUTION.md', 'docs/MISSION.md', 'docs/NORTH_STAR.md'];
 
 // ── pure core ────────────────────────────────────────────────────────────────
 
@@ -158,7 +158,7 @@ if (isMain) {
   if (argv.includes('--self-test')) selfTest();
   const arg = (k) => { const i = argv.indexOf(k); return i !== -1 ? argv[i + 1] : null; };
   const docsArg = arg('--docs');
-  const docs = docsArg ? docsArg.split(',').map((s) => s.trim()).filter(Boolean) : L0_DOCS;
+  const docs = docsArg ? docsArg.split(',').map((s) => s.trim()).filter(Boolean) : L0_NORMATIVE_DOCS;
   const readDoc = (rel) => { try { return readFileSync(path.join(ROOT, rel), 'utf8'); } catch { return null; } };
   let registry = {};
   try { registry = JSON.parse(readFileSync(REGISTRY, 'utf8')); } catch { /* first run */ }
