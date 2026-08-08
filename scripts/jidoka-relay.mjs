@@ -18,6 +18,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { routeDevelopmentTask } from './model-router.mjs';
+import { classifyAgentError, retryPlan } from './agent-error-policy.mjs';
 
 const DEFAULT_STORE = join(homedir(), '.jidoka', 'relay');
 const DEFAULT_CLAUDE_TIMEOUT_MS = 4 * 60 * 1000;
@@ -282,8 +283,8 @@ function runClaude(run, { claudeTimeoutMs = null } = {}) {
     return;
   }
   if (res.status !== 0) {
-    updateStatus(run.dir, (s) => appendHistory({ ...s, state: 'failed', nextAgent: null }, { event: 'claude-failed', status: res.status }));
-    throw new Error(`claude failed with status ${res.status}`);
+    handleAgentFailure(run, 'claude', res, 'claude-retry');
+    return;
   }
   const route = readJson(join(run.dir, 'route.json'));
   writePromptFiles(run.dir, request, route, res.stdout || '');
@@ -316,8 +317,8 @@ function runCodex(run, { allowCodexWrite = false, codexTimeoutMs = null } = {}) 
     throw new Error(`codex timed out after ${timeoutMs}ms`);
   }
   if (res.status !== 0) {
-    updateStatus(run.dir, (s) => appendHistory({ ...s, state: 'failed', nextAgent: null }, { event: 'codex-failed', status: res.status }));
-    throw new Error(`codex failed with status ${res.status}`);
+    handleAgentFailure(run, 'codex', res, 'codex-retry');
+    return;
   }
   if (route.route === 'codex-then-fable-review' && !readJson(join(run.dir, 'status.json')).fableReviewed) {
     const reviewText = existsSync(outputFile) ? readFileSync(outputFile, 'utf8') : '';
@@ -346,6 +347,48 @@ function runCodex(run, { allowCodexWrite = false, codexTimeoutMs = null } = {}) 
     updateStatus(run.dir, (s) => appendHistory({ ...s, state: 'done', nextAgent: null, phase: 'complete' }, { event: 'codex-done', output: outputFile }));
   }
   console.log(`jidoka-relay: Codex finished ${run.id}`);
+}
+
+// agent-error-taxonomy: a non-zero exit used to kill the run outright. Now it is classified,
+// and a blip is requeued instead of ending a live client run. See scripts/agent-error-policy.mjs.
+const RELAY_MAX_ATTEMPTS = Number(process.env.JIDOKA_RELAY_MAX_ATTEMPTS || 3);
+const relayWaitMs = () => {
+  const v = arg('--wait');
+  return v ? Number(v) : (process.env.JIDOKA_RELAY_WAIT_MS ? Number(process.env.JIDOKA_RELAY_WAIT_MS) : null);
+};
+
+/** Block for ms without a scheduler — the relay is fully synchronous. */
+function sleepSync(ms) {
+  if (!ms || ms <= 0) return;
+  const sab = new SharedArrayBuffer(4);
+  Atomics.wait(new Int32Array(sab), 0, 0, ms);
+}
+
+/**
+ * Decide and record what happens after a failed agent invocation.
+ * Requeues the SAME agent on a retryable failure, fails the run otherwise.
+ */
+function handleAgentFailure(run, agent, res, phase) {
+  const text = `${res.stdout || ''}\n${res.stderr || ''}`;
+  const cls = classifyAgentError(text, res.status);
+  const status = readJson(join(run.dir, 'status.json'), {});
+  const attempts = { ...(status.attempts || {}) };
+  attempts[agent] = (attempts[agent] || 0) + 1;
+  const plan = retryPlan(cls, { attempt: attempts[agent], maxAttempts: RELAY_MAX_ATTEMPTS, waitMs: relayWaitMs() });
+
+  if (plan.retry) {
+    updateStatus(run.dir, (s2) => appendHistory(
+      { ...s2, state: 'queued', nextAgent: agent, phase, attempts, retryAfterMs: plan.delayMs },
+      { event: `${agent}-retrying`, status: res.status, errorKind: cls.kind, matched: cls.matched, reason: plan.reason },
+    ));
+    console.log(`jidoka-relay: ${agent} failed (${cls.kind}: ${cls.why}) — ${plan.reason}`);
+    return { retry: true, delayMs: plan.delayMs };
+  }
+  updateStatus(run.dir, (s2) => appendHistory(
+    { ...s2, state: 'failed', nextAgent: null, attempts, errorKind: cls.kind },
+    { event: `${agent}-failed`, status: res.status, errorKind: cls.kind, matched: cls.matched, reason: plan.reason },
+  ));
+  throw new Error(`${agent} failed (${cls.kind}): ${cls.why}${cls.matched ? ` [${cls.matched}]` : ''} — ${plan.reason}`);
 }
 
 function runAgent(agent, id, options = {}) {
@@ -398,6 +441,13 @@ function commandAuto() {
     }
     if (status.state === 'failed') throw new Error(`run failed: ${run.id}`);
     if (!status.nextAgent) throw new Error(`run has no next agent: ${run.id}`);
+    // a retryable failure asked for a pause before the next attempt; honour it here so the
+    // backoff is real and not a tight spin against a rate limit.
+    if (status.retryAfterMs > 0) {
+      console.log(`jidoka-relay: waiting ${Math.round(status.retryAfterMs / 1000)}s before retrying ${status.nextAgent}`);
+      sleepSync(status.retryAfterMs);
+      updateStatus(run.dir, (s2) => ({ ...s2, retryAfterMs: 0 }));
+    }
     console.log(`jidoka-relay: step ${step}/${maxSteps} -> ${status.nextAgent} (${status.phase})`);
     runAgent(status.nextAgent, run.id, {
       allowCodexWrite,
