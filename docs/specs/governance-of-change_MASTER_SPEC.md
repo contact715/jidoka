@@ -102,6 +102,17 @@ INVERTED (содержание изменилось, версия нет — б�
   `docs/audits/l0-stamp-log.jsonl`, `~/.jidoka/compaction-events.jsonl`.
 - Полный разбор: `docs/PERMISSION_IS_A_RECORD_NOT_A_MEMORY.md`.
 
+
+### Управление и настройка
+
+- Выдать разрешение: `permission-ledger.mjs grant <действие> --scope <путь> --hours N --by <кто>
+  --reason "<почему>"`; посмотреть живые: `list`; снять: `revoke <id>`.
+- Застолбить содержание нормативных документов: `l0-content-guard.mjs --stamp --reason "<что и
+  почему меняется>"`. Причина обязательна: перештамповка без неё это то же самое, что её
+  отсутствие.
+- Переопределение хранилищ для проверки и переноса: переменные окружения `JIDOKA_PERMISSIONS`
+  и `JIDOKA_COMPACTION_LOG`.
+
 ## 5. Out of scope
 
 - Защита от злоумышленника. И реестр разрешений, и реестр отпечатков это файлы: процесс,
