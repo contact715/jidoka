@@ -35,6 +35,17 @@ echo "✓ pre-commit · meta-honesty: ledger signal OK"
 # script count, with four commits landing on top of the red, two days after the same defect
 # had been "fixed". A gate that is soft where you work and hard where you publish does not
 # protect you, it just moves the failure somewhere you are not looking.
+
+# l0-normative-fingerprint (2026-W31-R5) — a normative rule must not change without the version
+# moving. Three drift gates watch versions and references; none of them reads what the
+# constitution SAYS, so an inverted rule used to pass all of them byte-identically.
+out=$(node "$ROOT/scripts/l0-content-guard.mjs" 2>&1); rc=$?
+if [ $rc -ne 0 ]; then
+  echo "$out"
+  echo "✗ pre-commit BLOCKED by l0-content-guard (норма изменена без объявления поправки — см. выше)."
+  exit 1
+fi
+echo "✓ pre-commit · l0-content-guard: нормативные документы не менялись молча"
 out=$(node "$ROOT/scripts/instantiation-audit.mjs" 2>&1); rc=$?
 if [ $rc -ne 0 ]; then
   echo "$out"
