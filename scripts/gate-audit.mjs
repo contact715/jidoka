@@ -157,20 +157,28 @@ export function closesClassTags(files = []) {
  *   stale   — the registry names a mechanism that no file declares → the registry drifted
  * Pure. `wired` is a Set of file basenames known to have a standing caller.
  */
-export function reverseRemedyAudit({ tags = [], remedies = {}, wired = new Set(), today = '' } = {}) {
-  const pending = [], unwired = [], declared = new Set();
+export function reverseRemedyAudit({ tags = [], remedies = {}, wired = new Set(), today = '', settingsAvailable = true } = {}) {
+  const pending = [], unwired = [], unverifiable = [], declared = new Set();
   for (const t of tags) {
     const base = String(t.path).replace(/^.*\//, '');
     for (const cls of t.classes) {
       declared.add(cls);
-      if (!wired.has(base)) { unwired.push({ cls, mechanism: t.path }); continue; }
+      if (!wired.has(base)) {
+        // Глобальные Stop/PreToolUse хуки подключаются в ~/.claude/settings.json, и этого
+        // файла в CI нет и быть не может. Без него «вызывающий не найден» означает
+        // «проверить нечем», а не «вызывающего нет». Раньше эти два состояния были
+        // склеены, и CI краснел на условии, которое сервер физически не может выполнить,
+        // ровно то, что этот же скрипт запрещает другим проверкам (severity parity).
+        (settingsAvailable ? unwired : unverifiable).push({ cls, mechanism: t.path });
+        continue;
+      }
       if (!Object.prototype.hasOwnProperty.call(remedies, cls)) pending.push({ cls, mechanism: t.path, since: today });
     }
   }
   const stale = Object.entries(remedies)
     .filter(([cls, r]) => r && r.mechanism && !declared.has(cls))
     .map(([cls, r]) => ({ cls, mechanism: r.mechanism }));
-  return { pending, unwired, stale };
+  return { pending, unwired, unverifiable, stale };
 }
 
 // ONE definition of "which mechanisms exist" and "which of them are wired", shared by this tool and
@@ -426,7 +434,28 @@ function selfTest() {
     })()],
     ['tagged but NOT wired → the tag is a claim, not a gate (reported separately)', (() => {
       const r = reverseRemedyAudit({ tags: [{ path: 'hooks/ghost.mjs', classes: ['c'] }], remedies: {}, wired: new Set() });
-      return r.unwired.length === 1 && r.pending.length === 0;
+      return r.unwired.length === 1 && r.pending.length === 0 && r.unverifiable.length === 0;
+    })()],
+    ['no global config (CI) → unwired becomes UNVERIFIABLE, never a violation', (() => {
+      const r = reverseRemedyAudit({
+        tags: [{ path: 'hooks/permission-gate.mjs', classes: ['c'] }],
+        remedies: {}, wired: new Set(), settingsAvailable: false,
+      });
+      return r.unwired.length === 0 && r.unverifiable.length === 1 && r.unverifiable[0].mechanism === 'hooks/permission-gate.mjs';
+    })()],
+    ['the same input WITH a global config is still a hard violation (no weakening where it is checkable)', (() => {
+      const r = reverseRemedyAudit({
+        tags: [{ path: 'hooks/permission-gate.mjs', classes: ['c'] }],
+        remedies: {}, wired: new Set(), settingsAvailable: true,
+      });
+      return r.unwired.length === 1 && r.unverifiable.length === 0;
+    })()],
+    ['a wired mechanism is unaffected by the config being absent', (() => {
+      const r = reverseRemedyAudit({
+        tags: [{ path: 'scripts/skills-freshness.mjs', classes: ['c'] }],
+        remedies: {}, wired: new Set(['skills-freshness.mjs']), settingsAvailable: false, today: '2026-08-11',
+      });
+      return r.pending.length === 1 && r.unwired.length === 0 && r.unverifiable.length === 0;
     })()],
     ['tagged + wired + ALREADY registered → nothing to do', (() => {
       const r = reverseRemedyAudit({
@@ -542,13 +571,19 @@ if (isMain) {
   let REMEDIES = {};
   try { ({ REMEDIES } = await import('./meta-remedies.mjs')); } catch { /* registry unreadable → report nothing rather than guess */ }
   const today = new Date().toISOString().slice(0, 10);
-  const rev = reverseRemedyAudit({ tags, remedies: REMEDIES, wired, today });
+  const rev = reverseRemedyAudit({ tags, remedies: REMEDIES, wired, today, settingsAvailable: settingsRaw !== '' });
 
   console.log(`\n  reverse axis — ${tags.length} mechanism(s) declare a class, registry knows ${Object.keys(REMEDIES).length}`);
   if (rev.unwired.length) {
     console.error(`\n\x1b[31m✗ ${rev.unwired.length} mechanism(s) CLAIM a class but nothing calls them:\x1b[0m`);
     for (const u of rev.unwired) console.error(`    ${u.mechanism} claims "${u.cls}" — a tag with no standing caller protects nothing`);
     process.exit(1);
+  }
+  if (rev.unverifiable.length) {
+    // Не «всё хорошо» и не «нарушение»: непроверяемое названо непроверяемым.
+    console.log(`  \x1b[33mℹ ${rev.unverifiable.length} mechanism(s) whose only possible caller is ~/.claude/settings.json — not checkable here (no global config, i.e. CI):\x1b[0m`);
+    for (const u of rev.unverifiable) console.log(`    ${u.mechanism} claims "${u.cls}"`);
+    console.log('    On a machine WITH the global config this same check is hard-blocking; run it there to verify.');
   }
   if (rev.stale.length) {
     console.log(`  \x1b[33mℹ ${rev.stale.length} registered class(es) whose mechanism declares nothing: ${rev.stale.map((s) => s.cls).join(', ')}\x1b[0m`);
