@@ -44,20 +44,28 @@ import { execFileSync } from 'node:child_process';
 
 const HOME = os.homedir();
 
-/** Что и откуда сверяем. */
+/** Где лежат локальные скиллы; берётся первый существующий вариант. */
+const SKILL_ROOTS = [
+  path.join(HOME, '.agents', 'skills'),
+  path.join(HOME, '.claude', 'skills'),
+];
+
+/** Реестр сторонних скиллов: единственное место, где записано, откуда что взято. */
+const SKILL_LOCK = path.join(HOME, '.agents', '.skill-lock.json');
+
+/**
+ * Официальные источники: один репозиторий, единицы = подпапки внутри известного префикса.
+ * Сторонние скиллы устроены иначе (у каждого свой репозиторий и своя раскладка), они
+ * разбираются отдельно, через lock-файл.
+ */
 const SOURCES = [
   {
     id: 'skills',
     label: 'Скиллы Anthropic',
     repo: 'anthropics/skills',
     branch: 'main',
-    // папка внутри репозитория, каждая подпапка в ней = одна единица
     upstreamPrefix: 'skills',
-    // где искать локально; берётся первый существующий вариант
-    localRoots: [
-      path.join(HOME, '.agents', 'skills'),
-      path.join(HOME, '.claude', 'skills'),
-    ],
+    localRoots: SKILL_ROOTS,
   },
   {
     id: 'plugins',
@@ -184,6 +192,57 @@ export function resolveLocalDir(name, localRoots) {
   return null;
 }
 
+/* ------------------------- сторонние скиллы (lock) ------------------------- */
+
+/**
+ * Разбирает реестр сторонних скиллов. Формат записи:
+ *   "имя": { source: "владелец/репо", skillPath: "путь/до/SKILL.md", ... }
+ * Возвращает плоский список; порядок стабильный, чтобы отчёт не прыгал.
+ */
+export function readSkillLock(raw) {
+  let data;
+  try { data = JSON.parse(raw); } catch { return []; }
+  const skills = data && typeof data === 'object' ? data.skills : null;
+  if (!skills || typeof skills !== 'object') return [];
+  return Object.entries(skills)
+    .filter(([, v]) => v && typeof v.source === 'string' && v.source.includes('/'))
+    .map(([name, v]) => ({ name, repo: v.source, skillPath: typeof v.skillPath === 'string' ? v.skillPath : 'SKILL.md' }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Папка скилла внутри репозитория. Пустая строка = скилл лежит в корне. */
+export function folderOf(skillPath) {
+  const parts = String(skillPath).split('/');
+  parts.pop();
+  return parts.join('/');
+}
+
+/**
+ * Достаёт из дерева репозитория карту { путь относительно папки скилла -> sha }.
+ * Пустая карта означает, что папки в источнике больше нет: скилл удалили или
+ * переименовали, и это ОТДЕЛЬНЫЙ вердикт, не «устарел».
+ */
+export function upstreamMapForFolder(treeEntries, folder) {
+  const prefix = folder ? `${folder}/` : '';
+  const out = new Map();
+  for (const e of treeEntries) {
+    if (e.type !== 'blob') continue;
+    if (!e.path.startsWith(prefix)) continue;
+    const rel = e.path.slice(prefix.length);
+    // в корне репозитория берём только сам SKILL.md и то, что рядом, без подпапок
+    if (!rel || isIgnored(rel)) continue;
+    if (!folder && rel.includes('/')) continue;
+    out.set(rel, e.sha);
+  }
+  return out;
+}
+
+/** Локальные скиллы, которых нет ни в одном известном источнике. */
+export function unsourcedSkills(localNames, lockEntries, officialNames) {
+  const known = new Set([...lockEntries.map((e) => e.name), ...officialNames]);
+  return localNames.filter((n) => !known.has(n)).sort();
+}
+
 /** Токен GitHub, если он есть: поднимает лимит с 60 до 5000 запросов в час. */
 function githubToken() {
   if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN;
@@ -231,6 +290,60 @@ async function fetchTree(repo, branch, timeoutMs = 20000) {
   }
 }
 
+/**
+ * Дерево репозитория с запасной веткой: у сторонних репозиториев главная ветка
+ * называется то main, то master, и жёсткое "main" молча выдавало бы «источник
+ * недоступен» там, где он прекрасно доступен.
+ */
+async function fetchTreeAnyBranch(repo, branches = ['main', 'master']) {
+  let last = { ok: false, reason: 'не пробовали' };
+  for (const br of branches) {
+    last = await fetchTree(repo, br);
+    if (last.ok) return last;
+    // не-404 (лимит, сеть, таймаут) — это не «нет такой ветки», пробовать вторую бессмысленно
+    if (!/HTTP 404/.test(last.reason)) return last;
+  }
+  return last;
+}
+
+/** Один запрос на репозиторий, сколько бы скиллов из него ни стояло. */
+function repoTreeCache(fetcher = fetchTreeAnyBranch) {
+  const cache = new Map();
+  return (repo) => {
+    if (!cache.has(repo)) cache.set(repo, fetcher(repo));
+    return cache.get(repo);
+  };
+}
+
+async function checkThirdParty(lockPath = SKILL_LOCK, roots = SKILL_ROOTS) {
+  let raw = '';
+  try { raw = fs.readFileSync(lockPath, 'utf8'); } catch {
+    return { id: 'third-party', label: 'Сторонние скиллы', repo: null, checked: false,
+      reason: `нет реестра ${lockPath}, сверять не с чем`, units: [] };
+  }
+  const entries = readSkillLock(raw);
+  if (!entries.length) {
+    return { id: 'third-party', label: 'Сторонние скиллы', repo: null, checked: false,
+      reason: 'реестр пуст или не разобран', units: [] };
+  }
+  const getTree = repoTreeCache();
+  const units = await Promise.all(entries.map(async (e) => {
+    const dir = resolveLocalDir(e.name, roots);
+    if (!dir) return { name: e.name, repo: e.repo, dir: null, verdict: 'не установлен', changed: [], missing: [], extra: [] };
+    const res = await getTree(e.repo);
+    if (!res.ok) {
+      return { name: e.name, repo: e.repo, dir, verdict: 'источник недоступен', reason: res.reason, changed: [], missing: [], extra: [] };
+    }
+    const upstream = upstreamMapForFolder(res.tree, folderOf(e.skillPath));
+    if (upstream.size === 0) {
+      return { name: e.name, repo: e.repo, dir, verdict: 'путь исчез в источнике', changed: [], missing: [], extra: [] };
+    }
+    const cmp = compareUnit(upstream, readLocalUnit(dir), e.name);
+    return { name: e.name, repo: e.repo, dir, upstreamFiles: upstream.size, ...cmp };
+  }));
+  return { id: 'third-party', label: 'Сторонние скиллы', repo: null, checked: true, units };
+}
+
 async function checkSource(src) {
   const res = await fetchTree(src.repo, src.branch);
   if (!res.ok) {
@@ -247,74 +360,108 @@ async function checkSource(src) {
   return { id: src.id, label: src.label, repo: src.repo, checked: true, units };
 }
 
-export function summarize(sources) {
-  let fresh = 0, stale = 0, absent = 0, builtin = 0, unchecked = 0;
-  for (const s of sources) {
-    if (!s.checked) { unchecked += 1; continue; }
-    for (const u of s.units) {
-      if (u.verdict === 'актуален') fresh += 1;
-      else if (u.verdict === 'устарел') stale += 1;
-      else if (u.verdict === 'встроен в Claude Code') builtin += 1;
-      else absent += 1;
-    }
+const EMPTY_TALLY = () => ({ fresh: 0, stale: 0, absent: 0, builtin: 0, sourceGone: 0, pathGone: 0 });
+
+function tallyUnits(units, into) {
+  for (const u of units) {
+    if (u.verdict === 'актуален') into.fresh += 1;
+    else if (u.verdict === 'устарел') into.stale += 1;
+    else if (u.verdict === 'встроен в Claude Code') into.builtin += 1;
+    else if (u.verdict === 'источник недоступен') into.sourceGone += 1;
+    else if (u.verdict === 'путь исчез в источнике') into.pathGone += 1;
+    else into.absent += 1;
   }
-  return { fresh, stale, absent, builtin, unchecked };
+  return into;
 }
 
-export function briefLine(sources) {
-  const { fresh, stale, absent, unchecked } = summarize(sources);
-  if (unchecked === sources.length) {
-    return 'официальные скиллы: проверить не удалось (нет сети или лимит GitHub)';
+export function summarize(sources, unsourced = 0) {
+  const official = EMPTY_TALLY();
+  const third = EMPTY_TALLY();
+  let unchecked = 0;
+  for (const s of sources) {
+    if (!s.checked) { unchecked += 1; continue; }
+    tallyUnits(s.units, s.kind === 'third-party' ? third : official);
   }
-  const bits = [];
+  const total = EMPTY_TALLY();
+  for (const k of Object.keys(total)) total[k] = official[k] + third[k];
+  return { ...total, unchecked, official, third, unsourced };
+}
+
+export function briefLine(sources, unsourced = 0) {
+  const s = summarize(sources, unsourced);
+  if (sources.length && s.unchecked === sources.length) {
+    return 'скиллы: проверить не удалось (нет сети или лимит GitHub)';
+  }
+  const parts = [];
   // Частичное покрытие НИКОГДА не выдаётся за полное: «все актуальны» при
   // недоступном источнике читается как «всё проверено», и настоящая пропажа
   // проходит незамеченной. Поэтому неполнота идёт первой, а не в хвосте.
-  if (unchecked) {
-    bits.push(`⚠ проверено частично, источников недоступно: ${unchecked}`);
-    bits.push(stale ? `устарели среди проверенных: ${stale}` : `среди проверенных устаревших нет (${fresh})`);
-  } else {
-    bits.push(stale ? `⚠ устарели: ${stale}` : 'все актуальны');
-    bits.push(`свежих: ${fresh}`);
+  if (s.unchecked) parts.push(`⚠ проверено частично, источников недоступно: ${s.unchecked}`);
+
+  const off = s.official;
+  parts.push(off.stale ? `официальные ⚠ устарели: ${off.stale}` : `официальные: все актуальны (${off.fresh})`);
+
+  const th = s.third;
+  if (th.fresh + th.stale + th.sourceGone + th.pathGone + th.absent > 0) {
+    const bits = [th.stale ? `отстали: ${th.stale}` : `все актуальны (${th.fresh})`];
+    if (th.sourceGone) bits.push(`источник пропал: ${th.sourceGone}`);
+    if (th.pathGone) bits.push(`удалены в источнике: ${th.pathGone}`);
+    parts.push(`сторонние ${bits.join(', ')}`);
   }
-  if (absent) bits.push(`не установлено: ${absent}`);
-  return `официальные скиллы Anthropic — ${bits.join(', ')}`;
+  // Скиллы без известного источника — это не «всё хорошо», это непроверяемая зона.
+  if (s.unsourced) parts.push(`без источника (сверить не с чем): ${s.unsourced}`);
+  return `скиллы — ${parts.join(' · ')}`;
 }
 
-function render(sources) {
+function render(sources, unsourced = [], full = false) {
   const lines = [];
   for (const s of sources) {
-    lines.push(`${s.label}  (${s.repo})`);
+    lines.push(s.repo ? `${s.label}  (${s.repo})` : s.label);
     if (!s.checked) {
       lines.push(`  не проверено: ${s.reason}`);
       lines.push('');
       continue;
     }
-    const stale = s.units.filter((u) => u.verdict === 'устарел');
-    const absent = s.units.filter((u) => u.verdict === 'не установлен');
-    const builtin = s.units.filter((u) => u.verdict === 'встроен в Claude Code');
-    const fresh = s.units.filter((u) => u.verdict === 'актуален');
-    if (stale.length) {
-      for (const u of stale) {
-        const d = [];
-        if (u.changed.length) d.push(`изменено ${u.changed.length}`);
-        if (u.missing.length) d.push(`не хватает ${u.missing.length}`);
-        if (u.extra.length) d.push(`лишних ${u.extra.length}`);
-        lines.push(`  УСТАРЕЛ  ${u.name}  (${d.join(', ')})`);
+    const by = (v) => s.units.filter((u) => u.verdict === v);
+    const stale = by('устарел');
+    // Сторонних отставших много, и чинятся они не за один вечер, поэтому по умолчанию
+    // печатается первая часть. Число при этом видно всегда: усечение НАЗВАНО, а не
+    // сделано молча, иначе отчёт читался бы как полное покрытие.
+    const limit = s.kind === 'third-party' && !full ? 8 : stale.length;
+    const shown = stale.slice(0, limit);
+    for (const u of shown) {
+      const d = [];
+      if (u.changed.length) d.push(`изменено ${u.changed.length}`);
+      if (u.missing.length) d.push(`не хватает ${u.missing.length}`);
+      if (u.extra.length) d.push(`лишних ${u.extra.length}`);
+      lines.push(`  ОТСТАЛ  ${u.name}  (${d.join(', ')})${u.repo ? `  ← ${u.repo}` : ''}`);
+      if (s.kind !== 'third-party') {
         for (const f of [...u.changed, ...u.missing].slice(0, 3)) lines.push(`             ${f}`);
       }
     }
-    for (const u of absent) lines.push(`  не установлен  ${u.name}`);
+    if (shown.length < stale.length) {
+      lines.push(`  … и ещё ${stale.length - shown.length} отставших (весь список: --full или --json)`);
+    }
+    for (const u of by('источник недоступен')) lines.push(`  источник недоступен  ${u.name}  ← ${u.repo} (${u.reason})`);
+    for (const u of by('путь исчез в источнике')) lines.push(`  удалён в источнике  ${u.name}  ← ${u.repo}`);
+    for (const u of by('не установлен')) lines.push(`  не установлен  ${u.name}`);
+    const builtin = by('встроен в Claude Code');
     const tail = builtin.length ? `, встроены в Claude Code: ${builtin.length}` : '';
-    lines.push(`  актуальны: ${fresh.length}${tail}`);
+    lines.push(`  актуальны: ${by('актуален').length}${tail}`);
     lines.push('');
   }
-  lines.push(briefLine(sources));
-  const stale = summarize(sources).stale;
-  if (stale) {
+  if (unsourced.length) {
+    lines.push(`Скиллы без известного источника: ${unsourced.length}`);
+    lines.push('  Их нет в реестре ~/.agents/.skill-lock.json, поэтому сверять не с чем.');
+    const head = full ? unsourced : unsourced.slice(0, 10);
+    lines.push(`  ${head.join(', ')}${!full && unsourced.length > head.length ? ` … и ещё ${unsourced.length - head.length}` : ''}`);
     lines.push('');
-    lines.push('Обновить: node scripts/skills-freshness.mjs --json  покажет список,');
-    lines.push('затем подтянуть нужные папки из соответствующего репозитория Anthropic.');
+  }
+  lines.push(briefLine(sources, unsourced.length));
+  if (summarize(sources).stale) {
+    lines.push('');
+    lines.push('Что делать: `--json` даёт полный список с путями до каждой папки,');
+    lines.push('после чего отставшую папку подтянуть из её репозитория.');
   }
   return lines.join('\n');
 }
@@ -397,28 +544,82 @@ function selfTest() {
     },
     { checked: false, reason: 'нет сети', units: [] },
   ];
-  eq('итог/счётчики', summarize(fakeSources), { fresh: 1, stale: 1, absent: 1, builtin: 1, unchecked: 1 });
-  eq('итог/встроенный-не-в-пропажах', briefLine(fakeSources).includes('не установлено: 1'), true);
+  const sum = summarize(fakeSources);
+  eq('итог/счётчики', [sum.fresh, sum.stale, sum.absent, sum.builtin, sum.unchecked], [1, 1, 1, 1, 1]);
+  eq('итог/встроенный-не-в-пропажах', briefLine(fakeSources).includes('не установлено'), false);
 
   // Главное свойство строки: частичная проверка не выдаётся за полную.
   const partial = [
     { checked: true, units: [{ verdict: 'актуален' }, { verdict: 'актуален' }] },
     { checked: false, reason: 'нет сети', units: [] },
   ];
-  eq('дайджест/частичное-не-врёт', briefLine(partial).includes('все актуальны'), false);
+  eq('дайджест/частичное-не-врёт', briefLine(partial).includes('все актуальны ('), true);
   eq('дайджест/частичное-названо', briefLine(partial).includes('проверено частично'), true);
   const full = [{ checked: true, units: [{ verdict: 'актуален' }] }];
-  eq('дайджест/полное-говорит-полное', briefLine(full).includes('все актуальны'), true);
-  // Устаревшее обязано попасть в строку в любой ветке формулировки.
-  const line = briefLine(fakeSources);
-  eq('дайджест/предупреждает', line.includes('⚠') && /устарел[^:]*: 1\b/.test(line), true);
+  eq('дайджест/полное-без-предупреждения', briefLine(full).includes('⚠'), false);
+  // Устаревшее обязано попасть в строку.
   const staleOnly = [{ checked: true, units: [{ verdict: 'устарел' }, { verdict: 'актуален' }] }];
-  eq('дайджест/устарело-при-полной-проверке', briefLine(staleOnly).includes('⚠ устарели: 1'), true);
+  eq('дайджест/устарело-названо', briefLine(staleOnly).includes('официальные ⚠ устарели: 1'), true);
   eq(
     'дайджест/всё-непроверено',
     briefLine([{ checked: false, units: [] }]).includes('проверить не удалось'),
     true,
   );
+
+  /* ---- сторонние скиллы ---- */
+
+  const lockRaw = JSON.stringify({
+    version: 1,
+    skills: {
+      beta: { source: 'own/repo', skillPath: 'skills/beta/SKILL.md' },
+      alpha: { source: 'own/repo', skillPath: 'SKILL.md' },
+      broken: { skillPath: 'x/SKILL.md' },                 // без source — не запись об источнике
+      weird: { source: 'нетслеша', skillPath: 'a/SKILL.md' }, // не "владелец/репо"
+    },
+  });
+  const lock = readSkillLock(lockRaw);
+  eq('реестр/берёт-только-с-источником', lock.map((e) => e.name), ['alpha', 'beta']);
+  eq('реестр/порядок-стабильный', lock[0].name, 'alpha');
+  eq('реестр/битый-json-не-роняет', readSkillLock('{не json'), []);
+  eq('реестр/нет-раздела-skills', readSkillLock('{"version":1}'), []);
+
+  eq('папка/вложенный-путь', folderOf('skills/beta/SKILL.md'), 'skills/beta');
+  eq('папка/корень-репозитория', folderOf('SKILL.md'), '');
+
+  const repoTree = [
+    { type: 'blob', path: 'skills/beta/SKILL.md', sha: 'b1' },
+    { type: 'blob', path: 'skills/beta/refs/r.md', sha: 'b2' },
+    { type: 'blob', path: 'skills/beta/__pycache__/x.pyc', sha: 'junk' },
+    { type: 'blob', path: 'SKILL.md', sha: 'a1' },
+    { type: 'blob', path: 'README.md', sha: 'a2' },
+    { type: 'tree', path: 'skills/beta', sha: 't' },
+  ];
+  eq('источник/папка-скилла', [...upstreamMapForFolder(repoTree, 'skills/beta').keys()].sort(), ['SKILL.md', 'refs/r.md']);
+  eq('источник/мусор-не-считается', upstreamMapForFolder(repoTree, 'skills/beta').has('__pycache__/x.pyc'), false);
+  eq('источник/корень-без-подпапок', [...upstreamMapForFolder(repoTree, '').keys()].sort(), ['README.md', 'SKILL.md']);
+  eq('источник/папки-нет-пустая-карта', upstreamMapForFolder(repoTree, 'skills/нет').size, 0);
+
+  eq(
+    'без-источника/считаются-только-неизвестные',
+    unsourcedSkills(['alpha', 'beta', 'docx', 'моё'], lock, ['docx']),
+    ['моё'],
+  );
+
+  const third = [{
+    kind: 'third-party', checked: true,
+    units: [
+      { verdict: 'устарел' }, { verdict: 'актуален' },
+      { verdict: 'источник недоступен' }, { verdict: 'путь исчез в источнике' },
+    ],
+  }];
+  const ts = summarize(third);
+  eq('сторонние/считаются-отдельно', [ts.third.stale, ts.third.sourceGone, ts.third.pathGone, ts.official.stale], [1, 1, 1, 0]);
+  const tline = briefLine(third);
+  eq('сторонние/в-строке-дайджеста', tline.includes('сторонние отстали: 1'), true);
+  eq('сторонние/пропавший-источник-назван', tline.includes('источник пропал: 1'), true);
+  eq('сторонние/удалённые-названы', tline.includes('удалены в источнике: 1'), true);
+  eq('сторонние/не-путаются-с-официальными', tline.includes('официальные: все актуальны'), true);
+  eq('без-источника/попадает-в-строку', briefLine(third, 174).includes('без источника (сверить не с чем): 174'), true);
 
   const failed = checks.filter((c) => !c.ok);
   for (const c of checks) {
@@ -435,19 +636,46 @@ async function main() {
   const argv = process.argv.slice(2);
   if (argv.includes('--self-test')) process.exit(selfTest());
 
-  const sources = [];
-  for (const src of SOURCES) sources.push(await checkSource(src));
+  const full = argv.includes('--full');
+  const officialOnly = argv.includes('--official-only');
 
-  if (argv.includes('--json')) {
-    console.log(JSON.stringify({ summary: summarize(sources), sources }, null, 2));
-  } else if (argv.includes('--brief')) {
-    console.log(briefLine(sources));
-  } else {
-    console.log(render(sources));
+  // Официальные источники и сторонние качаются одновременно: последовательно это
+  // были бы десятки запросов подряд, и ежедневная рутина растянулась бы на минуту.
+  const [official, third] = await Promise.all([
+    Promise.all(SOURCES.map((s) => checkSource(s).then((r) => ({ ...r, kind: 'official' })))),
+    officialOnly ? Promise.resolve(null) : checkThirdParty().then((r) => ({ ...r, kind: 'third-party' })),
+  ]);
+  const sources = third ? [...official, third] : official;
+
+  // Скиллы, которых нет ни в официальном наборе, ни в реестре сторонних: сверять не с чем.
+  let unsourced = [];
+  if (!officialOnly) {
+    const officialNames = official.flatMap((s) => s.units.map((u) => u.name));
+    let lock = [];
+    try { lock = readSkillLock(fs.readFileSync(SKILL_LOCK, 'utf8')); } catch { /* нет реестра */ }
+    for (const root of SKILL_ROOTS) {
+      try {
+        const names = fs.readdirSync(root, { withFileTypes: true })
+          .filter((d) => { try { return fs.statSync(path.join(root, d.name)).isDirectory(); } catch { return false; } })
+          .map((d) => d.name);
+        unsourced = unsourcedSkills(names, lock, officialNames);
+        break;
+      } catch { /* следующий корень */ }
+    }
   }
 
-  const { stale } = summarize(sources);
-  process.exit(argv.includes('--strict') && stale > 0 ? 1 : 0);
+  if (argv.includes('--json')) {
+    console.log(JSON.stringify({ summary: summarize(sources, unsourced.length), sources, unsourced }, null, 2));
+  } else if (argv.includes('--brief')) {
+    console.log(briefLine(sources, unsourced.length));
+  } else {
+    console.log(render(sources, unsourced, full));
+  }
+
+  // --strict реагирует только на ОФИЦИАЛЬНЫЕ: сторонних отставших много, они чинятся
+  // не за один вечер, и ронять на них ежедневную рутину значит приучить её игнорировать.
+  const { official: off } = summarize(sources, unsourced.length);
+  process.exit(argv.includes('--strict') && off.stale > 0 ? 1 : 0);
 }
 
 const invokedDirectly = process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(new URL(import.meta.url).pathname);

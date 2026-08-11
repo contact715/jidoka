@@ -11,14 +11,35 @@ belongs here only if it (a) finishes in seconds, (b) dispatches no agents and
 spends no tokens, and (c) can genuinely change within a day. Everything else
 belongs in the weekly or monthly bundle.
 
-1. **Official skills freshness** (`scripts/skills-freshness.mjs`): are the installed
-   Anthropic skills and plugins still identical to what upstream ships?
+1. **Skills freshness** (`scripts/skills-freshness.mjs`): are the installed skills and
+   plugins still identical to what their sources ship? Covers both the official Anthropic
+   set and every third-party skill recorded in `~/.agents/.skill-lock.json`.
 
 No report file is written on purpose: 365 files a year go unread and a day-to-day
 diff is meaningless. Output goes to stdout and the morning digest
 (`~/.claude/hooks/daily-digest.sh`) folds it into that day's digest, and lifts
 any `⚠ устарели: N` into the macOS notification itself, because a line in a file
 nobody opens fixes nothing.
+
+**Only the OFFICIAL count reaches the notification, and only `--strict` fails on it.**
+Third-party skills are reported but never raise the alarm: measured 2026-08-11, 42 of
+55 checkable third-party skills were already behind their sources. A daily alarm on a
+number that takes weeks to bring down is how a report teaches you to ignore it. The
+official set is small and actionable, so that one alarms.
+
+Third-party checking adds four verdicts the official path never needs, because other
+people's repositories move under you:
+
+- `отстал` — the source has newer content
+- `источник недоступен` — the repository no longer answers (deleted, renamed, or private)
+- `удалён в источнике` — the repository is alive but the skill's folder is gone
+- `не установлен` — the lock records it, the disk does not
+
+**Honest gap, stated every run:** 173 installed skills carry no source record at all.
+They are not in the lock file and nothing inside them names a repository, so there is
+nothing to compare against. They are counted and named in the report as
+"без источника (сверить не с чем)" rather than silently dropped, because a skill nobody
+can check is a real blind spot, not a clean bill of health.
 
 **Why this check exists.** `skills-audit.sh` (weekly, section 1) measures whether a
 skill is USED. It cannot see that the skill itself was rewritten upstream while our
@@ -30,8 +51,15 @@ not from any gate. Meta class: `installed-copy-drifts-from-upstream`.
 
 **How it stays cheap.** One GitHub API call per repository returns a tree with every
 blob's SHA. A git blob SHA is `sha1("blob <len>\0" + content)`, so it is computed
-locally and compared without downloading a single file. Full run: ~1.4 s for 55 units.
-`GITHUB_TOKEN` / `gh auth token` is used when present (rate limit 60/h → 5000/h).
+locally and compared without downloading a single file. Repositories are fetched once
+each regardless of how many skills come from them, and all sources are fetched
+concurrently. Full run: ~2.9 s for 2 official repos plus 26 third-party ones.
+`GITHUB_TOKEN` / `gh auth token` is used when present (rate limit 60/h → 5000/h); with
+28 repositories per run the token is what keeps a daily cadence comfortable.
+
+Flags: `--brief` one line, `--json` everything with paths, `--full` the untruncated
+stale list, `--official-only` skips the third-party pass (and its 26 requests),
+`--strict` exits 1 when an OFFICIAL skill is behind.
 
 Fail-open by design: no network, a timeout, or an exhausted rate limit reports the
 gap and exits 0. A routine that fails on a plane gets switched off. But partial
