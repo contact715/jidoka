@@ -55,7 +55,17 @@ export const REMEDIES = {
     // 2026-07-12: enforcement closed — proof-of-work-gate.mjs (Stop hook) now watches what the
     // session DID: source edited + nothing executed after the last edit → the stop is blocked once.
     since: '2026-06-06',
-    mechanism: 'hooks/proof-of-work-gate.mjs',
+    strengthened: '2026-08-11',
+    mechanism: 'hooks/proof-of-work-gate.mjs + scripts/suppression-not-a-fix.mjs',
+    // УСИЛЕНО 2026-08-11 после регрессии (2 повтора при живом гейте).
+    // proof-of-work-gate спрашивает «выполнялось ли что-нибудь после правки», и
+    // оба раза выполнялось — просто проверка проверяла не заявленное:
+    //   2026-06-07 — «готово» после ОДНОЙ чистой проверки, до перерисовки;
+    //   2026-06-10 — починкой был МАСКИРУЮЩИЙ тип-каст, типы позеленели честно.
+    // Добавлен второй признак, потоковый: что правка ДОБАВИЛА. Молчаливое
+    // подавление (as any, @ts-ignore, eslint-disable, пропуск теста) делает
+    // последующее «зелено» бессмысленным и блокируется; объяснённое рядом
+    // комментарием от 25 символов проходит — гейт требует причину, не запрет.
     family: ['claim-without-test', 'fixed-without-rerun', 'wired-without-trace', 'orphaned-gate', 'code-edited-nothing-run'],
     premortem: {
       risk: /\b(done|implemented|fixed|wired|works|working|complete[d]?|ready|finished|mechanical(?:ly)?)\b/i,

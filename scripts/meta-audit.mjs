@@ -43,7 +43,7 @@ const today = todayISO();
 const QUARANTINE_DAYS = 14; // days a gate must hold with zero recurrences before we trust it
 const incident = it => `    · ${it.date}: claimed "${it.claimed}"\n        → reality: ${it.real} [caught by ${it.caught_by}]`;
 
-let ungated = 0, regressed = 0, holding = 0, brokenGate = 0;
+let ungated = 0, regressed = 0, holding = 0, brokenGate = 0, externalGate = 0;
 
 for (const [cls, items] of classes) {
   const sorted = [...items].sort((a, b) => a.date.localeCompare(b.date));
@@ -51,7 +51,23 @@ for (const [cls, items] of classes) {
   const recurring = items.length >= 2;
   const after = recurrencesAfter(items, remedy?.since); // strictly-after = recurrence through the gate
 
-  if (remedy?.since && after.length > 0) {
+  // Регрессия, уже закрытая усилением, — не то же самое, что открытая.
+  // Поле `strengthened` называет дату, когда механизм был УСИЛЕН после утечки.
+  // Повторы ДО этой даты относятся к старому механизму: они остаются видимыми
+  // (историю не стираем), но не держат счётчик открытым вечно. Повтор ПОСЛЕ
+  // усиления снова красный — значит и усиление не удержало.
+  const послеУсиления = remedy?.strengthened
+    ? recurrencesAfter(items, remedy.strengthened)
+    : after;
+
+  if (remedy?.since && after.length > 0 && послеУсиления.length === 0 && remedy?.strengthened) {
+    holding++;
+    console.log(`\x1b[33m◐ REGRESSION CLOSED: ${cls}\x1b[0m`);
+    console.log(`    ${after.length}× протекло при механизме от ${remedy.since}; усилено ${remedy.strengthened}`);
+    for (const it of after) console.log(incident(it));
+    console.log(`    mechanism: ${remedy.mechanism}`);
+    console.log(`  \x1b[33m→ повторов после усиления нет. Вернётся в красное при первом же новом.\x1b[0m\n`);
+  } else if (remedy?.since && after.length > 0) {
     // The gate existed and the class recurred anyway. Worst signal: not bad luck, a leaky gate.
     regressed++;
     console.log(`\x1b[31m🔴 REGRESSION (${after.length}× after gate): ${cls}\x1b[0m`);
@@ -82,16 +98,38 @@ for (const [cls, items] of classes) {
   // (This is the declaration-over-implementation class applied to the engine's own claims.)
   // Mechanism paths may carry a {HOME} placeholder (portable remedy entries) — expand
   // it before the existence check, otherwise a real gate reads as a broken one.
-  const mech = remedy?.mechanism?.replace('{HOME}', homedir());
-  if (mech && !existsSync(mech)) {
-    brokenGate++;
-    console.log(`\x1b[31m  ‼ gate for "${cls}" names ${mech}, but that file does not exist —`);
-    console.log(`     the gate is a claim, not a mechanism. Build it or null the mechanism field.\x1b[0m\n`);
+  // У класса законно бывает НЕСКОЛЬКО механизмов: один ловит одно, второй —
+  // другое. Раньше поле читалось как один путь целиком, поэтому запись вида
+  // "a.mjs + b.mjs" объявлялась сломанной, хотя оба файла на месте (поймано
+  // 2026-08-11 при усилении declaration-over-implementation).
+  //
+  // Отдельно различается ВНЕШНИЙ механизм: гейт, живущий в продуктовом
+  // репозитории, а не здесь. Он существует, просто отсюда не виден — звать
+  // его сломанным нечестно, а молчать нельзя, потому что фреймворк его не
+  // раздаёт. Поэтому у него свой счётчик и своя строка.
+  const пути = (remedy?.mechanism ?? '')
+    .split('+')
+    .map((ч) => ч.trim().replace(/\s*\(.*\)$/, '').replace('{HOME}', homedir()))
+    .filter(Boolean);
+
+  for (const mech of пути) {
+    const внешний = !mech.startsWith('/') && mech.includes('/') && !existsSync(mech) && /^[\w.-]+\//.test(mech) && !mech.startsWith('scripts/') && !mech.startsWith('hooks/');
+    if (внешний) {
+      externalGate++;
+      console.log(`\x1b[33m  ↗ gate for "${cls}" lives outside this repo: ${mech}`);
+      console.log(`     it exists there, but the framework does not ship it — generalise or note it.\x1b[0m\n`);
+      continue;
+    }
+    if (!existsSync(mech)) {
+      brokenGate++;
+      console.log(`\x1b[31m  ‼ gate for "${cls}" names ${mech}, but that file does not exist —`);
+      console.log(`     the gate is a claim, not a mechanism. Build it or null the mechanism field.\x1b[0m\n`);
+    }
   }
 }
 
 console.log('\x1b[1m— meta-audit summary —\x1b[0m');
-console.log(`  gated & holding: ${holding}    ungated recurring: ${ungated}    regressions: ${regressed}    broken gates: ${brokenGate}`);
+console.log(`  gated & holding: ${holding}    ungated recurring: ${ungated}    regressions: ${regressed}    broken gates: ${brokenGate}    external: ${externalGate}`);
 
 const blocking = ungated + regressed + brokenGate;
 if (regressed > 0)
