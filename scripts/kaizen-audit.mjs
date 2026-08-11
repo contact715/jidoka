@@ -44,6 +44,69 @@ export function splitPoi(poi = '') {
   return i === -1 ? { path: poi, anchor: '' } : { path: poi.slice(0, i), anchor: poi.slice(i + 1) };
 }
 
+// ── anchor-must-be-code-not-comment (2026-W33-R1) ───────────────────────────
+// An anchor used to be confirmed by `body.includes(anchor)`, so a comment counted as proof. The
+// author of a fix writes both the fix and the comment, which makes the evidence self-issued.
+// Evidence now has a TIER, and the weakest tier is reported as such instead of being rounded up.
+//
+// SCOPE, stated plainly: this changes ANCHORED entries only. Entries that address a code file by
+// bare path are weaker still (the file existed before the recommendation was written), and they
+// are already counted as visible debt by kaizen-ledger.legacyAnchorDebt(). Two demotions in one
+// move would be one unverified claim stacked on another.
+const CODE_FILE = /\.(mjs|js|cjs|ts|sh)$/i;
+const SHELL_FILE = /\.sh$/i;
+const kebabToCamel = (s) => s.replace(/-+([a-zA-Z0-9])/g, (_, c) => c.toUpperCase());
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const isCommentLine = (line, shell) => {
+  const t = line.trim();
+  return t.startsWith('//') || t.startsWith('*') || t.startsWith('/*') || (shell && t.startsWith('#'));
+};
+
+/**
+ * How strongly does `body` prove that `anchor` names a real capability?
+ *   'symbol'  — the file DEFINES an identifier with that name (strongest)
+ *   'code'    — the anchor appears on a line that is not a comment
+ *   'comment' — the anchor appears only inside a comment (a label, not behaviour)
+ *   'absent'  — not there at all
+ * Prose and data files (.md/.json/.jsonl/.yml) have no comment tier: their text IS the artifact.
+ */
+export function anchorEvidence(body, anchor, filePath = '') {
+  if (typeof body !== 'string' || !anchor) return 'absent';
+  const names = [...new Set([anchor, kebabToCamel(anchor)])];
+  const isCode = CODE_FILE.test(filePath);
+  if (isCode) {
+    for (const n of names) {
+      const def = new RegExp(`(?:^|[^\\w$])(?:export\\s+)?(?:default\\s+)?(?:async\\s+)?(?:function|class|const|let|var)\\s+${escapeRe(n)}(?![\\w$])`);
+      if (def.test(body)) return 'symbol';
+    }
+  }
+  const shell = SHELL_FILE.test(filePath);
+  let sawComment = false;
+  for (const line of body.split('\n')) {
+    if (!names.some((n) => line.includes(n))) continue;
+    if (!isCode || !isCommentLine(line, shell)) return 'code'; // a real line wins immediately
+    sawComment = true;
+  }
+  return sawComment ? 'comment' : 'absent';
+}
+
+/**
+ * Resolve a point-of-integration to an evidence tier against the live repo.
+ * Non-anchored forms keep their previous meaning and resolve to 'code' when present.
+ */
+export function resolvePoi(poi, probes = {}) {
+  if (!poi) return 'absent';
+  const exists = probes.exists || (() => false);
+  const read = probes.read || (() => null);
+  const { path: file, anchor } = splitPoi(poi);
+  if (anchor) {
+    if (!exists(file)) return 'absent';
+    return anchorEvidence(read(file), anchor, file);
+  }
+  return isPresent(poi, probes) ? 'code' : 'absent';
+}
+
 /**
  * Decide whether a point-of-integration is present in the repo.
  * @param {string} poi
@@ -72,11 +135,20 @@ export function isPresent(poi, probes) {
  */
 export function auditEntry(entry, probes = {}, week = '') {
   if (!entry || entry.status === 'rejected') return { ...entry }; // never re-audit a rejected one
-  const present = isPresent(entry.pointOfIntegration, probes);
+  const tier = resolvePoi(entry.pointOfIntegration, probes);
   const wasShipped = entry.status === 'shipped' || !!entry.shippedWeek;
 
-  if (present) {
-    return { ...entry, status: 'shipped', shippedWeek: entry.shippedWeek || week || entry.week, evidence: `present: ${entry.pointOfIntegration}` };
+  if (tier === 'symbol' || tier === 'code') {
+    return { ...entry, status: 'shipped', shippedWeek: entry.shippedWeek || week || entry.week, evidence: `present (${tier}): ${entry.pointOfIntegration}` };
+  }
+  if (tier === 'comment') {
+    // The label exists, the proof does not point at behaviour. NOT a regression: nothing was
+    // removed, the bar moved. shippedWeek is preserved so history is not rewritten.
+    return {
+      ...entry,
+      status: 'attested',
+      evidence: `только комментарий, не код: ${entry.pointOfIntegration} — доказательство написано автором починки рядом с ней; направь якорь на символ`,
+    };
   }
   if (wasShipped) {
     return { ...entry, status: 'regressed', evidence: `MISSING now (was shipped): ${entry.pointOfIntegration}` };
@@ -105,7 +177,8 @@ function selfTest() {
   const a = auditEntry({ id: 'r1', week: '2026-W27', title: 't', pointOfIntegration: 'scripts/dag-schedule.mjs', status: 'proposed', shippedWeek: null }, probes, W);
   ok('present-by-path → shipped', a.status === 'shipped');
   ok('shipped stamps shippedWeek (audit week)', a.shippedWeek === W);
-  ok('shipped carries evidence', /present:/.test(a.evidence));
+  // evidence now names the TIER it was proven at (symbol / code), so a reader can tell how strong it is
+  ok('shipped carries evidence naming its tier', /present \((symbol|code)\):/.test(a.evidence));
 
   // present by bare token in CI → shipped
   const b = auditEntry({ id: 'r2', week: '2026-W27', title: 't', pointOfIntegration: 'button-has-type', status: 'proposed', shippedWeek: null }, probes, W);
@@ -162,6 +235,57 @@ function selfTest() {
     isPresent('README.md#224 скрипта', { exists: (p) => p === 'README.md', read: () => 'блаблабла 224 скрипта тут', ciText: '' }) === true);
   ok('same container, wrong anchor → absent',
     isPresent('README.md#224 скрипта', { exists: (p) => p === 'README.md', read: () => '223 скрипта', ciText: '' }) === false);
+
+  // ── anchor-must-be-code-not-comment (2026-W33-R1) ────────────────────────
+  // Measured 2026-08-10: of 35 anchored entries, 31 anchors sat on a COMMENT line and 4 on real
+  // code. The audit was reading a label that the author of the fix had typed next to their own
+  // work, so "adoption 69%" meant "69% of entries have a word written near them". That is
+  // declaration-over-implementation, the one class the engine has never closed, living inside the
+  // instrument that measures it.
+  //
+  // The fix is NOT a binary flip. Demoting 31 entries to "open" would claim built things are
+  // unbuilt, which is the same error mirrored — and several of them are demonstrably built.
+  // So evidence gets a TIER and the weak tier gets its own honest status.
+  const CODE = 'scripts/x.mjs';
+  const evi = (body, anchor, file = CODE) => anchorEvidence(body, anchor, file);
+  ok('a DEFINED symbol is the strongest evidence',
+    evi('export function reverseRemedyAudit(x) {}', 'reverseRemedyAudit') === 'symbol');
+  ok('a kebab-case anchor matches its camelCase definition',
+    evi('export function reverseRemedyAudit(x) {}', 'reverse-remedy-audit') === 'symbol');
+  ok('const and class definitions count as symbols',
+    evi('const myThing = 1', 'my-thing') === 'symbol' && evi('class MyThing {}', 'MyThing') === 'symbol');
+  ok('the anchor on a non-comment line is code-tier',
+    evi('if (mode === "step-outcome-taxonomy") {}', 'step-outcome-taxonomy') === 'code');
+  ok('the anchor ONLY inside a // comment is comment-tier',
+    evi('// step-outcome-taxonomy (2026-W33-R2)\nconst a = 1', 'step-outcome-taxonomy') === 'comment');
+  ok('a block-comment line is also comment-tier', evi(' * anchor-here explained\ncode()', 'anchor-here') === 'comment');
+  ok('a shell # comment is comment-tier', evi('# my-anchor\necho hi', 'my-anchor', 'scripts/x.sh') === 'comment');
+  ok('absent anchor is absent', evi('nothing relevant', 'my-anchor') === 'absent');
+  ok('code beats comment when the anchor appears in BOTH',
+    evi('// my-anchor is why\nrun("my-anchor")', 'my-anchor') === 'code');
+  // in prose and data files there is no code/comment distinction — the text IS the artifact
+  ok('a markdown file has no comment tier', evi('some prose my-anchor here', 'my-anchor', 'docs/x.md') === 'code');
+  ok('a jsonl row is code-tier', evi('{"id":"my-anchor"}', 'my-anchor', 'docs/a.jsonl') === 'code');
+
+  const probesFor = (body) => ({ exists: () => true, read: () => body });
+  const attested = auditEntry({ id: 'a', week: '2026-W33', title: 't', pointOfIntegration: `${CODE}#my-cap`, status: 'proposed' },
+    probesFor('// my-cap explained\ncode()'), '2026-W33');
+  ok('comment-only anchor → status attested', attested.status === 'attested');
+  ok('attested evidence explains WHY it is weak', /комментар/i.test(attested.evidence));
+  const proven = auditEntry({ id: 'b', week: '2026-W33', title: 't', pointOfIntegration: `${CODE}#myCap`, status: 'proposed' },
+    probesFor('export function myCap() {}'), '2026-W33');
+  ok('symbol anchor → status shipped', proven.status === 'shipped');
+  // the BAR changed, the code did not: demoting an entry is a measurement change, not a regression
+  const demoted = auditEntry({ id: 'c', week: '2026-W30', title: 't', pointOfIntegration: `${CODE}#my-cap`, status: 'shipped', shippedWeek: '2026-W30' },
+    probesFor('// my-cap\ncode()'), '2026-W33');
+  ok('shipped → attested is NOT called a regression', demoted.status === 'attested');
+  ok('demotion keeps the original shippedWeek (history is not rewritten)', demoted.shippedWeek === '2026-W30');
+  const trulyGone = auditEntry({ id: 'd', week: '2026-W30', title: 't', pointOfIntegration: `${CODE}#my-cap`, status: 'shipped', shippedWeek: '2026-W30' },
+    { exists: () => false, read: () => null }, '2026-W33');
+  ok('shipped → absent is STILL a regression', trulyGone.status === 'regressed');
+  ok('an attested entry that later gains a symbol is promoted to shipped',
+    auditEntry({ id: 'e', week: '2026-W33', title: 't', pointOfIntegration: `${CODE}#my-cap`, status: 'attested' },
+      probesFor('export function myCap() {}'), '2026-W33').status === 'shipped');
 
   if (fails) { console.log('\n\x1b[31mkaizen-audit self-test FAILED\x1b[0m'); process.exit(1); }
   console.log('\n\x1b[32m✓ kaizen-audit: deterministic shipped/open/regressed detection correct\x1b[0m');

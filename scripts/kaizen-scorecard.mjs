@@ -51,8 +51,16 @@ export function scorecard(entries = [], opts = {}) {
   const shipped = actionable.filter((e) => e.status === 'shipped');
   const open = actionable.filter((e) => e.status === 'open' || e.status === 'proposed');
   const regressed = actionable.filter((e) => e.status === 'regressed');
+  // anchor-must-be-code-not-comment (2026-W33-R1): an entry whose only proof is a marker sitting in
+  // a comment. It must appear in its OWN bucket — folding it into shipped restores the old lie, and
+  // folding it into open claims built things are unbuilt. A status the scorecard does not name would
+  // vanish from every denominator silently, which is the worst of the three.
+  const attested = actionable.filter((e) => e.status === 'attested');
 
+  // adoption counts PROVEN work only. attestedRate is published beside it so the gap is visible
+  // rather than blended away.
   const adoptionRate = actionable.length ? round2(shipped.length / actionable.length) : 0;
+  const attestedRate = actionable.length ? round2(attested.length / actionable.length) : 0;
   // regression rate = regressed / (things that ever shipped) — shipped-now + regressed-from-shipped
   const everShipped = shipped.length + regressed.length;
   const regressionRate = everShipped ? round2(regressed.length / everShipped) : 0;
@@ -66,10 +74,12 @@ export function scorecard(entries = [], opts = {}) {
     recs: entries.length,
     actionable: actionable.length,
     shippedCount: shipped.length,
+    attestedCount: attested.length,
     openCount: open.length,
     regressedCount: regressed.length,
     rejectedCount: rejected.length,
     adoptionRate,
+    attestedRate,
     regressionRate,
     meanTimeToImplementWeeks,
     classClosure,
@@ -93,7 +103,10 @@ export function summarize(card) {
     ? ` (${card.trend.adoptionRate >= 0 ? '+' : ''}${Math.round(card.trend.adoptionRate * 100)}pp vs last week)` : '';
   const cc = card.classClosure ? `, class-closure ${card.classClosure.pct}%` : '';
   const tti = card.meanTimeToImplementWeeks != null ? `, ~${card.meanTimeToImplementWeeks}w to ship` : '';
-  return `adoption ${pct}%${trend} · shipped ${card.shippedCount}/${card.actionable}, open ${card.openCount}, regressed ${card.regressedCount}${tti}${cc}`;
+  // attested is named in the one-liner on purpose: a reader who sees only "adoption N%" would
+  // assume the rest is unbuilt, when most of it is built-but-unproven
+  const att = card.attestedCount ? `, attested ${card.attestedCount} (доказано только комментарием)` : '';
+  return `adoption ${pct}%${trend} · shipped ${card.shippedCount}/${card.actionable}${att}, open ${card.openCount}, regressed ${card.regressedCount}${tti}${cc}`;
 }
 
 // ── self-test ──────────────────────────────────────────────────────────────
@@ -129,6 +142,20 @@ function selfTest() {
 
   ok('empty ledger → zero adoption, no crash', (() => { const c = scorecard([]); return c.adoptionRate === 0 && c.recs === 0 && c.meanTimeToImplementWeeks === null; })());
   ok('summarize renders a one-liner', /adoption 50%/.test(summarize(card)));
+
+  // ── attested is its own bucket (2026-W33-R1) ─────────────────────────────
+  const withAtt = scorecard([
+    { id: 'a', week: '2026-W33', status: 'shipped', shippedWeek: '2026-W33' },
+    { id: 'b', week: '2026-W33', status: 'attested' },
+    { id: 'c', week: '2026-W33', status: 'attested' },
+    { id: 'd', week: '2026-W33', status: 'open' },
+  ]);
+  ok('attested entries are counted, not silently dropped', withAtt.attestedCount === 2);
+  ok('every actionable entry lands in exactly one bucket',
+    withAtt.shippedCount + withAtt.attestedCount + withAtt.openCount + withAtt.regressedCount === withAtt.actionable);
+  ok('adoption counts PROVEN work only, not attested', withAtt.adoptionRate === 0.25);
+  ok('attestedRate is published beside adoption', withAtt.attestedRate === 0.5);
+  ok('the one-liner names the attested pile', /attested 2/.test(summarize(withAtt)));
 
   if (fails) { console.log('\n\x1b[31mkaizen-scorecard self-test FAILED\x1b[0m'); process.exit(1); }
   console.log('\n\x1b[32m✓ kaizen-scorecard: analytics (adoption/regression/TTI/closure/trend) correct\x1b[0m');

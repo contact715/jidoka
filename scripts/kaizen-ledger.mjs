@@ -23,7 +23,10 @@ export const KINDS = new Set(['recommendation', 'killer-feature', 'session-fix']
 export const TARGETS = new Set(['jidoka', 'global', 'product']);
 export const PRIORITIES = new Set(['P0', 'P1', 'P2']);
 export const EFFORTS = new Set(['low', 'medium', 'high']);
-export const STATUSES = new Set(['proposed', 'shipped', 'open', 'rejected', 'regressed']);
+// 'attested' (2026-W33-R1): the capability is CLAIMED by a marker sitting in a comment, not proven
+// by a symbol or a real code line. Distinct from 'shipped' (proven) and from 'open' (absent) —
+// collapsing it into either one is a lie in one direction or the other.
+export const STATUSES = new Set(['proposed', 'shipped', 'attested', 'open', 'rejected', 'regressed']);
 
 /** Parse a JSON-lines ledger. Skips blank/comment lines; throws on a malformed data line. */
 export function parseLedger(text = '') {
