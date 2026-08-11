@@ -190,4 +190,27 @@ export const REMEDIES = {
     },
     gate: 'If a task is bounded (top-N, sampled, partial), the boundary must be stated explicitly in the same turn. Silent truncation reads as full coverage.',
   },
+  'canonical-doc-silently-overwritten': {
+    since: '2026-08-11',
+    mechanism: 'projectx-app/scripts/canonical-docs-guard.mjs (эталонная реализация)',
+    family: ['fixture-left-in-place', 'backup-never-restored', 'corruption-swept-into-commit'],
+    premortem: {
+      // Без \b: в JS граница слова опирается на латиницу, поэтому перед
+      // кириллицей она не срабатывает и половина шаблона молчала бы
+      // (проверено при заведении класса — гейт выглядел рабочим и не ловил).
+      risk: /(substitut|подмен|swap (the|a) file|inject.*(fixture|corpus)|temporarily (replace|overwrite)|restore in finally|finally.*restore)/i,
+      clears: /(SIGINT|SIGTERM|signal handler|on startup|orphan|recover|self-heal|самолеч|при старте)/i,
+      advise: 'инструмент, который подменяет ОТСЛЕЖИВАЕМЫЙ файл, обязан возвращать его не только из finally: finally не выполняется при SIGKILL. Нужны обработчики сигналов И самолечение при старте — иначе один убитый прогон оставит порчу, и её подметёт следующий коммит',
+    },
+    gate:
+      'Любой инструмент, временно подменяющий отслеживаемый файл (фуз-стенд, генератор фикстур, ' +
+      'проверка валидатора на кривом вводе), обязан иметь ДВА слоя возврата: обработчики сигналов ' +
+      '(SIGINT/SIGTERM/uncaughtException) и поиск осиротевших резервных копий ПРИ СТАРТЕ. SIGKILL ' +
+      'не перехватывается в принципе, поэтому вернуть файл может только следующий запуск. Отдельно: ' +
+      'каноническому документу нужен сторож формы («это всё ещё тот файл?» — размер, заголовок, ' +
+      'разметка не стала JSON), стоящий в pre-commit. Происхождение: projectx-app 2026-08-11 — ' +
+      'docs/AGENT_ROSTER.md пролежал затёртым заготовкой фуз-стенда (378 строк удалено, одна ' +
+      'вставлена, коммит 703bafcb2), ронял семь наборов тестов неделю, и нашли его по СОДЕРЖИМОМУ ' +
+      'падений, а не проверкой.',
+  },
 };
