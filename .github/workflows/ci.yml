@@ -94,6 +94,10 @@ jobs:
         run: node scripts/ac-verify-map.mjs --self-test
       - name: AC-as-tests (execute every L3 self/engine acceptance check)
         run: node scripts/ac-verify-map.mjs --run --strict
+      # Только самопроверка: боевой прогон ходит в GitHub API, в CI это лишняя
+      # сетевая зависимость и лишний расход лимита на каждый пуш.
+      - name: skills-freshness self-test (installed copy vs upstream)
+        run: node scripts/skills-freshness.mjs --self-test
 
       # ── 2026-W27 enrichment mechanisms: run each new self-test in CI (not dead tests) ──
       - name: reasoning-bank self-test (contrast-signal capture)

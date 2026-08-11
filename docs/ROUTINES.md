@@ -2,16 +2,53 @@
 
 Wave-55 ships bundled weekly + monthly audit routines. They are NPM scripts that compose existing audits. The point: catch drift between sessions without manual triggering.
 
-## Routines (two local npm audits + one scheduled Kaizen task)
+## Routines (three local npm audits + one scheduled Kaizen task)
+
+### Daily: `npm run routine:daily`
+
+The fastest cadence, added 2026-08-11. Admission is deliberately strict: a check
+belongs here only if it (a) finishes in seconds, (b) dispatches no agents and
+spends no tokens, and (c) can genuinely change within a day. Everything else
+belongs in the weekly or monthly bundle.
+
+1. **Official skills freshness** (`scripts/skills-freshness.mjs`): are the installed
+   Anthropic skills and plugins still identical to what upstream ships?
+
+No report file is written on purpose: 365 files a year go unread and a day-to-day
+diff is meaningless. Output goes to stdout and the morning digest
+(`~/.claude/hooks/daily-digest.sh`) folds it into that day's digest, and lifts
+any `⚠ устарели: N` into the macOS notification itself, because a line in a file
+nobody opens fixes nothing.
+
+**Why this check exists.** `skills-audit.sh` (weekly, section 1) measures whether a
+skill is USED. It cannot see that the skill itself was rewritten upstream while our
+copy stayed put. On 2026-08-11 `frontend-design` turned out to be a half-year-old
+4440-byte copy of an 8260-byte skill. The current one calibrates against three
+templated "AI looks", works in two passes with a self-critique of the design plan,
+and adds a whole section on interface copy. We found out from a social-media post,
+not from any gate. Meta class: `installed-copy-drifts-from-upstream`.
+
+**How it stays cheap.** One GitHub API call per repository returns a tree with every
+blob's SHA. A git blob SHA is `sha1("blob <len>\0" + content)`, so it is computed
+locally and compared without downloading a single file. Full run: ~1.4 s for 55 units.
+`GITHUB_TOKEN` / `gh auth token` is used when present (rate limit 60/h → 5000/h).
+
+Fail-open by design: no network, a timeout, or an exhausted rate limit reports the
+gap and exits 0. A routine that fails on a plane gets switched off. But partial
+coverage is never dressed up as full. When a source is unreachable the summary
+leads with "проверено частично", never "все актуальны".
 
 ### Weekly — `npm run routine:weekly`
 
-Bundles 4 fast checks (< 1 min total wallclock, no agent dispatch):
+Bundles 6 fast checks (< 1 min total wallclock, no agent dispatch):
 
-1. **Skills aging** (`scripts/skills-audit.sh`) — citation counts per skill, flag dormant
-2. **Design drift snapshot** (`scripts/design-drift-audit.sh`) — 7 violation categories
-3. **Audit backlog status** (`scripts/audit-backlog-status.sh`) — open + escalated proposals
-4. **Outcomes status** (`scripts/outcome-check.mjs`) — which outcomes met / unmet
+1. **Skills aging** (`scripts/skills-audit.sh`): citation counts per skill, flag dormant
+2. **Design drift snapshot** (`scripts/design-drift-audit.sh`): 7 violation categories
+3. **Audit backlog status** (`scripts/audit-backlog-status.sh`): open + escalated proposals
+4. **Outcomes status** (`scripts/outcome-check.mjs`): which outcomes met / unmet
+5. **Dev-system Kaizen** (`scripts/kaizen-feed.mjs`): how the way we build is trending
+6. **Official skills freshness** (`scripts/skills-freshness.mjs`): installed copy vs upstream
+   (same check as the daily routine; here it lands in the diffable weekly report)
 
 Output: `docs/audit-reports/routine-weekly-YYYY-WNN.md`
 
@@ -25,10 +62,10 @@ next session-start, instead of paying that cost on the next session's critical p
 
 It composes two existing scripts (no new memory logic):
 
-1. **Consolidate** (`scripts/memory-consolidate.mjs`) — rebuild the consolidated lessons digest
+1. **Consolidate** (`scripts/memory-consolidate.mjs`): rebuild the consolidated lessons digest
    (memory-consolidated.md, written to the global engine dir) from the cross-project mistake
    ledger (recency-weighted, decayed).
-2. **Distill** (`scripts/reasoning-distill.mjs`) — turn captured best-of-N / reflexion contrast
+2. **Distill** (`scripts/reasoning-distill.mjs`): turn captured best-of-N / reflexion contrast
    into gated strategy candidates (private until ≥2 judges are calibrated, then shared through
    memory-guard's dedup).
 
@@ -164,13 +201,18 @@ For true scheduled routines, OS-level cron is the right primitive. Claude sessio
 
 | Routine | Tool | Schedule | Output |
 |---|---|---|---|
+| Daily bundle | `npm run routine:daily` → bash | launchd `com.mityamit.claude-daily-digest`, 09:00 | folded into `~/.claude/digests/YYYY-MM-DD.txt` + notification |
 | Weekly bundle | `npm run routine:weekly` → bash | OS cron (or manual) | `docs/audit-reports/routine-weekly-*.md` |
 | Monthly bundle | `npm run routine:monthly` → bash | OS cron (or manual) | `docs/audit-reports/routine-monthly-*.md` |
 | Per-wave SI Reviewer | `.githooks/post-commit` → bash | Auto on commit when wave-NN % 5 == 0 | `.claude/self-improvement-queue/wave-NN.md` |
 | Per-commit Reflexion | `.githooks/post-commit` → bash | Auto when diff > 100 TS LOC + > 3 files | `.claude/reflexion-queue/<sha>.md` |
 | Per-commit wave-artifact | `.githooks/commit-msg` → bash | Every commit with wave-NN subject | inline error if missing |
 
-5 distinct cadences, each closing a class of drift the next-finer cadence misses (per wave-41 architecture).
+6 distinct cadences, each closing a class of drift the next-finer cadence misses (per wave-41 architecture).
+
+The daily bundle deliberately does NOT get its own launchd agent. One already fires
+every morning at 09:00 for the digest; a second alarm for the same moment would be a
+parallel mechanism to keep in sync, not extra safety. The digest calls the routine.
 
 ## Honest gaps
 

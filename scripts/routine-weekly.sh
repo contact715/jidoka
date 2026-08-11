@@ -102,12 +102,31 @@ cat >> "$REPORT" <<EOF
 
 ---
 
+## 6. Official skills freshness (installed copy vs upstream)
+
+Section 1 measures whether a skill is USED. This one measures whether it is
+CURRENT. A skill can be cited every week and still be a half-year-old copy of
+what Anthropic ships today. That is exactly what happened on 2026-08-11.
+
+EOF
+
+if [ -f scripts/skills-freshness.mjs ]; then
+  node scripts/skills-freshness.mjs >> "$REPORT" 2>&1 || true
+else
+  echo "(scripts/skills-freshness.mjs not present; skipping)" >> "$REPORT"
+fi
+
+cat >> "$REPORT" <<EOF
+
+---
+
 ## What to do with this report
 
 1. If any drift category INCREASED week-over-week → action a sweep wave before new work.
 2. If audit-backlog ESCALATED count > 0 → action the oldest before new work (per wave-47 banner discipline).
 3. If skills:audit shows dormant skills (🔴) → either retire them or surface them in agent prompts so they get cited.
 4. If outcomes show new misses → either ship the corresponding sweep or honestly mark the outcome as out of reach for now.
+5. If skills freshness lists anything УСТАРЕЛ → pull that folder from the Anthropic repo before the next wave. A stale skill silently degrades every session that loads it.
 
 The prior week's report (if any) is at \`docs/audit-reports/routine-weekly-*.md\` — diff against it to see deltas.
 

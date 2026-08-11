@@ -163,7 +163,9 @@
     "tla:check": "node scripts/run-tla.mjs",
     "prepare": "husky",
     "gate:ledger-sync": "node scripts/ledger-sync-gate.mjs",
-    "gate:settings": "node scripts/settings-integrity.mjs"
+    "gate:settings": "node scripts/settings-integrity.mjs",
+    "skills:freshness": "node scripts/skills-freshness.mjs",
+    "routine:daily": "bash scripts/routine-daily.sh"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
