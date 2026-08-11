@@ -231,7 +231,8 @@ try {
       import(pathToFileURL(join(jidoka, 'scripts', 'meta-remedies.mjs')).href),
     ]);
     // same helpers the auditor uses, so the two never disagree about what "wired" means
-    const files = ga.collectMechanisms(jidoka);
+    // the live hooks sit in ~/.claude/hooks; only some are mirrored into the install, so both are scanned
+    const files = ga.collectMechanisms(jidoka, { extraDirs: [join(homedir(), '.claude', 'hooks')] });
     let settingsRaw = '';
     try { settingsRaw = readFileSync(join(homedir(), '.claude', 'settings.json'), 'utf8'); } catch { /* none */ }
     const wired = ga.wiredSetFrom(files, ga.callerTexts(jidoka, settingsRaw));

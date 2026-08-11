@@ -177,14 +177,19 @@ export function reverseRemedyAudit({ tags = [], remedies = {}, wired = new Set()
 // by the session digest. Two callers computing the same word from different inputs is how
 // agent-eval-dashboard and judge-calibration-state ended up printing "10 of 11 measured" and
 // "0 of 7 measured" about the same judges on the same day (2026-08-10). One word, one bar.
-export function collectMechanisms(root, read = readFileSync, list = readdirSync, exists = existsSync) {
+// extraDirs matters in the INSTALLED layout, where the live Stop/PreToolUse hooks live in
+// ~/.claude/hooks and only some of them are mirrored into ~/.claude/jidoka/hooks. Scanning the repo
+// layout alone under-counted the pending registrations 3 → 1 on the first live run.
+export function collectMechanisms(root, { extraDirs = [] } = {}, read = readFileSync, list = readdirSync, exists = existsSync) {
   const files = [];
-  for (const dir of ['hooks', 'scripts']) {
-    const abs = join(root, dir);
+  const seen = new Set();
+  const dirs = [...['hooks', 'scripts'].map((d) => ({ abs: join(root, d), label: d })), ...extraDirs.map((d) => ({ abs: d, label: 'hooks' }))];
+  for (const { abs, label } of dirs) {
     if (!exists(abs)) continue;
     for (const f of list(abs)) {
-      if (!/\.(mjs|js|sh)$/.test(f)) continue;
-      try { files.push({ path: `${dir}/${f}`, text: read(join(abs, f), 'utf8') }); } catch { /* unreadable → skip */ }
+      if (!/\.(mjs|js|sh)$/.test(f) || seen.has(f)) continue;
+      seen.add(f);
+      try { files.push({ path: `${label}/${f}`, text: read(join(abs, f), 'utf8') }); } catch { /* unreadable → skip */ }
     }
   }
   return files;
