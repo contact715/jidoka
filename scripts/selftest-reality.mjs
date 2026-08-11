@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @closes-class: self-test-blindspot
 // selftest-reality — the gate for the self-test-blindspot class.
 //
 // THE CLASS IT GATES (3 recurring incidents): a self-test reads GREEN but never actually exercised the

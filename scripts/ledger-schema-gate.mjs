@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @closes-class: ledger-pollution
 // ledger-schema-gate — mechanical schema gate for the meta-mistake ledger (2026-W28-G3).
 //
 // Class it gates: ledger-pollution (2× on 2026-06-06 — wave-judge-debias telemetry rows

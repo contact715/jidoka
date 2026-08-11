@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @closes-class: browser-verification-skipped
 /**
  * browser-verify-gate — Stop hook forcing function.
  *

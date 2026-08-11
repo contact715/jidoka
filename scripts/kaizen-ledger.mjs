@@ -63,7 +63,61 @@ export function validateEntry(e = {}) {
   if (e.effort && !EFFORTS.has(e.effort)) p.push(`effort must be one of ${[...EFFORTS].join('|')}`);
   if (e.status && !STATUSES.has(e.status)) p.push(`status must be one of ${[...STATUSES].join('|')}`);
   if (e.impact != null && !(Number.isInteger(e.impact) && e.impact >= 1 && e.impact <= 5)) p.push('impact must be an integer 1..5');
+  p.push(...validatePointOfIntegration(e.pointOfIntegration, e.week));
   return p;
+}
+
+// Code files whose capability an anchor must name. For these a bare path proves only that a file
+// exists, never that it gained the behaviour the entry promised (2026-W32-R5, read side).
+const CODE_FILE = /\.(mjs|js|cjs|ts|sh)$/i;
+
+// The week the anchor rule went live. Entries from this week on must name a capability; older rows
+// keep their bare paths and surface as legacyAnchorDebt() so the debt is counted, not forgotten.
+export const ANCHOR_RULE_FROM = '2026-W33';
+
+/**
+ * The ADDRESS of a recommendation must be resolvable on disk, because that is the only thing the
+ * outcome audit can check. Two forms are legal:
+ *   docs/evals/debate-judge/calibration.json          — data/doc: existence IS the capability
+ *   scripts/dag-schedule.mjs#critical-path-edges      — code: the anchor names the capability
+ * A bare marker with no path is rejected: nothing on disk corresponds to it, so the entry can never
+ * leave "open" and it silently drags the adoption number down. Returns a list of problems ([] = ok).
+ */
+export function validatePointOfIntegration(poi, week = ANCHOR_RULE_FROM) {
+  if (poi == null || poi === '') return [];
+  const raw = String(poi);
+  const [pathPart, ...rest] = raw.split('#');
+  const anchor = rest.join('#');
+  // "Is this an address?" is decided by shape, not by the presence of a slash: README.md sits at the
+  // repo root and is a perfectly resolvable address, while "judges-10of10-measured" is not.
+  const looksLikePath = pathPart.includes('/') || /\.[A-Za-z0-9]{1,6}$/.test(pathPart);
+  if (!looksLikePath) {
+    return [`pointOfIntegration "${raw}" is a bare marker — it must be a file path (dir/file.ext or file.ext), optionally with #anchor, or the audit can never resolve it`];
+  }
+  if (raw.includes('#') && anchor.trim() === '') {
+    return [`pointOfIntegration "${raw}" has an empty anchor — name the capability after # or drop the #`];
+  }
+  // GRANDFATHER CLAUSE, and it is deliberate. 25 entries written before this rule address code by
+  // bare path. Their evidence IS weak, but flipping 25 statuses in one move would be its own
+  // unverified claim — the exact mistake this rule exists to stop, run backwards. So the rule is
+  // hard for anything written from ANCHOR_RULE_FROM onward, and the older rows are reported as
+  // visible debt by legacyAnchorDebt() instead of being silently rewritten.
+  if (CODE_FILE.test(pathPart) && anchor === '' && String(week) >= ANCHOR_RULE_FROM) {
+    return [`pointOfIntegration "${raw}" points at code without an anchor — add #<capability>, because a bare file path proves existence, not behaviour`];
+  }
+  return [];
+}
+
+/**
+ * Entries that predate the anchor rule and address code by bare path. Not an error — a debt to be
+ * paid one verified entry at a time. Returned so the CLI can print it instead of hiding it.
+ */
+export function legacyAnchorDebt(entries = []) {
+  return entries.filter((e) => {
+    const poi = String(e.pointOfIntegration || '');
+    if (!poi || poi.includes('#')) return false;
+    return CODE_FILE.test(poi.split('#')[0]) && String(e.week || '') < ANCHOR_RULE_FROM;
+  });
 }
 
 /**
@@ -101,7 +155,7 @@ function selfTest() {
   let fails = 0;
   const ok = (name, cond) => { if (!cond) fails++; console.log(`  ${cond ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); };
 
-  const e1 = { id: '2026-W27-R5', week: '2026-W27', title: 'DAG planner', kind: 'recommendation', target: 'jidoka', pointOfIntegration: 'scripts/dag-schedule.mjs', priority: 'P2', effort: 'medium', impact: 4 };
+  const e1 = { id: '2026-W27-R5', week: '2026-W27', title: 'DAG planner', kind: 'recommendation', target: 'jidoka', pointOfIntegration: 'scripts/dag-schedule.mjs#critical-path-edges', priority: 'P2', effort: 'medium', impact: 4 };
   let led = upsert([], e1);
   ok('upsert appends a new entry with default status proposed', led.length === 1 && led[0].status === 'proposed');
   ok('new entry gets shippedWeek null + evidence ""', led[0].shippedWeek === null && led[0].evidence === '');
@@ -116,6 +170,38 @@ function selfTest() {
   ok('validate flags impact out of range', validateEntry({ id: 'x', week: '2026-W27', title: 't', impact: 9 }).some((p) => p.includes('impact')));
   ok('validate passes a good entry', validateEntry(e1).length === 0);
   ok('upsert throws on an invalid entry', (() => { try { upsert([], { id: '', week: 'x', title: '' }); return false; } catch { return true; } })());
+
+  // ── point-of-integration-form-validated (2026-W33-S1) ────────────────────
+  // The audit resolves an address by looking for it on disk. A BARE MARKER
+  // ("judges-10of10-measured") has no disk to look at, so such an entry can
+  // never be confirmed and sits "open" forever. On 2026-08-10 seventeen of the
+  // twenty-four open entries were exactly this, and two of the seventeen turned
+  // out to be built long ago — the backlog was lying downward. The read side was
+  // hardened in W32 (kaizen-audit probe form); the WRITE side never was, so a
+  // bare marker could still be recorded today. A guard that stands on the read
+  // path only is the same "alternate path" hole logged on 2026-07-28.
+  const poi = (v) => validateEntry({ id: 'x', week: '2026-W33', title: 't', pointOfIntegration: v });
+  ok('bare marker is rejected at write time', poi('judges-10of10-measured').some((p) => /pointOfIntegration/.test(p)));
+  ok('a script path WITHOUT an anchor is rejected', poi('scripts/dag-schedule.mjs').some((p) => /anchor/.test(p)));
+  ok('a script path WITH an anchor passes', poi('scripts/dag-schedule.mjs#critical-path-edges').length === 0);
+  ok('a data/doc path without an anchor passes', poi('docs/evals/debate-judge/calibration.json').length === 0);
+  ok('a doc path with an anchor also passes', poi('docs/HONEST_SYSTEM_STATE.md#48-agents').length === 0);
+  ok('an empty anchor is rejected', poi('scripts/x.mjs#').some((p) => /anchor/.test(p)));
+  ok('no pointOfIntegration at all is still allowed (not every entry is code)', poi(undefined).length === 0);
+  // a real ledger row (2026-W31-Q1) addresses a root-level file; "has a slash" would have
+  // rejected a perfectly resolvable address, so the shape test allows a bare filename too
+  ok('a root-level doc with no slash passes', poi('README.md').length === 0);
+  ok('a root-level SCRIPT with no anchor is still rejected', poi('build.sh').some((p) => /anchor/.test(p)));
+
+  // grandfather clause: the anchor rule binds forward, and the older rows become COUNTED debt
+  const oldRow = { id: 'x', week: '2026-W29', title: 't', pointOfIntegration: 'scripts/memory-ppr.mjs' };
+  ok('a pre-rule entry keeps its bare code path (no throw on legacy rows)', validateEntry(oldRow).length === 0);
+  ok('the SAME address written this week is rejected',
+    validateEntry({ ...oldRow, week: '2026-W33' }).some((p) => /anchor/.test(p)));
+  ok('a bare MARKER is rejected even on a legacy week (no grandfathering of unresolvable rows)',
+    validateEntry({ id: 'x', week: '2026-W27', title: 't', pointOfIntegration: 'judges-10of10-measured' }).length > 0);
+  const debt = legacyAnchorDebt([oldRow, { id: 'y', week: '2026-W33', title: 't', pointOfIntegration: 'scripts/a.mjs#cap' }, { id: 'z', week: '2026-W28', title: 't', pointOfIntegration: 'docs/x.md' }]);
+  ok('legacyAnchorDebt counts only pre-rule bare CODE paths', debt.length === 1 && debt[0].id === 'x');
 
   const round = parseLedger(serializeLedger(led));
   // compare canonically (serialize imposes a stable key order, so re-serialize both sides)
@@ -145,5 +231,12 @@ if (isMain) {
   const led = readLedger(file);
   console.log(`[kaizen-ledger] ${led.length} entrie(s) in ${path.relative(ROOT, file)}:`);
   for (const e of led) console.log(`  ${e.status?.padEnd(9) || '—'} ${e.id}  ${e.title}  → ${e.pointOfIntegration || ''}`);
+  const debt = legacyAnchorDebt(led);
+  if (debt.length) {
+    console.log(`\n\x1b[33m⚠ ${debt.length} entrie(s) written before ${ANCHOR_RULE_FROM} address code by bare path.\x1b[0m`);
+    console.log('  Their evidence is "the file exists", which proves existence, not behaviour.');
+    console.log('  Pay this down one VERIFIED entry at a time — do not bulk-rewrite the statuses.');
+    console.log(`  ${debt.map((e) => e.id).join(', ')}`);
+  }
   process.exit(0);
 }

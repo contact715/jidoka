@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @closes-class: synthesis-shipped-without-coverage-audit
 /**
  * synthesis-coverage-gate — Stop-хук против сдачи документа-синтеза без сверки с источниками.
  *

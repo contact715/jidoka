@@ -8,9 +8,10 @@
 // this session has not claimed yet, so the number is taken. Born from the projectx triple
 // wave-id collision (2026-06-10). Self-test: --self-test.
 
-import { readFileSync, existsSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { homedir, tmpdir } from 'node:os';
 
 const REGISTRY_REL = 'docs/specs/_CLAIMED_WAVES.jsonl';
@@ -219,6 +220,27 @@ try {
   const lessons = hotFrom(md);
   const live = ungatedFrom(md);
 
+  // 3b) гейты, которые РАБОТАЮТ, но реестру классов неизвестны (2026-W33-K1).
+  // Пока их не зарегистрировал человек, строка «БЕЗ гейта» выше завышена: 2026-08-10 из
+  // пятнадцати «живых рисков» пять были закрыты работающим механизмом. Считаем дёшево и
+  // молча падаем в пустую строку, чтобы не задерживать старт сессии.
+  let pendingLine = '';
+  try {
+    const [ga, { REMEDIES }] = await Promise.all([
+      import(pathToFileURL(join(jidoka, 'scripts', 'gate-audit.mjs')).href),
+      import(pathToFileURL(join(jidoka, 'scripts', 'meta-remedies.mjs')).href),
+    ]);
+    // same helpers the auditor uses, so the two never disagree about what "wired" means
+    const files = ga.collectMechanisms(jidoka);
+    let settingsRaw = '';
+    try { settingsRaw = readFileSync(join(homedir(), '.claude', 'settings.json'), 'utf8'); } catch { /* none */ }
+    const wired = ga.wiredSetFrom(files, ga.callerTexts(jidoka, settingsRaw));
+    const rev = ga.reverseRemedyAudit({ tags: ga.closesClassTags(files), remedies: REMEDIES, wired });
+    if (rev.pending.length) {
+      pendingLine = `ждут регистрации в реестре классов: ${rev.pending.length} (${rev.pending.map((p) => p.cls).join(', ')}) — гейт работает, метрики его не видят; node scripts/gate-audit.mjs даст блок для вставки`;
+    }
+  } catch { /* fail-open: нет строки лучше, чем задержанный старт */ }
+
   // 4) чужие свежие клеймы wave-id в проекте этой сессии (cwd хука = корень проекта)
   let claims = [];
   try { claims = freshClaims(sh('git rev-parse --show-toplevel', process.cwd())); } catch { /* не git-репо */ }
@@ -265,6 +287,7 @@ try {
     queueLine,
     lessons.length ? `активные уроки (🔴): ${lessons.join(', ')}` : '',
     live.total ? `БЕЗ гейта (живой риск, ${live.total}): ${live.shown.join(', ')}${live.total > live.shown.length ? ` и ещё ${live.total - live.shown.length}` : ''}` : '',
+    pendingLine,
     claims.length ? `⚠️ занятые wave-id (клеймы <24ч): ${claims.join(', ')} — свой номер бери через claim-wave-id.mjs` : '',
     'полный дайджест: ~/.claude/jidoka/memory-consolidated.md',
   ].filter(Boolean).join('\n');

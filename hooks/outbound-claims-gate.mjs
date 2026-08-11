@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @closes-class: fabricated-plausible-detail
 /**
  * outbound-claims-gate — forcing function against fabricated verifiable specifics.
  *

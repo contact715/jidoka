@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @closes-class: gate-bypass
 // policy-enforce-hook — a PreToolUse hook that BLOCKS writes to protected L0/security paths in
 // real time (not after the fact). This is the honest enforcement step beyond policy-sandbox (which
 // only reports): here a Write/Edit to a constitution, mission, the agent-access registry, an eval
@@ -35,6 +36,48 @@ export const L0_DOCS = [
 ];
 export const PROTECTED = [...ALWAYS_PROTECTED, ...L0_DOCS];
 const WRITE_TOOLS = /^(Write|Edit|MultiEdit|NotebookEdit)$/;
+
+// ── default-deny-write-tools (2026-W33-R5) ──────────────────────────────────
+// An allowlist of four tool names can only protect against the tools that existed when it was
+// written. Every MCP server brings its own write verb, so the default flips: unknown means WRITING.
+// Read-only tools are named explicitly, because they are the ones that legitimately touch a
+// protected path without changing it.
+const READ_ONLY_TOOLS = /^(Read|Grep|Glob|LS|NotebookRead|WebFetch|WebSearch|TodoWrite|Task|Agent|Skill|ToolSearch)$/;
+// An MCP verb is read-only when its name says so. Checked on the verb, after the server prefix,
+// so a server called "mcp__readwise__delete_note" is not mistaken for a reader.
+const MCP_READ_VERB = /(^|_)(read|get|list|search|find|fetch|query|show|view|describe|inspect|resolve|count|status|info)(_|$)/i;
+
+// Only PATH-SHAPED FIELDS are inspected. Never free text: on 2026-08-08 the permission guard
+// blocked its own commit because the flag it polices appeared inside the commit MESSAGE
+// (class guard-fires-on-mention-not-action). A guard that fires on mention teaches people to
+// disable it, so content/body/message/old_string/new_string are never scanned.
+const PATH_FIELDS = /^(file_?path|path|paths|files?|relative_?path|notebook_?path|target|targets|destination|dest|dir|directory|uri)$/i;
+
+/** Is this tool capable of writing? Unknown tools default to yes. Bash is routed to the parser. */
+export function isWriteTool(tool) {
+  const t = String(tool || '');
+  if (!t) return false;
+  if (t === 'Bash') return true;
+  if (WRITE_TOOLS.test(t)) return true;
+  if (READ_ONLY_TOOLS.test(t)) return false;
+  if (t.startsWith('mcp__')) return !MCP_READ_VERB.test(t.replace(/^mcp__[^_]*(?:__)?/, ''));
+  return true;
+}
+
+/** Collect the path-shaped values of a tool input (one level of array, nested objects walked). */
+export function pathFieldValues(input, depth = 0) {
+  if (!input || typeof input !== 'object' || depth > 4) return [];
+  const out = [];
+  for (const [k, v] of Object.entries(input)) {
+    if (PATH_FIELDS.test(k)) {
+      if (typeof v === 'string') out.push(v);
+      else if (Array.isArray(v)) for (const x of v) if (typeof x === 'string') out.push(x);
+    } else if (v && typeof v === 'object') {
+      out.push(...pathFieldValues(v, depth + 1));
+    }
+  }
+  return out;
+}
 
 // ── Owner grant for L0 docs ──────────────────────────────────────────────────
 // File: ~/.claude/hooks/l0-write-grant.json → { grantedBy, reason, expiresAt (epoch ms) }.
@@ -83,17 +126,22 @@ export function bashWriteTargets(cmd = '') {
 }
 
 // pure: should this tool call be blocked (before considering any grant)?
-export function isBlocked(tool, file, protectedList = PROTECTED, command = '') {
-  if (tool === 'Bash') return bashWriteTargets(command).some(t => protectedList.some(re => re.test(t)));
-  if (!WRITE_TOOLS.test(tool || '')) return false;
-  if (!file) return false;
-  return protectedList.some(re => re.test(file));
+export function isBlocked(tool, file, protectedList = PROTECTED, command = '', input = null) {
+  return offendingTargets(tool, file, command, protectedList, input).length > 0;
 }
 
 // pure: the offending targets of a call (for grant evaluation + the block message)
-export function offendingTargets(tool, file, command = '', protectedList = PROTECTED) {
+export function offendingTargets(tool, file, command = '', protectedList = PROTECTED, input = null) {
   if (tool === 'Bash') return bashWriteTargets(command).filter(t => protectedList.some(re => re.test(t)));
-  return file ? [file] : [];
+  if (!isWriteTool(tool)) return [];
+  // the declared file_path plus every other path-shaped field the call carries
+  const candidates = [...(file ? [file] : []), ...pathFieldValues(input)];
+  const seen = new Set();
+  return candidates.filter((t) => {
+    if (!t || seen.has(t)) return false;
+    seen.add(t);
+    return protectedList.some((re) => re.test(t));
+  });
 }
 
 function selfTest() {
@@ -116,6 +164,37 @@ function selfTest() {
     ['blocks Bash "sed -i" on the gate registry', isBlocked('Bash', '', PROTECTED, `sed -i '' 's/a/b/' scripts/meta-remedies.mjs`) === true],
     ['does NOT block Bash READ (grep) of a protected path', isBlocked('Bash', '', PROTECTED, 'grep foo scripts/meta-remedies.mjs') === false],
     ['does NOT block Bash that reads protected but writes elsewhere', isBlocked('Bash', '', PROTECTED, 'cat docs/CONSTITUTION.md > /tmp/out') === false],
+
+    // ── default-deny-write-tools (2026-W33-R5) ─────────────────────────────
+    // The guard listed FOUR tool names. Every MCP write tool walked past it: on 2026-08-10 the
+    // session had filesystem, serena and Desktop_Commander servers connected, each with its own
+    // write verb, and none of them was Write/Edit/MultiEdit/NotebookEdit. The Bash side-channel was
+    // closed in July for exactly this reason; the MCP side-channel was still open. An allowlist of
+    // names cannot cover tools that did not exist when it was written, so the default flips: a tool
+    // is treated as WRITING unless it is known to be read-only.
+    ['an unknown tool naming a protected path is blocked (default deny)',
+      isBlocked('mcp__filesystem__write_file', '', PROTECTED, '', { path: 'docs/CONSTITUTION.md' }) === true],
+    ['serena replace_content into the gate registry is blocked',
+      isBlocked('mcp__serena__replace_content', '', PROTECTED, '', { relative_path: 'scripts/meta-remedies.mjs' }) === true],
+    ['a brand-new unknown tool is treated as writing',
+      isBlocked('mcp__some__brand_new_verb', '', PROTECTED, '', { file_path: '.secrets.json' }) === true],
+    ['an MCP READ verb on a protected path is NOT blocked',
+      isBlocked('mcp__filesystem__read_text_file', '', PROTECTED, '', { path: 'docs/MISSION.md' }) === false],
+    ['a plain unknown tool touching a normal path passes',
+      isBlocked('mcp__filesystem__write_file', '', PROTECTED, '', { path: 'src/app.ts' }) === false],
+    // guard-fires-on-mention-not-action (logged 2026-08-08): the permission guard once blocked its
+    // OWN commit because the flag it polices appeared INSIDE the commit message. Never again: only
+    // path-shaped FIELDS are inspected, never free text.
+    ['a protected path MENTIONED in content is NOT blocked',
+      isBlocked('mcp__filesystem__write_file', '', PROTECTED, '', { path: 'docs/report.md', content: 'we changed scripts/meta-remedies.mjs today' }) === false],
+    ['a protected path mentioned in new_string is NOT blocked',
+      isBlocked('Edit', 'docs/report.md', PROTECTED, '', { file_path: 'docs/report.md', new_string: 'see docs/CONSTITUTION.md' }) === false],
+    ['a path-shaped field inside an array is inspected',
+      isBlocked('mcp__x__write_many', '', PROTECTED, '', { paths: ['src/a.ts', '.secrets.json'] }) === true],
+    ['known read-only core tools stay allowed', isBlocked('Read', 'docs/MISSION.md', PROTECTED, '', { file_path: 'docs/MISSION.md' }) === false
+      && isBlocked('Grep', '', PROTECTED, '', { path: 'scripts/meta-remedies.mjs' }) === false],
+    ['isWriteTool: Bash is always routed to the command parser', isWriteTool('Bash') === true],
+    ['isWriteTool: an unknown non-MCP tool defaults to writing', isWriteTool('SomeFutureTool') === true],
     ['does NOT block an ordinary Bash command', isBlocked('Bash', '', PROTECTED, 'npm run eval') === false],
     // Owner grant for L0 docs: allows constitution/mission/north-star, NEVER secrets/.git/registries.
     ['grant covers an L0 doc write', grantCovers(['docs/CONSTITUTION.md'], grant) === true],
@@ -145,8 +224,10 @@ if (isMain) {
   const tool = data.tool_name || data.tool || '';
   const file = data.tool_input?.file_path || data.tool_input?.path || data.file_path || '';
   const command = data.tool_input?.command || '';
-  if (isBlocked(tool, file, PROTECTED, command)) {
-    const targets = offendingTargets(tool, file, command);
+  // the whole input is passed so path-shaped fields of UNKNOWN tools are inspected too (W33-R5)
+  const input = data.tool_input || null;
+  if (isBlocked(tool, file, PROTECTED, command, input)) {
+    const targets = offendingTargets(tool, file, command, PROTECTED, input);
     const grant = getGrant();
     if (grantCovers(targets, grant)) {
       // Owner-granted L0 write: allow, but leave a permanent audit record.

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @closes-class: tree-not-history
 // Pre-publish guard — a MECHANICAL andon for irreversible publication.
 //
 // Per-rule severity + scope, so the guard protects what actually matters without

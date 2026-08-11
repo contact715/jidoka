@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @closes-class: precedent-generalized-into-standing-permission
 // permission-gate — PreToolUse hook on Bash. Blocks the actions that are only ever allowed by
 // an explicit, scoped, expiring permission, and refuses to accept precedent as a substitute.
 //

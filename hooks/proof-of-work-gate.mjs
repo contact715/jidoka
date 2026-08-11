@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @closes-class: declaration-over-implementation
 /**
  * proof-of-work-gate — Stop hook forcing function for declaration-over-implementation.
  *

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @closes-class: reward-hacking
 // meta-honesty — adversarial audit of the SIGNAL the engine learns from.
 //
 // Every other engine in the family trusts the ledger. But a learning loop is only

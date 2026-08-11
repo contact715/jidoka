@@ -114,6 +114,113 @@ export function findOrphanGateScripts(pkg, callersText) {
 }
 
 
+// ── live-gate-must-map-to-remedy-class (2026-W33-K1) ─────────────────────────
+// The forward axis of this file asks "does every declared gate actually run?". The REVERSE axis
+// asks the question that was never asked: "does the learning registry know about every gate that
+// runs?". On 2026-08-10 it did not. scripts/meta-remedies.mjs listed 8 classes; this map saw 62
+// live gates; and the session-start digest told the owner "ungated — live risk: 15" while five of
+// those fifteen were already closed by a wired, working mechanism (synthesis-coverage-gate,
+// outbound-claims-gate, plus three product-side fixes). A third of the top risk signal was noise,
+// which is worse than no signal: it buries the eight real holes among fifteen names.
+//
+// Why not just let the agent register the gate? Because meta-remedies.mjs is L0 and
+// ALWAYS_PROTECTED on purpose: an agent that can register its own gate can also declare itself
+// safe, which is the exact reward-hacking surface the registry exists to prevent. So the human
+// paste stays. What changes is that the divergence is now DETECTED, the mechanism is PROVEN wired
+// before anything is proposed, and the human gets a block to paste instead of a memory to keep.
+//
+// The routing claim (`@closes-class:`) is written by whoever writes the gate, so on its own it is
+// only a claim — the same weak evidence as an anchor in a comment. It is paired with a WIRED check
+// against the live hook/CI/git-hook config, so the pair says "this class is routed to this file,
+// and this file really runs". Routing is declared; running is proven.
+// The tag ends at the END OF ITS LINE. A character class containing \s would swallow the newline
+// and glue the next line of code onto the class name — caught by the self-test on the first run.
+const CLOSES_CLASS = /@closes-class:[ \t]*([^\r\n]+)/;
+const CLASS_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** Read `@closes-class: a, b` tags off mechanism files. Input: [{path, text}]. */
+export function closesClassTags(files = []) {
+  const out = [];
+  for (const f of files) {
+    const m = CLOSES_CLASS.exec(String(f.text || ''));
+    if (!m) continue;
+    const classes = m[1].split(',').map((s) => s.trim()).filter((s) => CLASS_SLUG.test(s));
+    if (classes.length) out.push({ path: f.path, classes });
+  }
+  return out;
+}
+
+/**
+ * Cross-check declared routing against the L0 registry and against what is really wired.
+ *   pending — routed + wired + absent from the registry → hand the human a paste block
+ *   unwired — routed but nothing calls the file → the tag is a claim with no gate behind it
+ *   stale   — the registry names a mechanism that no file declares → the registry drifted
+ * Pure. `wired` is a Set of file basenames known to have a standing caller.
+ */
+export function reverseRemedyAudit({ tags = [], remedies = {}, wired = new Set(), today = '' } = {}) {
+  const pending = [], unwired = [], declared = new Set();
+  for (const t of tags) {
+    const base = String(t.path).replace(/^.*\//, '');
+    for (const cls of t.classes) {
+      declared.add(cls);
+      if (!wired.has(base)) { unwired.push({ cls, mechanism: t.path }); continue; }
+      if (!Object.prototype.hasOwnProperty.call(remedies, cls)) pending.push({ cls, mechanism: t.path, since: today });
+    }
+  }
+  const stale = Object.entries(remedies)
+    .filter(([cls, r]) => r && r.mechanism && !declared.has(cls))
+    .map(([cls, r]) => ({ cls, mechanism: r.mechanism }));
+  return { pending, unwired, stale };
+}
+
+// ONE definition of "which mechanisms exist" and "which of them are wired", shared by this tool and
+// by the session digest. Two callers computing the same word from different inputs is how
+// agent-eval-dashboard and judge-calibration-state ended up printing "10 of 11 measured" and
+// "0 of 7 measured" about the same judges on the same day (2026-08-10). One word, one bar.
+export function collectMechanisms(root, read = readFileSync, list = readdirSync, exists = existsSync) {
+  const files = [];
+  for (const dir of ['hooks', 'scripts']) {
+    const abs = join(root, dir);
+    if (!exists(abs)) continue;
+    for (const f of list(abs)) {
+      if (!/\.(mjs|js|sh)$/.test(f)) continue;
+      try { files.push({ path: `${dir}/${f}`, text: read(join(abs, f), 'utf8') }); } catch { /* unreadable → skip */ }
+    }
+  }
+  return files;
+}
+
+/** A mechanism is WIRED when some standing caller names its file. `callerTexts` are joined verbatim. */
+export function wiredSetFrom(files = [], callerTexts = []) {
+  const callers = callerTexts.filter(Boolean).join('\n');
+  return new Set(files.map((f) => f.path.replace(/^.*\//, '')).filter((b) => callers.includes(b)));
+}
+
+/** Every text that can legitimately wire a mechanism: global hooks, CI, git hooks, npm scripts, installer. */
+export function callerTexts(root, settingsRaw = '', read = readFileSync, exists = existsSync) {
+  const readIf = (p) => { try { return read(p, 'utf8'); } catch { return ''; } };
+  const ghDir = join(root, '.githooks');
+  const gh = exists(ghDir) ? readdirSync(ghDir).map((f) => readIf(join(ghDir, f))).join('\n') : '';
+  const pkgPath = join(root, 'package.json');
+  const pkg = exists(pkgPath) ? readIf(pkgPath) : '';
+  const wfDir = join(root, '.github', 'workflows');
+  const wfs = exists(wfDir) ? readdirSync(wfDir).map((f) => readIf(join(wfDir, f))).join('\n') : '';
+  return [settingsRaw, wfs, gh, pkg, readIf(join(root, 'scripts', 'install-into.mjs'))];
+}
+
+/** Render the exact entries a human pastes into the L0 registry. Empty string when nothing pends. */
+export function remedyPasteBlock(pending = []) {
+  if (!pending.length) return '';
+  return pending.map(({ cls, mechanism, since }) => `  '${cls}': {
+    // since = the date the MECHANISM went live, not the date it was detected. ${since} is when this
+    // block was generated; replace it with the real activation date or meta-trend's time-to-gate lies.
+    since: '${since}',
+    mechanism: '${mechanism}',
+    family: [],
+    gate: 'TODO: one sentence — what this mechanism refuses, in prose.',
+  },`).join('\n');
+}
+
 // stop-layer-derived (2026-W31-R8) — the gate map called itself "the single map of every gate"
 // and had no Stop layer at all, while four Stop hooks were live in settings.json:
 // browser-verify-gate, proof-of-work-gate, outbound-claims-gate, synthesis-coverage-gate. A map
@@ -165,6 +272,14 @@ export function verifyPreToolUse(settingsText) {
   for (const tool of ['Write', 'Edit', 'Bash']) {
     if (!routed(tool, 'policy-enforce-hook')) missing.push(`policy-enforce-hook not routed for ${tool} (the ${tool === 'Bash' ? 'side-channel' : 'write'} path is open)`);
   }
+  // default-deny-write-tools (2026-W33-R5): the hook now treats an unknown tool as writing, but a
+  // hook that is never invoked decides nothing. MCP servers are where unknown write verbs live, so
+  // the MCP family must be routed too, or the default-deny is logic without a caller.
+  const mcpRouted = groups.some((g) => {
+    const m = String(g.matcher ?? '');
+    return (m === '*' || /mcp__/.test(m)) && (g.hooks || []).some((h) => String(h.command || '').includes('policy-enforce-hook'));
+  });
+  if (!mcpRouted) missing.push('policy-enforce-hook not routed for mcp__* (every MCP server write verb bypasses the guard)');
   if (!routed('Bash', 'jidoka-guard')) missing.push('jidoka-guard not routed for Bash (secret-guard on push/commit is open)');
   return { checked: true, missing };
 }
@@ -252,7 +367,10 @@ function selfTest() {
     ['битый конфиг не роняет аудит', stopGatesFrom('{не json').checked === false],
     ['fully-routed PreToolUse config → no missing', verifyPreToolUse(JSON.stringify({ hooks: { PreToolUse: [
       { matcher: 'Bash', hooks: [{ command: 'jidoka-guard.sh' }, { command: 'node policy-enforce-hook.mjs' }] },
-      { matcher: 'Write|Edit|MultiEdit|NotebookEdit', hooks: [{ command: 'node policy-enforce-hook.mjs' }] },
+      // 2026-W33-R5 raised the bar: "fully routed" now includes the MCP family, because that is
+      // where unknown write verbs live. The old fixture stopped being fully routed the day the
+      // standard changed, which is exactly what this assertion is for.
+      { matcher: 'Write|Edit|MultiEdit|NotebookEdit|mcp__.*', hooks: [{ command: 'node policy-enforce-hook.mjs' }] },
     ] } })).missing.length === 0],
     ['policy-enforce-hook absent from Bash matcher is caught (2026-07-12 incident)', verifyPreToolUse(JSON.stringify({ hooks: { PreToolUse: [
       { matcher: 'Bash', hooks: [{ command: 'jidoka-guard.sh' }] },
@@ -279,6 +397,68 @@ function selfTest() {
     ['a second HARD local invocation clears the softened one',
       findSeverityMismatches('node "$ROOT/scripts/z.mjs" --warn\nnode "$ROOT/scripts/z.mjs"', '- run: node scripts/z.mjs').length === 0],
     ['empty inputs → no findings, no crash', findSeverityMismatches('', '').length === 0],
+
+    // ── live-gate-must-map-to-remedy-class (2026-W33-K1) ────────────────────
+    // The learning registry (scripts/meta-remedies.mjs) knew 8 classes while this map saw 62 live
+    // gates, so the session-start digest kept printing "ungated — live risk" for classes that were
+    // ALREADY closed: synthesis-coverage-gate, outbound-claims-gate and permission-gate were all
+    // live and wired on 2026-08-10, and all three read as unprotected. Five of the fifteen risks the
+    // owner saw every session were false. The registry is L0 and agent-writable-by-design-never, so
+    // the fix is not "let the agent register itself" — it is to DETECT the divergence, prove the
+    // mechanism is really wired, and hand the human a ready block to paste.
+    ['a @closes-class tag is read off the mechanism',
+      closesClassTags([{ path: 'hooks/x-gate.mjs', text: '// @closes-class: some-class\ncode' }])[0].classes[0] === 'some-class'],
+    ['two classes on one tag line are both read',
+      closesClassTags([{ path: 'hooks/x.mjs', text: '// @closes-class: a-class, b-class' }])[0].classes.length === 2],
+    ['a file with no tag contributes nothing',
+      closesClassTags([{ path: 'hooks/y.mjs', text: 'no tag here' }]).length === 0],
+    ['tagged + wired + NOT in the registry → pending registration', (() => {
+      const r = reverseRemedyAudit({
+        tags: [{ path: 'hooks/synthesis-coverage-gate.mjs', classes: ['synthesis-shipped-without-coverage-audit'] }],
+        remedies: {}, wired: new Set(['synthesis-coverage-gate.mjs']),
+      });
+      return r.pending.length === 1 && r.pending[0].cls === 'synthesis-shipped-without-coverage-audit' && r.unwired.length === 0;
+    })()],
+    ['tagged but NOT wired → the tag is a claim, not a gate (reported separately)', (() => {
+      const r = reverseRemedyAudit({ tags: [{ path: 'hooks/ghost.mjs', classes: ['c'] }], remedies: {}, wired: new Set() });
+      return r.unwired.length === 1 && r.pending.length === 0;
+    })()],
+    ['tagged + wired + ALREADY registered → nothing to do', (() => {
+      const r = reverseRemedyAudit({
+        tags: [{ path: 'hooks/proof-of-work-gate.mjs', classes: ['declaration-over-implementation'] }],
+        remedies: { 'declaration-over-implementation': { mechanism: 'hooks/proof-of-work-gate.mjs' } },
+        wired: new Set(['proof-of-work-gate.mjs']),
+      });
+      return r.pending.length === 0 && r.unwired.length === 0 && r.stale.length === 0;
+    })()],
+    ['a registered class whose mechanism nothing declares → stale registration', (() => {
+      const r = reverseRemedyAudit({ tags: [], remedies: { c: { mechanism: 'scripts/gone.mjs' } }, wired: new Set() });
+      return r.stale.length === 1 && r.stale[0].cls === 'c';
+    })()],
+    ['a documented-only remedy (mechanism null) is NOT called stale', (() => {
+      const r = reverseRemedyAudit({ tags: [], remedies: { c: { mechanism: null } }, wired: new Set() });
+      return r.stale.length === 0;
+    })()],
+    ['the paste block names the class and its mechanism', (() => {
+      const b = remedyPasteBlock([{ cls: 'my-class', mechanism: 'hooks/my-gate.mjs', since: '2026-08-10' }]);
+      return b.includes("'my-class'") && b.includes('hooks/my-gate.mjs') && b.includes('2026-08-10');
+    })()],
+    ['no pending → no paste block at all', remedyPasteBlock([]) === ''],
+    ['an mcp__ matcher satisfies the MCP routing check', (() => {
+      const cfg = { hooks: { PreToolUse: [
+        { matcher: 'Write|Edit|Bash', hooks: [{ command: 'node scripts/policy-enforce-hook.mjs' }] },
+        { matcher: 'mcp__.*', hooks: [{ command: 'node scripts/policy-enforce-hook.mjs' }] },
+      ] } };
+      // asserts only the MCP axis — this config deliberately omits jidoka-guard, which is a
+      // separate finding and must not mask the thing under test
+      return !verifyPreToolUse(JSON.stringify(cfg)).missing.some((m) => /mcp__/.test(m));
+    })()],
+    ['no mcp__ matcher is reported as an open MCP write path', (() => {
+      const cfg = { hooks: { PreToolUse: [
+        { matcher: 'Write|Edit|Bash', hooks: [{ command: 'node scripts/policy-enforce-hook.mjs' }] },
+      ] } };
+      return verifyPreToolUse(JSON.stringify(cfg)).missing.some((m) => /mcp__/.test(m));
+    })()],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
@@ -345,9 +525,39 @@ if (isMain) {
       for (const m of ptu.missing) console.error(`    ${m}`);
       process.exit(1);
     }
-    console.log('  \x1b[32m✓ PreToolUse hooks are routed for Write/Edit AND Bash (no unwired side-channel).\x1b[0m');
+    console.log('  \x1b[32m✓ PreToolUse hooks are routed for Write/Edit, Bash AND mcp__* (no unwired side-channel).\x1b[0m');
   } else {
     console.log('  \x1b[33mℹ no ~/.claude/settings.json here (CI) — PreToolUse routing not checkable, skipped honestly.\x1b[0m');
+  }
+
+  // ── reverse axis: does the LEARNING REGISTRY know about every gate that runs? ──
+  const mechFiles = collectMechanisms(process.cwd());
+  const tags = closesClassTags(mechFiles);
+  const wired = wiredSetFrom(mechFiles, callerTexts(process.cwd(), settingsRaw));
+  let REMEDIES = {};
+  try { ({ REMEDIES } = await import('./meta-remedies.mjs')); } catch { /* registry unreadable → report nothing rather than guess */ }
+  const today = new Date().toISOString().slice(0, 10);
+  const rev = reverseRemedyAudit({ tags, remedies: REMEDIES, wired, today });
+
+  console.log(`\n  reverse axis — ${tags.length} mechanism(s) declare a class, registry knows ${Object.keys(REMEDIES).length}`);
+  if (rev.unwired.length) {
+    console.error(`\n\x1b[31m✗ ${rev.unwired.length} mechanism(s) CLAIM a class but nothing calls them:\x1b[0m`);
+    for (const u of rev.unwired) console.error(`    ${u.mechanism} claims "${u.cls}" — a tag with no standing caller protects nothing`);
+    process.exit(1);
+  }
+  if (rev.stale.length) {
+    console.log(`  \x1b[33mℹ ${rev.stale.length} registered class(es) whose mechanism declares nothing: ${rev.stale.map((s) => s.cls).join(', ')}\x1b[0m`);
+    console.log('    Either the file moved, or it should carry `// @closes-class: <slug>`.');
+  }
+  if (rev.pending.length) {
+    console.log(`\n  \x1b[33m⚠ ждут регистрации: ${rev.pending.length}\x1b[0m — live, wired, and INVISIBLE to the learning metrics.`);
+    console.log('    Until a human pastes these, meta-trend under-counts gate coverage and the');
+    console.log('    session digest calls these classes "ungated — live risk" when they are not.');
+    for (const p of rev.pending) console.log(`      ${p.cls}  ←  ${p.mechanism}`);
+    console.log('\n    Paste into scripts/meta-remedies.mjs (L0 — human edit by design), before the closing };\n');
+    console.log(remedyPasteBlock(rev.pending));
+  } else {
+    console.log('  \x1b[32m✓ every live, wired gate is known to the learning registry (no invisible gate).\x1b[0m');
   }
   process.exit(0);
 }
