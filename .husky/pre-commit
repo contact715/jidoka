@@ -5,3 +5,9 @@
 # With this shim the .githooks gates keep running under husky too.
 # Direct activation without husky: git config core.hooksPath .githooks
 exec "$(git rev-parse --show-toplevel)/.githooks/pre-commit" "$@"
+
+# Гейт, объявляющий блокировку, обязан блокировать (2026-08-11).
+# Происхождение: 2026-06-10 хук печатал «Commit refused», писал запись об
+# обходе — и коммит проходил, потому что код выхода не пробрасывался. Лгущий
+# гейт хуже отсутствующего: отсутствующий виден, а этот создаёт уверенность.
+node scripts/gate-honesty-check.mjs || exit $?
