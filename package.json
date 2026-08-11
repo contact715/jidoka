@@ -165,7 +165,8 @@
     "gate:ledger-sync": "node scripts/ledger-sync-gate.mjs",
     "gate:settings": "node scripts/settings-integrity.mjs",
     "skills:freshness": "node scripts/skills-freshness.mjs",
-    "routine:daily": "bash scripts/routine-daily.sh"
+    "routine:daily": "bash scripts/routine-daily.sh",
+    "skills:diff": "node scripts/skills-diff.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

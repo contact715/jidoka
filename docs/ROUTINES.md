@@ -61,6 +61,22 @@ Flags: `--brief` one line, `--json` everything with paths, `--full` the untrunca
 stale list, `--official-only` skips the third-party pass (and its 26 requests),
 `--strict` exits 1 when an OFFICIAL skill is behind.
 
+**Deciding what to actually update** — `npm run skills:diff` (`scripts/skills-diff.mjs`)
+takes the same comparison and renders the real diffs into one document, with a triage
+table on top. It answers the question freshness cannot: is this worth pulling?
+
+The one thing that table exists for: **divergence has two directions.** A source that
+ADDED content is worth pulling; a source that DELETED content would, on update, remove
+what we still have. Measured 2026-08-11, `verification-before-completion` was reported
+as behind while its diff was `+0 −19`: upstream had dropped a section, our copy was the
+fuller one. Updating it blindly would have deleted content, not gained any. Rows where
+the source only removed are marked ⚠ and never sorted to the top.
+
+Diffs are fetched only for CHANGED files; for files that are simply new upstream the
+size already sits in the repository tree, which removes about two thirds of the requests.
+Full run: ~9 s for 42 skills. Report goes to `docs/audit-reports/` (gitignored, it is a
+local artifact and runs to ~1 MB).
+
 Fail-open by design: no network, a timeout, or an exhausted rate limit reports the
 gap and exits 0. A routine that fails on a plane gets switched off. But partial
 coverage is never dressed up as full. When a source is unreachable the summary
