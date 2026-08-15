@@ -163,6 +163,73 @@ export function getEmbedder() {
  * @param {number} k
  * @param {{embed?: (t:string)=>number[]}} opts
  */
+// ── query-seeded PPR reranker (2026-W29-R7, HippoRAG shape) ─────────────────
+// Lexical and vector retrieval both answer "which lesson LOOKS like the query?". Neither can
+// answer "which lesson is one hop away from the ones that look like it?" — and that is where the
+// useful answer often sits: the query names a symptom, the lesson that explains it was recorded
+// under a different class that keeps arriving alongside.
+//
+// Personalised PageRank over the class graph does exactly that: seed the nodes the query matched,
+// let weight flow along the edges, read the settled distribution. The graph is the caller's to
+// supply (memory-consolidate.classEdges builds one), so the caller also owns the threshold —
+// a single co-occurrence is too weak to STATE as a lesson but is legitimate as a ranking hint,
+// and those are different bars for different jobs (docs/METRICS_GLOSSARY.md).
+//
+// NOT WIRED INTO LIVE RETRIEVAL ON PURPOSE. Changing what retrieval returns, on reasoning alone,
+// is how a ranker becomes either useless or unbearable — the same argument that made the replan
+// streak measure real history before it was wired (W32-R10). The mechanism is here and proven;
+// switching it on is a separate, measured decision.
+export function pprRank(seeds = [], edges = {}, { damping = 0.85, iterations = 30, epsilon = 1e-9 } = {}) {
+  const seedList = [...new Set(seeds.filter(Boolean))];
+  if (!seedList.length) return [];
+
+  // node set = seeds plus everything reachable through the supplied edges
+  const nodes = new Set(seedList);
+  for (const [to, froms] of Object.entries(edges)) {
+    nodes.add(to);
+    for (const f of froms || []) nodes.add(f.cls ?? f);
+  }
+  // out-edges: an edge "prev → cls" means weight flows from prev to cls
+  const out = new Map([...nodes].map((n) => [n, []]));
+  for (const [to, froms] of Object.entries(edges)) {
+    for (const f of froms || []) {
+      const from = f.cls ?? f;
+      const w = Number(f.count ?? 1) || 1;
+      out.get(from).push({ to, w });
+    }
+  }
+  const seedMass = 1 / seedList.length;
+  let rank = new Map([...nodes].map((n) => [n, seedList.includes(n) ? seedMass : 0]));
+
+  for (let i = 0; i < iterations; i++) {
+    const next = new Map([...nodes].map((n) => [n, 0]));
+    let dangling = 0;
+    for (const n of nodes) {
+      const mass = rank.get(n);
+      if (mass === 0) continue;
+      const edgesOut = out.get(n);
+      const total = edgesOut.reduce((a, e) => a + e.w, 0);
+      // a node with nowhere to send its weight returns it to the seeds rather than losing it:
+      // silently evaporating mass would make every score drift down and mean nothing
+      if (!total) { dangling += mass; continue; }
+      for (const e of edgesOut) next.set(e.to, next.get(e.to) + (mass * e.w) / total);
+    }
+    const settled = new Map();
+    for (const n of nodes) {
+      const teleport = seedList.includes(n) ? (1 - damping) * seedMass + damping * dangling * seedMass : 0;
+      settled.set(n, damping * next.get(n) + teleport);
+    }
+    let delta = 0;
+    for (const n of nodes) delta += Math.abs(settled.get(n) - rank.get(n));
+    rank = settled;
+    if (delta < epsilon) break;
+  }
+  return [...rank.entries()]
+    .filter(([, score]) => score > 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([cls, score]) => ({ cls, score: Math.round(score * 1e6) / 1e6 }));
+}
+
 export function retrieveFused(items, taskText, k = 5, opts = {}) {
   const embed = opts.embed || getEmbedder();
   if (typeof embed !== 'function') {
@@ -217,6 +284,29 @@ function selfTest() {
   let fail = 0;
   const ok = (c, m) => { if (c) console.log(`  \x1b[32m✓\x1b[0m ${m}`); else { console.error(`  \x1b[31m✗\x1b[0m ${m}`); fail++; } };
   console.log('memory-vector --self-test');
+
+// ── query-seeded PPR reranker (2026-W29-R7) ─────────────────────────────
+  const chain = { b: [{ cls: 'a', count: 3 }], c: [{ cls: 'b', count: 2 }] };
+  const fromA = pprRank(['a'], chain);
+  ok(fromA[0].cls === 'a', 'PPR keeps the seed itself on top');
+  ok(fromA.some((r) => r.cls === 'b') && fromA.some((r) => r.cls === 'c'),
+    'PPR reaches BOTH one hop and two hops away (this is the multi-hop part)');
+  ok(fromA.find((r) => r.cls === 'b').score > fromA.find((r) => r.cls === 'c').score,
+    'weight decays with distance: one hop outranks two');
+  ok(pprRank([], chain).length === 0, 'no seeds → no ranking (never a silent full-graph dump)');
+  ok(pprRank(['unknown-class'], chain).map((r) => r.cls).join() === 'unknown-class',
+    'a seed with no edges ranks only itself');
+  // mass that has nowhere to go returns to the seeds; letting it evaporate would drift every score
+  ok(Math.abs(pprRank(['a'], chain).reduce((t, r) => t + r.score, 0) - 1) < 0.01,
+    'no probability mass is lost (scores still sum to ~1)');
+  ok(JSON.stringify(pprRank(['a'], chain)) === JSON.stringify(pprRank(['a'], chain)),
+    'deterministic: same graph and seed give the same ranking');
+  ok((() => {
+    const weighted = { target: [{ cls: 's', count: 10 }], other: [{ cls: 's', count: 1 }] };
+    const r = pprRank(['s'], weighted);
+    return r.find((x) => x.cls === 'target').score > r.find((x) => x.cls === 'other').score;
+  })(), 'a chain seen more often outranks one seen rarely');
+  ok(pprRank(['a'], {}).map((r) => r.cls).join() === 'a', 'an empty graph degrades to the seed, not a crash');
 
   // RRF: an id ranked high in BOTH lists beats one high in only one.
   const fused = rrfFuse([['a', 'b', 'c'], ['b', 'a', 'd']]);

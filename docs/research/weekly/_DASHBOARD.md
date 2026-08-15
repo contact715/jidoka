@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 81% · shipped 79/97, open 18, regressed 0, ~0.92w to ship**
+**adoption 82% · shipped 80/97, open 17, regressed 0, ~0.96w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -33,7 +33,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W29-R4 | UPDATE/MERGE third verdict in memory-guard (mem0) | scripts/memory-guard.mjs | present (code): scripts/memory-guard.mjs |
 | shipped | 2026-W29-R5 | Deterministic JTBD-frame check on business-question answers | scripts/clarify-gate.mjs | present (code): scripts/clarify-gate.mjs |
 | shipped | 2026-W29-R6 | Node-events checkpoint stream -> revive observability + crash-resume (langgraph) | scripts/replan-ledger.mjs#createCheckpointStream | present (symbol): scripts/replan-ledger.mjs#createCheckpointStream |
-| open | 2026-W29-R7 | Query-seeded PPR reranker -> multi-hop retrieval (HippoRAG) | scripts/memory-ppr.mjs | not yet present: scripts/memory-ppr.mjs |
+| shipped | 2026-W29-R7 | Query-seeded PPR reranker -> multi-hop retrieval (HippoRAG) | scripts/memory-vector.mjs#pprRank | present (symbol): scripts/memory-vector.mjs#pprRank |
 | open | 2026-W29-R8 | Static distilled embeddings -> revive memory-vector RRF (model2vec) | scripts/static-embed.mjs | not yet present: scripts/static-embed.mjs |
 | open | 2026-W29-R9 | Conditional router-edge for DAG (crewAI Flows) - BANK do not build now | scripts/dag-schedule.mjs#conditional-router-edge | not yet present: scripts/dag-schedule.mjs#conditional-router-edge |
 | shipped | 2026-W29-S1 | Register ledger-schema-gate remedy for ledger-pollution (owner paste, L0) | scripts/meta-remedies.mjs | present (code): scripts/meta-remedies.mjs |
