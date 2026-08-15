@@ -74,6 +74,7 @@
     "gate:e2e": "node scripts/e2e-run-gate.mjs",
     "gate:selftest": "node scripts/selftest-reality.mjs",
     "gate:ledger-schema": "node scripts/ledger-schema-gate.mjs",
+    "gate:waves": "node scripts/run-state.mjs --audit-closed",
     "red:team": "node scripts/red-team.mjs",
     "eval:trajectory": "node scripts/trajectory-eval.mjs",
     "harvest:prod": "node scripts/prod-harvest.mjs",

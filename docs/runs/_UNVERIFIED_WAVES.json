@@ -1,0 +1,16 @@
+{
+  "why": "Волны, закрытые ДО того, как появилась постоянная проверка вердикта (2026-08-15). Гейт стоял на моменте перехода, и все десять закрылись мимо него: 7 фаз из 7 done, ни одного verdict.json, ни одного acceptance.json. Список существует, чтобы долг был назван и посчитан, а не прощён молча. Новые волны в него не добавляются: закрытие без вердикта для них блокирует.",
+  "recordedAt": "2026-08-15",
+  "waves": [
+    "wave-cost-ledger",
+    "wave-dashboard",
+    "wave-gsd-merge",
+    "wave-judge-debias",
+    "wave-memory-validity",
+    "wave-meta-gates",
+    "wave-tui-control",
+    "wave-tui-interactive",
+    "wave-tui-live",
+    "wave-tui-top"
+  ]
+}

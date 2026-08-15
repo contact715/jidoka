@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 71% · shipped 69/97, open 28, regressed 0, ~0.77w to ship**
+**adoption 72% · shipped 70/97, open 27, regressed 0, ~0.76w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -87,7 +87,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W32-R15 | Разбор сбоя агента на четыре вида вместо одного: временный повторяем, лимит ждём по разрешению, смертельный обрываем (порт идеи ralphex) | scripts/agent-error-policy.mjs#classifyAgentError | present (symbol): scripts/agent-error-policy.mjs#classifyAgentError |
 | shipped | 2026-W33-R1 | Доказательство внедрения по СИМВОЛУ, а не по комментарию (31 из 35 якорей сидят в комментарии) | scripts/kaizen-audit.mjs#anchorEvidence | present (symbol): scripts/kaizen-audit.mjs#anchorEvidence |
 | shipped | 2026-W33-R2 | Типизированный исход шага: «не запускался» отдельно от «упал» | scripts/phase-gate-runner.mjs#outcomeOf | present (symbol): scripts/phase-gate-runner.mjs#outcomeOf |
-| open | 2026-W33-R3 | Оживить путь вердикта волны (10 волн закрылись без единого verdict.json) | scripts/acceptance-verdict.mjs#wave-cannot-close-without-verdict | not yet present: scripts/acceptance-verdict.mjs#wave-cannot-close-without-verdict |
+| shipped | 2026-W33-R3 | Оживить путь вердикта волны (10 волн закрылись без единого verdict.json) | scripts/run-state.mjs#auditClosedWaves | present (symbol): scripts/run-state.mjs#auditClosedWaves |
 | open | 2026-W33-R4 | Ось исхода в ранжировании уроков (Memory Worth) — верхний ярус структурно пуст | scripts/memory-consolidate.mjs#outcome-axis-in-score | not yet present: scripts/memory-consolidate.mjs#outcome-axis-in-score |
 | shipped | 2026-W33-R5 | Сторож записи по принципу default-deny, включая матчер mcp__.* | scripts/policy-enforce-hook.mjs#isWriteTool | present (symbol): scripts/policy-enforce-hook.mjs#isWriteTool |
 | open | 2026-W33-R6 | Несущее свойство как ПОЛЕ спеки и маркер догадки | scripts/spec-structural-gate.mjs#core-property-field | not yet present: scripts/spec-structural-gate.mjs#core-property-field |

@@ -25,7 +25,7 @@
 //   node scripts/run-state.mjs --advance wave-58 --phase build --status done [--note "..."]
 //   node scripts/run-state.mjs --resume [wave-58]
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rmSync, mkdtempSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync, rmSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { plan } from './orchestration-planner.mjs';
@@ -92,6 +92,30 @@ export function verdictStatus(verdict, wave = null) {
   else for (const ac of verdict.acs) if (ac.exitCode !== 0) reasons.push(`AC ${ac.id ?? '?'} failed: exit ${ac.exitCode} · ${ac.command ?? '?'}`);
   if (verdict.pass !== true) reasons.push('verdict.pass is not true');
   return { ok: reasons.length === 0, reasons };
+}
+
+// ── wave-cannot-close-without-verdict (2026-W33-R3) ─────────────────────────
+// The forcing function above guards a MOMENT: the `--advance` call that flips the last phase to
+// done. Miss that moment — write state.json directly, advance the last phase before the gate
+// existed, close the wave by hand — and the wave sits "complete" forever with no verdict, and
+// nothing ever looks again. Measured 2026-08-10: all ten waves in docs/runs show 7 of 7 phases
+// done, and not one has a verdict.json or even an acceptance.json. The gate never fired once.
+//
+// So the moment-gate gains a STANDING companion: a check that can be run at any time over what is
+// already on disk. A gate that only ever asks a question while you are looking at it is not a gate.
+//
+// The ten existing waves are grandfathered by name, not waved through silently: they are listed,
+// counted, and reported on every run. New closures get no such grace.
+export function auditClosedWaves(waves = [], baseline = []) {
+  const grandfathered = new Set(baseline);
+  const closed = waves.filter((w) => Array.isArray(w.phases) && w.phases.length > 0 && w.phases.every((p) => p.status === 'done'));
+  const rows = closed.map((w) => {
+    const vs = verdictStatus(w.verdict, w.wave);
+    return { wave: w.wave, ok: vs.ok, reasons: vs.reasons, grandfathered: grandfathered.has(w.wave) };
+  });
+  const violations = rows.filter((r) => !r.ok && !r.grandfathered);
+  const legacy = rows.filter((r) => !r.ok && r.grandfathered);
+  return { closed: rows.length, verified: rows.filter((r) => r.ok).length, violations, legacy, ok: violations.length === 0 };
 }
 
 export function loadVerdict(root, wave) {
@@ -225,6 +249,31 @@ function selfTest() {
   ok('completesWave: false when an earlier phase advances (wave stays open)', completesWave(initState('wv-cw2', { risk: 'normal', surfaces: ['backend'] }), 'discovery', 'done') === false);
   ok('completesWave: false for a non-done status', completesWave(cw, lastPhase, 'running') === false);
   ok('completesWave: false for an unknown phase', completesWave(cw, 'no-such-phase', 'done') === false);
+
+  // ── the STANDING check (2026-W33-R3) ────────────────────────────────────
+  const doneP = [{ phase: 'a', status: 'done' }, { phase: 'b', status: 'done' }];
+  const openP = [{ phase: 'a', status: 'done' }, { phase: 'b', status: 'pending' }];
+  const goodV = { wave: 'w1', pass: true, acs: [{ id: 'AC1', command: 'true', exitCode: 0 }] };
+  ok('a closed wave WITH a passing verdict is verified',
+    auditClosedWaves([{ wave: 'w1', phases: doneP, verdict: goodV }]).ok === true);
+  ok('a closed wave with NO verdict is a violation',
+    auditClosedWaves([{ wave: 'w1', phases: doneP, verdict: null }]).violations.length === 1);
+  ok('a closed wave whose verdict FAILS is a violation too', auditClosedWaves([
+    { wave: 'w1', phases: doneP, verdict: { wave: 'w1', pass: true, acs: [{ id: 'AC1', exitCode: 1 }] } }]).violations.length === 1);
+  ok('a wave still in flight is not judged at all',
+    auditClosedWaves([{ wave: 'w1', phases: openP, verdict: null }]).closed === 0);
+  ok('a wave with no phases is not counted as closed (empty is not complete)',
+    auditClosedWaves([{ wave: 'w1', phases: [], verdict: null }]).closed === 0);
+  ok('a grandfathered wave is listed as legacy, not as a violation', (() => {
+    const r = auditClosedWaves([{ wave: 'old', phases: doneP, verdict: null }], ['old']);
+    return r.ok === true && r.legacy.length === 1 && r.violations.length === 0;
+  })());
+  ok('a NEW wave gets no grace even when others are grandfathered', (() => {
+    const r = auditClosedWaves([{ wave: 'old', phases: doneP, verdict: null }, { wave: 'new', phases: doneP, verdict: null }], ['old']);
+    return r.ok === false && r.violations.map((v) => v.wave).join() === 'new';
+  })());
+  ok('the violation says WHY, not just that it failed',
+    auditClosedWaves([{ wave: 'w1', phases: doneP, verdict: null }]).violations[0].reasons.some((x) => /missing/.test(x)));
   ok('verdictStatus: null verdict → not ok', verdictStatus(null, 'wv').ok === false);
   ok('verdictStatus: pass + all exit0 → ok', verdictStatus({ wave: 'wv', pass: true, acs: [{ id: 'AC1', command: 'true', exitCode: 0 }] }, 'wv').ok === true);
   ok('verdictStatus: a failing AC → not ok', verdictStatus({ wave: 'wv', pass: true, acs: [{ id: 'AC1', command: 'x', exitCode: 1 }] }, 'wv').ok === false);
@@ -253,6 +302,43 @@ if (isMain) {
     const dir = saveState(ROOT, s);
     console.log(`✓ init ${wave}: ${s.phases.length} phases pending → ${join(dir, 'STATE.md')}`);
     console.log('  ' + nextStep(s).message);
+    process.exit(0);
+  }
+
+  // the standing companion to the transition gate: judges what is ALREADY on disk, at any time
+  if (mode === '--audit-closed') {
+    const runsDir = join(ROOT, 'docs', 'runs');
+    const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
+    const baseline = readJson(join(runsDir, '_UNVERIFIED_WAVES.json'))?.waves ?? [];
+    const dirs = existsSync(runsDir)
+      ? readdirSync(runsDir).filter((d) => { try { return statSync(join(runsDir, d)).isDirectory(); } catch { return false; } })
+      : [];
+    const waves = dirs.map((w) => {
+      const st = readJson(join(runsDir, w, 'state.json'));
+      return { wave: w, phases: st?.phases ?? [], verdict: readJson(join(runsDir, w, 'verdict.json')) };
+    });
+    // Пустой результат при непустом каталоге — это не «всё чисто», это сломанный обход. Первый
+    // прогон этой самой сверки напечатал «закрыто волн: 0», потому что statSync не был импортирован,
+    // ошибка ушла в catch и все каталоги отфильтровались. Зелёное по недосмотру хуже красного.
+    if (existsSync(runsDir) && readdirSync(runsDir).length > 0 && waves.length === 0) {
+      console.error('✗ каталог docs/runs не пуст, но обход не нашёл ни одной волны — сверка сломана, а не чиста');
+      process.exit(1);
+    }
+    const r = auditClosedWaves(waves, baseline);
+    console.log(`run-state — постоянная сверка закрытых волн\n`);
+    console.log(`  закрыто волн: ${r.closed} · с доказанным вердиктом: ${r.verified}`);
+    if (r.legacy.length) {
+      console.log(`\n  \x1b[33mстарый долг (закрыты до появления этой сверки, ${r.legacy.length}):\x1b[0m`);
+      for (const l of r.legacy) console.log(`    ○ ${l.wave} — ${l.reasons[0]}`);
+      console.log('    \x1b[2mсписок в docs/runs/_UNVERIFIED_WAVES.json — он назван и посчитан, а не прощён\x1b[0m');
+    }
+    if (r.violations.length) {
+      console.error(`\n  \x1b[31m✗ закрыты БЕЗ вердикта (${r.violations.length}):\x1b[0m`);
+      for (const v of r.violations) console.error(`    ${v.wave} — ${v.reasons.join('; ')}`);
+      console.error('    Волна не закрывается без независимого вердикта: node scripts/acceptance-verdict.mjs <волна>');
+      process.exit(1);
+    }
+    console.log('\n  \x1b[32m✓ ни одной волны, закрытой без вердикта (кроме названного старого долга)\x1b[0m');
     process.exit(0);
   }
 

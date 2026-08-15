@@ -40,6 +40,11 @@ jobs:
       # meta-log — the exact path of the 2026-06-06 ledger-pollution incidents.
       - name: ledger-schema-gate (ledger rows must carry the full mistake schema)
         run: npm run gate:ledger-schema
+      # wave-cannot-close-without-verdict (2026-W33-R3): the transition gate guards a MOMENT and was
+      # missed by all ten existing waves. This is the standing companion — it judges what is already
+      # on disk, so a wave closed outside `--advance` can no longer sit "complete" unverified.
+      - name: waves-closed-with-a-verdict (standing check, not only at the transition)
+        run: npm run gate:waves
       # ledger-pollution regression (2026-07-04): a judge-calibration/debias run streams
       # position-sensitivity telemetry — it must land in its sidecar, NEVER in the mistake ledger.
       # Prove it: run the debias-writing self-tests, assert the ledger is byte-unchanged, then that
