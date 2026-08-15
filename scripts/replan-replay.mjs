@@ -25,11 +25,14 @@
 //   node scripts/replan-replay.mjs --limit 40 --json
 
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { detect } from './stuck-detector.mjs';
 
 const PROJECTS = path.join(homedir(), '.claude', 'projects');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // ── pure core ────────────────────────────────────────────────────────────────
 
@@ -37,6 +40,34 @@ const PROJECTS = path.join(homedir(), '.claude', 'projects');
  * The rule in production today: any earlier stall of the same pattern halts. Pure.
  * @returns {{halts:number, stalls:number}}
  */
+// ── engine-fingerprint-in-checkpoint (2026-W33-R12, discipline from Temporal versioning) ──────
+// A replay result is a measurement OF A RULE. The moment the rule's code changes, the old number
+// stops describing anything — but it keeps sitting in a report, in a commit message, in someone's
+// memory, looking like current evidence. Temporal solves the same problem for workflow histories:
+// a history may only be replayed against the code version that produced it.
+//
+// So a report carries the fingerprint of the exact sources whose behaviour it measured. Comparing
+// two reports then answers a question nobody could answer before: "was this measured on today's
+// rules, or on the ones we replaced last week?"
+export const ENGINE_SOURCES = ['scripts/replan-ledger.mjs', 'scripts/stuck-detector.mjs', 'scripts/replan-replay.mjs'];
+
+/** Stable fingerprint over {relPath: sourceText}. Pure — order-independent, content-sensitive. */
+export function engineFingerprint(sources = {}) {
+  const body = Object.keys(sources).sort().map((k) => `${k}\n${String(sources[k] ?? '')}`).join('\n---\n');
+  return createHash('sha256').update(body).digest('hex').slice(0, 12);
+}
+
+/**
+ * May a recorded result still be read as current? Pure.
+ * An ABSENT fingerprint is not "fine" — it is unknown, and unknown provenance is reported as such
+ * rather than assumed to match, because that assumption is what makes a stale number look fresh.
+ */
+export function fingerprintVerdict(recorded, current) {
+  if (!recorded) return { ok: false, status: 'unknown', reason: 'в записи нет отпечатка движка: на каком коде её мерили, установить нельзя' };
+  if (recorded === current) return { ok: true, status: 'same', reason: 'замер сделан на текущем коде правил' };
+  return { ok: false, status: 'changed', reason: `правила изменились после замера (${recorded} → ${current}): число описывает код, которого больше нет` };
+}
+
 export function replayCurrentRule(events) {
   const seen = new Set();
   let halts = 0; let stalls = 0;
@@ -168,6 +199,24 @@ function selfTest() {
   const rows = Array.from({ length: 6 }, () => ({ fingerprint: 'Bash:ls', progress: false }));
   ok('four identical actions in a row register as a stall', eventsFromFingerprints(rows).some((e) => e.stuck));
 
+  // ── engine-fingerprint-in-checkpoint (2026-W33-R12) ────────────────────
+  ok('the same sources give the same fingerprint',
+    engineFingerprint({ 'a.mjs': 'x', 'b.mjs': 'y' }) === engineFingerprint({ 'a.mjs': 'x', 'b.mjs': 'y' }));
+  ok('key order does not change the fingerprint',
+    engineFingerprint({ 'a.mjs': 'x', 'b.mjs': 'y' }) === engineFingerprint({ 'b.mjs': 'y', 'a.mjs': 'x' }));
+  ok('a ONE-CHARACTER rule change moves the fingerprint',
+    engineFingerprint({ 'a.mjs': 'threshold = 2' }) !== engineFingerprint({ 'a.mjs': 'threshold = 3' }));
+  ok('renaming a source file moves it too (the set of rules IS part of the identity)',
+    engineFingerprint({ 'a.mjs': 'x' }) !== engineFingerprint({ 'c.mjs': 'x' }));
+  ok('a matching fingerprint reads as current', fingerprintVerdict('abc', 'abc').status === 'same');
+  ok('a different fingerprint is reported as changed, with both values', (() => {
+    const v = fingerprintVerdict('abc', 'def');
+    return v.status === 'changed' && v.ok === false && /abc → def/.test(v.reason);
+  })());
+  // silence about provenance must never read as agreement
+  ok('a MISSING fingerprint is unknown, not assumed to match',
+    fingerprintVerdict(null, 'abc').status === 'unknown' && fingerprintVerdict(null, 'abc').ok === false);
+
   if (fails) { console.log(`\n\x1b[31mreplan-replay self-test FAILED (${fails})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ replan-replay: both rules replay correctly; progress resets the streak\x1b[0m');
   process.exit(0);
@@ -215,7 +264,13 @@ if (isMain) {
   }
 
   const pct = (o) => (o.halts ? Math.round((o.premature / o.halts) * 1000) / 10 : 0);
+  // the report says WHICH code it measured, so a later reader can tell fresh from stale
+  const sources = Object.fromEntries(ENGINE_SOURCES.map((rel) => {
+    try { return [rel, readFileSync(path.join(ROOT, rel), 'utf8')]; } catch { return [rel, '']; }
+  }));
   const report = {
+    engineFingerprint: engineFingerprint(sources),
+    engineSources: ENGINE_SOURCES,
     sessions, assistantSteps: totalRows, stallEvents: totalStalls,
     rules: {
       'current (any prior same pattern)': { halts: all.current.halts, premature: all.current.premature, prematurePct: pct(all.current) },
@@ -232,6 +287,8 @@ if (isMain) {
   for (const [name, r] of Object.entries(report.rules)) {
     console.log(`| ${name} | ${r.halts} | ${r.premature} | ${r.prematurePct}% |`);
   }
+  console.log(`\nотпечаток движка: ${report.engineFingerprint} (${ENGINE_SOURCES.join(', ')})`);
+  console.log('Число описывает ИМЕННО этот код правил. Изменится код — отпечаток разойдётся, и старый замер перестанет считаться свежим.');
   console.log('\nПреждевременной считается остановка, после которой в этой же сессии был реальный прогресс');
   console.log('(запись или правка файла). Это калибровка, ничего не подключено.');
   process.exit(0);

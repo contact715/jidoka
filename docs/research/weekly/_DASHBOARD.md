@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 77% · shipped 75/97, open 22, regressed 0, ~0.85w to ship**
+**adoption 78% · shipped 76/97, open 21, regressed 0, ~0.84w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -96,7 +96,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W33-R9 | Витрина перегенерируется из реестра, а не живёт своей жизнью | scripts/kaizen-audit.mjs#dashboardStale | present (symbol): scripts/kaizen-audit.mjs#dashboardStale |
 | shipped | 2026-W33-R10 | Гейт паритета канона и установленной копии | scripts/install-into.mjs#parityReport | present (symbol): scripts/install-into.mjs#parityReport |
 | open | 2026-W33-R11 | Честный корпус бенчмарка на чужом коде с прогоном в CI (условие: после R1 и R2) | docs/benchmarks/_tasks.jsonl#external-corpus-not-selftests | not yet present: docs/benchmarks/_tasks.jsonl#external-corpus-not-selftests |
-| open | 2026-W33-R12 | Отпечаток движка в контрольной точке: проигрывать можно только тот же код | scripts/replan-replay.mjs#engine-fingerprint-in-checkpoint | not yet present: scripts/replan-replay.mjs#engine-fingerprint-in-checkpoint |
+| shipped | 2026-W33-R12 | Отпечаток движка в контрольной точке: проигрывать можно только тот же код | scripts/replan-replay.mjs#engineFingerprint | present (symbol): scripts/replan-replay.mjs#engineFingerprint |
 | open | 2026-W33-R13 | Сторож на СВЁРТКЕ памяти, а не только на записи | scripts/memory-guard.mjs#guard-on-consolidation | not yet present: scripts/memory-guard.mjs#guard-on-consolidation |
 | open | 2026-W33-R14 | Оракул неоднозначности по расхождению исполнения — УСЛОВНО, сначала эксперимент | scripts/clarify-engine.mjs#execution-divergence-oracle | not yet present: scripts/clarify-engine.mjs#execution-divergence-oracle |
 | shipped | 2026-W33-K1 | Обратная ось реестра гейтов: живой гейт обязан быть известен реестру классов | scripts/gate-audit.mjs#reverseRemedyAudit | present (symbol): scripts/gate-audit.mjs#reverseRemedyAudit |
