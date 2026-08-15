@@ -73,19 +73,42 @@ for (const ref of autoRefs) {
 if (c1 === 0) console.log('  \x1b[32m✓ every cited workflow/hook exists\x1b[0m');
 
 // ── Class 2 — doc-count drift ─────────────────────────────────────────────────
-console.log('\n\x1b[1m▌ Class 2 — doc-count drift (README claims vs reality)\x1b[0m');
-const readme = existsSync('README.md') ? readFileSync('README.md', 'utf8') : '';
+console.log('\n\x1b[1m▌ Class 2 — doc-count drift (published claims vs reality)\x1b[0m');
+// Scanned documents. README was the only one until 2026-08-15, and HONEST_SYSTEM_STATE.md —
+// the document whose entire purpose is to be honest about the system — sat 76 days stale
+// publishing "28 агентов-ролей", "14 тестов" and "21/21 eval-кейсов" against a reality of
+// 48, 75 and 97. A hand-maintained number guarding a property a machine can read is exactly
+// the shape this class exists to catch; it just was not pointed at the second file.
+const COUNT_DOCS = ['README.md', 'docs/HONEST_SYSTEM_STATE.md'];
 const real = { agent: count('.claude/agents'), skill: count('.claude/skills'), script: count('scripts', '.mjs') + count('scripts', '.sh') };
 const labels = { agent: /(\d+)(\+?)\s*(?:агент|agent)/i, skill: /(\d+)(\+?)\s*(?:навык|skill)/i, script: /(\d+)(\+?)\s*(?:скрипт|script)/i };
 let c2 = 0;
-for (const [key, re] of Object.entries(labels)) {
-  const m = readme.match(re);
-  if (!m) continue;
-  const claimed = +m[1], plus = m[2] === '+', actual = real[key];
-  const drifted = plus ? actual < claimed : actual !== claimed;
-  if (drifted) { c2++; ghosts++; console.log(`  \x1b[31m👻 ${key}s: README says ${claimed}${plus ? '+' : ''}, real ${actual}\x1b[0m`); }
+for (const doc of COUNT_DOCS) {
+  const text = existsSync(doc) ? readFileSync(doc, 'utf8') : '';
+  if (!text) continue;
+  // An EXPLICIT machine-readable claim wins over prose. Guessing the claim from prose is how this
+  // check fired on its own fix: the sentence "измерены 10 из 11 агентов" was read as "claims 11
+  // agents". A document states its counts on purpose or it states none — it is never inferred.
+  //   <!-- counts: agents=47 skills=0 scripts=242 -->
+  const explicit = /<!--\s*counts:([^>]*)-->/.exec(text);
+  if (explicit) {
+    for (const [key] of Object.entries(labels)) {
+      const em = new RegExp(`\\b${key}s?\\s*=\\s*(\\d+)`).exec(explicit[1]);
+      if (!em) continue;
+      const claimed = +em[1], actual = real[key];
+      if (claimed !== actual) { c2++; ghosts++; console.log(`  \x1b[31m👻 ${key}s: ${doc} declares ${claimed}, real ${actual}\x1b[0m`); }
+    }
+    continue;
+  }
+  for (const [key, re] of Object.entries(labels)) {
+    const m = text.match(re);
+    if (!m) continue;
+    const claimed = +m[1], plus = m[2] === '+', actual = real[key];
+    const drifted = plus ? actual < claimed : actual !== claimed;
+    if (drifted) { c2++; ghosts++; console.log(`  \x1b[31m👻 ${key}s: ${doc} says ${claimed}${plus ? '+' : ''}, real ${actual}\x1b[0m`); }
+  }
 }
-if (c2 === 0) console.log('  \x1b[32m✓ README counts match reality (or make no claim)\x1b[0m');
+if (c2 === 0) console.log(`  \x1b[32m✓ published counts match reality in ${COUNT_DOCS.join(', ')} (or they make no claim)\x1b[0m`);
 
 // ── Class 3 — registry ghosts (curated manifest of required INPUT objects) ─────
 console.log('\n\x1b[1m▌ Class 3 — registry ghosts (validators whose required object is absent)\x1b[0m');

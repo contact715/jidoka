@@ -1,6 +1,7 @@
+<!-- counts: agents=47 scripts=242 -->
 # Honest System State — что реально работает, что каркас, где границы
 
-> Снимок на 2026-05-31. Этот документ намеренно честный: он отделяет «доказуемо
+> Снимок на 2026-08-15 (предыдущий был от 2026-05-31 и протух на 76 дней). Этот документ намеренно честный: он отделяет «доказуемо
 > работает прямо сейчас» от «каркас готов, данных нет» и от «осознанная граница». Для
 > технического оценщика честный self-assessment ценнее красивого демо — каждое
 > утверждение ниже проверяется командой. Если запустить и получить иное, документ врёт,
@@ -21,22 +22,23 @@ node-builtins).
 | Возможность | Команда проверки | Что увидите |
 |---|---|---|
 | Meta-Mistake Engine (closed-loop) | `node scripts/meta-audit.mjs` | классифицирует промахи: holding / regression / ungated; ловит рецидив *сквозь* gate |
-| Тесты ядра движка (14, zero-dep) | `npm run test:engine` | 14 pass — чистые функции + интеграция closed-loop |
+| Тесты ядра движка (zero-dep) | `npm run test:engine` | 75 pass — чистые функции + интеграция closed-loop |
 | Самопроверка целостности | `node scripts/instantiation-audit.mjs` | 0 ghosts: каждый заявленный механизм указывает на реальный объект |
 | Честность входного сигнала | `node scripts/meta-honesty.mjs` | аудит ledger на self-confirming/booster-язык |
 | Механический secret-гейт | `node scripts/pre-publish-guard.mjs` | сканирует дерево + **всю git-историю**, блокирует push на секреты/PII |
-| CI на чистом клоне | см. `.github/workflows/ci.yml` | 7 шагов-гейтов, exit 0 без `npm install` |
+| CI на чистом клоне | см. `.github/workflows/ci.yml` | 42 шага-гейта, exit 0 без `npm install` |
 | Декомпозиция (ratchet) | `npm run check:structural` | LOC/hook-лимиты, baseline не может ухудшиться |
 | Тренд обучения | `node scripts/meta-trend.mjs` | покрытие gate / time-to-gate / regression-rate |
-| Agent eval suite (детерминир.) | `node scripts/eval-suite.mjs` | 21/21 кейсов: каждый движковый механизм ведёт себя по спеке, регрессия валит CI |
-| Измеримость LLM-судей | `node scripts/agent-eval-dashboard.mjs` | 3/3 агента с golden измерены: constitutional-reviewer 6/6, debate-judge 3/3, reflexion-critic 2/3 |
+| Agent eval suite (детерминир.) | `node scripts/eval-suite.mjs` | 97/97 кейсов: каждый движковый механизм ведёт себя по спеке, регрессия валит CI |
+| Измеримость LLM-судей | `node scripts/agent-eval-dashboard.mjs` | измерены 10 из 11 агентов с golden-кейсами; слабый назван вслух (debate-defender 1/2) |
+| Калибровка судей (запись, а не факт прогона) | `node scripts/judge-calibration-state.mjs --dry` | 6 из 7 судей с записью калибровки, из них надёжных 5; запись устаревает при смене эталонов |
 | Контракт конвейера (E2E) | `node scripts/pipeline-contract.mjs` | граф оркестратора well-formed: 37 узлов резолвятся в реальных агентов/скрипты, у каждой фазы артефакт |
 | Real-time policy enforcement | `echo '{"tool_name":"Write","tool_input":{"file_path":"docs/CONSTITUTION.md"}}' \| node scripts/policy-enforce-hook.mjs` | блок записи в L0/security пути (exit 2), PreToolUse hook |
 | North Star gate | `node scripts/northstar-check.mjs --self-test` | продукт без полного North Star не проходит pre-push |
 | Product Kaizen loop | `node scripts/kaizen-loop.mjs --self-test` | тренд метрики vs цель North Star (логика live, данные продукта dormant) |
 
-Плюс архитектура, проверяемая чтением: **28 агентов-ролей** (31 в roster c L0) в трёх
-линиях защиты (`docs/governance/AGENT_TOPOLOGY.md`), debate / best-of-N / reflexion,
+Плюс архитектура, проверяемая чтением: **47 агентов-ролей** (53 в глобальной установке;
+точное число сверяется машиной, см. блок counts в начале файла) в трёх линиях защиты (`docs/governance/AGENT_TOPOLOGY.md`), debate / best-of-N / reflexion,
 TLA+-спека andon (`docs/formal/AndonHalt.tla`), и таблица «механизм → файл → research-паттерн»
 в `ENGINEERING_SYSTEM_ASSESSMENT.md` (8/8 гейтов резолвятся на диск).
 
