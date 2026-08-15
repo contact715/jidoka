@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 96% · shipped 91/95, open 4, regressed 0, ~1.27w to ship**
+**adoption 97% · shipped 91/94, open 3, regressed 0, ~1.27w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -34,7 +34,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W29-R5 | Deterministic JTBD-frame check on business-question answers | scripts/clarify-gate.mjs | present (code): scripts/clarify-gate.mjs |
 | shipped | 2026-W29-R6 | Node-events checkpoint stream -> revive observability + crash-resume (langgraph) | scripts/replan-ledger.mjs#createCheckpointStream | present (symbol): scripts/replan-ledger.mjs#createCheckpointStream |
 | shipped | 2026-W29-R7 | Query-seeded PPR reranker -> multi-hop retrieval (HippoRAG) | scripts/memory-vector.mjs#pprRank | present (symbol): scripts/memory-vector.mjs#pprRank |
-| open | 2026-W29-R8 | Static distilled embeddings -> revive memory-vector RRF (model2vec) | scripts/static-embed.mjs | not yet present: scripts/static-embed.mjs |
+| rejected | 2026-W29-R8 | Static distilled embeddings -> revive memory-vector RRF (model2vec) | scripts/static-embed.mjs | УСЛОВИЕ (c) НЕВЫПОЛНИМО НИ ОДНИМ ЭМБЕДДЕРОМ, проверено прогоном 2026-08-15. Запись требовала включать векторный слой только за eval, показавшим «слитно лучше, чем одна лексика». Замер: лексика 8/8, слияние 4/8. Лексика на ПОТОЛКЕ, значит спасать нечего, а слияние может только опустить верный ответ ниже. Заявленный пробел «нет беззнакового источника эмбеддингов» закрыт ещё в W31-R14 (hashingEmbed), и он проиграл по той же причине. Условие возврата: сначала нарастить золотой набор ПЕРЕФРАЗАМИ, на которых лексика РЕАЛЬНО промахивается; если она перестанет быть 8/8, вопрос открывается заново. |
 | rejected | 2026-W29-R9 | Conditional router-edge for DAG (crewAI Flows) - BANK do not build now | scripts/dag-schedule.mjs#conditional-router-edge | БАНК, условия постройки не выполнены (проверено 2026-08-15): meta-trend вышел из REGRESSING — да; живой телеметрии прогонов DAG нет; в реестре ноль инцидентов, где безусловное ребро стоило времени. Строить механизм без доказательства нужности запрещает правило 12 («addition is not free»). Возврат к вопросу — когда появится хотя бы один залогированный случай. |
 | shipped | 2026-W29-S1 | Register ledger-schema-gate remedy for ledger-pollution (owner paste, L0) | scripts/meta-remedies.mjs | present (code): scripts/meta-remedies.mjs |
 | shipped | 2026-W30-S1 | Owner registers ledger-schema-gate remedy in L0 meta-remedies registry (closes last ungated recurring class) | scripts/meta-remedies.mjs#ledger-pollution | present (code): scripts/meta-remedies.mjs#ledger-pollution |
