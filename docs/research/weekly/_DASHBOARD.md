@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 73% · shipped 71/97, open 26, regressed 0, ~0.82w to ship**
+**adoption 74% · shipped 72/97, open 25, regressed 0, ~0.81w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -100,7 +100,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | open | 2026-W33-R13 | Сторож на СВЁРТКЕ памяти, а не только на записи | scripts/memory-guard.mjs#guard-on-consolidation | not yet present: scripts/memory-guard.mjs#guard-on-consolidation |
 | open | 2026-W33-R14 | Оракул неоднозначности по расхождению исполнения — УСЛОВНО, сначала эксперимент | scripts/clarify-engine.mjs#execution-divergence-oracle | not yet present: scripts/clarify-engine.mjs#execution-divergence-oracle |
 | shipped | 2026-W33-K1 | Обратная ось реестра гейтов: живой гейт обязан быть известен реестру классов | scripts/gate-audit.mjs#reverseRemedyAudit | present (symbol): scripts/gate-audit.mjs#reverseRemedyAudit |
-| open | 2026-W33-K2 | Stop-хук очереди задач: не останавливаться с непустой очередью | hooks/task-queue-gate.mjs#stop-with-waiting-queue-blocks | not yet present: hooks/task-queue-gate.mjs#stop-with-waiting-queue-blocks |
+| shipped | 2026-W33-K2 | Stop-хук очереди задач: не останавливаться с непустой очередью | hooks/task-queue-gate.mjs#queueVerdict | present (symbol): hooks/task-queue-gate.mjs#queueVerdict |
 | shipped | 2026-W33-S1 | Форма pointOfIntegration проверяется НА ЗАПИСИ, плюс backfill 17 голых маркеров | scripts/kaizen-ledger.mjs#validatePointOfIntegration | present (symbol): scripts/kaizen-ledger.mjs#validatePointOfIntegration |
 | shipped | 2026-W33-S2 | Словарь терминов измерения: два прибора не могут звать «measured» разные планки | docs/METRICS_GLOSSARY.md#one-word-one-bar | present (code): docs/METRICS_GLOSSARY.md#one-word-one-bar |
 | open | 2026-W33-Q1 | Метрика длины горизонта (CS329A лекция 17) — крупная ставка СЛЕДУЮЩЕЙ недели | scripts/horizon-length.mjs#unaided-task-length | not yet present: scripts/horizon-length.mjs#unaided-task-length |
