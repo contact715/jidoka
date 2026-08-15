@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 91% · shipped 86/95, open 9, regressed 0, ~1.12w to ship**
+**adoption 92% · shipped 87/95, open 8, regressed 0, ~1.16w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -19,7 +19,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W28-G3 | ledger-pollution schema gate: require claimed/real/caught_by on every meta-mistakes.jsonl row, reject telemetry rows | scripts/ledger-schema-gate.mjs | present (code): scripts/ledger-schema-gate.mjs |
 | shipped | 2026-W28-R1 | Finish golden judge-calibration run for >=2 judges + native Rogan-Gladen theta+CI budget-split | scripts/agent-eval-dashboard.mjs#calibrationRecord | present (symbol): scripts/agent-eval-dashboard.mjs#calibrationRecord |
 | shipped | 2026-W28-R2 | Wire parallel-guard as hard path-gate on DAG leaves (close scope-escape) | scripts/parallel-guard.mjs#leafGateVerdict | present (symbol): scripts/parallel-guard.mjs#leafGateVerdict |
-| open | 2026-W28-R3 | guardrail-tripwire.mjs — mid-run andon-halt on core-property/L0 violation (CORE_PROPERTY_GATE becomes live) | scripts/guardrail-tripwire.mjs | not yet present: scripts/guardrail-tripwire.mjs |
+| shipped | 2026-W28-R3 | guardrail-tripwire.mjs — mid-run andon-halt on core-property/L0 violation (CORE_PROPERTY_GATE becomes live) | hooks/guardrail-tripwire.mjs#tripwireVerdict | present (symbol): hooks/guardrail-tripwire.mjs#tripwireVerdict |
 | shipped | 2026-W28-R4 | cohesionPartition() — split/serialize from real import edges (kills scaffold buildDag) | scripts/dag-schedule.mjs#cohesionPartition | present (symbol): scripts/dag-schedule.mjs#cohesionPartition |
 | open | 2026-W28-R5 | Deterministic evidence-gap loop in memory retrieval (close last open-loop) | scripts/get-spec-context.mjs#evidence-gap-loop | not yet present: scripts/get-spec-context.mjs#evidence-gap-loop |
 | shipped | 2026-W28-R6 | Per-bundle token meter at context-assembly (thermometer under budget-gate) | scripts/shard-story-bundle.mjs | present (code): scripts/shard-story-bundle.mjs |
