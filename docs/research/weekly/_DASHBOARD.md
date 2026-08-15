@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 95% · shipped 90/95, open 5, regressed 0, ~1.26w to ship**
+**adoption 96% · shipped 91/95, open 4, regressed 0, ~1.27w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -42,7 +42,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W30-R2 | Contradiction -> INVALIDATE: fourth verdict in memory-guard (graphiti bi-temporal idea) | scripts/memory-guard.mjs#INVALIDATE | present (code): scripts/memory-guard.mjs#INVALIDATE |
 | shipped | 2026-W30-R3 | Deterministic cross-level requirement->task coverage matrix as hard verdict field | scripts/req-trace.mjs#taskCoverage | present (symbol): scripts/req-trace.mjs#taskCoverage |
 | shipped | 2026-W30-R4 | Retroactive neighbour update in memory-consolidate (deterministic class-graph buildLinks+evolve) | scripts/memory-consolidate.mjs#buildLinks | present (symbol): scripts/memory-consolidate.mjs#buildLinks |
-| open | 2026-W30-R5 | Pareto archive over deterministic golden-case match vectors (second self-improvement engine) | scripts/prompt-evolution.mjs#pareto-archive | not yet present: scripts/prompt-evolution.mjs#pareto-archive |
+| shipped | 2026-W30-R5 | Pareto archive over deterministic golden-case match vectors (second self-improvement engine) | scripts/prompt-evolution.mjs#paretoArchive | present (symbol): scripts/prompt-evolution.mjs#paretoArchive |
 | shipped | 2026-W30-Q1 | Refresh two stale honest-state docs (agent count 28/31/53 -> real ~48) | docs/HONEST_SYSTEM_STATE.md#counts: agents=47 | present (code): docs/HONEST_SYSTEM_STATE.md#counts: agents=47 |
 | shipped | 2026-W30-Q2 | Make ~/.claude/jidoka install carry docs/research + honest-state docs | scripts/install-into.mjs#GLOBAL_SYNC_DIRS | present (symbol): scripts/install-into.mjs#GLOBAL_SYNC_DIRS |
 | shipped | 2026-W30-Q3 | Bind kaizen-audit checkPaths to real evidence markers (auditor emitted false statuses on W29) | scripts/kaizen-audit.mjs#anchorEvidence | present (symbol): scripts/kaizen-audit.mjs#anchorEvidence |

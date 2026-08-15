@@ -34,6 +34,64 @@ export function isImprovement(before, after) {
   return { improved: afterAcc > beforeAcc && !regressed, beforeAcc, afterAcc, regressed };
 }
 
+// ── paretoArchive: a front instead of one monotonic winner (2026-W30-R5, GEPA) ───────────────
+// `isImprovement` above is a STRICT scalar gate: higher accuracy AND no previously-passing case
+// now failing. That is the right gate for SHIPPING, and it is a trap for SEARCHING. A variant that
+// fixes three hard cases and breaks one easy one is rejected outright, so the search can only ever
+// crawl uphill from where it stands and dies in the first local optimum it meets. Every variant
+// that traded one case for three is thrown away and never seen again.
+//
+// A Pareto front keeps them. A variant belongs on the front when NO other variant is at least as
+// good on every single case and strictly better somewhere — so "best overall" and "the only one
+// that solves case 7" both survive, and the next round can start from either.
+//
+// This SEARCHES and ARCHIVES. It never ships anything: `isImprovement` plus a human stay the only
+// way in. That separation is deliberate — an archive that could promote its own members would be a
+// self-improving loop grading its own homework, which is the reward-hacking surface this engine
+// already guards with meta-honesty.
+//
+// It runs on the DETERMINISTIC per-case match vectors from llm-eval-score.score(): no judge, no
+// LLM, no network. That is why it works today while judge calibration is still a standing P0 —
+// it does not depend on it at all.
+
+/** Per-case pass vector of a variant, as a Map. Pure. */
+export const matchVector = (results = []) => new Map(results.map((r) => [r.case_id, r.match === true]));
+
+/**
+ * Does `a` dominate `b`? At least as good on EVERY case, strictly better on at least one. Pure.
+ * Cases only one side ran are ignored: comparing on different case sets would let a variant
+ * "dominate" by having been measured on less.
+ */
+export function dominates(a, b) {
+  const A = matchVector(a), B = matchVector(b);
+  const shared = [...A.keys()].filter((k) => B.has(k));
+  if (!shared.length) return false;
+  let strictlyBetter = false;
+  for (const k of shared) {
+    const av = A.get(k), bv = B.get(k);
+    if (!av && bv) return false;        // worse somewhere → cannot dominate
+    if (av && !bv) strictlyBetter = true;
+  }
+  return strictlyBetter;
+}
+
+/**
+ * The Pareto front of variants. Pure.
+ * @param {Array<{id:string, results:Array}>} variants
+ * @returns {{front:Array, dominated:Array, reason:string}}
+ */
+export function paretoArchive(variants = []) {
+  const front = variants.filter((v) => !variants.some((o) => o.id !== v.id && dominates(o.results, v.results)));
+  const dominated = variants.filter((v) => !front.includes(v));
+  return {
+    front,
+    dominated,
+    reason: front.length
+      ? `на фронте ${front.length} вариант(ов): каждый лучший хоть на чём-то, ни один не побеждён целиком`
+      : 'вариантов нет — фронт пуст, и это не «всё хорошо», а «нечего сравнивать»',
+  };
+}
+
 function scan() {
   if (!existsSync(EVALS)) return [];
   const dirs = readdirSync(EVALS).filter(d => { try { return statSync(join(EVALS, d)).isDirectory(); } catch { return false; } });
@@ -62,6 +120,41 @@ function selfTest() {
     ['fixing one but breaking another is NOT (regression guard)', isImprovement(before, brokeOther).improved === false],
     ['the broken case is flagged regressed', isImprovement(before, brokeOther).regressed === true],
     ['no accuracy gain is not an improvement', isImprovement(before, before).improved === false],
+
+    // ── Pareto archive: search wide, ship narrow (2026-W30-R5) ─────────────
+    ['a variant better everywhere dominates', dominates(
+      [{ case_id: '1', match: true }, { case_id: '2', match: true }],
+      [{ case_id: '1', match: true }, { case_id: '2', match: false }]) === true],
+    ['trading one case for another dominates NOTHING', dominates(
+      [{ case_id: '1', match: true }, { case_id: '2', match: false }],
+      [{ case_id: '1', match: false }, { case_id: '2', match: true }]) === false],
+    ['an identical variant does not dominate (no strict gain)', dominates(
+      [{ case_id: '1', match: true }], [{ case_id: '1', match: true }]) === false],
+    // measured on a different case set is not "better", it is incomparable
+    ['variants sharing no cases never dominate each other', dominates(
+      [{ case_id: 'a', match: true }], [{ case_id: 'b', match: false }]) === false],
+
+    ['both halves of a trade survive on the front — the local optimum escape', (() => {
+      const A = { id: 'A', results: [{ case_id: '1', match: true }, { case_id: '2', match: false }] };
+      const B = { id: 'B', results: [{ case_id: '1', match: false }, { case_id: '2', match: true }] };
+      return paretoArchive([A, B]).front.length === 2;
+    })()],
+    ['a variant better on everything clears the front', (() => {
+      const A = { id: 'A', results: [{ case_id: '1', match: true }, { case_id: '2', match: false }] };
+      const C = { id: 'C', results: [{ case_id: '1', match: true }, { case_id: '2', match: true }] };
+      const r = paretoArchive([A, C]);
+      return r.front.map((v) => v.id).join() === 'C' && r.dominated.map((v) => v.id).join() === 'A';
+    })()],
+    ['a single variant is its own front', paretoArchive([{ id: 'A', results: [{ case_id: '1', match: true }] }]).front.length === 1],
+    ['no variants → empty front, and it says that is not "fine"',
+      paretoArchive([]).front.length === 0 && /нечего сравнивать/.test(paretoArchive([]).reason)],
+
+    // the separation that keeps this from grading its own homework
+    ['the SHIP gate is untouched: a trade is still rejected for shipping', (() => {
+      const b = [{ case_id: '1', match: true }, { case_id: '2', match: false }];
+      const a = [{ case_id: '1', match: false }, { case_id: '2', match: true }];
+      return isImprovement(b, a).improved === false;
+    })()],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
