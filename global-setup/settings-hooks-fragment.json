@@ -8,16 +8,29 @@
             "type": "command",
             "command": "$HOME/.claude/hooks/jidoka-guard.sh",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/policy-enforce-hook.mjs",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/permission-gate.mjs"
           }
         ]
       },
       {
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|mcp__.*",
         "hooks": [
           {
             "type": "command",
             "command": "node $HOME/.claude/hooks/policy-enforce-hook.mjs",
             "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/guardrail-tripwire.mjs\""
           }
         ]
       },
@@ -27,6 +40,80 @@
           {
             "type": "command",
             "command": "node $HOME/.claude/hooks/session-state.mjs PreToolUse",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/outbound-claims-gate.mjs PreToolUse",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay $HOME/.claude/sounds/done.wav",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/session-state.mjs Stop",
+            "timeout": 5,
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/browser-verify-gate.mjs",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/proof-of-work-gate.mjs",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/outbound-claims-gate.mjs Stop",
+            "timeout": 25
+          },
+          {
+            "type": "command",
+            "command": "node \"$HOME/.claude/hooks/task-queue-gate.mjs\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/synthesis-coverage-gate.mjs"
+          }
+        ],
+        "matcher": ""
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay $HOME/.claude/sounds/attention.wav",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/session-state.mjs Notification",
             "timeout": 5,
             "async": true
           }
@@ -44,12 +131,17 @@
           },
           {
             "type": "command",
-            "command": "node $HOME/claude-code-dev-framework/scripts/skill-selector.mjs --hook",
+            "command": "node $HOME/.claude/jidoka/scripts/skill-selector.mjs --hook",
             "timeout": 10
           },
           {
             "type": "command",
             "command": "node $HOME/.claude/hooks/session-state.mjs UserPromptSubmit",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/jidoka/scripts/session-lock.mjs --hook",
             "timeout": 5
           }
         ]
@@ -64,6 +156,46 @@
             "command": "node $HOME/.claude/hooks/injection-watch.mjs",
             "timeout": 5,
             "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/spec-push.mjs"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/session-start-digest.mjs",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/compaction-trace.mjs PreCompact"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/compaction-trace.mjs PostCompact"
           }
         ]
       }

@@ -26,6 +26,10 @@ import { readFileSync, appendFileSync } from 'node:fs';
 //   L0_DOCS          — constitution / mission / north-star documents. Blocked by default
 //                      ("human edits directly"), but writable under an explicit OWNER GRANT
 //                      (see getGrant below) with a full audit trail.
+// 2026-07-28: `.env` was briefly removed at the owner's instruction to write a credentials
+// file, then RESTORED the same day at the owner's request ("защити теперь его"). Back to the
+// default: agents cannot write/overwrite any .env file. .secrets / .credentials / .git /
+// registries were never removed.
 export const ALWAYS_PROTECTED = [
   /(^|\/)\.secrets/i, /(^|\/)\.credentials/i, /\.env(\.|$)/i, /(^|\/)\.git\//i,
   /agent-access-registry\.json$/i, /_baseline\.json$/i, /meta-remedies\.mjs$/i,
