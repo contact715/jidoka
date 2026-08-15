@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 64% · shipped 62/97, open 35, regressed 0, ~0.63w to ship**
+**adoption 66% · shipped 64/97, open 33, regressed 0, ~0.61w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -91,7 +91,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | open | 2026-W33-R4 | Ось исхода в ранжировании уроков (Memory Worth) — верхний ярус структурно пуст | scripts/memory-consolidate.mjs#outcome-axis-in-score | not yet present: scripts/memory-consolidate.mjs#outcome-axis-in-score |
 | shipped | 2026-W33-R5 | Сторож записи по принципу default-deny, включая матчер mcp__.* | scripts/policy-enforce-hook.mjs#isWriteTool | present (symbol): scripts/policy-enforce-hook.mjs#isWriteTool |
 | open | 2026-W33-R6 | Несущее свойство как ПОЛЕ спеки и маркер догадки | scripts/spec-structural-gate.mjs#core-property-field | not yet present: scripts/spec-structural-gate.mjs#core-property-field |
-| open | 2026-W33-R7 | Протухший in_progress размораживает очередь, а не запирает её | scripts/task-queue.mjs#stale-in-progress-thaw | not yet present: scripts/task-queue.mjs#stale-in-progress-thaw |
+| shipped | 2026-W33-R7 | Протухший in_progress размораживает очередь, а не запирает её | scripts/task-queue.mjs#STALE_LOCK_MS | present (symbol): scripts/task-queue.mjs#STALE_LOCK_MS |
 | open | 2026-W33-R8 | Проба конфликта решений при слиянии уроков (DeMem) | scripts/memory-consolidate.mjs#decision-conflict-probe | not yet present: scripts/memory-consolidate.mjs#decision-conflict-probe |
 | shipped | 2026-W33-R9 | Витрина перегенерируется из реестра, а не живёт своей жизнью | scripts/kaizen-audit.mjs#dashboardStale | present (symbol): scripts/kaizen-audit.mjs#dashboardStale |
 | open | 2026-W33-R10 | Гейт паритета канона и установленной копии | scripts/install-into.mjs#canon-install-parity-gate | not yet present: scripts/install-into.mjs#canon-install-parity-gate |
@@ -102,5 +102,5 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W33-K1 | Обратная ось реестра гейтов: живой гейт обязан быть известен реестру классов | scripts/gate-audit.mjs#reverseRemedyAudit | present (symbol): scripts/gate-audit.mjs#reverseRemedyAudit |
 | open | 2026-W33-K2 | Stop-хук очереди задач: не останавливаться с непустой очередью | hooks/task-queue-gate.mjs#stop-with-waiting-queue-blocks | not yet present: hooks/task-queue-gate.mjs#stop-with-waiting-queue-blocks |
 | shipped | 2026-W33-S1 | Форма pointOfIntegration проверяется НА ЗАПИСИ, плюс backfill 17 голых маркеров | scripts/kaizen-ledger.mjs#validatePointOfIntegration | present (symbol): scripts/kaizen-ledger.mjs#validatePointOfIntegration |
-| open | 2026-W33-S2 | Словарь терминов измерения: два прибора не могут звать «measured» разные планки | docs/METRICS_GLOSSARY.md#one-word-one-bar | not yet present: docs/METRICS_GLOSSARY.md#one-word-one-bar |
+| shipped | 2026-W33-S2 | Словарь терминов измерения: два прибора не могут звать «measured» разные планки | docs/METRICS_GLOSSARY.md#one-word-one-bar | present (code): docs/METRICS_GLOSSARY.md#one-word-one-bar |
 | open | 2026-W33-Q1 | Метрика длины горизонта (CS329A лекция 17) — крупная ставка СЛЕДУЮЩЕЙ недели | scripts/horizon-length.mjs#unaided-task-length | not yet present: scripts/horizon-length.mjs#unaided-task-length |

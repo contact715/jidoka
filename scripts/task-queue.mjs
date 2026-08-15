@@ -39,10 +39,32 @@ const STORE = process.env.TASK_QUEUE || join(process.env.HOME || '', '.jidoka', 
 //   { blocked: <active task> }   — one already in_progress → do NOT start another
 //   { start: <task> }            — the oldest queued task, to be marked in_progress
 //   { empty: true }              — nothing queued
-export function pickNext(items) {
+// stale-in-progress-thaw (2026-W33-R7) — how long a lock may be held before the queue stops
+// believing it. A session that dies mid-task leaves `in_progress` behind and nothing ever clears it,
+// so the serial gate turned into a permanent stop: `next` answered "blocked" forever while the
+// digest reported the work as in flight. Four hours is longer than any real task in this engine and
+// short enough that a dead session does not cost a day.
+export const STALE_LOCK_MS = Number(process.env.TASK_QUEUE_STALE_MS || 4 * 60 * 60 * 1000);
+
+/** Age of a held lock, from `started`, falling back to `created` for rows written before W33-R7. */
+const lockAge = (task, now) => {
+  const stamp = task.started ?? task.created ?? null;
+  return typeof stamp === 'number' ? now - stamp : null;
+};
+
+export function pickNext(items, { now = Date.now(), staleAfterMs = STALE_LOCK_MS } = {}) {
   const active = items.find(t => t.status === 'in_progress');
-  if (active) return { blocked: active };
   const queued = items.filter(t => t.status === 'queued').sort((a, b) => (a.created || 0) - (b.created || 0));
+  if (active) {
+    const age = lockAge(active, now);
+    // No timestamp at all: the age cannot be judged, so the lock is HONOURED and the reason is
+    // named. Guessing "probably stale" here would silently break the one invariant this file owns.
+    if (age === null) return { blocked: active, ageUnknown: true };
+    if (age <= staleAfterMs) return { blocked: active, ageMs: age };
+    // Stale: the queue thaws, and the abandoned task is returned so the caller can SAY it was
+    // abandoned. It is never quietly flipped — a silent steal would hide a dead session.
+    return queued.length ? { stale: active, ageMs: age, start: queued[0] } : { stale: active, ageMs: age, empty: true };
+  }
   if (!queued.length) return { empty: true };
   return { start: queued[0] };
 }
@@ -94,11 +116,21 @@ function cmdStatus() {
 function cmdNext() {
   const items = load();
   const r = pickNext(items);
-  if (r.blocked) { console.log(JSON.stringify({ blocked: true, active: r.blocked })); return; }
-  if (r.empty) { console.log(JSON.stringify({ empty: true })); return; }
-  const started = applyStatus(items, r.start.id, 'in_progress', { started: Date.now() });
+  if (r.blocked) { console.log(JSON.stringify({ blocked: true, active: r.blocked, ageUnknown: r.ageUnknown ?? false, ageMs: r.ageMs ?? null })); return; }
+  // stale-in-progress-thaw: the abandoned lock is marked `failed` with a reason, so the queue moves
+  // AND the history says why. Silently flipping it back to queued would erase the fact that a
+  // session died holding it, and the same task would be pulled again with no trace.
+  let working = items;
+  if (r.stale) {
+    const hours = Math.round((r.ageMs / 3_600_000) * 10) / 10;
+    working = applyStatus(items, r.stale.id, 'failed', { failedReason: `замок протух: держался ${hours}ч без завершения, сессия не закрыла задачу` });
+    save(working);
+    console.error(`⚠ ${r.stale.id} держал очередь ${hours}ч и помечен failed — очередь разморожена. Вернуть в работу: task-queue.mjs reset ${r.stale.id}`);
+  }
+  if (r.empty || !r.start) { console.log(JSON.stringify({ empty: true, thawed: r.stale?.id ?? null })); return; }
+  const started = applyStatus(working, r.start.id, 'in_progress', { started: Date.now() });
   save(started);
-  console.log(JSON.stringify({ start: { ...r.start, status: 'in_progress' } }));
+  console.log(JSON.stringify({ start: { ...r.start, status: 'in_progress' }, thawed: r.stale?.id ?? null }));
 }
 
 function cmdTransition(id, status, patch) {
@@ -117,14 +149,45 @@ function selfTest() {
   const withActive = [{ id: 'x', status: 'in_progress', created: 5 }, ...items];
   const T = [
     ['pickNext returns oldest queued', pickNext(items).start.id === 'a'],
-    ['pickNext blocks when one in_progress', pickNext(withActive).blocked.id === 'x'],
+    // `now` is pinned: since W33-R7 a lock has an AGE, so a fixture that leaves the clock to the
+    // wall would start reading as stale the moment the fixture's timestamps aged past the threshold.
+    ['pickNext blocks when one in_progress', pickNext(withActive, { now: 10 }).blocked.id === 'x'],
     ['pickNext empty when none queued', pickNext([{ id: 'z', status: 'done' }]).empty === true],
     ['applyStatus flips only the target', applyStatus(items, 'a', 'in_progress').find(t => t.id === 'a').status === 'in_progress'],
     ['applyStatus leaves others alone', applyStatus(items, 'a', 'in_progress').find(t => t.id === 'b').status === 'queued'],
     ['summarize tallies', (() => { const s = summarize(items); return s.queued === 2 && s.done === 1; })()],
     ['makeId is stable for same input', makeId('t', 100) === makeId('t', 100)],
     ['makeId differs by ts', makeId('t', 100) !== makeId('t', 200)],
-    ['serial: after start, next would block', (() => { const started = applyStatus(items, 'a', 'in_progress'); return !!pickNext(started).blocked; })()],
+    ['serial: after start, next would block', (() => { const started = applyStatus(items, 'a', 'in_progress', { started: 9 }); return !!pickNext(started, { now: 10 }).blocked; })()],
+
+    // ── stale-in-progress-thaw (2026-W33-R7) ────────────────────────────────
+    // `started` was written on every start (line ~99) and read by nobody, so a task whose session
+    // died mid-run held the serial lock forever. The queue reported "1 in progress" and the digest
+    // called that work in flight; nothing was moving. The serial gate is the point, so the thaw is
+    // LOUD — the stale task is named and returned, never silently stolen.
+    ['a FRESH in_progress still blocks (the serial gate is not weakened)',
+      !!pickNext([{ id: 'x', status: 'in_progress', started: 1_000_000 }, { id: 'y', status: 'queued', created: 1 }],
+        { now: 1_000_000 + 60_000, staleAfterMs: 3_600_000 }).blocked],
+    ['a STALE in_progress thaws the queue and is named', (() => {
+      const r = pickNext([{ id: 'x', status: 'in_progress', started: 1_000_000 }, { id: 'y', status: 'queued', created: 1 }],
+        { now: 1_000_000 + 7_200_000, staleAfterMs: 3_600_000 });
+      return r.stale?.id === 'x' && r.start?.id === 'y' && !r.blocked;
+    })()],
+    ['a stale lock with NOTHING queued still reports the stale task', (() => {
+      const r = pickNext([{ id: 'x', status: 'in_progress', started: 1 }], { now: 9_999_999, staleAfterMs: 1000 });
+      return r.stale?.id === 'x' && !r.start;
+    })()],
+    ['age falls back to `created` when `started` was never recorded (legacy rows)', (() => {
+      const r = pickNext([{ id: 'x', status: 'in_progress', created: 1_000 }, { id: 'y', status: 'queued', created: 1 }],
+        { now: 1_000 + 7_200_000, staleAfterMs: 3_600_000 });
+      return r.stale?.id === 'x' && r.start?.id === 'y';
+    })()],
+    ['an in_progress with NO timestamp at all blocks, and says the age is unknown', (() => {
+      const r = pickNext([{ id: 'x', status: 'in_progress' }, { id: 'y', status: 'queued', created: 1 }], { now: 9e12 });
+      return r.blocked?.id === 'x' && r.ageUnknown === true;
+    })()],
+    ['default staleness is used when the caller passes nothing (no silent never-stale)',
+      pickNext([{ id: 'x', status: 'in_progress', started: 1 }, { id: 'y', status: 'queued', created: 1 }], { now: 9e12 }).stale?.id === 'x'],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
