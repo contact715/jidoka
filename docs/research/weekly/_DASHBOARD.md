@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 74% · shipped 72/97, open 25, regressed 0, ~0.81w to ship**
+**adoption 75% · shipped 73/97, open 24, regressed 0, ~0.84w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -40,7 +40,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W30-S1 | Owner registers ledger-schema-gate remedy in L0 meta-remedies registry (closes last ungated recurring class) | scripts/meta-remedies.mjs#ledger-pollution | present (code): scripts/meta-remedies.mjs#ledger-pollution |
 | open | 2026-W30-R1 | Native append-only event-log checkpoint (crash-resume + HITL interrupt + lead-time stream) | scripts/checkpoint.mjs | not yet present: scripts/checkpoint.mjs |
 | shipped | 2026-W30-R2 | Contradiction -> INVALIDATE: fourth verdict in memory-guard (graphiti bi-temporal idea) | scripts/memory-guard.mjs#INVALIDATE | present (code): scripts/memory-guard.mjs#INVALIDATE |
-| open | 2026-W30-R3 | Deterministic cross-level requirement->task coverage matrix as hard verdict field | scripts/requirement-task-coverage.mjs | not yet present: scripts/requirement-task-coverage.mjs |
+| shipped | 2026-W30-R3 | Deterministic cross-level requirement->task coverage matrix as hard verdict field | scripts/req-trace.mjs#taskCoverage | present (symbol): scripts/req-trace.mjs#taskCoverage |
 | open | 2026-W30-R4 | Retroactive neighbour update in memory-consolidate (deterministic class-graph buildLinks+evolve) | scripts/memory-consolidate.mjs#buildLinks-evolve | not yet present: scripts/memory-consolidate.mjs#buildLinks-evolve |
 | open | 2026-W30-R5 | Pareto archive over deterministic golden-case match vectors (second self-improvement engine) | scripts/prompt-evolution.mjs#pareto-archive | not yet present: scripts/prompt-evolution.mjs#pareto-archive |
 | open | 2026-W30-Q1 | Refresh two stale honest-state docs (agent count 28/31/53 -> real ~48) | docs/HONEST_SYSTEM_STATE.md#48-agents | not yet present: docs/HONEST_SYSTEM_STATE.md#48-agents |

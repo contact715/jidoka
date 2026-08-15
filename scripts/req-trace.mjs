@@ -27,7 +27,35 @@
 //   node scripts/req-trace.mjs --self-test
 //   node scripts/req-trace.mjs --register docs/req-register.json [--code docs/code-inventory.json]
 
-const STAGES = ['spec', 'ac', 'test', 'code', 'deployed'];
+// requirement→task coverage (2026-W30-R3) — `task` sits between the acceptance criterion and the
+// test: it is the unit of work a wave actually dispatches. Without it the chain could show a
+// requirement fully traced to code while NO task ever carried it, which is how a requirement gets
+// satisfied by accident and nobody can say which wave owns it.
+//
+// This was proposed as a separate scripts/requirement-task-coverage.mjs. It is built HERE instead:
+// a second traceability instrument would be a second answer to "is this requirement covered?", and
+// two instruments answering one question with different bars is the defect this engine keeps
+// closing (see docs/METRICS_GLOSSARY.md). One register, one verdict, one more axis on it.
+const STAGES = ['spec', 'ac', 'task', 'test', 'code', 'deployed'];
+
+/**
+ * Requirement → task matrix: which wave-task carries each requirement, and which tasks carry none.
+ * Pure. `taskInventory` (optional) enables the reverse axis: a dispatched task nobody asked for.
+ */
+export function taskCoverage(register = [], taskInventory = null) {
+  const rows = register.map((r) => ({ id: r.id, task: r.task || null, covered: Boolean(r.task) }));
+  const uncovered = rows.filter((r) => !r.covered).map((r) => r.id);
+  const claimed = new Set(register.map((r) => r.task).filter(Boolean));
+  const unrequested = Array.isArray(taskInventory) ? taskInventory.filter((t) => !claimed.has(t)) : [];
+  return {
+    rows,
+    uncovered,
+    unrequested,
+    // an empty register is "не проверено", never 100% — the same vacuum-green rule as trace()
+    coveragePct: register.length ? Math.round((rows.filter((r) => r.covered).length / register.length) * 100) : null,
+    ok: register.length > 0 && uncovered.length === 0 && unrequested.length === 0,
+  };
+}
 
 /**
  * Full traceability verdict. Pure.
@@ -88,12 +116,14 @@ function selfTest() {
   const fails = [];
   const ok = (n, c) => { if (!c) fails.push(n); console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };
 
-  const full = [{ id: 'REQ-1', spec: 'wave-1', ac: 'AC-1', test: 'auth.test.ts', code: 'auth.ts', deployed: true }];
+  // `task` joined STAGES in W30-R3, so every fixture that claims FULL tracing must now name the
+  // task that carried the requirement. The old fixtures going red was the change announcing itself.
+  const full = [{ id: 'REQ-1', spec: 'wave-1', ac: 'AC-1', task: 'T-1', test: 'auth.test.ts', code: 'auth.ts', deployed: true }];
   ok('fully traced requirement → ok', trace(full).ok === true && trace(full).coveragePct === 100);
 
   const partial = [
-    { id: 'REQ-1', spec: 'wave-1', ac: 'AC-1', test: 'auth.test.ts', code: 'auth.ts', deployed: true },
-    { id: 'REQ-2', spec: 'wave-1', ac: 'AC-2', test: null, code: null, deployed: false },
+    { id: 'REQ-1', spec: 'wave-1', ac: 'AC-1', task: 'T-1', test: 'auth.test.ts', code: 'auth.ts', deployed: true },
+    { id: 'REQ-2', spec: 'wave-1', ac: 'AC-2', task: null, test: null, code: null, deployed: false },
   ];
   const r = trace(partial);
   ok('partially traced → not ok', r.ok === false);
@@ -107,6 +137,23 @@ function selfTest() {
   const empty = trace([]);
   ok('empty register is NOT ok anymore', empty.ok === false);
   ok('empty register is marked unverifiable, not failed-with-gaps', empty.unverifiable === true && empty.gaps.length === 0);
+
+  // ── requirement → task coverage (2026-W30-R3) ───────────────────────────
+  ok('a requirement with no task is a gap at the TASK stage',
+    trace([{ id: 'REQ-9', spec: 's', ac: 'a', task: null, test: 't', code: 'c', deployed: true }]).gaps[0].missing.includes('task'));
+  ok('every requirement carried by a task → covered',
+    taskCoverage([{ id: 'REQ-1', task: 'T-1' }, { id: 'REQ-2', task: 'T-2' }]).ok === true);
+  ok('a requirement no task carries is named',
+    taskCoverage([{ id: 'REQ-1', task: 'T-1' }, { id: 'REQ-2', task: null }]).uncovered.join() === 'REQ-2');
+  ok('coverage percentage counts only the carried ones',
+    taskCoverage([{ id: 'a', task: 'T' }, { id: 'b', task: null }]).coveragePct === 50);
+  ok('a dispatched task no requirement asked for is surfaced (reverse axis)',
+    taskCoverage([{ id: 'REQ-1', task: 'T-1' }], ['T-1', 'T-99']).unrequested.join() === 'T-99');
+  ok('an unrequested task alone makes the verdict not ok',
+    taskCoverage([{ id: 'REQ-1', task: 'T-1' }], ['T-1', 'T-99']).ok === false);
+  // same vacuum-green rule as trace(): nothing to check is never 100%
+  ok('an empty register is NOT 100% task coverage',
+    taskCoverage([]).coveragePct === null && taskCoverage([]).ok === false);
   ok('empty register says WHY in plain words', /пуст/.test(empty.reason));
   ok('empty register has no coverage number at all, not 100', empty.coveragePct === null);
 
