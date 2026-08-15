@@ -32,9 +32,54 @@ const INPUT = process.env.META_LEDGER || join(GLOBAL, 'meta-mistakes.jsonl');
 const OUTPUT = process.env.MEMORY_OUT || join(GLOBAL, 'memory-consolidated.md');
 const RETROS_DIR = process.env.RETROS_DIR || 'docs/retros';
 
-// recency-weighted frequency: frequency, recency, and decay in one sum.
+// ── outcome-axis-in-score (2026-W33-R4, Memory Worth) ───────────────────────
+// The old score summed ONE thing: how recently a class was seen. An incident contributes at most
+// 1.0 (on the day it happened), and ACTIVE needs 1.5 — so a class had to recur at least twice
+// within a month before it could ever reach the top tier. Measured 2026-08-10: the 🔴 Active
+// section of the digest was structurally EMPTY, top score 1.065 against a threshold of 1.5, and
+// the reason was arithmetic, not calm. Raising or lowering the threshold does not fix that; the
+// model was missing an axis.
+//
+// The missing axis is OUTCOME: not how often, but how badly. The ledger already records it, in the
+// field nobody scored — `caught_by`. A mistake the OWNER caught escaped every gate, every agent
+// and every review, and reached a human. A mistake a gate caught was contained by design. Those
+// are not the same lesson at equal weight, and treating them equally is why one severe escape
+// could never outrank two harmless self-catches.
+//
+// Weights are deliberately modest. A big multiplier would let a single dramatic incident dominate
+// the digest forever, which is the opposite failure and just as blind.
+export const OUTCOME_WEIGHT = {
+  owner: 2.0,   // reached the person the whole system exists to protect
+  user: 2.0,
+  human: 2.0,
+  'product-code': 1.6,        // escaped into a product
+  'red-team': 1.2,            // found by deliberate attack, not by luck
+  'adversarial-review': 1.2,
+  claude: 1.0,
+  agent: 1.0,
+  self: 0.8,                  // caught inside the same session, before it cost anything
+  'self-noticed': 0.8,
+  'in-session-kaizen': 0.8,
+  verification: 0.7,
+  'reflexion-critic': 0.6,    // a gate did its job — the containment worked
+  'meta-honesty': 0.6,
+  orchestrator: 0.6,
+  'dev-pipeline': 0.6,
+};
+export const DEFAULT_OUTCOME_WEIGHT = 1.0;
+
+/** How much this incident's outcome should count. Unknown catchers weigh 1.0, never 0. Pure. */
+export function outcomeWeight(incident = {}) {
+  const who = String(incident.caught_by || '').toLowerCase().trim();
+  return OUTCOME_WEIGHT[who] ?? DEFAULT_OUTCOME_WEIGHT;
+}
+
+// recency-weighted frequency × outcome: how recently, how often, AND how badly.
 export function scoreCluster(incidents, today) {
-  return incidents.reduce((s, it) => s + Math.pow(0.5, Math.max(0, daysBetween(it.date, today)) / HALF_LIFE), 0);
+  return incidents.reduce(
+    (s, it) => s + Math.pow(0.5, Math.max(0, daysBetween(it.date, today)) / HALF_LIFE) * outcomeWeight(it),
+    0,
+  );
 }
 
 const tierOf = (score) => (score >= ACTIVE ? 'ACTIVE' : score >= WATCH ? 'WATCH' : 'DORMANT');
@@ -199,7 +244,10 @@ function selfTest() {
   const histSection = out.includes(HIST_HEADER) ? out.slice(out.indexOf(HIST_HEADER)) : '';
   const seq = (...pairs) => pairs.map(([date, cls]) => ({ date, class: cls }));
   const T = [
-    ['hot ranks first (recency+frequency)', m.clusters[0].cls === 'hot'],
+    // Since W33-R4 the ranking also weighs OUTCOME, so a user-caught class legitimately outranks
+    // a self-caught one. The assertion states what it always meant: among equally-caught classes,
+    // seen-often-and-recently beats seen-once-long-ago.
+    ['hot outranks its equally-caught neighbours', get('hot').score > get('medium').score && get('hot').score > get('stale').score],
     ['hot > medium (frequency: 3 recent beats 1)', get('hot').score > get('medium').score],
     ['hot is ACTIVE', get('hot').tier === 'ACTIVE'],
     ['medium is WATCH (single recent)', get('medium').tier === 'WATCH'],
@@ -233,6 +281,26 @@ function selfTest() {
     })()],
     ['rows without a class or date are skipped, not crashed on',
       Object.keys(classEdges([{ date: '2026-01-01' }, { class: 'a' }, null])).length === 0],
+    // ── outcome-axis-in-score (2026-W33-R4) ─────────────────────────────────
+    ['an owner-caught incident weighs more than a self-caught one',
+      outcomeWeight({ caught_by: 'owner' }) > outcomeWeight({ caught_by: 'self' })],
+    ['a gate-caught incident weighs LEAST — containment worked',
+      outcomeWeight({ caught_by: 'reflexion-critic' }) < outcomeWeight({ caught_by: 'self' })],
+    ['an unknown catcher weighs 1.0, never 0 (silence must not erase a lesson)',
+      outcomeWeight({ caught_by: 'somebody-new' }) === 1 && outcomeWeight({}) === 1],
+    ['ONE owner-caught incident can now reach ACTIVE — the whole point of the axis', (() => {
+      const one = [{ date: '2026-06-01', class: 'escaped', claimed: 'a', real: 'b', caught_by: 'owner' }];
+      return consolidate(one, '2026-06-01', {}).clusters[0].tier === 'ACTIVE';
+    })()],
+    ['one gate-caught incident does NOT reach ACTIVE (containment is not an alarm)', (() => {
+      const one = [{ date: '2026-06-01', class: 'contained', claimed: 'a', real: 'b', caught_by: 'reflexion-critic' }];
+      return consolidate(one, '2026-06-01', {}).clusters[0].tier !== 'ACTIVE';
+    })()],
+    ['the outcome axis does not overpower time: an old owner-catch still decays', (() => {
+      const old = [{ date: '2026-01-01', class: 'ancient', claimed: 'a', real: 'b', caught_by: 'owner' }];
+      return consolidate(old, '2026-06-01', {}).clusters[0].tier === 'DORMANT';
+    })()],
+
     ['consolidate attaches the edges to the cluster', (() => {
       const rs = seq(['2026-01-01', 'a'], ['2026-01-02', 'b'], ['2026-01-03', 'a'], ['2026-01-04', 'b'])
         .map((r) => ({ ...r, claimed: 'c', real: 'r', caught_by: 'x' }));
