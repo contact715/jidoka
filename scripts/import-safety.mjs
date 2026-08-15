@@ -215,6 +215,12 @@ export function analyze(src, filePath = '') {
   // функции, объявленные в этом же файле: вызов такой функции из объявления
   // верхнего уровня — это работа, спрятанная за словом const
   const localFns = new Set([...src.matchAll(/^(?:export\s+)?(?:async\s+)?function\*?\s+([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]));
+  // Вызовы, у которых есть ПОСЛЕДСТВИЯ, даже если функция не своя. Список
+  // намеренно узкий: path.join и JSON.parse сюда не входят, иначе гейт зашумит.
+  // Ловится только НАСТОЯЩИЙ вызов — определение функции (const f = () => …)
+  // при импорте ничего не делает.
+  const EFFECTFUL = /(?:execSync|execFileSync|spawnSync|fetch|readFileSync|readdirSync|writeFileSync|appendFileSync|mkdirSync|rmSync|unlinkSync|copyFileSync)\s*\(/;
+  const IS_FN_DEF = /=\s*(?:async\s*)?(?:\([^)]*\)|[\w$]+)\s*=>|=\s*(?:async\s+)?function\b/;
   const exec = [];
   let guardedTail = false;
   // цепочка if / else if / else на верхнем уровне — ОДНО целое: если её голова
@@ -228,8 +234,12 @@ export function analyze(src, filePath = '') {
     if (/^else\b/.test(line)) { if (inChain) continue; }
     if (DECLARATION.test(line) || CLOSER.test(line)) {
       inChain = false;
-      const call = (info[i].code || line).match(/^(?:export\s+)?(?:const|let|var)\s+[^=]*=\s*(?:await\s+)?([A-Za-z_$][\w$]*)\s*\(/);
-      if (call && localFns.has(call[1])) exec.push({ line: i, text: line.trim().slice(0, 80) });
+      const code = info[i].code || line;
+      const call = code.match(/^(?:export\s+)?(?:const|let|var)\s+[^=]*=\s*(?:await\s+)?([A-Za-z_$][\w$]*)\s*\(/);
+      const isDecl = /^(?:export\s+)?(?:const|let|var)\s/.test(code);
+      if ((call && localFns.has(call[1])) || (isDecl && !IS_FN_DEF.test(code) && EFFECTFUL.test(code))) {
+        exec.push({ line: i, text: line.trim().slice(0, 80) });
+      }
       continue;
     }
     if (isOptionalImport(line)) { inChain = false; continue; }
@@ -406,6 +416,21 @@ function selfTest() {
   ok('существующий сторож переиспользован', (reuse.src.match(/const isMain/g) || []).length === 1);
   // 16. идемпотентность
   ok('повторный прогон ничего не меняет', applyGuard(fixed.src).changed === false);
+  // 49. настоящий ввод-вывод в объявлении — дефект
+  ok(
+    'const x = readFileSync(...) — дефект',
+    analyze("import { readFileSync } from 'node:fs';\nconst raw = readFileSync('a.txt', 'utf8');\n", 'a.mjs').exec.length === 1,
+  );
+  // 50. а определение функции с тем же вызовом внутри — нет
+  ok(
+    'const f = (p) => readFileSync(p) — не дефект',
+    analyze("import { readFileSync } from 'node:fs';\nconst read = (p) => readFileSync(p, 'utf8');\n", 'a.mjs').exec.length === 0,
+  );
+  // 51. и безобидный помощник не считается
+  ok(
+    'const ROOT = path.join(...) — не дефект',
+    analyze("import path from 'node:path';\nconst ROOT = path.join('a', 'b');\n", 'a.mjs').exec.length === 0,
+  );
   // 46. обход области видит настоящие файлы движка и не лезет в тесты
   const mods = allModules('.');
   ok('обход находит модули движка', mods.length > 100 && mods.includes('scripts/import-safety.mjs'));

@@ -47,11 +47,13 @@ function extractTools(content) {
 }
 
 // Mirror validate-agent-access.mjs:getAgentLine.
-const rosterText = readFileSync(ROSTER, 'utf8');
+// лениво: чтение файла при импорте — работа, а getLine зовут уже по делу
+let _rosterText = null;
+const rosterText = () => (_rosterText ??= readFileSync(ROSTER, 'utf8'));
 function getLine(slug) {
   const norm = slug.replace(/[\s-]/g, '').toLowerCase();
   let inT = false;
-  for (const line of rosterText.split('\n')) {
+  for (const line of rosterText().split('\n')) {
     if (line.includes('| Agent |') && line.includes('Line:')) { inT = true; continue; }
     if (inT) {
       if (line.startsWith('#') || (!line.startsWith('|') && line.trim() !== '' && !line.startsWith('|---'))) break;

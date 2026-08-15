@@ -92,6 +92,7 @@
         "Grep",
         "WebFetch",
         "WebSearch",
+        "Skill",
         "Write"
       ],
       "write_scope": null,
@@ -327,6 +328,7 @@
         "Grep",
         "WebFetch",
         "WebSearch",
+        "Skill",
         "Write"
       ],
       "write_scope": null,
@@ -404,10 +406,48 @@
         "Grep",
         "WebFetch",
         "WebSearch",
+        "Skill",
         "Write"
       ],
       "write_scope": null,
       "line": "Line: Pre-wave / Support",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "project-steward",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "prompt-evolver",
+      "declared_tools": [
+        "Read",
+        "Grep",
+        "Write"
+      ],
+      "write_scope": null,
+      "line": "",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
+      "slug": "red-team",
+      "declared_tools": [
+        "Read",
+        "Grep",
+        "Bash"
+      ],
+      "write_scope": null,
+      "line": "",
       "blast_radius": "low",
       "llm06_category": "none"
     },
@@ -481,6 +521,19 @@
       "llm06_category": "none"
     },
     {
+      "slug": "spec-custodian",
+      "declared_tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Bash"
+      ],
+      "write_scope": null,
+      "line": "",
+      "blast_radius": "low",
+      "llm06_category": "none"
+    },
+    {
       "slug": "surface-cartographer",
       "declared_tools": [
         "Read",
@@ -529,6 +582,7 @@
         "Grep",
         "WebFetch",
         "WebSearch",
+        "Skill",
         "Write"
       ],
       "write_scope": null,

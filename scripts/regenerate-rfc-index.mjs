@@ -23,15 +23,16 @@ const OUT = path.join(DECISIONS_DIR, '_RFC_INDEX.md');
 const EXCLUDE = new Set(['_TEMPLATE.md', 'README.md', '_INDEX.md', '_RFC_INDEX.md']);
 const isDry = process.argv.includes('--dry');
 
-const files = fs.readdirSync(DECISIONS_DIR)
-  .filter((f) => f.endsWith('.md') && !EXCLUDE.has(f) && f.startsWith('ADR-'))
-  .sort((a, b) => parseInt((a.match(/^ADR-(\d+)/) || [])[1] ?? '0', 10) - parseInt((b.match(/^ADR-(\d+)/) || [])[1] ?? '0', 10));
-
 const rows = [];
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  // чтение папки — работа, поэтому только при прямом запуске
+  const files = fs.readdirSync(DECISIONS_DIR)
+    .filter((f) => f.endsWith('.md') && !EXCLUDE.has(f) && f.startsWith('ADR-'))
+    .sort((a, b) => parseInt((a.match(/^ADR-(\d+)/) || [])[1] ?? '0', 10) - parseInt((b.match(/^ADR-(\d+)/) || [])[1] ?? '0', 10));
+
   for (const file of files) {
     const content = fs.readFileSync(path.join(DECISIONS_DIR, file), 'utf8');
     const statusShort = (extractBoldField(content, 'Status') ?? '').split(/[|,(]/)[0].trim();

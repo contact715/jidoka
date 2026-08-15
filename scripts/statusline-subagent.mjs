@@ -35,11 +35,11 @@ export function render(ctx) {
   return parts.join(C.dim(' · '));
 }
 
-let raw = ''; try { raw = readFileSync(0, 'utf8'); } catch { /* no stdin */ }
-let ctx = {}; try { ctx = JSON.parse(raw || '{}'); } catch { /* none */ }
-
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  // чтение stdin — работа: при импорте оно подвешивало модуль
+  let raw = ''; try { raw = readFileSync(0, 'utf8'); } catch { /* no stdin */ }
+  let ctx = {}; try { ctx = JSON.parse(raw || '{}'); } catch { /* none */ }
   process.stdout.write(render(ctx));
 }
