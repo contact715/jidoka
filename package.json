@@ -169,7 +169,9 @@
     "routine:daily": "bash scripts/routine-daily.sh",
     "skills:diff": "node scripts/skills-diff.mjs",
     "gate:checkpoint": "node scripts/checkpoint.mjs --self-test",
-    "gate:benchmark": "node scripts/agent-benchmark.mjs --verify"
+    "gate:benchmark": "node scripts/agent-benchmark.mjs --verify",
+    "gate:ceremony": "node scripts/change-ceremony.mjs --self-test",
+    "gate:amendment": "node scripts/spec-amendment-gate.mjs --self-test"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

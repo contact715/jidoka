@@ -65,6 +65,18 @@ else
   echo "✓ pre-commit · clarify-gate: $(echo "$out" | tail -1)"
 fi
 
+# spec-amendment-gate — WIRED 2026-08-15 (W28-R9). It existed, self-tested 8/8, and NOTHING EVER
+# CALLED IT: a gate with no caller is a file, not a defence. That disconnection is the same class
+# as the orphan gates gate-audit already refuses. WARN on first wiring, per the engine's own
+# soft-trial doctrine — a gate that blocks on its very first run teaches people to bypass it.
+out=$(node "$ROOT/scripts/spec-amendment-gate.mjs" --staged 2>&1)
+if echo "$out" | grep -qi 'violation\|amendment required'; then
+  echo "$out"
+  echo "↑ spec-amendment-gate: spec changed without its amendment (WARN, not blocking)."
+else
+  echo "✓ pre-commit · spec-amendment-gate: $(echo "$out" | tail -1)"
+fi
+
 # dup-guard — WARN by default: a new .mjs module re-declaring an existing export is a likely
 # duplicate (survey-before-scaffold). Soft trial; promote to --block via gate-graduation.
 out=$(node "$ROOT/scripts/dup-guard.mjs" --staged 2>&1)

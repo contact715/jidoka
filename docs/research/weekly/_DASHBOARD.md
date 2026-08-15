@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 98% · shipped 92/94, open 2, regressed 0, ~1.26w to ship**
+**adoption 100% · shipped 94/94, open 0, regressed 0, ~1.29w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -25,7 +25,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W28-R6 | Per-bundle token meter at context-assembly (thermometer under budget-gate) | scripts/shard-story-bundle.mjs | present (code): scripts/shard-story-bundle.mjs |
 | shipped | 2026-W28-R7 | Persisted class-edges (prevInClass[]) in memory-consolidate (episodic->semantic) | scripts/memory-consolidate.mjs#classEdges | present (symbol): scripts/memory-consolidate.mjs#classEdges |
 | shipped | 2026-W28-R8 | Static intent-vs-evidence contract-drift gate (reverse axis of spec-drift) | scripts/detect-drift.mjs#intentVsEvidence | present (symbol): scripts/detect-drift.mjs#intentVsEvidence |
-| open | 2026-W28-R9 | Dated delta-archive of specs (EARS) + wire disconnected change-ceremony gates | scripts/spec-archive.mjs | not yet present: scripts/spec-archive.mjs |
+| shipped | 2026-W28-R9 | Dated delta-archive of specs (EARS) + wire disconnected change-ceremony gates | .githooks/pre-commit#spec-amendment-gate | present (code): .githooks/pre-commit#spec-amendment-gate |
 | rejected | 2026-W28-P1 | process-mine.mjs — data-grounded business-process discovery + conformance gap (PORT the process-mining IDEA, reject PM4Py dep) for business-process-architect/data-analyst/kaizen-officer | scripts/process-mine.mjs | deferred by owner 2026-07-06: target confirmed = dev-environment (jidoka/Claude Code), not client product. Process-mining is a product-building capability; revisit only when a real client+event-log exists. |
 | shipped | 2026-W29-R1 | AC-completeness gate on verdict.json (spec-kit /converge) | scripts/acceptance-verdict.mjs | present (code): scripts/acceptance-verdict.mjs |
 | shipped | 2026-W29-R2 | Human golden sets (ReqElicitBench+Zenodo) -> native elicitation-recall scorer, breaks judge-calibration P0 | scripts/elicitation-gym.mjs#scoreRun | present (symbol): scripts/elicitation-gym.mjs#scoreRun |
@@ -103,4 +103,4 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W33-K2 | Stop-хук очереди задач: не останавливаться с непустой очередью | hooks/task-queue-gate.mjs#queueVerdict | present (symbol): hooks/task-queue-gate.mjs#queueVerdict |
 | shipped | 2026-W33-S1 | Форма pointOfIntegration проверяется НА ЗАПИСИ, плюс backfill 17 голых маркеров | scripts/kaizen-ledger.mjs#validatePointOfIntegration | present (symbol): scripts/kaizen-ledger.mjs#validatePointOfIntegration |
 | shipped | 2026-W33-S2 | Словарь терминов измерения: два прибора не могут звать «measured» разные планки | docs/METRICS_GLOSSARY.md#one-word-one-bar | present (code): docs/METRICS_GLOSSARY.md#one-word-one-bar |
-| open | 2026-W33-Q1 | Метрика длины горизонта (CS329A лекция 17) — крупная ставка СЛЕДУЮЩЕЙ недели | scripts/horizon-length.mjs#unaided-task-length | not yet present: scripts/horizon-length.mjs#unaided-task-length |
+| shipped | 2026-W33-Q1 | Метрика длины горизонта (CS329A лекция 17) — крупная ставка СЛЕДУЮЩЕЙ недели | scripts/horizon-length.mjs#horizons | present (symbol): scripts/horizon-length.mjs#horizons |
