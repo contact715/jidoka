@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 88% · shipped 84/95, open 11, regressed 0, ~1.05w to ship**
+**adoption 89% · shipped 85/95, open 10, regressed 0, ~1.07w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -41,7 +41,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | open | 2026-W30-R1 | Native append-only event-log checkpoint (crash-resume + HITL interrupt + lead-time stream) | scripts/checkpoint.mjs | not yet present: scripts/checkpoint.mjs |
 | shipped | 2026-W30-R2 | Contradiction -> INVALIDATE: fourth verdict in memory-guard (graphiti bi-temporal idea) | scripts/memory-guard.mjs#INVALIDATE | present (code): scripts/memory-guard.mjs#INVALIDATE |
 | shipped | 2026-W30-R3 | Deterministic cross-level requirement->task coverage matrix as hard verdict field | scripts/req-trace.mjs#taskCoverage | present (symbol): scripts/req-trace.mjs#taskCoverage |
-| open | 2026-W30-R4 | Retroactive neighbour update in memory-consolidate (deterministic class-graph buildLinks+evolve) | scripts/memory-consolidate.mjs#buildLinks-evolve | not yet present: scripts/memory-consolidate.mjs#buildLinks-evolve |
+| shipped | 2026-W30-R4 | Retroactive neighbour update in memory-consolidate (deterministic class-graph buildLinks+evolve) | scripts/memory-consolidate.mjs#buildLinks | present (symbol): scripts/memory-consolidate.mjs#buildLinks |
 | open | 2026-W30-R5 | Pareto archive over deterministic golden-case match vectors (second self-improvement engine) | scripts/prompt-evolution.mjs#pareto-archive | not yet present: scripts/prompt-evolution.mjs#pareto-archive |
 | shipped | 2026-W30-Q1 | Refresh two stale honest-state docs (agent count 28/31/53 -> real ~48) | docs/HONEST_SYSTEM_STATE.md#counts: agents=47 | present (code): docs/HONEST_SYSTEM_STATE.md#counts: agents=47 |
 | shipped | 2026-W30-Q2 | Make ~/.claude/jidoka install carry docs/research + honest-state docs | scripts/install-into.mjs#GLOBAL_SYNC_DIRS | present (symbol): scripts/install-into.mjs#GLOBAL_SYNC_DIRS |

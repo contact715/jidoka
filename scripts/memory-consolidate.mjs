@@ -122,6 +122,77 @@ export function classEdges(rows = [], { minCount = 2 } = {}) {
   return byClass;
 }
 
+// ── buildLinks + evolve: an associative digest, deterministically (2026-W30-R4) ───────────────
+// The digest is grouped by EXACT class. Two lessons that are obviously kin to a reader —
+// core-property-substituted-by-scaffold and reactive-literal-execution, say — sit in different
+// sections with nothing joining them, because their strings differ. The associative value that
+// memory-vector was supposed to deliver needs an embedder the engine does not have.
+//
+// It does not need one. Three signals are already on disk and are exact, not guessed:
+//   family     — the classes share their first two kebab tokens (one naming family)
+//   project    — they were recorded in the same project
+//   sequence   — one keeps arriving right after the other (prevInClass, W28-R7)
+//
+// `evolve` is the half nobody had anywhere: when new rows arrive, the neighbourhood of the OLD
+// clusters changes too, and until now nothing recomputed it. A digest that only ever grows
+// forward keeps yesterday's answer to a question today's data has changed.
+const familyKey = (cls) => String(cls).split('-').slice(0, 2).join('-');
+
+/** Attach deterministic `links[]` to every cluster. Pure — returns new clusters, mutates nothing. */
+export const PROJECT_LINK_MAX_SHARE = 1 / 3;
+export const MAX_LINKS = 5;   // a lesson with twenty "see also" lines has none
+
+export function buildLinks(clusters = []) {
+  // A shared project is only informative when the project is RARE. Measured 2026-08-15 before this
+  // guard: 420 of 544 links came from one repository, because nearly every class was recorded
+  // there — "we both happened in the main repo" links everything to everything and says nothing.
+  // So a project links two classes only while it hosts less than a third of all clusters.
+  const projectCount = new Map();
+  for (const c of clusters) for (const p of new Set(c.projects || [])) projectCount.set(p, (projectCount.get(p) || 0) + 1);
+  // The share rule needs a population to be a share OF. On two clusters sharing one project the
+  // formula called that project "dominant" and killed the only real link — the guard was firing
+  // before there was anything to guard against. A project linking at most two classes is always
+  // informative; the share only starts to matter once there are more.
+  const discriminating = (p) => {
+    const n = projectCount.get(p) || 0;
+    return n <= 2 || n <= clusters.length * PROJECT_LINK_MAX_SHARE;
+  };
+
+  return clusters.map((c) => {
+    const links = [];
+    for (const other of clusters) {
+      if (other.cls === c.cls) continue;
+      const why = [];
+      if (familyKey(other.cls) === familyKey(c.cls)) why.push('семья');
+      const sharedProjects = (c.projects || []).filter((p) => (other.projects || []).includes(p) && discriminating(p));
+      if (sharedProjects.length) why.push(`проект ${sharedProjects[0]}`);
+      if ((c.prevInClass || []).some((p) => p.cls === other.cls)) why.push('идёт следом');
+      // strength, strongest first: arriving in sequence is a behavioural fact, a naming family is
+      // a structural one, a shared project is only circumstantial. Threshold-tuning alone could not
+      // fix this — one project still formed a clique of 90 edges — so the links are RANKED and CAPPED.
+      const strength = why.includes('идёт следом') ? 3 : why.includes('семья') ? 2 : 1;
+      if (why.length) links.push({ cls: other.cls, why: why.join(', '), strength });
+    }
+    links.sort((a, b) => b.strength - a.strength || a.cls.localeCompare(b.cls));
+    return { ...c, links: links.slice(0, MAX_LINKS) };
+  });
+}
+
+/**
+ * Recompute the link neighbourhood after new rows land. Pure.
+ * Returns { clusters, touched } where `touched` names the OLD clusters whose neighbourhood
+ * actually changed — the retroactive part, and the part worth reporting.
+ */
+export function evolve(clusters = [], nextClusters = []) {
+  const before = new Map(clusters.map((c) => [c.cls, (c.links || []).map((l) => l.cls).sort().join(',')]));
+  const after = buildLinks(nextClusters);
+  const touched = after
+    .filter((c) => before.has(c.cls) && before.get(c.cls) !== c.links.map((l) => l.cls).sort().join(','))
+    .map((c) => c.cls)
+    .sort();
+  return { clusters: after, touched };
+}
+
 export function consolidate(rows, today = todayISO(), remedies = REMEDIES) {
   // map every gated class AND its remedy family to the gate that covers it
   const familyGate = {};
@@ -148,7 +219,9 @@ export function consolidate(rows, today = todayISO(), remedies = REMEDIES) {
       examples: sorted.slice(0, 2).map(i => ({ date: i.date, claimed: i.claimed, real: i.real, caught_by: i.caught_by })),
     };
   }).sort((a, b) => b.score - a.score || (a.cls < b.cls ? -1 : 1)); // stable: score desc, then class asc
-  return { today, total: rows.length, classes: clusters.length, clusters };
+  // links are attached AFTER clustering: a link needs the whole set to point into (W30-R4)
+  const linked = buildLinks(clusters);
+  return { today, total: rows.length, classes: linked.length, clusters: linked };
 }
 
 // secondary EPISODIC source: retro files (gracefully empty when none exist yet)
@@ -178,10 +251,13 @@ function renderLesson(c) {
   const proj = c.projects.length ? ` · ${c.projects.join(', ')}` : '';
   const ex = c.examples.map(e => `  - \`${e.date}\` claimed *"${e.claimed}"* → really *"${e.real}"* (caught by ${e.caught_by})`).join('\n');
   // the chain, when there is one: what this class keeps arriving right after (2026-W28-R7)
+  const also = (c.links || []).length
+    ? `\n→ см. также: ${c.links.slice(0, 3).map(l => `\`${l.cls}\` (${l.why})`).join(', ')}`
+    : '';
   const chain = (c.prevInClass || []).length
     ? `\n↩ обычно приходит следом за: ${c.prevInClass.slice(0, 3).map(p => `\`${p.cls}\` (${p.count}×)`).join(', ')}`
     : '';
-  return `### ${c.cls}  ·  score ${c.score}  ·  seen ${c.count}×  ·  last ${c.lastAge}d ago${proj}\n${gate}${chain}\n${ex}`;
+  return `### ${c.cls}  ·  score ${c.score}  ·  seen ${c.count}×  ·  last ${c.lastAge}d ago${proj}\n${gate}${chain}${also}\n${ex}`;
 }
 
 export function render(model, retro = { scanned: 0, lessons: [] }) {
@@ -299,6 +375,43 @@ function selfTest() {
     ['the outcome axis does not overpower time: an old owner-catch still decays', (() => {
       const old = [{ date: '2026-01-01', class: 'ancient', claimed: 'a', real: 'b', caught_by: 'owner' }];
       return consolidate(old, '2026-06-01', {}).clusters[0].tier === 'DORMANT';
+    })()],
+
+    // ── buildLinks + evolve: associative digest (2026-W30-R4) ───────────────
+    ['classes of one naming family are linked', (() => {
+      const l = buildLinks([{ cls: 'gate-bypass-a', projects: [] }, { cls: 'gate-bypass-b', projects: [] }]);
+      return l[0].links[0].cls === 'gate-bypass-b' && /семья/.test(l[0].links[0].why);
+    })()],
+    ['a rare shared project links two classes',
+      buildLinks([{ cls: 'aaa', projects: ['tiny'] }, { cls: 'bbb', projects: ['tiny'] }])[0].links.length === 1],
+    // measured before this guard: 420 of 544 links came from ONE repository, linking everything
+    // to everything — a signal that fires on almost every pair carries no information
+    ['a project hosting MOST classes stops linking (noise, not signal)', (() => {
+      const many = Array.from({ length: 9 }, (_, i) => ({ cls: `c${i}`, projects: ['dominant'] }));
+      return buildLinks(many).every((c) => c.links.length === 0);
+    })()],
+    ['a sequence link outranks a project link', (() => {
+      const l = buildLinks([
+        { cls: 'aaa', projects: ['tiny'], prevInClass: [{ cls: 'zzz', count: 2 }] },
+        { cls: 'bbb', projects: ['tiny'] }, { cls: 'zzz', projects: [] },
+      ]);
+      return l[0].links[0].cls === 'zzz';
+    })()],
+    ['links are capped — twenty "see also" lines are none', (() => {
+      const fam = Array.from({ length: 12 }, (_, i) => ({ cls: `same-family-${i}`, projects: [] }));
+      return buildLinks(fam)[0].links.length === MAX_LINKS;
+    })()],
+    ['a class with nothing in common gets no links',
+      buildLinks([{ cls: 'alpha-one', projects: ['x'] }, { cls: 'beta-two', projects: ['y'] }])[0].links.length === 0],
+    ['evolve names the OLD clusters whose neighbourhood changed', (() => {
+      // a family is the first TWO kebab tokens, so the newcomer must share both to be kin
+      const before = buildLinks([{ cls: 'alpha-one-x', projects: [] }, { cls: 'beta-two-z', projects: [] }]);
+      const after = [{ cls: 'alpha-one-x', projects: [] }, { cls: 'beta-two-z', projects: [] }, { cls: 'alpha-one-y', projects: [] }];
+      return evolve(before, after).touched.includes('alpha-one-x');
+    })()],
+    ['evolve reports nothing when the neighbourhood is unchanged', (() => {
+      const c = buildLinks([{ cls: 'alpha-one', projects: [] }, { cls: 'beta-two', projects: [] }]);
+      return evolve(c, [{ cls: 'alpha-one', projects: [] }, { cls: 'beta-two', projects: [] }]).touched.length === 0;
     })()],
 
     ['consolidate attaches the edges to the cluster', (() => {
