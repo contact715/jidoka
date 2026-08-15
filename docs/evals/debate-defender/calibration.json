@@ -1,0 +1,12 @@
+{
+  "slug": "debate-defender",
+  "accuracy": 0.5,
+  "matches": 1,
+  "total": 2,
+  "passThreshold": 0.8,
+  "meetsThreshold": false,
+  "goldenFingerprint": "d83e602",
+  "runFile": "run-2026-05-31.jsonl",
+  "runDate": "2026-05-31",
+  "note": "Снимок: точность посчитана по записанному прогону, а не заново. Если эталонные случаи изменятся, отпечаток разойдётся и запись считается устаревшей."
+}

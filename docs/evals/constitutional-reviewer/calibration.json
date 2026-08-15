@@ -1,0 +1,12 @@
+{
+  "slug": "constitutional-reviewer",
+  "accuracy": 1,
+  "matches": 6,
+  "total": 6,
+  "passThreshold": 0.8,
+  "meetsThreshold": true,
+  "goldenFingerprint": "68dc09b3",
+  "runFile": "run-2026-05-31.jsonl",
+  "runDate": "2026-05-31",
+  "note": "Снимок: точность посчитана по записанному прогону, а не заново. Если эталонные случаи изменятся, отпечаток разойдётся и запись считается устаревшей."
+}

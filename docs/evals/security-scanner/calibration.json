@@ -1,0 +1,12 @@
+{
+  "slug": "security-scanner",
+  "accuracy": 1,
+  "matches": 3,
+  "total": 3,
+  "passThreshold": 0.8,
+  "meetsThreshold": true,
+  "goldenFingerprint": "1ca55dfc",
+  "runFile": "run-2026-05-31.jsonl",
+  "runDate": "2026-05-31",
+  "note": "Снимок: точность посчитана по записанному прогону, а не заново. Если эталонные случаи изменятся, отпечаток разойдётся и запись считается устаревшей."
+}

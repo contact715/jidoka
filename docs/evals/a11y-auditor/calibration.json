@@ -1,0 +1,12 @@
+{
+  "slug": "a11y-auditor",
+  "accuracy": 1,
+  "matches": 2,
+  "total": 2,
+  "passThreshold": 0.8,
+  "meetsThreshold": true,
+  "goldenFingerprint": "3717294e",
+  "runFile": "run-2026-05-31.jsonl",
+  "runDate": "2026-05-31",
+  "note": "Снимок: точность посчитана по записанному прогону, а не заново. Если эталонные случаи изменятся, отпечаток разойдётся и запись считается устаревшей."
+}

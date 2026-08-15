@@ -2,12 +2,12 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 69% · shipped 67/97, open 30, regressed 0, ~0.63w to ship**
+**adoption 71% · shipped 69/97, open 28, regressed 0, ~0.77w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
 | shipped | 2026-W27-R1 | Fix commit-gate exit-code propagation (gate-claims-block-but-passes) | .githooks/commit-msg | present (code): .githooks/commit-msg |
-| open | 2026-W27-R1b | Calibrate 7 sleeping LLM judges to measured (precondition for strategy injection) | docs/evals/constitutional-reviewer/calibration.json | not yet present: docs/evals/constitutional-reviewer/calibration.json |
+| shipped | 2026-W27-R1b | Calibrate 7 sleeping LLM judges to measured (precondition for strategy injection) | docs/evals/constitutional-reviewer/calibration.json | present (code): docs/evals/constitutional-reviewer/calibration.json |
 | shipped | 2026-W27-R2 | memory-vector.mjs — semantic memory layer via Reciprocal Rank Fusion | scripts/memory-vector.mjs | present (code): scripts/memory-vector.mjs |
 | shipped | 2026-W27-R3a | reasoning-bank Part A — persist contrastive artifacts before force-delete | scripts/reasoning-bank.mjs | present (code): scripts/reasoning-bank.mjs |
 | open | 2026-W27-R3b | reasoning-bank Part B — distill failure->strategy category in extract-retro-memory | scripts/extract-retro.mjs#strategy-distill | not yet present: scripts/extract-retro.mjs#strategy-distill |
@@ -17,7 +17,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W28-G1 | Orphan-gate detector — flag any gate script with zero inbound refs from CI/hooks/registry (closes declaration-over-implementation regression + wired-or-dead defect) | scripts/gate-audit.mjs | present (code): scripts/gate-audit.mjs |
 | shipped | 2026-W28-G2 | Close gate-bypass: extend policy-enforce to Bash side-channel writes (>>, sed -i, fs.writeFileSync) + case-insensitive L0 path match | scripts/policy-enforce-hook.mjs | present (code): scripts/policy-enforce-hook.mjs |
 | shipped | 2026-W28-G3 | ledger-pollution schema gate: require claimed/real/caught_by on every meta-mistakes.jsonl row, reject telemetry rows | scripts/ledger-schema-gate.mjs | present (code): scripts/ledger-schema-gate.mjs |
-| open | 2026-W28-R1 | Finish golden judge-calibration run for >=2 judges + native Rogan-Gladen theta+CI budget-split | docs/evals/debate-judge/calibration.json | not yet present: docs/evals/debate-judge/calibration.json |
+| shipped | 2026-W28-R1 | Finish golden judge-calibration run for >=2 judges + native Rogan-Gladen theta+CI budget-split | scripts/agent-eval-dashboard.mjs#calibrationRecord | present (symbol): scripts/agent-eval-dashboard.mjs#calibrationRecord |
 | open | 2026-W28-R2 | Wire parallel-guard as hard path-gate on DAG leaves (close scope-escape) | scripts/parallel-guard.mjs#dag-leaf-path-gate | not yet present: scripts/parallel-guard.mjs#dag-leaf-path-gate |
 | open | 2026-W28-R3 | guardrail-tripwire.mjs — mid-run andon-halt on core-property/L0 violation (CORE_PROPERTY_GATE becomes live) | scripts/guardrail-tripwire.mjs | not yet present: scripts/guardrail-tripwire.mjs |
 | open | 2026-W28-R4 | cohesionPartition() — split/serialize from real import edges (kills scaffold buildDag) | scripts/dag-schedule.mjs#cohesionPartition | not yet present: scripts/dag-schedule.mjs#cohesionPartition |
