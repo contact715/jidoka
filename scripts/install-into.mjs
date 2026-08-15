@@ -150,7 +150,12 @@ function profileSelfTest() {
   const closure = (prof) => {
     const set = new Set(resolveProfile(prof));
     for (const f of set) {
-      for (const m of readFileSync(join(HERE, 'scripts', f), 'utf8').matchAll(/from '\.\/([\w-]+\.mjs)'/g)) {
+      // Anchored to the START of a line on purpose. The old pattern matched `from './x.mjs'`
+      // ANYWHERE, including inside a test fixture string — on 2026-08-15 dag-schedule added
+      // self-test data like "import x from './b.mjs';" and the closure check declared a dependency
+      // on a file that does not exist. What a file SAYS is data; what it IMPORTS is syntax, and
+      // only a real import statement starts its own line.
+      for (const m of readFileSync(join(HERE, 'scripts', f), 'utf8').matchAll(/^\s*(?:import|export)[^'"\n]*from '\.\/([\w-]+\.mjs)'/gm)) {
         if (!set.has(m[1])) return { ok: false, f, missing: m[1] };
       }
     }

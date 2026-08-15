@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 82% · shipped 80/97, open 17, regressed 0, ~0.96w to ship**
+**adoption 84% · shipped 81/97, open 16, regressed 0, ~1.01w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -20,7 +20,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W28-R1 | Finish golden judge-calibration run for >=2 judges + native Rogan-Gladen theta+CI budget-split | scripts/agent-eval-dashboard.mjs#calibrationRecord | present (symbol): scripts/agent-eval-dashboard.mjs#calibrationRecord |
 | shipped | 2026-W28-R2 | Wire parallel-guard as hard path-gate on DAG leaves (close scope-escape) | scripts/parallel-guard.mjs#leafGateVerdict | present (symbol): scripts/parallel-guard.mjs#leafGateVerdict |
 | open | 2026-W28-R3 | guardrail-tripwire.mjs — mid-run andon-halt on core-property/L0 violation (CORE_PROPERTY_GATE becomes live) | scripts/guardrail-tripwire.mjs | not yet present: scripts/guardrail-tripwire.mjs |
-| open | 2026-W28-R4 | cohesionPartition() — split/serialize from real import edges (kills scaffold buildDag) | scripts/dag-schedule.mjs#cohesionPartition | not yet present: scripts/dag-schedule.mjs#cohesionPartition |
+| shipped | 2026-W28-R4 | cohesionPartition() — split/serialize from real import edges (kills scaffold buildDag) | scripts/dag-schedule.mjs#cohesionPartition | present (symbol): scripts/dag-schedule.mjs#cohesionPartition |
 | open | 2026-W28-R5 | Deterministic evidence-gap loop in memory retrieval (close last open-loop) | scripts/get-spec-context.mjs#evidence-gap-loop | not yet present: scripts/get-spec-context.mjs#evidence-gap-loop |
 | shipped | 2026-W28-R6 | Per-bundle token meter at context-assembly (thermometer under budget-gate) | scripts/shard-story-bundle.mjs | present (code): scripts/shard-story-bundle.mjs |
 | shipped | 2026-W28-R7 | Persisted class-edges (prevInClass[]) in memory-consolidate (episodic->semantic) | scripts/memory-consolidate.mjs#classEdges | present (symbol): scripts/memory-consolidate.mjs#classEdges |

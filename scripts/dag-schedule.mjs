@@ -22,6 +22,77 @@
 //   const s = scheduleDAG(nodes);   // → { ok, order, levels, criticalPath, cpw }
 //   node scripts/dag-schedule.mjs --self-test
 
+// ── cohesionPartition: edges from REAL imports, not from a hand-written list (2026-W28-R4) ────
+// scheduleDAG below takes `dependsOn` as given. That list is a DECLARATION: somebody typed what
+// they believed the dependencies were. When the belief is wrong the scheduler is confidently
+// wrong too — it will happily run two tasks in parallel that import each other, and the parallel
+// build corrupts itself in a way that looks like a flaky test.
+//
+// The import graph is EVIDENCE and it is already on disk. Files that reach each other (in either
+// direction) form one cohesive unit: they must go to ONE agent, or be serialised. Files in
+// different components share nothing and are genuinely safe to run at the same time.
+//
+// Composes with parallel-guard: this answers "may these run together at all?", parallel-guard
+// answers "did the agent stay inside the boundary it was given?".
+const IMPORT_RE = /(?:^|\n)\s*(?:import[^'"]*|export[^'"]*)from\s*['"](\.[^'"]+)['"]/g;
+
+/** Relative imports of each file. Input: {path: sourceText}. Pure. */
+export function importEdges(files = {}) {
+  const names = new Set(Object.keys(files));
+  const resolve = (from, spec) => {
+    const base = from.includes('/') ? from.slice(0, from.lastIndexOf('/') + 1) : '';
+    const flat = (base + spec.replace(/^\.\//, '')).replace(/[^/]+\/\.\.\//g, '');
+    return names.has(flat) ? flat : null;
+  };
+  const out = {};
+  for (const [path, text] of Object.entries(files)) {
+    const deps = new Set();
+    for (const m of String(text ?? '').matchAll(IMPORT_RE)) {
+      const target = resolve(path, m[1]);
+      if (target && target !== path) deps.add(target);
+    }
+    out[path] = [...deps].sort();
+  }
+  return out;
+}
+
+/**
+ * Partition files into cohesive groups from their import edges. Pure.
+ * A group is a weakly-connected component: whether A imports B or B imports A, they move together.
+ * `parallelSafe` is true only when there is more than one group — one component means everything
+ * is entangled and running it in parallel is the lost-update this exists to prevent.
+ */
+export function cohesionPartition(files = {}) {
+  const edges = importEdges(files);
+  const nodes = Object.keys(edges).sort();
+  const adj = new Map(nodes.map((n) => [n, new Set()]));
+  for (const [from, deps] of Object.entries(edges)) {
+    for (const to of deps) { adj.get(from)?.add(to); adj.get(to)?.add(from); } // undirected: cohesion has no direction
+  }
+  const seen = new Set();
+  const groups = [];
+  for (const n of nodes) {
+    if (seen.has(n)) continue;
+    const stack = [n]; const group = [];
+    while (stack.length) {
+      const cur = stack.pop();
+      if (seen.has(cur)) continue;
+      seen.add(cur); group.push(cur);
+      for (const nb of adj.get(cur) || []) if (!seen.has(nb)) stack.push(nb);
+    }
+    groups.push(group.sort());
+  }
+  groups.sort((a, b) => b.length - a.length || a[0].localeCompare(b[0]));
+  return {
+    groups,
+    edges,
+    parallelSafe: groups.length > 1,
+    reason: groups.length > 1
+      ? `${groups.length} независимых групп(ы): их можно вести параллельно, внутри каждой — последовательно`
+      : 'всё связано в одну группу: параллелить нечего, иначе агенты перепишут друг друга',
+  };
+}
+
 /**
  * Schedule a task DAG.
  * @param {Array<{id:string, agent:string, dependsOn?:string[]}>} nodes
@@ -147,6 +218,34 @@ if (isMain && process.argv.includes('--self-test')) {
   // Empty is valid (no sub-tasks → empty schedule).
   const empty = scheduleDAG([]);
   ok('empty DAG is valid and empty', empty.ok && empty.order.length === 0);
+
+// ── cohesionPartition: edges from real imports (2026-W28-R4) ──────────────
+  const islands = { 'a.mjs': "import x from './b.mjs';", 'b.mjs': '', 'c.mjs': "import y from './d.mjs';", 'd.mjs': '' };
+  const ip = cohesionPartition(islands);
+  ok('two independent islands become two groups', ip.groups.length === 2);
+  ok('each island keeps its own members together',
+    JSON.stringify(ip.groups[0]) === JSON.stringify(['a.mjs', 'b.mjs']));
+  ok('separate groups mean parallel is safe', ip.parallelSafe === true);
+
+  const chained = { 'a.mjs': "import x from './b.mjs';", 'b.mjs': "import y from './c.mjs';", 'c.mjs': '' };
+  ok('a chain collapses into ONE group', cohesionPartition(chained).groups.length === 1);
+  ok('one group means parallel is NOT safe, and says why',
+    cohesionPartition(chained).parallelSafe === false && /перепишут друг друга/.test(cohesionPartition(chained).reason));
+  // cohesion has no direction: whether A imports B or B imports A, they move together
+  ok('the edge direction does not split a pair',
+    cohesionPartition({ 'a.mjs': '', 'b.mjs': "import x from './a.mjs';" }).groups.length === 1);
+
+  ok('an import of a file OUTSIDE the set is ignored, not invented as a node',
+    JSON.stringify(importEdges({ 'a.mjs': "import x from './nowhere.mjs';" })) === JSON.stringify({ 'a.mjs': [] }));
+  ok('a bare package import is not a cohesion edge',
+    JSON.stringify(importEdges({ 'a.mjs': "import fs from 'node:fs';" })) === JSON.stringify({ 'a.mjs': [] }));
+  ok('a file importing itself is not an edge',
+    JSON.stringify(importEdges({ 'a.mjs': "import x from './a.mjs';" })) === JSON.stringify({ 'a.mjs': [] }));
+  ok('export-from counts as a real edge too',
+    JSON.stringify(importEdges({ 'a.mjs': "export { z } from './b.mjs';", 'b.mjs': '' })['a.mjs']) === JSON.stringify(['b.mjs']));
+  ok('files with no imports at all are each their own group',
+    cohesionPartition({ 'a.mjs': '', 'b.mjs': '' }).groups.length === 2);
+  ok('an empty file set does not crash', cohesionPartition({}).groups.length === 0);
 
   if (fails) { console.log('\n\x1b[31mdag-schedule self-test FAILED\x1b[0m'); process.exit(1); }
   console.log('\n\x1b[32m✓ dag-schedule schedules DAGs by dependency + critical path\x1b[0m');
