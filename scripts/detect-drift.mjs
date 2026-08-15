@@ -6,10 +6,12 @@
  * Orchestration entry-point for spec-vs-code drift detection.
  * Two modes:
  *   --staged       Per-commit fast check (DR1, DR2, DR3). <2s. Fires on staged files only.
- *   --comprehensive Daily full scan (DR1-DR7). Always exits 0. Opens GitHub issue on drift.
+ *   --comprehensive Daily full scan (DR1-DR8). Always exits 0. Opens GitHub issue on drift.
  *   --dry-run      Print events to stdout; do not write to drift-events.jsonl.
  *
- * 7 drift rules (hard cap per §8 scope OUT / anti-pattern #6):
+ * 8 drift rules. The cap was 7 by design (§8 scope OUT / anti-pattern #6); DR8 raises it by one
+ * with a reason, because DR1-DR7 all ask the SAME direction and the opposite question caught a
+ * class the forward ones structurally cannot (see DR8's own comment below).
  *   DR1  Shipped wave spec references non-existent file paths        severity: block
  *   DR2  AGENT_ROSTER.md row missing Line: column for any agent      severity: warn
  *   DR3  .sdd-config.json missing required keys                      severity: block
@@ -17,6 +19,7 @@
  *   DR5  Shipped spec component inventory -> file exists             severity: warn
  *   DR6  Spec hierarchy missing parent reference (cascade result)    severity: warn
  *   DR7  Anti-pattern catalog slug in spec not in catalog file       severity: warn
+ *   DR8  Spec claims a mechanism BLOCKS, code cannot block            severity: block
  *
  * Recurrence escalation (T5): if recurrence-events.jsonl has count_24h >= 3 for
  * a slug matching a drift event, escalate severity one tier (info->warn, warn->block).
@@ -61,6 +64,43 @@ const AUDITS_DIR = path.join(ROOT, 'docs', 'audits');
  * Returns safe defaults if the key is absent or file is malformed.
  * @returns {{ enabled: boolean, hardBlockEnabled: boolean, dailyEnabled: boolean }}
  */
+
+// ── DR8 intent-vs-evidence: the reverse axis (2026-W28-R8) ───────────────────
+// DR1-DR7 all run the same direction: the spec names something, does it exist? Not one of them
+// asks the opposite question — the spec CLAIMS a behaviour, can the code actually perform it?
+//
+// The claim that matters most is "this blocks". A spec saying a gate REFUSES a bad commit, backed
+// by a script that only ever prints and exits 0, is a gate on paper. That exact shape is already
+// in this engine's ledger twice (gate-claims-block-but-passes, 2026-06-07 and 2026-06-10): the
+// hook printed "Commit refused" and the commit was created anyway, because nothing propagated a
+// non-zero exit. Every forward rule was green throughout — the file existed, the reference
+// resolved. Only the reverse question would have caught it.
+//
+// Static and deterministic: a claim is words in the spec, evidence is a non-zero exit or a throw
+// in the named file. No judgement, no runtime.
+const BLOCK_INTENT = /\b(blocks?|blocking|refus\w*|rejects?|halts?|prevents?|forbids?|exits? (?:1|2)\b)|блокир\w*|отказ\w*|запрещ\w*|не пропуст\w*/i;
+const BLOCK_EVIDENCE = /process\.exit\(\s*(?!0\s*\))[1-9]|throw new \w*Error|exit\s+[1-9]/;
+
+/**
+ * Does each claim of blocking have code that can actually block? Pure.
+ * @param {Array<{spec:string, mechanism:string, specText:string, codeText:string|null}>} claims
+ * @returns {Array<{spec:string, mechanism:string, reason:string}>} drift findings
+ */
+export function intentVsEvidence(claims = []) {
+  const out = [];
+  for (const c of claims) {
+    if (!BLOCK_INTENT.test(String(c.specText ?? ''))) continue;   // no claim → nothing to check
+    if (c.codeText == null) {
+      out.push({ spec: c.spec, mechanism: c.mechanism, reason: `спека заявляет блокировку, а файл ${c.mechanism} не читается` });
+      continue;
+    }
+    if (!BLOCK_EVIDENCE.test(String(c.codeText))) {
+      out.push({ spec: c.spec, mechanism: c.mechanism, reason: `спека заявляет блокировку, но ${c.mechanism} нигде не выходит с ненулевым кодом и не бросает исключение — гейт на бумаге` });
+    }
+  }
+  return out;
+}
+
 function readDriftConfig() {
   try {
     const raw = JSON.parse(fs.readFileSync(SDD_CONFIG_PATH, 'utf8'));
@@ -775,7 +815,44 @@ async function main() {
   process.exit(0);
 }
 
-main().catch(err => {
-  process.stderr.write(`[drift-daemon] FATAL: ${err}\n`);
-  process.exit(0); // non-fatal per A10
-});
+// Guarded so the module can be IMPORTED (for tests, and by other checks) without running the whole
+// daemon. Before this, importing it to test intentVsEvidence() printed usage and exited — the third
+// file today whose module body did real work on import.
+const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
+if (isMain) {
+  if (process.argv.includes('--self-test')) selfTest();
+  main().catch(err => {
+    process.stderr.write(`[drift-daemon] FATAL: ${err}\n`);
+    process.exit(0); // non-fatal per A10
+  });
+}
+
+// ── self-test ──────────────────────────────────────────────────────────
+function selfTest() {
+  let fails = 0;
+  const ok = (n, c) => { if (!c) fails++; console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };
+  const claim = (specText, codeText) => intentVsEvidence([{ spec: 's.md', mechanism: 'g.mjs', specText, codeText }]);
+
+  ok('a spec claiming a block, backed by a non-zero exit, is clean',
+    claim('this gate blocks the commit', 'process.exit(2);').length === 0);
+  // the exact 2026-06 incident: printed "Commit refused", exited 0, the commit was created anyway
+  ok('a spec claiming a block whose code only PRINTS is drift',
+    claim('this gate blocks the commit', 'console.log("Commit refused"); process.exit(0);').length === 1);
+  ok('the finding says what is wrong, not just that something is',
+    /гейт на бумаге/.test(claim('blocks the commit', 'console.log(1)')[0].reason));
+  ok('a throw counts as evidence of blocking',
+    claim('refuses the write', 'throw new Error("nope")').length === 0);
+  ok('a spec claiming NOTHING about blocking is not checked',
+    claim('this reports findings to a log', 'console.log(1)').length === 0);
+  ok('Russian claims are read too (the ledger is bilingual)',
+    claim('гейт блокирует пуш', 'console.log(1)').length === 1);
+  ok('an unreadable mechanism is drift, not silently fine',
+    intentVsEvidence([{ spec: 's.md', mechanism: 'gone.mjs', specText: 'blocks', codeText: null }]).length === 1);
+  ok('exit(0) alone is never mistaken for blocking',
+    claim('blocks', 'process.exit(0)').length === 1);
+  ok('no claims at all → no findings, no crash', intentVsEvidence([]).length === 0);
+
+  if (fails) { console.log(`\n\x1b[31mdetect-drift self-test FAILED (${fails})\x1b[0m`); process.exit(1); }
+  console.log('\n\x1b[32m✓ detect-drift: DR8 reverse axis — a claimed block needs code that can block\x1b[0m');
+  process.exit(0);
+}

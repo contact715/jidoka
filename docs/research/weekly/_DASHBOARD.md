@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 89% · shipped 85/95, open 10, regressed 0, ~1.07w to ship**
+**adoption 91% · shipped 86/95, open 9, regressed 0, ~1.12w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -24,7 +24,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | open | 2026-W28-R5 | Deterministic evidence-gap loop in memory retrieval (close last open-loop) | scripts/get-spec-context.mjs#evidence-gap-loop | not yet present: scripts/get-spec-context.mjs#evidence-gap-loop |
 | shipped | 2026-W28-R6 | Per-bundle token meter at context-assembly (thermometer under budget-gate) | scripts/shard-story-bundle.mjs | present (code): scripts/shard-story-bundle.mjs |
 | shipped | 2026-W28-R7 | Persisted class-edges (prevInClass[]) in memory-consolidate (episodic->semantic) | scripts/memory-consolidate.mjs#classEdges | present (symbol): scripts/memory-consolidate.mjs#classEdges |
-| open | 2026-W28-R8 | Static intent-vs-evidence contract-drift gate (reverse axis of spec-drift) | scripts/detect-drift.mjs#intent-vs-evidence | not yet present: scripts/detect-drift.mjs#intent-vs-evidence |
+| shipped | 2026-W28-R8 | Static intent-vs-evidence contract-drift gate (reverse axis of spec-drift) | scripts/detect-drift.mjs#intentVsEvidence | present (symbol): scripts/detect-drift.mjs#intentVsEvidence |
 | open | 2026-W28-R9 | Dated delta-archive of specs (EARS) + wire disconnected change-ceremony gates | scripts/spec-archive.mjs | not yet present: scripts/spec-archive.mjs |
 | rejected | 2026-W28-P1 | process-mine.mjs — data-grounded business-process discovery + conformance gap (PORT the process-mining IDEA, reject PM4Py dep) for business-process-architect/data-analyst/kaizen-officer | scripts/process-mine.mjs | deferred by owner 2026-07-06: target confirmed = dev-environment (jidoka/Claude Code), not client product. Process-mining is a product-building capability; revisit only when a real client+event-log exists. |
 | shipped | 2026-W29-R1 | AC-completeness gate on verdict.json (spec-kit /converge) | scripts/acceptance-verdict.mjs | present (code): scripts/acceptance-verdict.mjs |
