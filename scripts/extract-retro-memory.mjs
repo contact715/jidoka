@@ -58,6 +58,64 @@ const SECTION_RULES = [
   { re: /^out-of-scope\s+follow/i, category: 'followup' },
 ];
 
+
+// ── strategy-distill: failure → reusable STRATEGY (2026-W27-R3b, ReasoningBank Part B) ───────
+// A retro records WHAT went wrong. Read a year of them and you get a museum of individual
+// accidents: each one true, none of them transferable. ReasoningBank's point is that the useful
+// residue of a failure is not its description but the STRATEGY that would have prevented it —
+// and a strategy is reusable precisely because it is not about that one incident.
+//
+// Deterministic on purpose. An LLM classifier here would be a judge nobody measured, and this
+// engine already carries the scar of that. Patterns, thresholds, and an explicit unknown.
+//
+// The unknown is the load-bearing part. A classifier that always returns SOMETHING quietly
+// mislabels the failures it does not understand, and mislabelled memory is worse than absent
+// memory: it is retrieved confidently. So an unrecognised lesson returns category `unnamed` and
+// is REPORTED, not dropped and not guessed — it is exactly the pile a human should name next.
+export const STRATEGY_RULES = [
+  { category: 'prove-by-execution', re: /(claim|declar|said|report|заявил|объяв|сказал)[^.]{0,60}(without|no |не )[^.]{0,25}(proof|test|run|execut|доказ|прогон|провер)|declaration-over-implementation/i,
+    strategy: 'Перед словом «готово» выполнить проверку и показать её вывод в том же ходе.' },
+  { category: 'read-before-writing', re: /(assum|guess|inferr|предполож|догад|решил, что)[^.]{0,60}(instead of|rather than|вместо|не прочит)|(did ?n[o']t|never|не)\s*(read|open|look|прочит|открыл|посмотрел)/i,
+    strategy: 'Прочитать целевой файл или запустить замер до того, как утверждать, что в нём есть.' },
+  { category: 'name-the-boundary', re: /(silent|quietly|молч|тихо).{0,60}(truncat|skip|drop|narrow|пропус|обрез|сузил)|scope-narrowed|partial.{0,20}(pass|green)/i,
+    strategy: 'Назвать вслух, что НЕ проверено и почему; молчание читается как полное покрытие.' },
+  { category: 'gate-the-side-channel', re: /(bypass|side.?channel|alternate path|обход|мимо гейта|another path)/i,
+    strategy: 'Закрыть все пути к действию, а не парадный: сторож на одном входе это не сторож.' },
+  { category: 'verify-the-instrument', re: /(gate|check|audit|instrument|гейт|провер|прибор)[^.]{0,60}(pass|green|print|report|said|прошёл|зелён|напечатал)[^.]{0,60}(but|however|though|never|хотя|при этом|а на деле)|false.?(green|pass)/i,
+    strategy: 'Проверить сам прибор негативным прогоном: он обязан краснеть на заведомо плохом входе.' },
+  { category: 'confirm-the-target', re: /(wrong|another|different|не тот|другой|неверн).{0,40}(repo|file|branch|project|репозитор|файл|ветк|проект)|assumed canonical/i,
+    strategy: 'Назвать конкретный репозиторий, файл и ветку до работы, а не выводить их из контекста.' },
+];
+
+/**
+ * Distil one retro lesson into a reusable strategy. Pure.
+ * @returns {{category:string, strategy:string|null, matched:boolean}}
+ */
+export function distillStrategy(text = '') {
+  const t = String(text || '');
+  if (!t.trim()) return { category: 'unnamed', strategy: null, matched: false };
+  for (const rule of STRATEGY_RULES) {
+    if (rule.re.test(t)) return { category: rule.category, strategy: rule.strategy, matched: true };
+  }
+  return { category: 'unnamed', strategy: null, matched: false };
+}
+
+/** Distil a batch and keep the unrecognised ones VISIBLE rather than silently dropped. Pure. */
+export function distillBatch(lessons = []) {
+  const distilled = lessons.map((l) => ({ text: l, ...distillStrategy(l) }));
+  const named = distilled.filter((d) => d.matched);
+  const unnamed = distilled.filter((d) => !d.matched);
+  const byCategory = {};
+  for (const d of named) (byCategory[d.category] ??= []).push(d.text);
+  return {
+    distilled, byCategory, unnamed,
+    coveragePct: lessons.length ? Math.round((named.length / lessons.length) * 100) : null,
+    reason: unnamed.length
+      ? `${unnamed.length} урок(ов) не распознаны — их стратегию должен назвать человек, а не угадать классификатор`
+      : 'каждый урок сведён к стратегии',
+  };
+}
+
 // ─── Entry point ───────────────────────────────────────────────────────
 function main() {
   if (!fs.existsSync(RETROS_DIR)) {
@@ -257,4 +315,50 @@ function printVerbose({ file, entity, relations }) {
   for (const o of entity.observations) console.log(`    ${o}`);
 }
 
-main();
+// ── self-test ──────────────────────────────────────────────────────────
+// This file had none before 2026-08-15: it was 260 lines of parsing with nothing asserting that
+// the parsing was right, and importing it ran the extractor as a side effect.
+function selfTest() {
+  let fails = 0;
+  const ok = (n, c) => { if (!c) fails++; console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };
+
+  ok('a claim with no proof distils to prove-by-execution',
+    distillStrategy('claimed fixed without any test run').category === 'prove-by-execution');
+  ok('an instrument that lied distils to verify-the-instrument',
+    distillStrategy('the gate printed PASS but the step never ran').category === 'verify-the-instrument');
+  ok('a guess instead of a read distils to read-before-writing',
+    distillStrategy('never read the file, assumed the route existed').category === 'read-before-writing');
+  ok('a silent truncation distils to name-the-boundary',
+    distillStrategy('the scan silently skipped the subdirectory and reported green').category === 'name-the-boundary');
+  ok('a bypass distils to gate-the-side-channel',
+    distillStrategy('the agent used an alternate path and went around the gate').category === 'gate-the-side-channel');
+  ok('the wrong repository distils to confirm-the-target',
+    distillStrategy('searched the wrong repo and said the feature does not exist').category === 'confirm-the-target');
+  ok('a matched lesson carries an actionable strategy, not just a label',
+    (distillStrategy('claimed done without proof').strategy || '').length > 20);
+
+  // the load-bearing case: a classifier that always answers mislabels what it does not understand
+  ok('unrelated text is UNNAMED, never force-fitted',
+    distillStrategy('нечто совершенно постороннее').matched === false);
+  ok('empty input is unnamed, not a crash', distillStrategy('').category === 'unnamed');
+  ok('unnamed lessons are kept VISIBLE in a batch, not dropped', (() => {
+    const b = distillBatch(['claimed done without a test', 'нечто постороннее']);
+    return b.unnamed.length === 1 && b.distilled.length === 2;
+  })());
+  ok('batch coverage is a real percentage', distillBatch(['claimed done without a test', 'нечто постороннее']).coveragePct === 50);
+  ok('an empty batch reports null coverage, never 100%', distillBatch([]).coveragePct === null);
+  ok('the batch says out loud that unnamed ones need a human',
+    /должен назвать человек/.test(distillBatch(['нечто постороннее']).reason));
+
+  if (fails) { console.log(`\n\x1b[31mextract-retro-memory self-test FAILED (${fails})\x1b[0m`); process.exit(1); }
+  console.log('\n\x1b[32m✓ extract-retro-memory: failure → reusable strategy, unrecognised stays unnamed\x1b[0m');
+  process.exit(0);
+}
+
+// Guarded so the module can be IMPORTED without doing work. Before this, importing it to test
+// distillStrategy() ran the whole extractor and wrote a staging file as a side effect of a test.
+const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
+if (isMain) {
+  if (process.argv.includes('--self-test')) selfTest();
+  main();
+}

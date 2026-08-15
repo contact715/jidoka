@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 84% · shipped 81/96, open 15, regressed 0, ~1.01w to ship**
+**adoption 85% · shipped 82/96, open 14, regressed 0, ~1.07w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -10,7 +10,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W27-R1b | Calibrate 7 sleeping LLM judges to measured (precondition for strategy injection) | docs/evals/constitutional-reviewer/calibration.json | present (code): docs/evals/constitutional-reviewer/calibration.json |
 | shipped | 2026-W27-R2 | memory-vector.mjs — semantic memory layer via Reciprocal Rank Fusion | scripts/memory-vector.mjs | present (code): scripts/memory-vector.mjs |
 | shipped | 2026-W27-R3a | reasoning-bank Part A — persist contrastive artifacts before force-delete | scripts/reasoning-bank.mjs | present (code): scripts/reasoning-bank.mjs |
-| open | 2026-W27-R3b | reasoning-bank Part B — distill failure->strategy category in extract-retro-memory | scripts/extract-retro.mjs#strategy-distill | not yet present: scripts/extract-retro.mjs#strategy-distill |
+| shipped | 2026-W27-R3b | reasoning-bank Part B — distill failure->strategy category in extract-retro-memory | scripts/extract-retro-memory.mjs#distillStrategy | present (symbol): scripts/extract-retro-memory.mjs#distillStrategy |
 | shipped | 2026-W27-R4 | memory-guard.mjs — write-time dup gate (author!=judge, default-reject) | scripts/memory-guard.mjs | present (code): scripts/memory-guard.mjs |
 | shipped | 2026-W27-R5 | DAG task scheduler with critical path (dependsOn[] edges) | scripts/dag-schedule.mjs | present (code): scripts/dag-schedule.mjs |
 | shipped | 2026-W27-R6 | standards-mine.mjs — bottom-up code convention miner | scripts/standards-mine.mjs | present (code): scripts/standards-mine.mjs |
