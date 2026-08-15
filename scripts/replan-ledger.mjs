@@ -28,6 +28,7 @@
 //   node scripts/replan-ledger.mjs --decide <ledger.json> --pattern <p> --detail "<d>"   # prints action
 
 import { readFileSync } from 'node:fs';
+import { EventEmitter } from 'node:events';
 
 // ── two-registry ledger ────────────────────────────────────────────
 export function newLedger({ wave = '?', coreProperty = '', facts = [], guesses = [], plan = [] } = {}) {
@@ -81,13 +82,72 @@ export function noteProgress(ledger) {
 // ── the decision ───────────────────────────────────────────────────
 // diagnosis = stuck-detector.detect() output { stuck, pattern, detail }.
 // evidenceText (optional) = the current proof/output for the core-property AC, checked for scaffold.
+
+// ── checkpoint stream: observability + crash-resume (2026-W29-R6, langgraph shape) ───────────
+// The controller decides — continue, replan, halt — and those decisions used to exist only as a
+// return value the caller may or may not log. Two things were impossible as a result. First,
+// WATCHING a long run: nothing emitted, so a wave in progress was a black box until it ended.
+// Second, RESUMING one: the ledger lived in memory, so a crash lost every stall, streak and replan
+// the run had learned, and the retry started from a blank controller that would repeat the same
+// stalls before halting again.
+//
+// node:events is a builtin, so this stays zero-dep. Purity is preserved deliberately: `replan()`
+// emits ONLY when a stream is handed to it. With no stream it behaves exactly as before, which is
+// why every existing test keeps passing unchanged.
+export const CHECKPOINT_EVENTS = ['continue', 'replan', 'halt'];
+
+/** An observer for a run. Attach listeners before dispatching; never required. */
+export function createCheckpointStream() {
+  const em = new EventEmitter();
+  em.setMaxListeners(50);
+  return em;
+}
+
+/**
+ * Serialize a ledger to a resumable checkpoint. Pure.
+ * `version` is stamped so a checkpoint written by an older shape can be REFUSED rather than
+ * silently half-restored — a partial resume is worse than no resume, because it looks like state.
+ */
+export const CHECKPOINT_VERSION = 1;
+export function checkpoint(ledger = {}) {
+  return JSON.stringify({
+    version: CHECKPOINT_VERSION,
+    wave: ledger.wave ?? '?',
+    coreProperty: ledger.coreProperty ?? '',
+    facts: ledger.facts ?? [],
+    guesses: ledger.guesses ?? [],
+    plan: ledger.plan ?? [],
+    stalls: ledger.stalls ?? [],
+    stallStreak: ledger.stallStreak ?? {},
+    replans: ledger.replans ?? 0,
+  });
+}
+
+/**
+ * Restore a ledger from a checkpoint. Returns { ok, ledger, reason }.
+ * A wrong or missing version is REFUSED: resuming from a shape this code does not understand
+ * would produce a controller that looks initialised and has lost half its history.
+ */
+export function restore(text = '') {
+  let o;
+  try { o = JSON.parse(String(text)); } catch { return { ok: false, ledger: null, reason: 'контрольная точка не разбирается как JSON' }; }
+  if (!o || typeof o !== 'object') return { ok: false, ledger: null, reason: 'контрольная точка пуста' };
+  if (o.version !== CHECKPOINT_VERSION) {
+    return { ok: false, ledger: null, reason: `версия контрольной точки ${o.version ?? '(нет)'} не совпадает с текущей ${CHECKPOINT_VERSION}: частичное восстановление опаснее отсутствия` };
+  }
+  const { version, ...ledger } = o;
+  return { ok: true, ledger, reason: 'восстановлено полностью' };
+}
+
 export function replan(ledger, diagnosis = {}, evidenceText = '', opts = {}) {
   const lg = { ...ledger, stalls: [...(ledger.stalls || [])], plan: [...(ledger.plan || [])], replans: ledger.replans || 0 };
+  // emit only when the caller asked to observe; with no stream this function stays pure
+  const emit = (out) => { try { opts.stream?.emit(out.action, { ...out, at: opts.now ?? null }); } catch { /* an observer must never break the controller */ } return out; };
   const subs = coreSubstitutionSignals(lg.coreProperty, evidenceText);
   if (subs.length) {
-    return { action: 'halt', reason: `core-property substituted by scaffold: core property demands "${subs[0].demand}" but evidence shows "${subs[0].scaffold}" and never demonstrates the dynamic quality`, ledger: lg, substitutions: subs };
+    return emit({ action: 'halt', reason: `core-property substituted by scaffold: core property demands "${subs[0].demand}" but evidence shows "${subs[0].scaffold}" and never demonstrates the dynamic quality`, ledger: lg, substitutions: subs });
   }
-  if (!diagnosis.stuck) return { action: 'continue', reason: 'no stall', ledger: lg };
+  if (!diagnosis.stuck) return emit({ action: 'continue', reason: 'no stall', ledger: lg });
 
   const threshold = Number(opts.stallThreshold ?? 2);
   lg.stallStreak = { ...(lg.stallStreak || {}) };
@@ -96,7 +156,7 @@ export function replan(ledger, diagnosis = {}, evidenceText = '', opts = {}) {
   lg.stalls.push({ pattern: diagnosis.pattern, detail: diagnosis.detail, streak });
   if (streak >= threshold) {
     lg.stallStreak[diagnosis.pattern] = 0; // one loop is reported once, not on every later stall
-    return { action: 'halt', reason: `no-progress loop: stall pattern "${diagnosis.pattern}" hit ${streak}× with no progress in between (${diagnosis.detail})`, ledger: lg };
+    return emit({ action: 'halt', reason: `no-progress loop: stall pattern "${diagnosis.pattern}" hit ${streak}× with no progress in between (${diagnosis.detail})`, ledger: lg });
   }
   // recoverable: re-derive the plan — move the stalled step to the back, inject a step that
   // addresses the diagnosis so the next attempt is different, not a repeat.
@@ -105,7 +165,7 @@ export function replan(ledger, diagnosis = {}, evidenceText = '', opts = {}) {
   const fix = `address-stall(${diagnosis.pattern}): ${diagnosis.detail}`;
   lg.plan = [fix, ...rest, ...(stalledStep !== undefined ? [stalledStep] : [])];
   lg.replans += 1;
-  return { action: 'replan', reason: `stall "${diagnosis.pattern}" is new — re-planning once`, plan: lg.plan, ledger: lg };
+  return emit({ action: 'replan', reason: `stall "${diagnosis.pattern}" is new — re-planning once`, plan: lg.plan, ledger: lg });
 }
 
 // ── self-test (deterministic) ──────────────────────────────────────
@@ -175,6 +235,52 @@ function selfTest() {
     // after a halt the streak restarts, so one loop is reported once
     const afterHalt = replan(r2.ledger, d);
     ok('the stall right after a halt replans, not halts again', afterHalt.action === 'replan');
+
+  // ── checkpoint stream + crash-resume (2026-W29-R6) ────────────────────────
+  ok('with NO stream the controller behaves exactly as before (purity preserved)', (() => {
+    const lg = newLedger({ plan: ['s'] });
+    return replan(lg, { stuck: false }).action === 'continue';
+  })());
+  ok('a stream receives the decision it was attached for', (() => {
+    const stream = createCheckpointStream();
+    const seen = [];
+    for (const e of CHECKPOINT_EVENTS) stream.on(e, (p) => seen.push([e, p.reason]));
+    replan(newLedger({ plan: ['s'] }), { stuck: false }, '', { stream });
+    return seen.length === 1 && seen[0][0] === 'continue';
+  })());
+  ok('a halt is observable too', (() => {
+    const stream = createCheckpointStream();
+    let halted = null;
+    stream.on('halt', (p) => { halted = p; });
+    replan(newLedger({ coreProperty: 'must be non-deterministic', plan: ['s'] }), { stuck: false }, 'matched with a regex template', { stream });
+    return halted !== null && /core-property/.test(halted.reason);
+  })());
+  // an observer must never be able to break the thing it observes
+  ok('a listener that throws does not break the controller', (() => {
+    const stream = createCheckpointStream();
+    stream.on('continue', () => { throw new Error('boom'); });
+    return replan(newLedger({ plan: ['s'] }), { stuck: false }, '', { stream }).action === 'continue';
+  })());
+
+  ok('a checkpoint round-trips every field a run has learned', (() => {
+    const lg = replan(replan(newLedger({ wave: 'w1', plan: ['a', 'b'] }),
+      { stuck: true, pattern: 'p', detail: 'd' }).ledger, { stuck: true, pattern: 'q', detail: 'e' }).ledger;
+    const back = restore(checkpoint(lg));
+    return back.ok && JSON.stringify(back.ledger.stalls) === JSON.stringify(lg.stalls)
+      && JSON.stringify(back.ledger.stallStreak) === JSON.stringify(lg.stallStreak)
+      && back.ledger.replans === lg.replans && JSON.stringify(back.ledger.plan) === JSON.stringify(lg.plan);
+  })());
+  ok('a resumed controller keeps counting from where it crashed', (() => {
+    const first = replan(newLedger({ plan: ['a'] }), { stuck: true, pattern: 'p', detail: 'd' });
+    const resumed = restore(checkpoint(first.ledger)).ledger;
+    // the SAME pattern again must now hit the threshold, exactly as it would have without a crash
+    return replan(resumed, { stuck: true, pattern: 'p', detail: 'd' }).action === 'halt';
+  })());
+  // a partial resume looks like state and is worse than no resume
+  ok('a checkpoint from another version is REFUSED, not half-restored',
+    restore(JSON.stringify({ version: 999, plan: ['x'] })).ok === false);
+  ok('the refusal says which versions disagree', /999/.test(restore(JSON.stringify({ version: 999 })).reason));
+  ok('garbage is refused without throwing', restore('{not json').ok === false && restore('').ok === false);
 
     ok('a fresh ledger starts with an empty streak', Object.keys(newLedger({ wave: 'w', coreProperty: 'p' }).stallStreak).length === 0);
   }

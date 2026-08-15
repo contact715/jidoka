@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 80% · shipped 78/97, open 19, regressed 0, ~0.88w to ship**
+**adoption 81% · shipped 79/97, open 18, regressed 0, ~0.92w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -32,7 +32,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W29-R3 | Two-registry replan-controller -> live CORE_PROPERTY_GATE (delivers W28-R3) | scripts/replan-ledger.mjs | present (code): scripts/replan-ledger.mjs |
 | shipped | 2026-W29-R4 | UPDATE/MERGE third verdict in memory-guard (mem0) | scripts/memory-guard.mjs | present (code): scripts/memory-guard.mjs |
 | shipped | 2026-W29-R5 | Deterministic JTBD-frame check on business-question answers | scripts/clarify-gate.mjs | present (code): scripts/clarify-gate.mjs |
-| open | 2026-W29-R6 | Node-events checkpoint stream -> revive observability + crash-resume (langgraph) | scripts/replan-ledger.mjs#node-events-stream | not yet present: scripts/replan-ledger.mjs#node-events-stream |
+| shipped | 2026-W29-R6 | Node-events checkpoint stream -> revive observability + crash-resume (langgraph) | scripts/replan-ledger.mjs#createCheckpointStream | present (symbol): scripts/replan-ledger.mjs#createCheckpointStream |
 | open | 2026-W29-R7 | Query-seeded PPR reranker -> multi-hop retrieval (HippoRAG) | scripts/memory-ppr.mjs | not yet present: scripts/memory-ppr.mjs |
 | open | 2026-W29-R8 | Static distilled embeddings -> revive memory-vector RRF (model2vec) | scripts/static-embed.mjs | not yet present: scripts/static-embed.mjs |
 | open | 2026-W29-R9 | Conditional router-edge for DAG (crewAI Flows) - BANK do not build now | scripts/dag-schedule.mjs#conditional-router-edge | not yet present: scripts/dag-schedule.mjs#conditional-router-edge |
