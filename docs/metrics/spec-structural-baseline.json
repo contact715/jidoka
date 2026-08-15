@@ -2,5 +2,7 @@
   "brokenRefs": 158,
   "orphans": 9,
   "missingMeta": 9,
+  "missingCoreProperty": 72,
+  "staleGuesses": 0,
   "_note": "Spec-tree structural ceiling. Lower is better; the gate blocks any increase. Auto-tightens when a metric drops."
 }

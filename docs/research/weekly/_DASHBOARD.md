@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 75% · shipped 73/97, open 24, regressed 0, ~0.84w to ship**
+**adoption 76% · shipped 74/97, open 23, regressed 0, ~0.82w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -90,7 +90,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W33-R3 | Оживить путь вердикта волны (10 волн закрылись без единого verdict.json) | scripts/run-state.mjs#auditClosedWaves | present (symbol): scripts/run-state.mjs#auditClosedWaves |
 | open | 2026-W33-R4 | Ось исхода в ранжировании уроков (Memory Worth) — верхний ярус структурно пуст | scripts/memory-consolidate.mjs#outcome-axis-in-score | not yet present: scripts/memory-consolidate.mjs#outcome-axis-in-score |
 | shipped | 2026-W33-R5 | Сторож записи по принципу default-deny, включая матчер mcp__.* | scripts/policy-enforce-hook.mjs#isWriteTool | present (symbol): scripts/policy-enforce-hook.mjs#isWriteTool |
-| open | 2026-W33-R6 | Несущее свойство как ПОЛЕ спеки и маркер догадки | scripts/spec-structural-gate.mjs#core-property-field | not yet present: scripts/spec-structural-gate.mjs#core-property-field |
+| shipped | 2026-W33-R6 | Несущее свойство как ПОЛЕ спеки и маркер догадки | scripts/spec-structural-gate.mjs#specFieldVerdict | present (symbol): scripts/spec-structural-gate.mjs#specFieldVerdict |
 | shipped | 2026-W33-R7 | Протухший in_progress размораживает очередь, а не запирает её | scripts/task-queue.mjs#STALE_LOCK_MS | present (symbol): scripts/task-queue.mjs#STALE_LOCK_MS |
 | open | 2026-W33-R8 | Проба конфликта решений при слиянии уроков (DeMem) | scripts/memory-consolidate.mjs#decision-conflict-probe | not yet present: scripts/memory-consolidate.mjs#decision-conflict-probe |
 | shipped | 2026-W33-R9 | Витрина перегенерируется из реестра, а не живёт своей жизнью | scripts/kaizen-audit.mjs#dashboardStale | present (symbol): scripts/kaizen-audit.mjs#dashboardStale |

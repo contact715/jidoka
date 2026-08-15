@@ -8,10 +8,13 @@
 // as a ceiling — new breakage blocks, old debt stays soft, and when you fix some,
 // the ceiling tightens so it can never regress back.
 //
-// Three metrics, all from existing tools (no re-implementation):
-//   brokenRefs   — spec-drift-check.mjs missing references
-//   orphans      — build-lineage-graph.mjs specs with no parent/child edge
-//   missingMeta  — build-lineage-graph.mjs specs missing level/version
+// Five metrics. The first three come from existing tools (no re-implementation); the last two are
+// read straight off the spec files (2026-W33-R6):
+//   brokenRefs          — spec-drift-check.mjs missing references
+//   orphans             — build-lineage-graph.mjs specs with no parent/child edge
+//   missingMeta         — build-lineage-graph.mjs specs missing level/version
+//   missingCoreProperty — the spec never names the ONE quality it exists for
+//   staleGuesses        — a spec calls itself settled while a [NEEDS CLARIFICATION] is unanswered
 //
 // Baseline: docs/metrics/spec-structural-baseline.json (committed).
 //   - any metric ABOVE baseline → BLOCK (exit 1): new breakage introduced
@@ -24,14 +27,57 @@
 //   node scripts/spec-structural-gate.mjs --self-test
 //   node scripts/spec-structural-gate.mjs --json
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE = join(ROOT, 'docs/metrics/spec-structural-baseline.json');
-const METRICS = ['brokenRefs', 'orphans', 'missingMeta'];
+const METRICS = ['brokenRefs', 'orphans', 'missingMeta', 'missingCoreProperty', 'staleGuesses'];
+
+// ── core-property-field + guess marker (2026-W33-R6, discipline from github/spec-kit) ────────
+// A spec says WHAT to build. It rarely says which single quality the thing exists FOR — the
+// adjective the owner actually asked for ("недетерминированная", "в реальном времени", "любыми
+// словами"). Without that field named, scaffolding passes review: the frame is there, the load-
+// bearing property was quietly swapped for a template, and everyone signs off. That is the
+// `core-property-substituted-by-scaffold` class the owner named on 2026-07-04.
+//
+// Second half: a spec author who GUESSED must leave `[NEEDS CLARIFICATION: …]` at the guess. The
+// marker is a good thing while the spec is a draft, so it is NOT counted as debt on its own. It
+// becomes debt only when the spec claims to be settled (status: approved|final|shipped) and the
+// guess is still sitting there unanswered — a question nobody ever went back to ask.
+const FINAL_STATUS = /^\s*status:\s*["']?(approved|final|shipped|accepted)["']?\s*$/im;
+const CORE_PROPERTY = /^\s*core[-_]?[Pp]roperty:\s*(\S.*?)\s*$/m;
+export const CLARIFY_MARKER = /\[NEEDS CLARIFICATION(?::[^\]]*)?\]/g;
+
+/** The core property a spec declares, or null. Pure. */
+export function extractCoreProperty(text = '') {
+  const m = CORE_PROPERTY.exec(String(text));
+  const v = m ? m[1].trim().replace(/^["']|["']$/g, '') : null;
+  return v && v !== 'TODO' && v !== '?' ? v : null;
+}
+
+/** Guess markers still standing in the text. Pure. */
+export function clarificationMarkers(text = '') {
+  return String(text).match(CLARIFY_MARKER) ?? [];
+}
+
+/**
+ * Structural verdict for ONE spec. Pure.
+ *   missingCoreProperty — the spec never names the quality it exists for
+ *   staleGuess          — the spec calls itself settled while a guess marker is still unanswered
+ */
+export function specFieldVerdict(text = '') {
+  const settled = FINAL_STATUS.test(String(text));
+  const guesses = clarificationMarkers(text);
+  return {
+    coreProperty: extractCoreProperty(text),
+    missingCoreProperty: extractCoreProperty(text) === null,
+    guesses: guesses.length,
+    staleGuess: settled && guesses.length > 0,
+  };
+}
 
 // ── pure: compare current vs baseline → verdict ──────────────────────────────
 // Returns { regressions:[{metric,baseline,current}], improvements:[...], verdict }
@@ -77,7 +123,30 @@ function measure() {
   if (brokenRefs === null || orphans === null || missingMeta === null) {
     throw new Error(`could not parse metrics (brokenRefs=${brokenRefs}, orphans=${orphans}, missingMeta=${missingMeta})`);
   }
-  return { brokenRefs, orphans, missingMeta };
+  const { missingCoreProperty, staleGuesses } = measureSpecFields();
+  return { brokenRefs, orphans, missingMeta, missingCoreProperty, staleGuesses };
+}
+
+// Walk the spec tree and count the two new field metrics. Read-only, like the rest of the gate.
+function measureSpecFields() {
+  const specsDir = join(ROOT, 'docs', 'specs');
+  let missingCoreProperty = 0, staleGuesses = 0;
+  const walk = (dir, depth = 0) => {
+    if (depth > 6 || !existsSync(dir)) return;
+    for (const f of readdirSync(dir)) {
+      const abs = join(dir, f);
+      let st; try { st = statSync(abs); } catch { continue; }
+      if (st.isDirectory()) { walk(abs, depth + 1); continue; }
+      // only real specs: the templates, indexes and registries are not specs and must not be counted
+      if (!f.endsWith('.md') || f.startsWith('_')) continue;
+      let text; try { text = readFileSync(abs, 'utf8'); } catch { continue; }
+      const v = specFieldVerdict(text);
+      if (v.missingCoreProperty) missingCoreProperty++;
+      if (v.staleGuess) staleGuesses++;
+    }
+  };
+  walk(specsDir);
+  return { missingCoreProperty, staleGuesses };
 }
 
 function readBaseline() {
@@ -89,14 +158,14 @@ function writeBaseline(metrics, note) {
 
 function selfTest() {
   const T = [
-    ['no regression when equal', ratchet({ brokenRefs: 5, orphans: 5, missingMeta: 5 }, { brokenRefs: 5, orphans: 5, missingMeta: 5 }).verdict === 'PASS'],
-    ['BLOCK when a metric rises', ratchet({ brokenRefs: 5, orphans: 5, missingMeta: 5 }, { brokenRefs: 6, orphans: 5, missingMeta: 5 }).verdict === 'BLOCK'],
-    ['TIGHTEN when a metric falls', ratchet({ brokenRefs: 5, orphans: 5, missingMeta: 5 }, { brokenRefs: 4, orphans: 5, missingMeta: 5 }).verdict === 'TIGHTEN'],
+    ['no regression when equal', ratchet({ brokenRefs: 5, orphans: 5, missingMeta: 5, missingCoreProperty: 5, staleGuesses: 5 }, { brokenRefs: 5, orphans: 5, missingMeta: 5, missingCoreProperty: 5, staleGuesses: 5 }).verdict === 'PASS'],
+    ['BLOCK when a metric rises', ratchet({ brokenRefs: 5, orphans: 5, missingMeta: 5, missingCoreProperty: 5, staleGuesses: 5 }, { brokenRefs: 6, orphans: 5, missingMeta: 5 }).verdict === 'BLOCK'],
+    ['TIGHTEN when a metric falls', ratchet({ brokenRefs: 5, orphans: 5, missingMeta: 5, missingCoreProperty: 5, staleGuesses: 5 }, { brokenRefs: 4, orphans: 5, missingMeta: 5 }).verdict === 'TIGHTEN'],
     ['regression names the metric', ratchet({ orphans: 1 }, { orphans: 2, brokenRefs: 0, missingMeta: 0 }).regressions[0].metric === 'orphans'],
     ['no baseline → first run never blocks', ratchet(null, { brokenRefs: 99, orphans: 99, missingMeta: 99 }).verdict !== 'BLOCK'],
     ['parseDrift reads the count', parseDrift('spec-drift-check: scanned 147 spec(s) — 143 drift finding(s) [mode: soft/warn]') === 143],
     ['parseLineage reads orphans + missing-meta', (() => { const r = parseLineage('[lineage-graph] orphans: 50, missing-meta: 53'); return r.orphans === 50 && r.missingMeta === 53; })()],
-    ['mixed rise+fall still BLOCKs (a regression dominates)', ratchet({ brokenRefs: 5, orphans: 5, missingMeta: 5 }, { brokenRefs: 4, orphans: 6, missingMeta: 5 }).verdict === 'BLOCK'],
+    ['mixed rise+fall still BLOCKs (a regression dominates)', ratchet({ brokenRefs: 5, orphans: 5, missingMeta: 5, missingCoreProperty: 5, staleGuesses: 5 }, { brokenRefs: 4, orphans: 6, missingMeta: 5 }).verdict === 'BLOCK'],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
