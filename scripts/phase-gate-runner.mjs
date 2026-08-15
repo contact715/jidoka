@@ -57,19 +57,58 @@ export function classifyGates(gates = []) {
   return { run, needsInput, dormant, unknown };
 }
 
+// ── step-outcome-taxonomy (2026-W33-R2) ─────────────────────────────────────
+// Six realities used to be squeezed into two bits (`ran`, `pass`), and the squeeze hid the worst
+// one: a gate whose script is absent returned {ran:false, pass:false}, while the failure filter
+// asked for `r.ran && r.pass === false`. The missing gate fell out of the list and the phase went
+// green. A gate that is not on disk protects nothing; reporting that as "not a failure" is the
+// same shape as the incident of 2026-08-04, where a step killed on time printed PASS.
+//
+//   passed   — ran, exit 0
+//   failed   — ran, non-zero exit: the thing it guards is broken
+//   missing  — the gate script is not on disk: it guards nothing, and that FAILS the phase
+//   timeout  — killed on the clock: NOT proof of anything, neither green nor red
+//   skipped  — legitimately not applicable (file-scoped gate, nothing changed)
+//   dry-run  — execution was not requested
+// `ok` needs zero failed, zero missing, zero timeout and zero unknown. Only skipped and dry-run
+// are free, because only they mean "there was nothing here to check".
+export const STEP_OUTCOMES = ['passed', 'failed', 'missing', 'timeout', 'skipped', 'dry-run'];
+const BLOCKING = new Set(['failed', 'missing', 'timeout']);
+/** Outcomes that did not produce evidence — "не проверено", reported apart from real failures. */
+const NOT_RUN = new Set(['missing', 'timeout']);
+
+// how long a single gate may run before it is killed and reported as `timeout` rather than hanging
+// the whole phase forever (the quick win named in the W33 report alongside this taxonomy)
+export const GATE_TIMEOUT_MS = Number(process.env.PHASE_GATE_TIMEOUT_MS || 120_000);
+
+/** Derive the typed outcome from a raw result. Kept pure so both new and legacy shapes map. */
+export function outcomeOf(r = {}) {
+  if (r.outcome) return r.outcome;
+  if (r.timedOut) return 'timeout';
+  if (r.detail === 'dry-run') return 'dry-run';
+  if (r.ran === false && r.pass === false) return 'missing';
+  if (r.ran === false) return 'skipped';
+  return r.pass === true ? 'passed' : 'failed';
+}
+
 function runGate(g, { changed, root }) {
   const script = join(HERE, `${g.gate}.mjs`);
-  if (!existsSync(script)) return { gate: g.gate, mode: g.mode, ran: false, pass: false, detail: 'script not on disk' };
+  const base = { gate: g.gate, mode: g.mode };
+  if (!existsSync(script)) return { ...base, outcome: 'missing', ran: false, pass: false, detail: 'script not on disk' };
+  const exec = (cmd) => execSync(cmd, { cwd: root, stdio: 'pipe', timeout: GATE_TIMEOUT_MS });
   try {
     if (g.mode === 'file') {
-      if (!changed.length) return { gate: g.gate, mode: g.mode, ran: false, pass: null, detail: `file-scoped (${g.flag}) — no --changed given` };
-      for (const f of changed) execSync(`node ${JSON.stringify(script)} ${g.flag} ${JSON.stringify(f)}`, { cwd: root, stdio: 'pipe' });
-      return { gate: g.gate, mode: g.mode, ran: true, pass: true, detail: `${g.flag} scanned ${changed.length} file(s) clean` };
+      if (!changed.length) return { ...base, outcome: 'skipped', ran: false, pass: null, detail: `file-scoped (${g.flag}) — no --changed given` };
+      for (const f of changed) exec(`node ${JSON.stringify(script)} ${g.flag} ${JSON.stringify(f)}`);
+      return { ...base, outcome: 'passed', ran: true, pass: true, detail: `${g.flag} scanned ${changed.length} file(s) clean` };
     }
-    execSync(`node ${JSON.stringify(script)}`, { cwd: root, stdio: 'pipe' });
-    return { gate: g.gate, mode: g.mode, ran: true, pass: true, detail: 'ok' };
+    exec(`node ${JSON.stringify(script)}`);
+    return { ...base, outcome: 'passed', ran: true, pass: true, detail: 'ok' };
   } catch (e) {
-    return { gate: g.gate, mode: g.mode, ran: true, pass: false, detail: String(e.stdout || e.stderr || e.message || '').replace(/\s+/g, ' ').slice(0, 200) };
+    // A kill on the clock is not a verdict about the code. execSync surfaces it as SIGTERM/ETIMEDOUT.
+    const timedOut = e.signal === 'SIGTERM' || e.code === 'ETIMEDOUT' || e.killed === true;
+    if (timedOut) return { ...base, outcome: 'timeout', ran: false, pass: null, timedOut: true, detail: `снят по времени после ${GATE_TIMEOUT_MS}мс — НЕ ПРОВЕРЕНО` };
+    return { ...base, outcome: 'failed', ran: true, pass: false, detail: String(e.stdout || e.stderr || e.message || '').replace(/\s+/g, ' ').slice(0, 200) };
   }
 }
 
@@ -82,14 +121,36 @@ export function runPhaseGates(phase, plan, opts = {}) {
   const p = (plan.phases || []).find((x) => x.phase === phase);
   if (!p) return { phase, ok: false, error: `phase "${phase}" not in plan`, results: [], needsInput: [], dormant: [], unknown: [] };
   const { run, needsInput, dormant, unknown } = classifyGates(p.gates || []);
-  const results = opts.dryRun ? run.map((g) => ({ gate: g.gate, mode: g.mode, ran: false, pass: null, detail: 'dry-run' })) : run.map((g) => runGate(g, { changed, root }));
-  const failed = results.filter((r) => r.ran && r.pass === false);
+  // runOne is injectable so the taxonomy can be tested without putting fake scripts on disk
+  const runner = opts.runOne || ((g) => runGate(g, { changed, root }));
+  const raw = opts.dryRun
+    ? run.map((g) => ({ gate: g.gate, mode: g.mode, outcome: 'dry-run', ran: false, pass: null, detail: 'dry-run' }))
+    : run.map((g) => runner(g, { changed, root }));
+  const results = raw.map((r) => ({ ...r, outcome: outcomeOf(r) }));
+
+  const failed = results.filter((r) => r.outcome === 'failed');
+  const notRun = results.filter((r) => NOT_RUN.has(r.outcome));
+  const blocking = results.filter((r) => BLOCKING.has(r.outcome));
+  const count = (o) => results.filter((r) => r.outcome === o).length;
+
   return {
     phase,
-    ok: failed.length === 0 && unknown.length === 0,
+    ok: blocking.length === 0 && unknown.length === 0,
     results, needsInput, dormant, unknown,
+    // `failed` keeps its old meaning (a gate ran and said no) so existing callers do not shift
+    // meaning under them; `notRun` is the new, separately-named bucket that used to vanish.
     failed: failed.map((r) => r.gate),
-    summary: `${results.filter((r) => r.pass === true).length} green · ${failed.length} failed · ${results.filter((r) => r.pass === null).length} skipped · ${needsInput.length} needs-input · ${dormant.length} dormant · ${unknown.length} unknown`,
+    notRun: notRun.map((r) => r.gate),
+    summary: [
+      `${count('passed')} green`,
+      `${failed.length} failed`,
+      // named in capitals because the incident was a truthful line losing to a cheerful one below it
+      `НЕ ЗАПУСКАЛОСЬ: ${notRun.length}${notRun.length ? ` (${notRun.map((r) => `${r.gate}/${r.outcome}`).join(', ')})` : ''}`,
+      `${count('skipped') + count('dry-run')} skipped`,
+      `${needsInput.length} needs-input`,
+      `${dormant.length} dormant`,
+      `${unknown.length} unknown`,
+    ].join(' · '),
   };
 }
 
@@ -118,6 +179,43 @@ function selfTest() {
   ok('phase not in plan → error + not ok', runPhaseGates('nope', plan).error?.includes('not in plan'));
   ok('dry-run executes nothing real', runPhaseGates('build', plan, { dryRun: true, changed: ['x.ts'] }).results.every((r) => r.detail === 'dry-run'));
 
+  // ── step-outcome-taxonomy (2026-W33-R2) ──────────────────────────────────
+  // A step used to have two bits, `ran` and `pass`, and three different realities were squeezed
+  // into them. The worst squeeze: a gate whose script is NOT ON DISK returned {ran:false,
+  // pass:false} and the failure filter read `r.ran && r.pass === false`, so the missing gate was
+  // dropped from `failed` and the phase came out GREEN. A gate that does not exist protects
+  // nothing, and the runner said everything was fine. The same collapse is why a step killed on
+  // time could read as a plain failure, and why "не проверено" had nowhere to live.
+  ok('a gate script that is NOT on disk is outcome "missing"', outcomeOf({ ran: false, pass: false, detail: 'script not on disk' }) === 'missing');
+  ok('a missing gate BLOCKS the phase, and is named as not-run rather than as a failure', (() => {
+    const r = runPhaseGates('gate', { phases: [{ phase: 'gate', gates: ['dead-code'] }] }, {
+      root: process.cwd(), runOne: () => ({ gate: 'dead-code', mode: 'project', outcome: 'missing', detail: 'script not on disk' }),
+    });
+    // blocking, but NOT in `failed`: nothing ran, so nothing said no. Calling it a failure would be
+    // as wrong as calling it a pass — that separation is the whole point of the taxonomy.
+    return r.ok === false && r.notRun.includes('dead-code') && !r.failed.includes('dead-code');
+  })());
+  ok('a step killed on time is "timeout", not a pass and not a plain failure',
+    outcomeOf({ ran: false, pass: false, timedOut: true }) === 'timeout');
+  ok('a timeout FAILS the phase and is named separately from failures', (() => {
+    const r = runPhaseGates('gate', { phases: [{ phase: 'gate', gates: ['dead-code'] }] }, {
+      runOne: () => ({ gate: 'dead-code', mode: 'project', outcome: 'timeout', detail: 'killed after 120000ms' }),
+    });
+    return r.ok === false && r.notRun.includes('dead-code') && !r.failed.includes('dead-code');
+  })());
+  ok('a legitimately skipped file-gate still does NOT fail the phase', (() => {
+    const r = runPhaseGates('build', plan, {});
+    return r.ok === true && r.results.every((x) => x.outcome === 'skipped');
+  })());
+  ok('a real pass is outcome "passed"', outcomeOf({ ran: true, pass: true }) === 'passed');
+  ok('a real failure is outcome "failed"', outcomeOf({ ran: true, pass: false }) === 'failed');
+  ok('the summary names not-run steps out loud, never folded into green', (() => {
+    const r = runPhaseGates('gate', { phases: [{ phase: 'gate', gates: ['dead-code'] }] }, {
+      runOne: () => ({ gate: 'dead-code', mode: 'project', outcome: 'missing', detail: 'x' }),
+    });
+    return /НЕ ЗАПУСКАЛОСЬ: 1/.test(r.summary);
+  })());
+
   if (fails.length) { console.log(`\n\x1b[31mphase-gate-runner self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ phase-gate-runner: per-phase gate execution + honest classification correct\x1b[0m');
   process.exit(0);
@@ -133,7 +231,10 @@ if (isMain) {
   const changed = (arg('--changed') || '').split(',').map((s) => s.trim()).filter(Boolean);
   const r = runPhaseGates(phase, plan, { changed });
   console.log(`phase-gate-runner — phase "${phase}"\n`);
-  for (const x of r.results) console.log(`  ${x.pass === true ? '\x1b[32m✓\x1b[0m' : x.pass === false ? '\x1b[31m✗\x1b[0m' : '\x1b[33m○\x1b[0m'} ${x.gate} (${x.mode}) — ${x.detail}`);
+  // the mark is driven by the OUTCOME, not by a two-state guess: a step that never ran must not
+  // wear the same symbol as one that ran and passed, nor the same as one that ran and failed
+  const MARK = { passed: '\x1b[32m✓\x1b[0m', failed: '\x1b[31m✗\x1b[0m', missing: '\x1b[31m⌀ НЕ ЗАПУСКАЛСЯ\x1b[0m', timeout: '\x1b[31m⏱ НЕ ПРОВЕРЕНО\x1b[0m', skipped: '\x1b[33m○\x1b[0m', 'dry-run': '\x1b[33m○\x1b[0m' };
+  for (const x of r.results) console.log(`  ${MARK[x.outcome] || '\x1b[33m○\x1b[0m'} ${x.gate} (${x.mode}) — ${x.detail}`);
   for (const n of r.needsInput) console.log(`  \x1b[33m◇\x1b[0m ${n.gate} (needs-input) — executor must pass: ${n.need}`);
   if (r.dormant.length) console.log(`  \x1b[33m○ dormant (need infra/data): ${r.dormant.join(', ')}\x1b[0m`);
   if (r.unknown.length) console.log(`  \x1b[31m✗ unknown (no invocation rule — close this gap): ${r.unknown.join(', ')}\x1b[0m`);

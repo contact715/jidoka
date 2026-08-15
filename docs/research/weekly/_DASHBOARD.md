@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 66% · shipped 64/97, open 33, regressed 0, ~0.61w to ship**
+**adoption 69% · shipped 67/97, open 30, regressed 0, ~0.63w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -44,7 +44,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | open | 2026-W30-R4 | Retroactive neighbour update in memory-consolidate (deterministic class-graph buildLinks+evolve) | scripts/memory-consolidate.mjs#buildLinks-evolve | not yet present: scripts/memory-consolidate.mjs#buildLinks-evolve |
 | open | 2026-W30-R5 | Pareto archive over deterministic golden-case match vectors (second self-improvement engine) | scripts/prompt-evolution.mjs#pareto-archive | not yet present: scripts/prompt-evolution.mjs#pareto-archive |
 | open | 2026-W30-Q1 | Refresh two stale honest-state docs (agent count 28/31/53 -> real ~48) | docs/HONEST_SYSTEM_STATE.md#48-agents | not yet present: docs/HONEST_SYSTEM_STATE.md#48-agents |
-| open | 2026-W30-Q2 | Make ~/.claude/jidoka install carry docs/research + honest-state docs | scripts/install-into.mjs#docs-research-in-profile | not yet present: scripts/install-into.mjs#docs-research-in-profile |
+| shipped | 2026-W30-Q2 | Make ~/.claude/jidoka install carry docs/research + honest-state docs | scripts/install-into.mjs#GLOBAL_SYNC_DIRS | present (symbol): scripts/install-into.mjs#GLOBAL_SYNC_DIRS |
 | shipped | 2026-W30-Q3 | Bind kaizen-audit checkPaths to real evidence markers (auditor emitted false statuses on W29) | scripts/kaizen-audit.mjs#anchorEvidence | present (symbol): scripts/kaizen-audit.mjs#anchorEvidence |
 | shipped | 2026-W30-Q4 | Executable proof that shipped replan-controller halts mid-run on core-property substitution | docs/evals/_cases.jsonl#replan/core-property-halt-mid-run | present (code): docs/evals/_cases.jsonl#replan/core-property-halt-mid-run |
 | shipped | 2026-W31-R1 | Single versioned learning ledger: meta-mistakes + session-patterns written into the repo, pre-commit gate on copy divergence | scripts/meta-lib.mjs#loadLedgerUnion | present (symbol): scripts/meta-lib.mjs#loadLedgerUnion |
@@ -86,7 +86,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W32-K2 | КИЛЛЕР-ФИЧА C: мост одобрено-в-работу, kaizen-ledger -> approval-queue -> task-queue (приёмка W30 и W31 равна 0% и 6%) | scripts/kaizen-dispatch.mjs#planDispatch | present (symbol): scripts/kaizen-dispatch.mjs#planDispatch |
 | shipped | 2026-W32-R15 | Разбор сбоя агента на четыре вида вместо одного: временный повторяем, лимит ждём по разрешению, смертельный обрываем (порт идеи ralphex) | scripts/agent-error-policy.mjs#classifyAgentError | present (symbol): scripts/agent-error-policy.mjs#classifyAgentError |
 | shipped | 2026-W33-R1 | Доказательство внедрения по СИМВОЛУ, а не по комментарию (31 из 35 якорей сидят в комментарии) | scripts/kaizen-audit.mjs#anchorEvidence | present (symbol): scripts/kaizen-audit.mjs#anchorEvidence |
-| open | 2026-W33-R2 | Типизированный исход шага: «не запускался» отдельно от «упал» | scripts/phase-gate-runner.mjs#step-outcome-taxonomy | not yet present: scripts/phase-gate-runner.mjs#step-outcome-taxonomy |
+| shipped | 2026-W33-R2 | Типизированный исход шага: «не запускался» отдельно от «упал» | scripts/phase-gate-runner.mjs#outcomeOf | present (symbol): scripts/phase-gate-runner.mjs#outcomeOf |
 | open | 2026-W33-R3 | Оживить путь вердикта волны (10 волн закрылись без единого verdict.json) | scripts/acceptance-verdict.mjs#wave-cannot-close-without-verdict | not yet present: scripts/acceptance-verdict.mjs#wave-cannot-close-without-verdict |
 | open | 2026-W33-R4 | Ось исхода в ранжировании уроков (Memory Worth) — верхний ярус структурно пуст | scripts/memory-consolidate.mjs#outcome-axis-in-score | not yet present: scripts/memory-consolidate.mjs#outcome-axis-in-score |
 | shipped | 2026-W33-R5 | Сторож записи по принципу default-deny, включая матчер mcp__.* | scripts/policy-enforce-hook.mjs#isWriteTool | present (symbol): scripts/policy-enforce-hook.mjs#isWriteTool |
@@ -94,7 +94,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W33-R7 | Протухший in_progress размораживает очередь, а не запирает её | scripts/task-queue.mjs#STALE_LOCK_MS | present (symbol): scripts/task-queue.mjs#STALE_LOCK_MS |
 | open | 2026-W33-R8 | Проба конфликта решений при слиянии уроков (DeMem) | scripts/memory-consolidate.mjs#decision-conflict-probe | not yet present: scripts/memory-consolidate.mjs#decision-conflict-probe |
 | shipped | 2026-W33-R9 | Витрина перегенерируется из реестра, а не живёт своей жизнью | scripts/kaizen-audit.mjs#dashboardStale | present (symbol): scripts/kaizen-audit.mjs#dashboardStale |
-| open | 2026-W33-R10 | Гейт паритета канона и установленной копии | scripts/install-into.mjs#canon-install-parity-gate | not yet present: scripts/install-into.mjs#canon-install-parity-gate |
+| shipped | 2026-W33-R10 | Гейт паритета канона и установленной копии | scripts/install-into.mjs#parityReport | present (symbol): scripts/install-into.mjs#parityReport |
 | open | 2026-W33-R11 | Честный корпус бенчмарка на чужом коде с прогоном в CI (условие: после R1 и R2) | docs/benchmarks/_tasks.jsonl#external-corpus-not-selftests | not yet present: docs/benchmarks/_tasks.jsonl#external-corpus-not-selftests |
 | open | 2026-W33-R12 | Отпечаток движка в контрольной точке: проигрывать можно только тот же код | scripts/replan-replay.mjs#engine-fingerprint-in-checkpoint | not yet present: scripts/replan-replay.mjs#engine-fingerprint-in-checkpoint |
 | open | 2026-W33-R13 | Сторож на СВЁРТКЕ памяти, а не только на записи | scripts/memory-guard.mjs#guard-on-consolidation | not yet present: scripts/memory-guard.mjs#guard-on-consolidation |

@@ -96,9 +96,49 @@ export function resolveProfile(name = 'standard') {
   return [...new Set(PROFILES[name])];
 }
 
+// ── canon-install-parity-gate (2026-W33-R10) + docs-research-in-profile (2026-W30-Q2) ────────
+// The live copy at ~/.claude/jidoka is a COPY of this repo, and nothing ever compared the two.
+// Measured 2026-08-10: the install carried 230 scripts against the canon's 236, was missing
+// kaizen-dispatch / l0-content-guard / memory-eval / replan-replay / spec-path-index /
+// worktree-session, carried a script the canon does not have, and held no docs/research at all —
+// so the weekly reports and the kaizen registries were invisible from the live environment.
+// Nothing was wrong with either copy on its own; there was simply no instrument that looked at both.
+// The drift is two-directional, so the report names both sides rather than only what is missing.
+export const GLOBAL_SYNC_DIRS = ['scripts', 'hooks', 'agents', 'docs/research', 'docs/audits'];
+
+/**
+ * Compare two file lists (relative paths) and say how the copies differ. Pure, order-independent.
+ * `missing` = in canon, absent from the install. `extra` = in the install, absent from canon —
+ * that half matters just as much: a file only the install has is a fix that never reached the canon.
+ */
+export function parityReport(canonFiles = [], installFiles = []) {
+  const canon = new Set(canonFiles), install = new Set(installFiles);
+  const missing = [...canon].filter((f) => !install.has(f)).sort();
+  const extra = [...install].filter((f) => !canon.has(f)).sort();
+  return { missing, extra, inSync: missing.length === 0 && extra.length === 0, canonCount: canon.size, installCount: install.size };
+}
+
 function profileSelfTest() {
   const fails = [];
   const ok = (n, c) => { if (!c) fails.push(n); console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };
+
+  // canon-install-parity-gate (2026-W33-R10)
+  ok('identical copies are in sync', parityReport(['a.mjs', 'b.mjs'], ['b.mjs', 'a.mjs']).inSync === true);
+  ok('a file the install lacks is reported as missing',
+    parityReport(['a.mjs', 'b.mjs'], ['a.mjs']).missing.join() === 'b.mjs');
+  ok('a file only the INSTALL has is reported too (a fix that never reached the canon)',
+    parityReport(['a.mjs'], ['a.mjs', 'local-only.mjs']).extra.join() === 'local-only.mjs');
+  ok('drift in both directions is reported at once', (() => {
+    const r = parityReport(['a.mjs', 'b.mjs'], ['a.mjs', 'c.mjs']);
+    return r.missing.join() === 'b.mjs' && r.extra.join() === 'c.mjs' && r.inSync === false;
+  })());
+  ok('an empty install is fully missing, not silently in sync',
+    parityReport(['a.mjs'], []).inSync === false && parityReport(['a.mjs'], []).missing.length === 1);
+  // docs-research-in-profile (2026-W30-Q2): the weekly reports and kaizen registries must travel
+  ok('the global sync carries docs/research (weekly reports + kaizen registries)',
+    GLOBAL_SYNC_DIRS.includes('docs/research'));
+  ok('the global sync carries hooks and agents, not only scripts',
+    GLOBAL_SYNC_DIRS.includes('hooks') && GLOBAL_SYNC_DIRS.includes('agents'));
   ok('core profile = kernel only', resolveProfile('core').length === KERNEL.length);
   ok('standard contains all of core + more', KERNEL.every(k => resolveProfile('standard').includes(k)) && resolveProfile('standard').length > KERNEL.length);
   ok('full contains all of standard + more', resolveProfile('standard').every(s => resolveProfile('full').includes(s)) && resolveProfile('full').length > resolveProfile('standard').length);
@@ -126,6 +166,41 @@ function profileSelfTest() {
 }
 
 if (process.argv.includes('--self-test')) profileSelfTest();
+
+// canon-install-parity-gate: compare this repo against the live copy and report BOTH directions.
+// Read-only on purpose — it names the drift and exits non-zero; it never silently overwrites a
+// live environment, because a "fix" that only exists in the install would be destroyed by a sync.
+if (process.argv.includes('--check-parity')) {
+  const { readdirSync, statSync } = await import('node:fs');
+  const { homedir } = await import('node:os');
+  const argAfter = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+  const installRoot = (argAfter('--check-parity') || '').startsWith('/') ? argAfter('--check-parity') : join(homedir(), '.claude', 'jidoka');
+  // RECURSIVE on purpose. The first version listed only the top level of each directory, so
+  // docs/research/weekly/* — the kaizen registries, the whole reason W30-Q2 exists — was never
+  // compared at all and the gate reported "in sync" over a directory it had not looked into.
+  const listDir = (root, rel, depth = 0) => {
+    const abs = join(root, rel);
+    if (!existsSync(abs) || depth > 4) return [];
+    try {
+      return readdirSync(abs).flatMap((f) => {
+        const child = `${rel}/${f}`;
+        try {
+          return statSync(join(abs, f)).isDirectory() ? listDir(root, child, depth + 1) : [child];
+        } catch { return []; }
+      });
+    } catch { return []; }
+  };
+  const canonFiles = GLOBAL_SYNC_DIRS.flatMap((d) => listDir(HERE, d));
+  const installFiles = GLOBAL_SYNC_DIRS.flatMap((d) => listDir(installRoot, d));
+  const r = parityReport(canonFiles, installFiles);
+  console.log(`install-parity — канон ${HERE}\n                 копия  ${installRoot}\n`);
+  console.log(`  канон ${r.canonCount} файл(ов) · копия ${r.installCount}`);
+  for (const d of GLOBAL_SYNC_DIRS) if (!existsSync(join(installRoot, d))) console.log(`  \x1b[31m⌀ в копии нет каталога ${d} целиком\x1b[0m`);
+  if (r.missing.length) { console.log(`\n  \x1b[31mнет в копии (${r.missing.length}):\x1b[0m`); for (const f of r.missing.slice(0, 40)) console.log(`    ${f}`); if (r.missing.length > 40) console.log(`    …и ещё ${r.missing.length - 40}`); }
+  if (r.extra.length) { console.log(`\n  \x1b[33mесть ТОЛЬКО в копии (${r.extra.length}) — почини в каноне, иначе следующая синхронизация это сотрёт:\x1b[0m`); for (const f of r.extra.slice(0, 40)) console.log(`    ${f}`); }
+  console.log(r.inSync ? '\n  \x1b[32m✓ канон и установленная копия совпадают\x1b[0m' : '\n  \x1b[31m✗ копия разошлась с каноном — метрики и гейты читают разный код\x1b[0m');
+  process.exit(r.inSync ? 0 : 1);
+}
 
 const target = process.argv.slice(2).find(a => !a.startsWith('--'));
 const isFrontend = process.argv.includes('--frontend');
