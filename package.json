@@ -168,7 +168,8 @@
     "skills:freshness": "node scripts/skills-freshness.mjs",
     "routine:daily": "bash scripts/routine-daily.sh",
     "skills:diff": "node scripts/skills-diff.mjs",
-    "gate:checkpoint": "node scripts/checkpoint.mjs --self-test"
+    "gate:checkpoint": "node scripts/checkpoint.mjs --self-test",
+    "gate:benchmark": "node scripts/agent-benchmark.mjs --verify"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

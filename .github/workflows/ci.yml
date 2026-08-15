@@ -50,6 +50,11 @@ jobs:
       # feature would be scaffolding claiming crash-resume.
       - name: checkpoint (crash-resume skips finished nodes, interrupt parks the run)
         run: npm run gate:checkpoint
+      # honest benchmark corpus (2026-W33-R11): until 2026-08-15 every task ran the engine's OWN
+      # self-tests, so the gates were validated exclusively on themselves. The fixture tier runs
+      # them against code they did not author, and each fixture is proven able to fail.
+      - name: benchmark corpus (gates run against non-engine fixtures)
+        run: npm run gate:benchmark
       # ledger-pollution regression (2026-07-04): a judge-calibration/debias run streams
       # position-sensitivity telemetry — it must land in its sidecar, NEVER in the mistake ledger.
       # Prove it: run the debias-writing self-tests, assert the ledger is byte-unchanged, then that
