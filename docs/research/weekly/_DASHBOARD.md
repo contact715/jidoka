@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 94% · shipped 89/95, open 6, regressed 0, ~1.22w to ship**
+**adoption 95% · shipped 90/95, open 5, regressed 0, ~1.26w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -28,7 +28,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | open | 2026-W28-R9 | Dated delta-archive of specs (EARS) + wire disconnected change-ceremony gates | scripts/spec-archive.mjs | not yet present: scripts/spec-archive.mjs |
 | rejected | 2026-W28-P1 | process-mine.mjs — data-grounded business-process discovery + conformance gap (PORT the process-mining IDEA, reject PM4Py dep) for business-process-architect/data-analyst/kaizen-officer | scripts/process-mine.mjs | deferred by owner 2026-07-06: target confirmed = dev-environment (jidoka/Claude Code), not client product. Process-mining is a product-building capability; revisit only when a real client+event-log exists. |
 | shipped | 2026-W29-R1 | AC-completeness gate on verdict.json (spec-kit /converge) | scripts/acceptance-verdict.mjs | present (code): scripts/acceptance-verdict.mjs |
-| open | 2026-W29-R2 | Human golden sets (ReqElicitBench+Zenodo) -> native elicitation-recall scorer, breaks judge-calibration P0 | scripts/elicitation-gym.mjs | not yet present: scripts/elicitation-gym.mjs |
+| shipped | 2026-W29-R2 | Human golden sets (ReqElicitBench+Zenodo) -> native elicitation-recall scorer, breaks judge-calibration P0 | scripts/elicitation-gym.mjs#scoreRun | present (symbol): scripts/elicitation-gym.mjs#scoreRun |
 | shipped | 2026-W29-R3 | Two-registry replan-controller -> live CORE_PROPERTY_GATE (delivers W28-R3) | scripts/replan-ledger.mjs | present (code): scripts/replan-ledger.mjs |
 | shipped | 2026-W29-R4 | UPDATE/MERGE third verdict in memory-guard (mem0) | scripts/memory-guard.mjs | present (code): scripts/memory-guard.mjs |
 | shipped | 2026-W29-R5 | Deterministic JTBD-frame check on business-question answers | scripts/clarify-gate.mjs | present (code): scripts/clarify-gate.mjs |
