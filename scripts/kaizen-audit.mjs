@@ -161,6 +161,25 @@ export function auditLedger(entries = [], probes = {}, week = '') {
   return entries.map((e) => auditEntry(e, probes, week));
 }
 
+// ── dashboard-regenerated-from-ledger (2026-W33-R9) ──────────────────────────
+// The dashboard is a RENDER of the ledger, but nothing regenerated it after an audit, so it drifted
+// and was believed anyway. Measured 2026-08-10: the panel printed "adoption 31% · shipped 24/77"
+// while the ledger held 54 of 79. Both numbers were wrong by then, in opposite directions, and the
+// weekly report quoted the panel. A view that can disagree with its source is a second source.
+const DASH_COUNTS = /shipped\s+(\d+)\s*\/\s*(\d+)/;
+
+/**
+ * Does the rendered dashboard still agree with the ledger it claims to render?
+ * Compares only the counts it prints — the parts a reader quotes. Pure.
+ * @returns {{stale:boolean, was:string|null, now:string}}
+ */
+export function dashboardStale(card = {}, dashboardText = '') {
+  const now = `${card.shippedCount ?? 0}/${card.actionable ?? 0}`;
+  const m = DASH_COUNTS.exec(String(dashboardText || ''));
+  const was = m ? `${m[1]}/${m[2]}` : null;
+  return { stale: was !== now, was, now };
+}
+
 // ── self-test ──────────────────────────────────────────────────────────────
 function selfTest() {
   let fails = 0;
@@ -283,6 +302,16 @@ function selfTest() {
   const trulyGone = auditEntry({ id: 'd', week: '2026-W30', title: 't', pointOfIntegration: `${CODE}#my-cap`, status: 'shipped', shippedWeek: '2026-W30' },
     { exists: () => false, read: () => null }, '2026-W33');
   ok('shipped → absent is STILL a regression', trulyGone.status === 'regressed');
+  // dashboard-regenerated-from-ledger (2026-W33-R9)
+  ok('a dashboard printing the ledger counts is not stale',
+    dashboardStale({ shippedCount: 59, actionable: 97 }, '**adoption 61% · shipped 59/97, open 38**').stale === false);
+  ok('a dashboard printing OLD counts is stale, and names both numbers', (() => {
+    const d = dashboardStale({ shippedCount: 59, actionable: 97 }, '**adoption 31% · shipped 24/77, open 53**');
+    return d.stale === true && d.was === '24/77' && d.now === '59/97';
+  })());
+  ok('a dashboard with no counts at all reads as stale (never silently agreeable)',
+    dashboardStale({ shippedCount: 1, actionable: 2 }, '# empty').stale === true);
+
   ok('an attested entry that later gains a symbol is promoted to shipped',
     auditEntry({ id: 'e', week: '2026-W33', title: 't', pointOfIntegration: `${CODE}#my-cap`, status: 'attested' },
       probesFor('export function myCap() {}'), '2026-W33').status === 'shipped');
@@ -310,8 +339,29 @@ if (isMain) {
   for (const e of after) console.log(`  ${e.status.padEnd(9)} ${e.id}  ${e.pointOfIntegration || ''}`);
   const shipped = after.filter((e) => e.status === 'shipped').length;
   console.log(`  adoption: ${shipped}/${after.length} shipped`);
-  if (!process.argv.includes('--dry')) { writeLedger(after, file); console.log(`[kaizen-audit] ledger updated: ${path.relative(ROOT, file)}`); }
-  else console.log('[kaizen-audit] --dry: ledger not written');
+  if (!process.argv.includes('--dry')) {
+    writeLedger(after, file);
+    console.log(`[kaizen-audit] ledger updated: ${path.relative(ROOT, file)}`);
+    // dashboard-regenerated-from-ledger (2026-W33-R9): the view is rebuilt from the source that
+    // was just written, so it cannot survive as a second, older opinion. The renderer lives in its
+    // own module precisely so this import cannot close a cycle — the first attempt imported
+    // kaizen-engine and deadlocked into an unsettled top-level await that exited 0 in silence.
+    try {
+      const dashPath = path.join(path.dirname(file), '_DASHBOARD.md');
+      const [{ renderDashboard }, { scorecard }] = await Promise.all([
+        import('./kaizen-dashboard.mjs'), import('./kaizen-scorecard.mjs'),
+      ]);
+      const card = scorecard(after);
+      const before = fs.existsSync(dashPath) ? fs.readFileSync(dashPath, 'utf8') : '';
+      const drift = dashboardStale(card, before);
+      fs.writeFileSync(dashPath, renderDashboard(card, after, week), 'utf8');
+      if (drift.stale) console.log(`[kaizen-audit] витрина была не в ногу с реестром (${drift.was ?? 'без чисел'} → ${drift.now}) и перегенерирована`);
+      else console.log('[kaizen-audit] витрина перегенерирована, расхождения не было');
+    } catch (e) {
+      // fail-open: an audit that cannot redraw the view must still record the audit
+      console.log(`[kaizen-audit] витрину перегенерировать не удалось (${e.message}) — реестр записан, панель могла устареть`);
+    }
+  } else console.log('[kaizen-audit] --dry: ledger not written');
   process.exit(0);
 }
 
