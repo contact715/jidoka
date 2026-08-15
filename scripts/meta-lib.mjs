@@ -136,6 +136,64 @@ export function classKeyOf(cls = '') {
  * Near-duplicate candidates: class pairs sharing >= minShared meaningful tokens that are NOT
  * already aliased. Reported, never merged. Pure.
  */
+// ── decision-conflict probe (2026-W33-R8, DeMem) ────────────────────────────
+// `suggestClassMerges` proposes a merge from SHARED WORDS. Two classes that share two tokens are
+// probably the same defect — probably. On the real ledger it proposes exactly one merge today:
+// `code-first-in-spec-driven` + `spec-written-after-the-code`. They share "code" and "spec", and
+// they are NOT the same lesson: the first says read the controlling spec BEFORE writing, the
+// second says make sure a spec COVERS what was written. Merge them and one of the two behaviours
+// disappears — whoever reads the surviving lesson learns half of what the ledger knew.
+//
+// So a merge needs a second opinion: do the two prescribe the SAME ACTION? Deterministic signals
+// only, because a judge nobody measured is exactly what this engine keeps regretting:
+//   1. different registered mechanisms — two gates means two defects, whatever the words say;
+//   2. opposite temporal direction — "before/first" against "after/afterwards";
+//   3. opposite polarity — one prescribes doing a thing, the other prescribes not doing it.
+const BEFORE_WORDS = /(\bbefore\b|\bfirst\b|\bprior to\b|\bдо\b|сначала|заранее|перед)/i;
+const AFTER_WORDS = /(\bafter\b|\bafterwards\b|\bonce\b.{0,20}\bdone\b|после|потом|задним числом|по факту)/i;
+const NEGATION = /(\bnever\b|\bdo ?n[o']t\b|\bmust not\b|\bwithout\b|никогда|нельзя|не следует|запрещ)/i;
+
+/**
+ * May these two classes be merged into one lesson? Pure.
+ * @returns {{conflict:boolean, signals:string[], reason:string}}
+ */
+export function decisionConflict(a = {}, b = {}, remedies = {}) {
+  // The class SLUG carries meaning the incident prose often leaves implicit: on the real pair,
+  // "spec-written-after-the-code" states the timing in its name while its incident text does not.
+  // Reading only the prose made the probe answer "safe" on the very case it exists for.
+  const textA = `${String(a.cls ?? '').replace(/-/g, ' ')} ${String(a.text ?? '')}`;
+  const textB = `${String(b.cls ?? '').replace(/-/g, ' ')} ${String(b.text ?? '')}`;
+  const signals = [];
+
+  const mechA = remedies[a.cls]?.mechanism ?? null;
+  const mechB = remedies[b.cls]?.mechanism ?? null;
+  if (mechA && mechB && mechA !== mechB) signals.push(`разные механизмы: ${mechA} против ${mechB}`);
+
+  const dirA = BEFORE_WORDS.test(textA) ? 'before' : AFTER_WORDS.test(textA) ? 'after' : null;
+  const dirB = BEFORE_WORDS.test(textB) ? 'before' : AFTER_WORDS.test(textB) ? 'after' : null;
+  if (dirA && dirB && dirA !== dirB) signals.push(`противоположный момент действия: «${dirA}» против «${dirB}»`);
+
+  if (NEGATION.test(textA) !== NEGATION.test(textB)) signals.push('один предписывает делать, другой — не делать');
+
+  return {
+    conflict: signals.length > 0,
+    signals,
+    reason: signals.length
+      ? `слияние потеряет различие: ${signals.join('; ')}`
+      : 'предписываемое действие выглядит одинаковым — слияние безопасно',
+  };
+}
+
+/** Filter merge suggestions through the conflict probe. Pure. Rejected ones stay VISIBLE. */
+export function safeClassMerges(suggestions = [], lessons = {}, remedies = {}) {
+  const safe = [], blocked = [];
+  for (const s of suggestions) {
+    const v = decisionConflict({ cls: s.a, text: lessons[s.a] }, { cls: s.b, text: lessons[s.b] }, remedies);
+    (v.conflict ? blocked : safe).push({ ...s, ...v });
+  }
+  return { safe, blocked };
+}
+
 export function suggestClassMerges(classes = [], minShared = 2) {
   const list = [...new Set(classes)].sort();
   const tokens = (c) => new Set(normalizeClassKey(c).split('-').filter(Boolean));

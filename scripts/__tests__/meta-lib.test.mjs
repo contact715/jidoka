@@ -4,7 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { daysBetween, monthOf, groupByClass, recurrencesAfter } from '../meta-lib.mjs';
+import { daysBetween, monthOf, groupByClass, recurrencesAfter, decisionConflict, safeClassMerges } from '../meta-lib.mjs';
 
 test('daysBetween counts whole days', () => {
   assert.equal(daysBetween('2026-01-01', '2026-01-08'), 7);
@@ -45,4 +45,67 @@ test('recurrencesAfter sorts results ascending', () => {
   const after = recurrencesAfter(items, '2026-06-01');
   assert.equal(after[0].date, '2026-07-01');
   assert.equal(after[1].date, '2026-08-01');
+});
+
+// ── decision-conflict probe (2026-W33-R8, DeMem) ─────────────────────────────
+// suggestClassMerges proposes a merge from SHARED WORDS. On the real ledger it proposes exactly
+// one today, and that one is wrong: "read the spec BEFORE writing" and "make sure a spec covers
+// what was written" share the words and prescribe different actions. Merging them deletes one of
+// the two behaviours from memory, quietly.
+
+test('a merge whose halves prescribe opposite timing is blocked', () => {
+  const v = decisionConflict(
+    { cls: 'code-first-in-spec-driven', text: 'read the controlling spec FIRST; code is derived' },
+    { cls: 'spec-written-after-the-code', text: 'files written, no spec names them' },
+  );
+  assert.equal(v.conflict, true, 'before vs after must not be merged into one lesson');
+  assert.match(v.reason, /момент действия/);
+});
+
+test('the class SLUG is read, not only the incident prose', () => {
+  // the real case states its timing in the name and never in the text — reading prose alone
+  // made the probe answer "safe" on the exact pair it exists for
+  const v = decisionConflict(
+    { cls: 'code-first-in-spec-driven', text: '' },
+    { cls: 'spec-written-after-the-code', text: '' },
+  );
+  assert.equal(v.conflict, true);
+});
+
+test('two classes with DIFFERENT registered gates never merge', () => {
+  const v = decisionConflict({ cls: 'a', text: 'x' }, { cls: 'b', text: 'x' },
+    { a: { mechanism: 'hooks/one.mjs' }, b: { mechanism: 'hooks/two.mjs' } });
+  assert.equal(v.conflict, true, 'two gates means two defects, whatever the words say');
+});
+
+test('the same gate on both sides is not a conflict', () => {
+  const v = decisionConflict({ cls: 'a', text: 'x' }, { cls: 'b', text: 'x' },
+    { a: { mechanism: 'hooks/one.mjs' }, b: { mechanism: 'hooks/one.mjs' } });
+  assert.equal(v.conflict, false);
+});
+
+test('opposite polarity blocks a merge', () => {
+  const v = decisionConflict(
+    { cls: 'run-the-check', text: 'always run the check' },
+    { cls: 'skip-the-check', text: 'never run the check' },
+  );
+  assert.equal(v.conflict, true);
+});
+
+test('genuinely identical lessons stay mergeable', () => {
+  const v = decisionConflict(
+    { cls: 'gate-bypass', text: 'the agent went around the gate' },
+    { cls: 'gate-casing-bypass', text: 'the agent went around the gate' },
+  );
+  assert.equal(v.conflict, false, 'the probe must not block every merge — that would be useless');
+});
+
+test('blocked merges stay VISIBLE with their reason, never silently dropped', () => {
+  const { safe, blocked } = safeClassMerges(
+    [{ a: 'code-first-in-spec-driven', b: 'spec-written-after-the-code', shared: ['code', 'spec'] }],
+    {}, {},
+  );
+  assert.equal(safe.length, 0);
+  assert.equal(blocked.length, 1);
+  assert.ok(blocked[0].reason.length > 10, 'a blocked merge must say why');
 });

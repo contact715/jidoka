@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 87% · shipped 83/95, open 12, regressed 0, ~1.06w to ship**
+**adoption 88% · shipped 84/95, open 11, regressed 0, ~1.05w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -92,7 +92,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W33-R5 | Сторож записи по принципу default-deny, включая матчер mcp__.* | scripts/policy-enforce-hook.mjs#isWriteTool | present (symbol): scripts/policy-enforce-hook.mjs#isWriteTool |
 | shipped | 2026-W33-R6 | Несущее свойство как ПОЛЕ спеки и маркер догадки | scripts/spec-structural-gate.mjs#specFieldVerdict | present (symbol): scripts/spec-structural-gate.mjs#specFieldVerdict |
 | shipped | 2026-W33-R7 | Протухший in_progress размораживает очередь, а не запирает её | scripts/task-queue.mjs#STALE_LOCK_MS | present (symbol): scripts/task-queue.mjs#STALE_LOCK_MS |
-| open | 2026-W33-R8 | Проба конфликта решений при слиянии уроков (DeMem) | scripts/memory-consolidate.mjs#decision-conflict-probe | not yet present: scripts/memory-consolidate.mjs#decision-conflict-probe |
+| shipped | 2026-W33-R8 | Проба конфликта решений при слиянии уроков (DeMem) | scripts/meta-lib.mjs#decisionConflict | present (symbol): scripts/meta-lib.mjs#decisionConflict |
 | shipped | 2026-W33-R9 | Витрина перегенерируется из реестра, а не живёт своей жизнью | scripts/kaizen-audit.mjs#dashboardStale | present (symbol): scripts/kaizen-audit.mjs#dashboardStale |
 | shipped | 2026-W33-R10 | Гейт паритета канона и установленной копии | scripts/install-into.mjs#parityReport | present (symbol): scripts/install-into.mjs#parityReport |
 | open | 2026-W33-R11 | Честный корпус бенчмарка на чужом коде с прогоном в CI (условие: после R1 и R2) | docs/benchmarks/_tasks.jsonl#external-corpus-not-selftests | not yet present: docs/benchmarks/_tasks.jsonl#external-corpus-not-selftests |
