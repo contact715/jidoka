@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 85% · shipped 82/96, open 14, regressed 0, ~1.07w to ship**
+**adoption 86% · shipped 82/95, open 13, regressed 0, ~1.07w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -98,7 +98,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | open | 2026-W33-R11 | Честный корпус бенчмарка на чужом коде с прогоном в CI (условие: после R1 и R2) | docs/benchmarks/_tasks.jsonl#external-corpus-not-selftests | not yet present: docs/benchmarks/_tasks.jsonl#external-corpus-not-selftests |
 | shipped | 2026-W33-R12 | Отпечаток движка в контрольной точке: проигрывать можно только тот же код | scripts/replan-replay.mjs#engineFingerprint | present (symbol): scripts/replan-replay.mjs#engineFingerprint |
 | shipped | 2026-W33-R13 | Сторож на СВЁРТКЕ памяти, а не только на записи | scripts/meta-lib.mjs#consolidationVerdict | present (symbol): scripts/meta-lib.mjs#consolidationVerdict |
-| open | 2026-W33-R14 | Оракул неоднозначности по расхождению исполнения — УСЛОВНО, сначала эксперимент | scripts/clarify-engine.mjs#execution-divergence-oracle | not yet present: scripts/clarify-engine.mjs#execution-divergence-oracle |
+| rejected | 2026-W33-R14 | Оракул неоднозначности по расхождению исполнения — УСЛОВНО, сначала эксперимент | scripts/clarify-engine.mjs#execution-divergence-oracle | УСЛОВИЕ ПРОВЕРЕНО ЭКСПЕРИМЕНТОМ 2026-08-15 и НЕ выполнено. В реестре 7 инцидентов из классов, где инструкцию можно было прочитать двояко (target-assumed-not-confirmed, reactive-literal-execution ×2, peer-restyle-instead-of-clone ×2, core-property-substituted-by-scaffold, single-repo-assumed-canonical). Но оракулу расхождения нужны ДВА исполнения одной инструкции, чтобы было чему разойтись, а во всех семи случаях исполнение было ОДНО: агент выбрал одно прочтение и пошёл. Сравнивать было не с чем, сигнала бы не возникло. Оракул стоит НИЖЕ по течению от второго исполнения, а не вместо него. |
 | shipped | 2026-W33-K1 | Обратная ось реестра гейтов: живой гейт обязан быть известен реестру классов | scripts/gate-audit.mjs#reverseRemedyAudit | present (symbol): scripts/gate-audit.mjs#reverseRemedyAudit |
 | shipped | 2026-W33-K2 | Stop-хук очереди задач: не останавливаться с непустой очередью | hooks/task-queue-gate.mjs#queueVerdict | present (symbol): hooks/task-queue-gate.mjs#queueVerdict |
 | shipped | 2026-W33-S1 | Форма pointOfIntegration проверяется НА ЗАПИСИ, плюс backfill 17 голых маркеров | scripts/kaizen-ledger.mjs#validatePointOfIntegration | present (symbol): scripts/kaizen-ledger.mjs#validatePointOfIntegration |
