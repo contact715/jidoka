@@ -31,6 +31,62 @@ const featureName = args.find((_, i) => args[i - 1] === '--feature') ?? null;
 const format = args.find((_, i) => args[i - 1] === '--format') ?? 'text';
 
 // ── YAML + bold-field two-pass parser (shared contract from T.1) ───────
+// ── evidence-gap loop: retrieval that closes its own gaps (2026-W28-R5, MemR3) ───────────────
+// Retrieval here is a SINGLE fetch: ask once, take the top results, move on. Whatever the first
+// pool happens to cover is what the session gets. Nothing ever asks the obvious follow-up —
+// "which parts of this wave did that pool support with NOTHING?" — so a requirement with zero
+// supporting lessons looks exactly like a requirement that is well covered. Silence and support
+// are indistinguishable, which is the same shape as every other defect this engine keeps closing.
+//
+// The loop is deterministic and judge-free: coverage is "did any returned item mention this node",
+// and the second round re-queries FOR THE UNSUPPORTED NODES SPECIFICALLY rather than asking the
+// same question louder. It stops on closure or on a hard round cap — an unbounded retry loop is
+// how a helpful mechanism becomes an unbearable one.
+//
+// Stop states follow the clarify-gate idiom so the two read alike:
+//   clear    — every node has support
+//   partial  — some closed this round, some remain
+//   missing  — nothing was found for the remaining nodes
+//   deferred — the round cap was reached with gaps still open (honest, not silent)
+export const EVIDENCE_ROUND_CAP = 3;
+
+/** Which of `nodes` no returned item supports. Pure — support = the node id appears in the text. */
+export function evidenceGaps(nodes = [], results = []) {
+  const hay = results.map((r) => `${r.id ?? ''} ${r.title ?? ''} ${r.text ?? ''}`.toLowerCase()).join('\n');
+  return nodes.filter((n) => !hay.includes(String(n).toLowerCase()));
+}
+
+/**
+ * Retrieve, find what is still unsupported, re-query for exactly that, repeat. Pure over an
+ * injected `retrieve(query) -> items`.
+ * @returns {{results:Array, gaps:string[], rounds:number, stop:'clear'|'partial'|'missing'|'deferred'}}
+ */
+export function evidenceGapLoop(nodes = [], query = '', retrieve, { cap = EVIDENCE_ROUND_CAP } = {}) {
+  if (typeof retrieve !== 'function') return { results: [], gaps: [...nodes], rounds: 0, stop: 'missing' };
+  const seen = new Map();
+  const add = (items) => { for (const it of items || []) if (it && !seen.has(it.id)) seen.set(it.id, it); };
+
+  add(retrieve(query));
+  let gaps = evidenceGaps(nodes, [...seen.values()]);
+  let rounds = 1;
+
+  while (gaps.length && rounds < cap) {
+    const before = gaps.length;
+    // ask FOR THE GAPS, not the same question again
+    add(retrieve(gaps.join(' ')));
+    gaps = evidenceGaps(nodes, [...seen.values()]);
+    rounds++;
+    if (gaps.length === before) break; // another round found nothing new — stop rather than spin
+  }
+
+  const results = [...seen.values()];
+  const stop = gaps.length === 0 ? 'clear'
+    : rounds >= cap ? 'deferred'
+      : gaps.length === nodes.length ? 'missing'
+        : 'partial';
+  return { results, gaps, rounds, stop };
+}
+
 function extractYamlBlock(content) {
   const m = content.match(/^---\n([\s\S]+?)\n---\n/);
   return m ? m[1] : null;
@@ -355,4 +411,45 @@ function main() {
   process.exit(0);
 }
 
-main();
+// ── self-test ──────────────────────────────────────────────────────────
+function selfTest() {
+  let fails = 0;
+  const ok = (n, c) => { if (!c) fails++; console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };
+
+  ok('a node nobody mentions is a gap', evidenceGaps(['REQ-1'], [{ id: 'x', text: 'unrelated' }]).length === 1);
+  ok('a node the pool mentions is not a gap', evidenceGaps(['REQ-1'], [{ id: 'x', text: 'covers REQ-1' }]).length === 0);
+  ok('matching ignores case', evidenceGaps(['req-1'], [{ id: 'x', text: 'covers REQ-1' }]).length === 0);
+  ok('the id counts as support too', evidenceGaps(['REQ-1'], [{ id: 'REQ-1', text: '' }]).length === 0);
+
+  const store = { q: [{ id: 'a', text: 'covers REQ-1' }], 'REQ-2': [{ id: 'b', text: 'covers REQ-2' }] };
+  const r = evidenceGapLoop(['REQ-1', 'REQ-2'], 'q', (x) => store[x] || []);
+  ok('a second round is asked FOR THE GAP and closes it', r.stop === 'clear' && r.rounds === 2);
+  ok('both rounds\' results are kept, not replaced', r.results.length === 2);
+
+  const none = evidenceGapLoop(['REQ-9'], 'q', () => []);
+  ok('nothing found for anything → missing', none.stop === 'missing');
+  ok('a fruitless round stops the loop instead of spinning', none.rounds <= EVIDENCE_ROUND_CAP);
+
+  // an unbounded retry loop is how a helpful mechanism becomes unbearable
+  let calls = 0;
+  const churn = evidenceGapLoop(['A', 'B'], 'q', () => { calls++; return [{ id: `n${calls}`, text: 'A' }]; });
+  ok('the round cap is respected', churn.rounds <= EVIDENCE_ROUND_CAP);
+  ok('gaps still open at the cap are DEFERRED, never reported as clear',
+    churn.gaps.length === 0 || churn.stop === 'deferred' || churn.stop === 'partial');
+
+  ok('no retriever → honest missing, not a crash', evidenceGapLoop(['A'], 'q', null).stop === 'missing');
+  ok('no nodes to support → clear', evidenceGapLoop([], 'q', () => []).stop === 'clear');
+
+  if (fails) { console.log(`\n\x1b[31mget-spec-context self-test FAILED (${fails})\x1b[0m`); process.exit(1); }
+  console.log('\n\x1b[32m✓ get-spec-context: retrieval closes its own evidence gaps, and says so when it cannot\x1b[0m');
+  process.exit(0);
+}
+
+// Guarded so the module can be imported. Fifth file today whose body did real work on import —
+// see the note in docs/ANTI_PATTERNS_CATALOG.md; a CLI is a program AND a module, and only the
+// program half may act.
+const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
+if (isMain) {
+  if (process.argv.includes('--self-test')) selfTest();
+  main();
+}

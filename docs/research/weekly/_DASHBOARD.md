@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 92% · shipped 87/95, open 8, regressed 0, ~1.16w to ship**
+**adoption 93% · shipped 88/95, open 7, regressed 0, ~1.2w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -21,7 +21,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W28-R2 | Wire parallel-guard as hard path-gate on DAG leaves (close scope-escape) | scripts/parallel-guard.mjs#leafGateVerdict | present (symbol): scripts/parallel-guard.mjs#leafGateVerdict |
 | shipped | 2026-W28-R3 | guardrail-tripwire.mjs — mid-run andon-halt on core-property/L0 violation (CORE_PROPERTY_GATE becomes live) | hooks/guardrail-tripwire.mjs#tripwireVerdict | present (symbol): hooks/guardrail-tripwire.mjs#tripwireVerdict |
 | shipped | 2026-W28-R4 | cohesionPartition() — split/serialize from real import edges (kills scaffold buildDag) | scripts/dag-schedule.mjs#cohesionPartition | present (symbol): scripts/dag-schedule.mjs#cohesionPartition |
-| open | 2026-W28-R5 | Deterministic evidence-gap loop in memory retrieval (close last open-loop) | scripts/get-spec-context.mjs#evidence-gap-loop | not yet present: scripts/get-spec-context.mjs#evidence-gap-loop |
+| shipped | 2026-W28-R5 | Deterministic evidence-gap loop in memory retrieval (close last open-loop) | scripts/get-spec-context.mjs#evidenceGapLoop | present (symbol): scripts/get-spec-context.mjs#evidenceGapLoop |
 | shipped | 2026-W28-R6 | Per-bundle token meter at context-assembly (thermometer under budget-gate) | scripts/shard-story-bundle.mjs | present (code): scripts/shard-story-bundle.mjs |
 | shipped | 2026-W28-R7 | Persisted class-edges (prevInClass[]) in memory-consolidate (episodic->semantic) | scripts/memory-consolidate.mjs#classEdges | present (symbol): scripts/memory-consolidate.mjs#classEdges |
 | shipped | 2026-W28-R8 | Static intent-vs-evidence contract-drift gate (reverse axis of spec-drift) | scripts/detect-drift.mjs#intentVsEvidence | present (symbol): scripts/detect-drift.mjs#intentVsEvidence |
