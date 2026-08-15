@@ -20,7 +20,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { loadLedger, groupByClass, daysBetween, todayISO } from './meta-lib.mjs';
+import { loadLedger, groupByClass, daysBetween, todayISO, consolidationVerdict } from './meta-lib.mjs';
 import { REMEDIES } from './meta-remedies.mjs';
 
 export const HALF_LIFE = 30;   // days — an incident's weight halves every 30 days
@@ -192,8 +192,29 @@ const rows = loadLedger(INPUT);
 const model = consolidate(rows);
 const retro = scanRetros();
 const md = render(model, retro);
+
+// guard-on-consolidation (2026-W33-R13): the rebuild is compared with what it is about to replace.
+// A lesson may leave the active tiers by being SUPERSEDED (it stays in the History tail); vanishing
+// outright means this rebuild deleted knowledge, and that must never happen quietly. The guard
+// REPORTS and refuses to overwrite unless --force, because losing memory while organising memory is
+// the one failure nobody would notice afterwards.
+let lossVerdict = { ok: true, lost: [], gained: [], reason: 'предыдущего дайджеста не было' };
+try {
+  const before = existsSync(OUTPUT) ? readFileSync(OUTPUT, 'utf8') : '';
+  if (before) lossVerdict = consolidationVerdict(before, md);
+} catch { /* fail-open: a guard that cannot judge must not stop memory from being rebuilt */ }
+
+if (!lossVerdict.ok && !process.argv.includes('--force')) {
+  console.error(`memory-consolidate: ОТКАЗ — ${lossVerdict.reason}`);
+  console.error(`  потеряно: ${lossVerdict.lost.join(', ')}`);
+  console.error('  Урок исчезает законно только через пометку об устаревании: тогда он остаётся в хвосте History.');
+  console.error('  Если потеря намеренная, повтори с --force и скажи в отчёте, что именно выброшено.');
+  process.exit(1);
+}
+
 mkdirSync(dirname(OUTPUT), { recursive: true });
 writeFileSync(OUTPUT, md);
+if (!lossVerdict.ok) console.log(`  \x1b[33m⚠ --force: свёртка выбросила ${lossVerdict.lost.length} урок(ов): ${lossVerdict.lost.join(', ')}\x1b[0m`);
 const top = model.clusters.slice(0, 3).map(c => `${c.cls}(${c.score})`).join(', ');
 console.log(`memory-consolidate: ${model.total} episodes → ${model.classes} semantic lessons → ${OUTPUT}`);
 console.log(`  top: ${top || '—'}   retros scanned: ${retro.scanned}`);

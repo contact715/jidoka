@@ -30,6 +30,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tokenize, buildIdf, scoreItem } from './memory-retrieve.mjs';
+import { lessonKeys, consolidationVerdict } from './meta-lib.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -235,6 +236,13 @@ export function judgeMemoryWrite(record, existingItems = [], opts = {}) {
 // Existing shared-memory records already staged, for the dedup check. Best-effort: reads the
 // prior candidates in .claude/memory-staging/ (the queue this gate governs). Empty ⇒ no dedup,
 // but rules 1–4 still gate. Kept small and dependency-free.
+// guard-on-consolidation (2026-W33-R13) lives in meta-lib.mjs and is re-exported here so this
+// module stays the single door to "memory guarding". It was moved out because the write path
+// memory-consolidate → memory-guard → memory-retrieve → memory-consolidate is a CYCLE: the first
+// attempt deadlocked on an unsettled top-level await and the consolidation silently did nothing.
+// meta-lib imports none of these, so no cycle is possible.
+export { lessonKeys, consolidationVerdict } from './meta-lib.mjs';
+
 export function readStagedMemory(root = ROOT) {
   const dir = join(root, '.claude', 'memory-staging');
   if (!existsSync(dir)) return [];
@@ -322,6 +330,35 @@ function selfTest() {
 
   ok('parseRecord reads JSON fields', (() => { const r = parseRecord('{"author":"extract-retro","verdict":"shared","title":"t","text":"body"}'); return r.author === 'extract-retro' && r.verdict === 'shared'; })());
   ok('parseRecord reads loose key: value', (() => { const r = parseRecord('author: extract-retro\nverdict: private\ntitle: t'); return r.author === 'extract-retro' && r.verdict === 'private'; })());
+
+  // ── guard-on-consolidation (2026-W33-R13) ───────────────────────────────
+  const digest = (...classes) => classes.map((c) => `### ${c}  ·  score 1.0`).join('\n\n');
+  ok('a rebuild that keeps every lesson passes',
+    consolidationVerdict(digest('a-class', 'b-class'), digest('b-class', 'a-class')).ok === true);
+  ok('a lesson that vanished is named', (() => {
+    const v = consolidationVerdict(digest('a-class', 'b-class'), digest('a-class'));
+    return v.ok === false && v.lost.join() === 'b-class';
+  })());
+  ok('a lesson kept in the History tail is NOT lost (superseding is legitimate)',
+    consolidationVerdict(digest('a-class'), `## History\n\n### a-class  ·  score 0.1`).ok === true);
+  ok('a NEW lesson is not an error, and is reported separately',
+    consolidationVerdict(digest('a-class'), digest('a-class', 'new-class')).gained.join() === 'new-class');
+  // the worst case, and the one silence would hide best
+  ok('an empty rebuild is a broken rebuild, never "everything aged out"', (() => {
+    const v = consolidationVerdict(digest('a-class', 'b-class'), '# Consolidated memory\n\nno lessons');
+    return v.ok === false && /сломанная пересборка/.test(v.reason);
+  })());
+  ok('starting from an empty digest is fine (first ever run)',
+    consolidationVerdict('', digest('a-class')).ok === true);
+  // a RENAME is not a deletion — the guard's first live run called an alias merge a lost lesson
+  ok('a class merged into its alias target is not reported as lost',
+    consolidationVerdict(digest('gate-block-not-enforced'), digest('gate-claims-block-but-passes')).ok === true);
+  ok('but a class whose alias target is ALSO gone is still lost',
+    consolidationVerdict(digest('gate-block-not-enforced'), digest('unrelated-class')).lost.join() === 'gate-block-not-enforced');
+  ok('lessonKeys reads the class out of a real heading',
+    lessonKeys('### declaration-over-implementation  ·  score 0.949  ·  seen 5×').has('declaration-over-implementation'));
+  ok('prose that merely mentions a class name is not counted as a lesson',
+    lessonKeys('we discussed declaration-over-implementation at length').size === 0);
 
   const existing = [
     { title: 'secret-leak', text: 'git history still leaked private tokens before publish' },

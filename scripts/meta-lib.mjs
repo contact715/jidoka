@@ -296,3 +296,45 @@ export function validateLedgerEntry(e) {
   }
   return problems;
 }
+
+// ── guard-on-consolidation (2026-W33-R13) ───────────────────────────────────
+// Everything above guards a WRITE: one record arriving, judged against what memory already holds.
+// But the digest is not only written to — it is REBUILT. `memory-consolidate.render()` throws the
+// whole file away and prints a new one from the ledger, and nothing ever compared the two. A class
+// that stops matching a regex, a scoring change that drops a tier, a ledger row that fails to
+// parse: any of these deletes a lesson silently, and the next session simply never learns it.
+// Losing memory during the act of organising memory is the worst place to have no guard at all.
+//
+// A lesson may legitimately leave the active tiers — but only by being SUPERSEDED, which keeps it
+// in the History tail. Vanishing entirely is never legitimate.
+const LESSON_HEADING = /^###\s+([a-z0-9]+(?:-[a-z0-9]+)*)\b/gm;
+
+/** Every class named in a rendered digest, in any tier including History. Pure. */
+export function lessonKeys(markdown = '') {
+  const out = new Set();
+  for (const m of String(markdown).matchAll(LESSON_HEADING)) out.add(m[1]);
+  return out;
+}
+
+/**
+ * Compare the digest BEFORE a consolidation with the one it produced. Pure.
+ * `lost` = classes that were there and are now nowhere, not even in History.
+ * An empty new digest is never "everything was superseded" — it is a broken rebuild.
+ */
+export function consolidationVerdict(beforeMd = '', afterMd = '') {
+  const before = lessonKeys(beforeMd);
+  const after = lessonKeys(afterMd);
+  // A class that was RENAMED by an alias merge has not been lost: its incidents live on under the
+  // canonical name. Caught on the guard's first live run, where `gate-block-not-enforced` vanished
+  // and the guard called it a deletion — it had been merged into `gate-claims-block-but-passes` by
+  // W32-R7. A guard that cannot tell a rename from a deletion cries wolf until someone disables it.
+  const renamed = (k) => { const t = CLASS_ALIASES[k]; return Boolean(t && after.has(t)); };
+  const lost = [...before].filter((k) => !after.has(k) && !renamed(k)).sort();
+  const gained = [...after].filter((k) => !before.has(k)).sort();
+  if (before.size > 0 && after.size === 0) {
+    return { ok: false, lost, gained, reason: `свёртка стёрла ВСЕ уроки (${before.size} → 0): это сломанная пересборка, а не устаревание` };
+  }
+  return lost.length
+    ? { ok: false, lost, gained, reason: `свёртка потеряла ${lost.length} урок(ов) без пометки об устаревании: ${lost.slice(0, 6).join(', ')}` }
+    : { ok: true, lost, gained, reason: gained.length ? `уроков не потеряно, добавилось ${gained.length}` : 'уроков не потеряно' };
+}
