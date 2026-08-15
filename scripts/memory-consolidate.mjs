@@ -46,6 +46,37 @@ export const SUPERSEDE_MARKER = /\s\[superseded \d{4}-\d{2}-\d{2} by: [^\]]+\]\s
 export const isSupersededText = (s) => SUPERSEDE_MARKER.test(String(s || ''));
 
 // EPISODIC rows → SEMANTIC clusters, ranked by recency-weighted frequency.
+// ── prevInClass: episodic sequence → semantic edges (2026-W28-R7) ────────────
+// Each cluster is computed in isolation: N incidents of one class, scored, tiered, done. The
+// ORDER in which classes actually arrive is thrown away, and that order carries the one thing a
+// per-class lesson can never say — that this class keeps arriving right after that one. A gate
+// bypass that habitually follows a declaration-over-implementation is not two independent lessons,
+// it is a chain, and the chain is what a reader needs to break.
+//
+// Deliberately conservative: an edge is reported only when it repeats. A single "B came after A"
+// is coincidence, and a digest that promotes coincidence to a lesson teaches noise. The same
+// discipline the recurrence detector uses (threshold 2), for the same reason.
+export function classEdges(rows = [], { minCount = 2 } = {}) {
+  const chron = [...rows]
+    .filter((r) => r && r.class && r.date)
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const counts = new Map(); // "prev→cls" → n
+  for (let i = 1; i < chron.length; i++) {
+    const prev = chron[i - 1].class, cls = chron[i].class;
+    if (prev === cls) continue; // a class following itself is recurrence, already measured elsewhere
+    const key = `${prev}\u0000${cls}`;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const byClass = {};
+  for (const [key, count] of counts) {
+    if (count < minCount) continue;
+    const [prev, cls] = key.split('\u0000');
+    (byClass[cls] ??= []).push({ cls: prev, count });
+  }
+  for (const list of Object.values(byClass)) list.sort((a, b) => b.count - a.count || a.cls.localeCompare(b.cls));
+  return byClass;
+}
+
 export function consolidate(rows, today = todayISO(), remedies = REMEDIES) {
   // map every gated class AND its remedy family to the gate that covers it
   const familyGate = {};
@@ -54,6 +85,7 @@ export function consolidate(rows, today = todayISO(), remedies = REMEDIES) {
     for (const f of (r.family || [])) if (!familyGate[f]) familyGate[f] = cls;
   }
   const byClass = groupByClass(rows);
+  const edges = classEdges(rows);
   const clusters = Object.entries(byClass).map(([cls, items]) => {
     const sorted = [...items].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)); // newest first
     const score = scoreCluster(items, today);
@@ -67,6 +99,7 @@ export function consolidate(rows, today = todayISO(), remedies = REMEDIES) {
       projects: [...new Set(items.map(i => i.project).filter(Boolean))].sort(),
       gated: !!gate, gateMechanism: gate ? gate.mechanism : null,
       gateVia: gate && gateCls !== cls ? gateCls : null,
+      prevInClass: edges[cls] || [],
       examples: sorted.slice(0, 2).map(i => ({ date: i.date, claimed: i.claimed, real: i.real, caught_by: i.caught_by })),
     };
   }).sort((a, b) => b.score - a.score || (a.cls < b.cls ? -1 : 1)); // stable: score desc, then class asc
@@ -99,7 +132,11 @@ function renderLesson(c) {
     : '⚠ **ungated — still a live risk**';
   const proj = c.projects.length ? ` · ${c.projects.join(', ')}` : '';
   const ex = c.examples.map(e => `  - \`${e.date}\` claimed *"${e.claimed}"* → really *"${e.real}"* (caught by ${e.caught_by})`).join('\n');
-  return `### ${c.cls}  ·  score ${c.score}  ·  seen ${c.count}×  ·  last ${c.lastAge}d ago${proj}\n${gate}\n${ex}`;
+  // the chain, when there is one: what this class keeps arriving right after (2026-W28-R7)
+  const chain = (c.prevInClass || []).length
+    ? `\n↩ обычно приходит следом за: ${c.prevInClass.slice(0, 3).map(p => `\`${p.cls}\` (${p.count}×)`).join(', ')}`
+    : '';
+  return `### ${c.cls}  ·  score ${c.score}  ·  seen ${c.count}×  ·  last ${c.lastAge}d ago${proj}\n${gate}${chain}\n${ex}`;
 }
 
 export function render(model, retro = { scanned: 0, lessons: [] }) {
@@ -160,6 +197,7 @@ function selfTest() {
   const HIST_HEADER = '🗂 History — superseded';
   const beforeHist = out.includes(HIST_HEADER) ? out.slice(0, out.indexOf(HIST_HEADER)) : out;
   const histSection = out.includes(HIST_HEADER) ? out.slice(out.indexOf(HIST_HEADER)) : '';
+  const seq = (...pairs) => pairs.map(([date, cls]) => ({ date, class: cls }));
   const T = [
     ['hot ranks first (recency+frequency)', m.clusters[0].cls === 'hot'],
     ['hot > medium (frequency: 3 recent beats 1)', get('hot').score > get('medium').score],
@@ -174,6 +212,32 @@ function selfTest() {
     ['superseded cluster flagged on the model', get('retired-rule') && get('retired-rule').superseded === true],
     ['superseded cluster NOT in Active/Watch/Decayed sections', !beforeHist.includes('retired-rule')],
     ['superseded cluster DOES render under History tail', histSection.includes('retired-rule')],
+
+    // ── prevInClass: episodic sequence → semantic edges (2026-W28-R7) ────────
+    ['a pair that repeats becomes an edge', (() => {
+      const e = classEdges(seq(['2026-01-01', 'a'], ['2026-01-02', 'b'], ['2026-01-03', 'a'], ['2026-01-04', 'b']));
+      return e.b?.[0]?.cls === 'a' && e.b[0].count === 2;
+    })()],
+    // one co-occurrence is coincidence; promoting it to a lesson would teach noise
+    ['a pair seen ONCE is not an edge', Object.keys(classEdges(seq(['2026-01-01', 'a'], ['2026-01-02', 'b']))).length === 0],
+    ['a class following ITSELF is not an edge (that is recurrence, measured elsewhere)',
+      Object.keys(classEdges(seq(['2026-01-01', 'a'], ['2026-01-02', 'a'], ['2026-01-03', 'a']))).length === 0],
+    ['edges are ordered by how often the chain repeats', (() => {
+      const e = classEdges(seq(['2026-01-01', 'x'], ['2026-01-02', 'z'], ['2026-01-03', 'y'], ['2026-01-04', 'z'],
+        ['2026-01-05', 'x'], ['2026-01-06', 'z'], ['2026-01-07', 'y'], ['2026-01-08', 'z'], ['2026-01-09', 'x'], ['2026-01-10', 'z']));
+      return e.z[0].cls === 'x' && e.z[0].count === 3 && e.z[1].count === 2;
+    })()],
+    ['rows are read in DATE order, not file order', (() => {
+      const e = classEdges(seq(['2026-01-04', 'b'], ['2026-01-01', 'a'], ['2026-01-03', 'a'], ['2026-01-02', 'b']));
+      return e.b?.[0]?.count === 2;
+    })()],
+    ['rows without a class or date are skipped, not crashed on',
+      Object.keys(classEdges([{ date: '2026-01-01' }, { class: 'a' }, null])).length === 0],
+    ['consolidate attaches the edges to the cluster', (() => {
+      const rs = seq(['2026-01-01', 'a'], ['2026-01-02', 'b'], ['2026-01-03', 'a'], ['2026-01-04', 'b'])
+        .map((r) => ({ ...r, claimed: 'c', real: 'r', caught_by: 'x' }));
+      return consolidate(rs, '2026-01-05', {}).clusters.find((c) => c.cls === 'b').prevInClass[0].cls === 'a';
+    })()],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }

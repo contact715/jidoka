@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 79% · shipped 77/97, open 20, regressed 0, ~0.83w to ship**
+**adoption 80% · shipped 78/97, open 19, regressed 0, ~0.88w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -23,7 +23,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | open | 2026-W28-R4 | cohesionPartition() — split/serialize from real import edges (kills scaffold buildDag) | scripts/dag-schedule.mjs#cohesionPartition | not yet present: scripts/dag-schedule.mjs#cohesionPartition |
 | open | 2026-W28-R5 | Deterministic evidence-gap loop in memory retrieval (close last open-loop) | scripts/get-spec-context.mjs#evidence-gap-loop | not yet present: scripts/get-spec-context.mjs#evidence-gap-loop |
 | shipped | 2026-W28-R6 | Per-bundle token meter at context-assembly (thermometer under budget-gate) | scripts/shard-story-bundle.mjs | present (code): scripts/shard-story-bundle.mjs |
-| open | 2026-W28-R7 | Persisted class-edges (prevInClass[]) in memory-consolidate (episodic->semantic) | scripts/memory-consolidate.mjs#prevInClass | not yet present: scripts/memory-consolidate.mjs#prevInClass |
+| shipped | 2026-W28-R7 | Persisted class-edges (prevInClass[]) in memory-consolidate (episodic->semantic) | scripts/memory-consolidate.mjs#classEdges | present (symbol): scripts/memory-consolidate.mjs#classEdges |
 | open | 2026-W28-R8 | Static intent-vs-evidence contract-drift gate (reverse axis of spec-drift) | scripts/detect-drift.mjs#intent-vs-evidence | not yet present: scripts/detect-drift.mjs#intent-vs-evidence |
 | open | 2026-W28-R9 | Dated delta-archive of specs (EARS) + wire disconnected change-ceremony gates | scripts/spec-archive.mjs | not yet present: scripts/spec-archive.mjs |
 | rejected | 2026-W28-P1 | process-mine.mjs — data-grounded business-process discovery + conformance gap (PORT the process-mining IDEA, reject PM4Py dep) for business-process-architect/data-analyst/kaizen-officer | scripts/process-mine.mjs | deferred by owner 2026-07-06: target confirmed = dev-environment (jidoka/Claude Code), not client product. Process-mining is a product-building capability; revisit only when a real client+event-log exists. |
