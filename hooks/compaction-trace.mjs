@@ -22,6 +22,7 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const LOG = process.env.JIDOKA_COMPACTION_LOG || join(homedir(), '.jidoka', 'compaction-events.jsonl');
 
@@ -65,17 +66,22 @@ function selfTest() {
   process.exit(0);
 }
 
-if (process.argv.includes('--self-test')) selfTest();
 
-let raw = '';
-process.stdin.on('data', (c) => { raw += c; });
-process.stdin.on('end', () => {
-  try {
-    const input = JSON.parse(raw || '{}');
-    const event = process.argv[2] || input.hook_event_name || 'PreCompact';
-    mkdirSync(dirname(LOG), { recursive: true });
-    appendFileSync(LOG, `${JSON.stringify(traceRecord(input, event))}\n`);
-  } catch { /* fail-open: a missing trace line must never break compaction */ }
-  process.exit(0);
-});
-setTimeout(() => process.exit(0), 3000);
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  if (process.argv.includes('--self-test')) selfTest();
+
+  let raw = '';
+  process.stdin.on('data', (c) => { raw += c; });
+  process.stdin.on('end', () => {
+    try {
+      const input = JSON.parse(raw || '{}');
+      const event = process.argv[2] || input.hook_event_name || 'PreCompact';
+      mkdirSync(dirname(LOG), { recursive: true });
+      appendFileSync(LOG, `${JSON.stringify(traceRecord(input, event))}\n`);
+    } catch { /* fail-open: a missing trace line must never break compaction */ }
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(0), 3000);
+}

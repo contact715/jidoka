@@ -182,60 +182,65 @@ function generateContent(roster) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-const roster = parseRoster();
-const agentCount = roster.size;
 
-const { content, totalNodes, warnAgents } = generateContent(roster);
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-// AC-11: warn on any agent with no Line: annotation (lineClass === 'unknown')
-if (warnAgents.length > 0) {
-  process.stdout.write(`[arch] [WARN] ${warnAgents.length} agent(s) have no Line: annotation in AGENT_ROSTER.md:\n`);
-  for (const a of warnAgents) {
-    process.stdout.write(`  - ${a.name}\n`);
-  }
-  process.stdout.write(`[arch] [WARN] These agents are omitted from the topology diagram. Add a Line: column value to fix.\n`);
-}
+if (isMain) {
+  const roster = parseRoster();
+  const agentCount = roster.size;
 
-if (isCheck) {
-  // ── Check mode: compare buffer vs committed file ───────────────────────────
-  // Mirrors generate-api-types.mjs:142-155 drift-gate skeleton exactly.
-  let committed;
-  try {
-    committed = fs.readFileSync(OUT_PATH, 'utf8');
-  } catch (err) {
-    process.stderr.write(
-      `[arch] [FAIL] Cannot read committed file at ${OUT_PATH}\n  ${err.message}\n`
-    );
-    process.stderr.write(
-      `[arch] Hint: run \`npm run arch:topology\` to create the initial file.\n`
-    );
-    process.exit(1);
+  const { content, totalNodes, warnAgents } = generateContent(roster);
+
+  // AC-11: warn on any agent with no Line: annotation (lineClass === 'unknown')
+  if (warnAgents.length > 0) {
+    process.stdout.write(`[arch] [WARN] ${warnAgents.length} agent(s) have no Line: annotation in AGENT_ROSTER.md:\n`);
+    for (const a of warnAgents) {
+      process.stdout.write(`  - ${a.name}\n`);
+    }
+    process.stdout.write(`[arch] [WARN] These agents are omitted from the topology diagram. Add a Line: column value to fix.\n`);
   }
 
-  // Normalize timestamps for a stable comparison — the "Last update: <ISO>" line
-  // changes on every run; strip it before comparing (same pattern as generate-api-types.mjs:160).
-  const normalize = (s) => s.replace(/Last update: [^\n]+/g, 'Last update: <NORMALIZED>');
+  if (isCheck) {
+    // ── Check mode: compare buffer vs committed file ───────────────────────────
+    // Mirrors generate-api-types.mjs:142-155 drift-gate skeleton exactly.
+    let committed;
+    try {
+      committed = fs.readFileSync(OUT_PATH, 'utf8');
+    } catch (err) {
+      process.stderr.write(
+        `[arch] [FAIL] Cannot read committed file at ${OUT_PATH}\n  ${err.message}\n`
+      );
+      process.stderr.write(
+        `[arch] Hint: run \`npm run arch:topology\` to create the initial file.\n`
+      );
+      process.exit(1);
+    }
 
-  if (normalize(content) === normalize(committed)) {
-    process.stdout.write(
-      `[arch] [PASS] Committed AGENT_TOPOLOGY.md matches fresh regeneration.\n` +
-      `[arch] ${agentCount} agents parsed, ${totalNodes} nodes, 4 subgraphs.\n`
-    );
-    process.exit(0);
+    // Normalize timestamps for a stable comparison — the "Last update: <ISO>" line
+    // changes on every run; strip it before comparing (same pattern as generate-api-types.mjs:160).
+    const normalize = (s) => s.replace(/Last update: [^\n]+/g, 'Last update: <NORMALIZED>');
+
+    if (normalize(content) === normalize(committed)) {
+      process.stdout.write(
+        `[arch] [PASS] Committed AGENT_TOPOLOGY.md matches fresh regeneration.\n` +
+        `[arch] ${agentCount} agents parsed, ${totalNodes} nodes, 4 subgraphs.\n`
+      );
+      process.exit(0);
+    } else {
+      process.stdout.write(
+        `[arch] [FAIL] Committed AGENT_TOPOLOGY.md is STALE — it does not match a fresh regeneration.\n` +
+        `[arch] Run \`npm run arch:topology\` to update the committed file, then re-commit.\n` +
+        `[arch] ${agentCount} agents parsed, ${totalNodes} nodes in fresh output.\n`
+      );
+      process.exit(1);
+    }
   } else {
+    // ── Write mode ─────────────────────────────────────────────────────────────
+    fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
+    fs.writeFileSync(OUT_PATH, content, 'utf8');
     process.stdout.write(
-      `[arch] [FAIL] Committed AGENT_TOPOLOGY.md is STALE — it does not match a fresh regeneration.\n` +
-      `[arch] Run \`npm run arch:topology\` to update the committed file, then re-commit.\n` +
-      `[arch] ${agentCount} agents parsed, ${totalNodes} nodes in fresh output.\n`
+      `[arch] Wrote ${OUT_PATH}\n` +
+      `[arch] ${agentCount} agents parsed, ${totalNodes} nodes emitted, 4 subgraphs.\n`
     );
-    process.exit(1);
   }
-} else {
-  // ── Write mode ─────────────────────────────────────────────────────────────
-  fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
-  fs.writeFileSync(OUT_PATH, content, 'utf8');
-  process.stdout.write(
-    `[arch] Wrote ${OUT_PATH}\n` +
-    `[arch] ${agentCount} agents parsed, ${totalNodes} nodes emitted, 4 subgraphs.\n`
-  );
 }

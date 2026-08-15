@@ -260,4 +260,9 @@ ${table}
   process.stdout.write(`[specs-index] wrote ${rows.length} rows → docs/specs/_INDEX.md\n`);
 }
 
-main();
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  main();
+}

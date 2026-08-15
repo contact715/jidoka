@@ -683,8 +683,13 @@ const args = process.argv.slice(2);
 const applyMode = args.includes('--apply');
 const dryRunMode = args.includes('--dry-run') || !applyMode;
 
-if (applyMode) {
-  runApply();
-} else {
-  runDryRun();
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  if (applyMode) {
+    runApply();
+  } else {
+    runDryRun();
+  }
 }

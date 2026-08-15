@@ -13,6 +13,7 @@ import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { homedir, tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 const REGISTRY_REL = 'docs/specs/_CLAIMED_WAVES.jsonl';
 const sh = (cmd, cwd) => execSync(cmd, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -180,118 +181,123 @@ function selfTest() {
   process.exit(0);
 }
 
-if (process.argv.includes('--self-test')) selfTest();
 
-try {
-  const jidoka = join(homedir(), '.claude', 'jidoka');
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-  // 1) rebuild the digest (measured: ~40ms) + refresh the memory-curator utility priors
-  try { execSync(`node ${join(jidoka, 'scripts', 'memory-consolidate.mjs')}`, { stdio: 'ignore', timeout: 5000 }); } catch { /* keep old digest */ }
-  try { execSync(`node ${join(jidoka, 'scripts', 'memory-curator.mjs')} --build`, { stdio: 'ignore', timeout: 5000 }); } catch { /* keep old priors */ }
+if (isMain) {
+  if (process.argv.includes('--self-test')) selfTest();
 
-  // 2) jidoka health (same cached signals as the statusline)
-  let health = '⚪ нет baseline';
-  for (const p of ['docs/audits/andon-halt.json', 'docs/audits/halt-state.json']) {
-    if (existsSync(join(jidoka, p))) { health = '🔴 HALT — открой docs/audits/'; break; }
-  }
-  if (!health.startsWith('🔴')) {
+  try {
+    const jidoka = join(homedir(), '.claude', 'jidoka');
+
+    // 1) rebuild the digest (measured: ~40ms) + refresh the memory-curator utility priors
+    try { execSync(`node ${join(jidoka, 'scripts', 'memory-consolidate.mjs')}`, { stdio: 'ignore', timeout: 5000 }); } catch { /* keep old digest */ }
+    try { execSync(`node ${join(jidoka, 'scripts', 'memory-curator.mjs')} --build`, { stdio: 'ignore', timeout: 5000 }); } catch { /* keep old priors */ }
+
+    // 2) jidoka health (same cached signals as the statusline)
+    let health = '⚪ нет baseline';
+    for (const p of ['docs/audits/andon-halt.json', 'docs/audits/halt-state.json']) {
+      if (existsSync(join(jidoka, p))) { health = '🔴 HALT — открой docs/audits/'; break; }
+    }
+    if (!health.startsWith('🔴')) {
+      try {
+        // the installed copy does not carry docs/evals/_baseline.json, so this line said
+        // 'нет baseline' in every session while the number existed in the canon repo one
+        // directory away. Look there too before admitting ignorance.
+        const baselinePaths = [join(jidoka, 'docs/evals/_baseline.json'), join(homedir(), 'jidoka-framework/docs/evals/_baseline.json')];
+        const found = baselinePaths.find((p) => existsSync(p));
+        if (!found) throw new Error('no baseline anywhere');
+        const pct = Math.round(JSON.parse(readFileSync(found, 'utf8')).pass_rate * 100);
+        health = pct === 100 ? `🟢 eval ${pct}%` : `🟡 eval ${pct}%`;
+      } catch { /* keep default */ }
+    }
+
+    // 2b) age of the signals (2026-W31-R2). The CI line above already exists and stays silent when
+    // green, by design. What was missing is whether the DATA is still fresh: a ledger that stopped
+    // receiving entries and an honest-state doc nobody touched both read as authority while stale.
+    // --ages does no network call, so session start pays nothing extra.
+    let ages = '';
     try {
-      // the installed copy does not carry docs/evals/_baseline.json, so this line said
-      // 'нет baseline' in every session while the number existed in the canon repo one
-      // directory away. Look there too before admitting ignorance.
-      const baselinePaths = [join(jidoka, 'docs/evals/_baseline.json'), join(homedir(), 'jidoka-framework/docs/evals/_baseline.json')];
-      const found = baselinePaths.find((p) => existsSync(p));
-      if (!found) throw new Error('no baseline anywhere');
-      const pct = Math.round(JSON.parse(readFileSync(found, 'utf8')).pass_rate * 100);
-      health = pct === 100 ? `🟢 eval ${pct}%` : `🟡 eval ${pct}%`;
-    } catch { /* keep default */ }
-  }
+      ages = execSync(`node ${join(jidoka, 'scripts', 'system-truth.mjs')} --ages`, { encoding: 'utf8', timeout: 6000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    } catch { /* fail-open: no line rather than a hung session */ }
+    // 3) lessons — hot ones by name, and EVERY ungated class regardless of tier (2026-W32-R3)
+    const md = readFileSync(join(jidoka, 'memory-consolidated.md'), 'utf8');
+    const lessons = hotFrom(md);
+    const live = ungatedFrom(md);
 
-  // 2b) age of the signals (2026-W31-R2). The CI line above already exists and stays silent when
-  // green, by design. What was missing is whether the DATA is still fresh: a ledger that stopped
-  // receiving entries and an honest-state doc nobody touched both read as authority while stale.
-  // --ages does no network call, so session start pays nothing extra.
-  let ages = '';
-  try {
-    ages = execSync(`node ${join(jidoka, 'scripts', 'system-truth.mjs')} --ages`, { encoding: 'utf8', timeout: 6000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-  } catch { /* fail-open: no line rather than a hung session */ }
-  // 3) lessons — hot ones by name, and EVERY ungated class regardless of tier (2026-W32-R3)
-  const md = readFileSync(join(jidoka, 'memory-consolidated.md'), 'utf8');
-  const lessons = hotFrom(md);
-  const live = ungatedFrom(md);
-
-  // 3b) гейты, которые РАБОТАЮТ, но реестру классов неизвестны (2026-W33-K1).
-  // Пока их не зарегистрировал человек, строка «БЕЗ гейта» выше завышена: 2026-08-10 из
-  // пятнадцати «живых рисков» пять были закрыты работающим механизмом. Считаем дёшево и
-  // молча падаем в пустую строку, чтобы не задерживать старт сессии.
-  let pendingLine = '';
-  try {
-    const [ga, { REMEDIES }] = await Promise.all([
-      import(pathToFileURL(join(jidoka, 'scripts', 'gate-audit.mjs')).href),
-      import(pathToFileURL(join(jidoka, 'scripts', 'meta-remedies.mjs')).href),
-    ]);
-    // same helpers the auditor uses, so the two never disagree about what "wired" means
-    // the live hooks sit in ~/.claude/hooks; only some are mirrored into the install, so both are scanned
-    const files = ga.collectMechanisms(jidoka, { extraDirs: [join(homedir(), '.claude', 'hooks')] });
-    let settingsRaw = '';
-    try { settingsRaw = readFileSync(join(homedir(), '.claude', 'settings.json'), 'utf8'); } catch { /* none */ }
-    const wired = ga.wiredSetFrom(files, ga.callerTexts(jidoka, settingsRaw));
-    const rev = ga.reverseRemedyAudit({ tags: ga.closesClassTags(files), remedies: REMEDIES, wired });
-    if (rev.pending.length) {
-      pendingLine = `ждут регистрации в реестре классов: ${rev.pending.length} (${rev.pending.map((p) => p.cls).join(', ')}) — гейт работает, метрики его не видят; node scripts/gate-audit.mjs даст блок для вставки`;
-    }
-  } catch { /* fail-open: нет строки лучше, чем задержанный старт */ }
-
-  // 4) чужие свежие клеймы wave-id в проекте этой сессии (cwd хука = корень проекта)
-  let claims = [];
-  try { claims = freshClaims(sh('git rev-parse --show-toplevel', process.cwd())); } catch { /* не git-репо */ }
-
-  // 5) serial task-queue — remind to work it one at a time (autonomous default)
-  let queueLine = '';
-  try {
-    const qp = join(homedir(), '.jidoka', 'task-queue', 'queue.jsonl');
-    if (existsSync(qp)) {
-      const items = readFileSync(qp, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
-      const waiting = items.filter(t => t.status === 'queued').length;
-      const activeTask = items.find(t => t.status === 'in_progress');
-      if (waiting || activeTask) {
-        queueLine = `очередь задач: ${waiting} ждут${activeTask ? ` · в работе: ${activeTask.title}` : ''} — веди по одной (task-queue.mjs next → сделал → safe-commit → done)`;
+    // 3b) гейты, которые РАБОТАЮТ, но реестру классов неизвестны (2026-W33-K1).
+    // Пока их не зарегистрировал человек, строка «БЕЗ гейта» выше завышена: 2026-08-10 из
+    // пятнадцати «живых рисков» пять были закрыты работающим механизмом. Считаем дёшево и
+    // молча падаем в пустую строку, чтобы не задерживать старт сессии.
+    let pendingLine = '';
+    try {
+      const [ga, { REMEDIES }] = await Promise.all([
+        import(pathToFileURL(join(jidoka, 'scripts', 'gate-audit.mjs')).href),
+        import(pathToFileURL(join(jidoka, 'scripts', 'meta-remedies.mjs')).href),
+      ]);
+      // same helpers the auditor uses, so the two never disagree about what "wired" means
+      // the live hooks sit in ~/.claude/hooks; only some are mirrored into the install, so both are scanned
+      const files = ga.collectMechanisms(jidoka, { extraDirs: [join(homedir(), '.claude', 'hooks')] });
+      let settingsRaw = '';
+      try { settingsRaw = readFileSync(join(homedir(), '.claude', 'settings.json'), 'utf8'); } catch { /* none */ }
+      const wired = ga.wiredSetFrom(files, ga.callerTexts(jidoka, settingsRaw));
+      const rev = ga.reverseRemedyAudit({ tags: ga.closesClassTags(files), remedies: REMEDIES, wired });
+      if (rev.pending.length) {
+        pendingLine = `ждут регистрации в реестре классов: ${rev.pending.length} (${rev.pending.map((p) => p.cls).join(', ')}) — гейт работает, метрики его не видят; node scripts/gate-audit.mjs даст блок для вставки`;
       }
-    }
-  } catch { /* no queue */ }
+    } catch { /* fail-open: нет строки лучше, чем задержанный старт */ }
 
-  // 6) real CI verdict for the engine's own main branch, cached 30 min, silent on any failure
-  let ci = '';
-  try {
-    const cachePath = join(jidoka, '.ci-verdict-cache.json');
-    let cache = null;
-    try { cache = JSON.parse(readFileSync(cachePath, 'utf8')); } catch { /* no cache yet */ }
-    if (!cacheFresh(cache)) {
-      const repoDir = join(homedir(), 'jidoka-framework');
-      const slug = existsSync(repoDir)
-        ? (sh('git remote get-url origin', repoDir).match(/[:/]([^/:]+\/[^/]+?)(?:\.git)?$/) || [])[1]
-        : null;
-      if (slug) {
-        const raw = sh(`gh run list -R ${slug} --workflow=ci.yml --branch=main --limit 1 --json conclusion,createdAt`, repoDir);
-        cache = { at: Date.now(), run: JSON.parse(raw)[0] || null };
-        try { writeFileSync(cachePath, JSON.stringify(cache)); } catch { /* cache is best-effort */ }
+    // 4) чужие свежие клеймы wave-id в проекте этой сессии (cwd хука = корень проекта)
+    let claims = [];
+    try { claims = freshClaims(sh('git rev-parse --show-toplevel', process.cwd())); } catch { /* не git-репо */ }
+
+    // 5) serial task-queue — remind to work it one at a time (autonomous default)
+    let queueLine = '';
+    try {
+      const qp = join(homedir(), '.jidoka', 'task-queue', 'queue.jsonl');
+      if (existsSync(qp)) {
+        const items = readFileSync(qp, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
+        const waiting = items.filter(t => t.status === 'queued').length;
+        const activeTask = items.find(t => t.status === 'in_progress');
+        if (waiting || activeTask) {
+          queueLine = `очередь задач: ${waiting} ждут${activeTask ? ` · в работе: ${activeTask.title}` : ''} — веди по одной (task-queue.mjs next → сделал → safe-commit → done)`;
+        }
       }
-    }
-    ci = ciLine(cache && cache.run);
-  } catch { /* no gh / no network / no repo → say nothing rather than guess */ }
+    } catch { /* no queue */ }
 
-  const out = [
-    '[session-start digest]',
-    `jidoka: ${health}`,
-    ci,
-    ages,
-    queueLine,
-    lessons.length ? `активные уроки (🔴): ${lessons.join(', ')}` : '',
-    live.total ? `БЕЗ гейта (живой риск, ${live.total}): ${live.shown.join(', ')}${live.total > live.shown.length ? ` и ещё ${live.total - live.shown.length}` : ''}` : '',
-    pendingLine,
-    claims.length ? `⚠️ занятые wave-id (клеймы <24ч): ${claims.join(', ')} — свой номер бери через claim-wave-id.mjs` : '',
-    'полный дайджест: ~/.claude/jidoka/memory-consolidated.md',
-  ].filter(Boolean).join('\n');
-  process.stdout.write(out);
-} catch { /* silent */ }
-process.exit(0);
+    // 6) real CI verdict for the engine's own main branch, cached 30 min, silent on any failure
+    let ci = '';
+    try {
+      const cachePath = join(jidoka, '.ci-verdict-cache.json');
+      let cache = null;
+      try { cache = JSON.parse(readFileSync(cachePath, 'utf8')); } catch { /* no cache yet */ }
+      if (!cacheFresh(cache)) {
+        const repoDir = join(homedir(), 'jidoka-framework');
+        const slug = existsSync(repoDir)
+          ? (sh('git remote get-url origin', repoDir).match(/[:/]([^/:]+\/[^/]+?)(?:\.git)?$/) || [])[1]
+          : null;
+        if (slug) {
+          const raw = sh(`gh run list -R ${slug} --workflow=ci.yml --branch=main --limit 1 --json conclusion,createdAt`, repoDir);
+          cache = { at: Date.now(), run: JSON.parse(raw)[0] || null };
+          try { writeFileSync(cachePath, JSON.stringify(cache)); } catch { /* cache is best-effort */ }
+        }
+      }
+      ci = ciLine(cache && cache.run);
+    } catch { /* no gh / no network / no repo → say nothing rather than guess */ }
+
+    const out = [
+      '[session-start digest]',
+      `jidoka: ${health}`,
+      ci,
+      ages,
+      queueLine,
+      lessons.length ? `активные уроки (🔴): ${lessons.join(', ')}` : '',
+      live.total ? `БЕЗ гейта (живой риск, ${live.total}): ${live.shown.join(', ')}${live.total > live.shown.length ? ` и ещё ${live.total - live.shown.length}` : ''}` : '',
+      pendingLine,
+      claims.length ? `⚠️ занятые wave-id (клеймы <24ч): ${claims.join(', ')} — свой номер бери через claim-wave-id.mjs` : '',
+      'полный дайджест: ~/.claude/jidoka/memory-consolidated.md',
+    ].filter(Boolean).join('\n');
+    process.stdout.write(out);
+  } catch { /* silent */ }
+  process.exit(0);
+}

@@ -612,7 +612,12 @@ function appendDashboardSummary(summary) {
   }
 }
 
-main().catch(err => {
-  process.stderr.write(`[carbon] FATAL: ${err}\n`);
-  process.exit(1);
-});
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  main().catch(err => {
+    process.stderr.write(`[carbon] FATAL: ${err}\n`);
+    process.exit(1);
+  });
+}

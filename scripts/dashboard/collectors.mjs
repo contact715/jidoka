@@ -9,6 +9,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 // The canonical pipeline graph lives in orchestration-planner.plan() — the single source of truth for
 // the phase graph. The dashboard renders that REAL graph (phases · agents · gates) overlaid with the
@@ -458,4 +459,7 @@ function selfTest() {
   console.log('\n\x1b[32m✓ collectors: pure summarizers correct\x1b[0m'); process.exit(0);
 }
 
-if (process.argv.includes('--self-test')) selfTest();
+// самопроверка — только при прямом запуске. Раньше она срабатывала при импорте,
+// и tui-top.mjs вырезал --self-test из argv, чтобы её обойти
+const isMainCollectors = process.argv[1] === fileURLToPath(import.meta.url);
+if (isMainCollectors && process.argv.includes('--self-test')) selfTest();

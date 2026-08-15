@@ -170,154 +170,158 @@ function profileSelfTest() {
   process.exit(0);
 }
 
-if (process.argv.includes('--self-test')) profileSelfTest();
 
-// canon-install-parity-gate: compare this repo against the live copy and report BOTH directions.
-// Read-only on purpose — it names the drift and exits non-zero; it never silently overwrites a
-// live environment, because a "fix" that only exists in the install would be destroyed by a sync.
-if (process.argv.includes('--check-parity')) {
-  const { readdirSync, statSync } = await import('node:fs');
-  const { homedir } = await import('node:os');
-  const argAfter = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const installRoot = (argAfter('--check-parity') || '').startsWith('/') ? argAfter('--check-parity') : join(homedir(), '.claude', 'jidoka');
-  // RECURSIVE on purpose. The first version listed only the top level of each directory, so
-  // docs/research/weekly/* — the kaizen registries, the whole reason W30-Q2 exists — was never
-  // compared at all and the gate reported "in sync" over a directory it had not looked into.
-  const listDir = (root, rel, depth = 0) => {
-    const abs = join(root, rel);
-    if (!existsSync(abs) || depth > 4) return [];
-    try {
-      return readdirSync(abs).flatMap((f) => {
-        const child = `${rel}/${f}`;
-        try {
-          return statSync(join(abs, f)).isDirectory() ? listDir(root, child, depth + 1) : [child];
-        } catch { return []; }
-      });
-    } catch { return []; }
-  };
-  const canonFiles = GLOBAL_SYNC_DIRS.flatMap((d) => listDir(HERE, d));
-  const installFiles = GLOBAL_SYNC_DIRS.flatMap((d) => listDir(installRoot, d));
-  const r = parityReport(canonFiles, installFiles);
-  console.log(`install-parity — канон ${HERE}\n                 копия  ${installRoot}\n`);
-  console.log(`  канон ${r.canonCount} файл(ов) · копия ${r.installCount}`);
-  for (const d of GLOBAL_SYNC_DIRS) if (!existsSync(join(installRoot, d))) console.log(`  \x1b[31m⌀ в копии нет каталога ${d} целиком\x1b[0m`);
-  if (r.missing.length) { console.log(`\n  \x1b[31mнет в копии (${r.missing.length}):\x1b[0m`); for (const f of r.missing.slice(0, 40)) console.log(`    ${f}`); if (r.missing.length > 40) console.log(`    …и ещё ${r.missing.length - 40}`); }
-  if (r.extra.length) { console.log(`\n  \x1b[33mесть ТОЛЬКО в копии (${r.extra.length}) — почини в каноне, иначе следующая синхронизация это сотрёт:\x1b[0m`); for (const f of r.extra.slice(0, 40)) console.log(`    ${f}`); }
-  console.log(r.inSync ? '\n  \x1b[32m✓ канон и установленная копия совпадают\x1b[0m' : '\n  \x1b[31m✗ копия разошлась с каноном — метрики и гейты читают разный код\x1b[0m');
-  process.exit(r.inSync ? 0 : 1);
-}
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-const target = process.argv.slice(2).find(a => !a.startsWith('--'));
-const isFrontend = process.argv.includes('--frontend');
-const profile = (process.argv.find(a => a.startsWith('--profile=')) || '--profile=standard').split('=')[1];
+if (isMain) {
+  if (process.argv.includes('--self-test')) profileSelfTest();
 
-if (!target || !existsSync(target)) {
-  console.error('usage: node scripts/install-into.mjs <existing-target-dir> [--frontend] [--profile=core|standard|full]  (or --self-test)');
-  process.exit(2);
-}
-const T = s => join(target, s);
-const log = m => console.log(m);
-const isGit = (() => { try { execSync('git rev-parse --is-inside-work-tree', { cwd: target, stdio: 'ignore' }); return true; } catch { return false; } })();
-
-log(`\n\x1b[1minstall-into:\x1b[0m ${target}  (git: ${isGit ? 'yes' : 'NO'}, frontend: ${isFrontend})\n`);
-
-// ── 0. Pre-install survey (necessity check) ──────────────────────────────────
-// Before copying ANYTHING, ask the question that was missing when this whole thing was built: does the
-// target ALREADY have its own equivalent framework? If yes, a blind full install just duplicates it
-// (the Mosco incident: 51 scripts copied next to Mosco's own native framework, 45 went dead). Warn and
-// recommend the minimal profile — do not silently full-install over an existing framework.
-const preNative = detectNativeFramework(nativeSignals(target));
-if (preNative.hasOwn && profile !== 'core') {
-  log(`  \x1b[33m⚠ target already has its own framework\x1b[0m (${preNative.signals.join(', ')}).`);
-  log(`    A '${profile}' install will copy gates this target likely already runs → dead duplication.`);
-  log(`    Recommended: --profile=core (kernel only), or install ONLY the specific gates it lacks and wire them.`);
-  log(`    Proceeding with '${profile}' as requested — the post-install footprint audit below will show what went dead.\n`);
-}
-
-// ── 1. Copy the portable core (proportional: --profile=core|standard|full) ────
-// Self-learning engine + secret guard. NOT instantiation-audit (framework-self-specific).
-const scripts = resolveProfile(profile);
-mkdirSync(T('.jidoka/scripts'), { recursive: true });
-mkdirSync(T('.jidoka/lib/redaction'), { recursive: true });
-for (const f of scripts) copyFileSync(join(HERE, 'scripts', f), T(`.jidoka/scripts/${f}`));
-copyFileSync(join(HERE, 'lib/redaction/redact-pii.mjs'), T('.jidoka/lib/redaction/redact-pii.mjs'));
-log(`  ✓ profile '${profile}': copied ${scripts.length} engine scripts + redact-pii → .jidoka/  (kernel always included)`);
-
-// meta-remedies references mechanism paths as "scripts/..." — rewrite to ".jidoka/scripts/..."
-// so meta-audit's broken-gate check resolves them in the target layout.
-const remPath = T('.jidoka/scripts/meta-remedies.mjs');
-writeFileSync(remPath, readFileSync(remPath, 'utf8').replaceAll("'scripts/", "'.jidoka/scripts/"));
-log('  ✓ adapted meta-remedies mechanism paths to .jidoka/scripts/');
-
-// ── 2. SECURITY FIRST — ensure .gitignore covers secrets BEFORE any git wiring ─
-const SECRET_RULES = ['.secrets.json', '.credentials/', '.env', '.env.local', '.env*.local', '*.key', '**/google_tokens.json', '.jidoka/**/*-events.jsonl', '.jidoka/**/*-trips.jsonl'];
-const giPath = T('.gitignore');
-const gi = existsSync(giPath) ? readFileSync(giPath, 'utf8') : '';
-const missing = SECRET_RULES.filter(r => !gi.split('\n').some(l => l.trim() === r));
-if (missing.length) {
-  appendFileSync(giPath, `\n# jidoka: secret/state guards (added by install-into)\n${missing.join('\n')}\n`);
-  log(`  \x1b[33m✓ added ${missing.length} secret rule(s) to .gitignore (were missing)\x1b[0m`);
-} else {
-  log('  ✓ .gitignore already covers secrets');
-}
-// Hard safety check: are any secret files currently tracked / not ignored?
-if (isGit) {
-  let exposed = [];
-  for (const f of ['.secrets.json', '.env', '.env.local', '.credentials/google_tokens.json']) {
-    if (!existsSync(T(f))) continue;
-    try { execSync(`git check-ignore ${JSON.stringify(f)}`, { cwd: target, stdio: 'ignore' }); }
-    catch { exposed.push(f); } // check-ignore exits 1 = NOT ignored
+  // canon-install-parity-gate: compare this repo against the live copy and report BOTH directions.
+  // Read-only on purpose — it names the drift and exits non-zero; it never silently overwrites a
+  // live environment, because a "fix" that only exists in the install would be destroyed by a sync.
+  if (process.argv.includes('--check-parity')) {
+    const { readdirSync, statSync } = await import('node:fs');
+    const { homedir } = await import('node:os');
+    const argAfter = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+    const installRoot = (argAfter('--check-parity') || '').startsWith('/') ? argAfter('--check-parity') : join(homedir(), '.claude', 'jidoka');
+    // RECURSIVE on purpose. The first version listed only the top level of each directory, so
+    // docs/research/weekly/* — the kaizen registries, the whole reason W30-Q2 exists — was never
+    // compared at all and the gate reported "in sync" over a directory it had not looked into.
+    const listDir = (root, rel, depth = 0) => {
+      const abs = join(root, rel);
+      if (!existsSync(abs) || depth > 4) return [];
+      try {
+        return readdirSync(abs).flatMap((f) => {
+          const child = `${rel}/${f}`;
+          try {
+            return statSync(join(abs, f)).isDirectory() ? listDir(root, child, depth + 1) : [child];
+          } catch { return []; }
+        });
+      } catch { return []; }
+    };
+    const canonFiles = GLOBAL_SYNC_DIRS.flatMap((d) => listDir(HERE, d));
+    const installFiles = GLOBAL_SYNC_DIRS.flatMap((d) => listDir(installRoot, d));
+    const r = parityReport(canonFiles, installFiles);
+    console.log(`install-parity — канон ${HERE}\n                 копия  ${installRoot}\n`);
+    console.log(`  канон ${r.canonCount} файл(ов) · копия ${r.installCount}`);
+    for (const d of GLOBAL_SYNC_DIRS) if (!existsSync(join(installRoot, d))) console.log(`  \x1b[31m⌀ в копии нет каталога ${d} целиком\x1b[0m`);
+    if (r.missing.length) { console.log(`\n  \x1b[31mнет в копии (${r.missing.length}):\x1b[0m`); for (const f of r.missing.slice(0, 40)) console.log(`    ${f}`); if (r.missing.length > 40) console.log(`    …и ещё ${r.missing.length - 40}`); }
+    if (r.extra.length) { console.log(`\n  \x1b[33mесть ТОЛЬКО в копии (${r.extra.length}) — почини в каноне, иначе следующая синхронизация это сотрёт:\x1b[0m`); for (const f of r.extra.slice(0, 40)) console.log(`    ${f}`); }
+    console.log(r.inSync ? '\n  \x1b[32m✓ канон и установленная копия совпадают\x1b[0m' : '\n  \x1b[31m✗ копия разошлась с каноном — метрики и гейты читают разный код\x1b[0m');
+    process.exit(r.inSync ? 0 : 1);
   }
-  if (exposed.length) log(`  \x1b[31m‼ WARNING: these secret files are NOT git-ignored: ${exposed.join(', ')} — fix before committing\x1b[0m`);
-}
 
-// ── 3. Seed the ledger home ──────────────────────────────────────────────────
-mkdirSync(T('docs/audits'), { recursive: true });
-if (!existsSync(T('docs/audits/meta-mistakes.jsonl'))) writeFileSync(T('docs/audits/meta-mistakes.jsonl'), '');
-log('  ✓ seeded docs/audits/meta-mistakes.jsonl (empty ledger)');
+  const target = process.argv.slice(2).find(a => !a.startsWith('--'));
+  const isFrontend = process.argv.includes('--frontend');
+  const profile = (process.argv.find(a => a.startsWith('--profile=')) || '--profile=standard').split('=')[1];
 
-// ── 3a. Seed .sdd-config.json so the spec-drift gate has its soft/hard switch ──
-// Soft by default (warn, never blocks) — graduation to hardBlockEnabled is a human
-// decision after the trial (K8s admission-webhook warn→enforce pattern).
-if (!existsSync(T('.sdd-config.json'))) {
-  writeFileSync(T('.sdd-config.json'), JSON.stringify({
-    _comment: 'jidoka gate config. Flip driftDetection.hardBlockEnabled to true after a soft trial to block on spec→missing-file drift.',
-    driftDetection: { enabled: true, hardBlockEnabled: false, specPaths: ['docs'] },
-  }, null, 2) + '\n');
-  log('  ✓ seeded .sdd-config.json (spec-drift gate: soft/warn — set specPaths to your spec dirs, flip hardBlockEnabled after trial)');
-} else {
-  log('  • .sdd-config.json exists — left as is (add a driftDetection block if missing)');
-}
+  if (!target || !existsSync(target)) {
+    console.error('usage: node scripts/install-into.mjs <existing-target-dir> [--frontend] [--profile=core|standard|full]  (or --self-test)');
+    process.exit(2);
+  }
+  const T = s => join(target, s);
+  const log = m => console.log(m);
+  const isGit = (() => { try { execSync('git rev-parse --is-inside-work-tree', { cwd: target, stdio: 'ignore' }); return true; } catch { return false; } })();
 
-// ── 3b. Federation: project-steward (guardian) + North Star/Charter templates ──
-mkdirSync(T('.claude/agents'), { recursive: true });
-if (!existsSync(T('.claude/agents/project-steward.md'))) copyFileSync(join(HERE, '.claude/agents/project-steward.md'), T('.claude/agents/project-steward.md'));
-if (!existsSync(T('.claude/agents/spec-custodian.md'))) copyFileSync(join(HERE, '.claude/agents/spec-custodian.md'), T('.claude/agents/spec-custodian.md'));
-for (const tpl of ['NORTH_STAR_TEMPLATE.md', 'PROJECT_CHARTER_TEMPLATE.md']) {
-  if (existsSync(join(HERE, 'docs', tpl)) && !existsSync(T('docs/' + tpl))) copyFileSync(join(HERE, 'docs', tpl), T('docs/' + tpl));
-}
-log('  ✓ federation: project-steward + North Star/Charter templates → project (steward fills them)');
+  log(`\n\x1b[1minstall-into:\x1b[0m ${target}  (git: ${isGit ? 'yes' : 'NO'}, frontend: ${isFrontend})\n`);
 
-// ── 4. Install hooks (only if git, and only if not clobbering existing hooks) ──
-const existingHooksPath = (() => { try { return execSync('git config core.hooksPath', { cwd: target, encoding: 'utf8' }).trim(); } catch { return ''; } })();
-const hasHusky = existsSync(T('.husky'));
-if (!isGit) {
-  log('  \x1b[33m• not a git repo → hooks skipped. Run `git init` (after checking .gitignore) then re-run to wire hooks.\x1b[0m');
-} else if (hasHusky || existingHooksPath) {
-  // The target already manages hooks (husky or a custom hooksPath). Overriding would
-  // SILENTLY DISABLE the project's own dev-flow — refuse and print the integration steps.
-  log(`  \x1b[33m• target already has hooks (${hasHusky ? '.husky' : 'core.hooksPath=' + existingHooksPath}) — NOT overriding (would disable them).`);
-  log('    Integrate by adding to the existing pre-commit hook:');
-  log('      node "$(git rev-parse --show-toplevel)/.jidoka/scripts/ledger-schema-gate.mjs" || exit 1');
-  log('      node "$(git rev-parse --show-toplevel)/.jidoka/scripts/meta-honesty.mjs" || exit 1');
-  log('      node "$(git rev-parse --show-toplevel)/.jidoka/scripts/meta-audit.mjs"   || exit 1');
-  log('    and to pre-push: node "$(git rev-parse --show-toplevel)/.jidoka/scripts/pre-publish-guard.mjs" || exit 1');
-  log('    and (if docs/NORTH_STAR.md exists): node "$(git rev-parse --show-toplevel)/.jidoka/scripts/northstar-check.mjs" --doc docs/NORTH_STAR.md || exit 1');
-  log('    and (if docs/PROJECT_CHARTER.md exists): node "$(git rev-parse --show-toplevel)/.jidoka/scripts/charter-check.mjs" --doc docs/PROJECT_CHARTER.md || exit 1');
-  log('    and (spec-drift gate, soft until .sdd-config driftDetection.hardBlockEnabled=true): node "$(git rev-parse --show-toplevel)/.jidoka/scripts/spec-drift-check.mjs" --root "$(git rev-parse --show-toplevel)" || exit 1\x1b[0m');
-} else {
-  mkdirSync(T('.githooks'), { recursive: true });
-  const preCommit = `#!/bin/sh
+  // ── 0. Pre-install survey (necessity check) ──────────────────────────────────
+  // Before copying ANYTHING, ask the question that was missing when this whole thing was built: does the
+  // target ALREADY have its own equivalent framework? If yes, a blind full install just duplicates it
+  // (the Mosco incident: 51 scripts copied next to Mosco's own native framework, 45 went dead). Warn and
+  // recommend the minimal profile — do not silently full-install over an existing framework.
+  const preNative = detectNativeFramework(nativeSignals(target));
+  if (preNative.hasOwn && profile !== 'core') {
+    log(`  \x1b[33m⚠ target already has its own framework\x1b[0m (${preNative.signals.join(', ')}).`);
+    log(`    A '${profile}' install will copy gates this target likely already runs → dead duplication.`);
+    log(`    Recommended: --profile=core (kernel only), or install ONLY the specific gates it lacks and wire them.`);
+    log(`    Proceeding with '${profile}' as requested — the post-install footprint audit below will show what went dead.\n`);
+  }
+
+  // ── 1. Copy the portable core (proportional: --profile=core|standard|full) ────
+  // Self-learning engine + secret guard. NOT instantiation-audit (framework-self-specific).
+  const scripts = resolveProfile(profile);
+  mkdirSync(T('.jidoka/scripts'), { recursive: true });
+  mkdirSync(T('.jidoka/lib/redaction'), { recursive: true });
+  for (const f of scripts) copyFileSync(join(HERE, 'scripts', f), T(`.jidoka/scripts/${f}`));
+  copyFileSync(join(HERE, 'lib/redaction/redact-pii.mjs'), T('.jidoka/lib/redaction/redact-pii.mjs'));
+  log(`  ✓ profile '${profile}': copied ${scripts.length} engine scripts + redact-pii → .jidoka/  (kernel always included)`);
+
+  // meta-remedies references mechanism paths as "scripts/..." — rewrite to ".jidoka/scripts/..."
+  // so meta-audit's broken-gate check resolves them in the target layout.
+  const remPath = T('.jidoka/scripts/meta-remedies.mjs');
+  writeFileSync(remPath, readFileSync(remPath, 'utf8').replaceAll("'scripts/", "'.jidoka/scripts/"));
+  log('  ✓ adapted meta-remedies mechanism paths to .jidoka/scripts/');
+
+  // ── 2. SECURITY FIRST — ensure .gitignore covers secrets BEFORE any git wiring ─
+  const SECRET_RULES = ['.secrets.json', '.credentials/', '.env', '.env.local', '.env*.local', '*.key', '**/google_tokens.json', '.jidoka/**/*-events.jsonl', '.jidoka/**/*-trips.jsonl'];
+  const giPath = T('.gitignore');
+  const gi = existsSync(giPath) ? readFileSync(giPath, 'utf8') : '';
+  const missing = SECRET_RULES.filter(r => !gi.split('\n').some(l => l.trim() === r));
+  if (missing.length) {
+    appendFileSync(giPath, `\n# jidoka: secret/state guards (added by install-into)\n${missing.join('\n')}\n`);
+    log(`  \x1b[33m✓ added ${missing.length} secret rule(s) to .gitignore (were missing)\x1b[0m`);
+  } else {
+    log('  ✓ .gitignore already covers secrets');
+  }
+  // Hard safety check: are any secret files currently tracked / not ignored?
+  if (isGit) {
+    let exposed = [];
+    for (const f of ['.secrets.json', '.env', '.env.local', '.credentials/google_tokens.json']) {
+      if (!existsSync(T(f))) continue;
+      try { execSync(`git check-ignore ${JSON.stringify(f)}`, { cwd: target, stdio: 'ignore' }); }
+      catch { exposed.push(f); } // check-ignore exits 1 = NOT ignored
+    }
+    if (exposed.length) log(`  \x1b[31m‼ WARNING: these secret files are NOT git-ignored: ${exposed.join(', ')} — fix before committing\x1b[0m`);
+  }
+
+  // ── 3. Seed the ledger home ──────────────────────────────────────────────────
+  mkdirSync(T('docs/audits'), { recursive: true });
+  if (!existsSync(T('docs/audits/meta-mistakes.jsonl'))) writeFileSync(T('docs/audits/meta-mistakes.jsonl'), '');
+  log('  ✓ seeded docs/audits/meta-mistakes.jsonl (empty ledger)');
+
+  // ── 3a. Seed .sdd-config.json so the spec-drift gate has its soft/hard switch ──
+  // Soft by default (warn, never blocks) — graduation to hardBlockEnabled is a human
+  // decision after the trial (K8s admission-webhook warn→enforce pattern).
+  if (!existsSync(T('.sdd-config.json'))) {
+    writeFileSync(T('.sdd-config.json'), JSON.stringify({
+      _comment: 'jidoka gate config. Flip driftDetection.hardBlockEnabled to true after a soft trial to block on spec→missing-file drift.',
+      driftDetection: { enabled: true, hardBlockEnabled: false, specPaths: ['docs'] },
+    }, null, 2) + '\n');
+    log('  ✓ seeded .sdd-config.json (spec-drift gate: soft/warn — set specPaths to your spec dirs, flip hardBlockEnabled after trial)');
+  } else {
+    log('  • .sdd-config.json exists — left as is (add a driftDetection block if missing)');
+  }
+
+  // ── 3b. Federation: project-steward (guardian) + North Star/Charter templates ──
+  mkdirSync(T('.claude/agents'), { recursive: true });
+  if (!existsSync(T('.claude/agents/project-steward.md'))) copyFileSync(join(HERE, '.claude/agents/project-steward.md'), T('.claude/agents/project-steward.md'));
+  if (!existsSync(T('.claude/agents/spec-custodian.md'))) copyFileSync(join(HERE, '.claude/agents/spec-custodian.md'), T('.claude/agents/spec-custodian.md'));
+  for (const tpl of ['NORTH_STAR_TEMPLATE.md', 'PROJECT_CHARTER_TEMPLATE.md']) {
+    if (existsSync(join(HERE, 'docs', tpl)) && !existsSync(T('docs/' + tpl))) copyFileSync(join(HERE, 'docs', tpl), T('docs/' + tpl));
+  }
+  log('  ✓ federation: project-steward + North Star/Charter templates → project (steward fills them)');
+
+  // ── 4. Install hooks (only if git, and only if not clobbering existing hooks) ──
+  const existingHooksPath = (() => { try { return execSync('git config core.hooksPath', { cwd: target, encoding: 'utf8' }).trim(); } catch { return ''; } })();
+  const hasHusky = existsSync(T('.husky'));
+  if (!isGit) {
+    log('  \x1b[33m• not a git repo → hooks skipped. Run `git init` (after checking .gitignore) then re-run to wire hooks.\x1b[0m');
+  } else if (hasHusky || existingHooksPath) {
+    // The target already manages hooks (husky or a custom hooksPath). Overriding would
+    // SILENTLY DISABLE the project's own dev-flow — refuse and print the integration steps.
+    log(`  \x1b[33m• target already has hooks (${hasHusky ? '.husky' : 'core.hooksPath=' + existingHooksPath}) — NOT overriding (would disable them).`);
+    log('    Integrate by adding to the existing pre-commit hook:');
+    log('      node "$(git rev-parse --show-toplevel)/.jidoka/scripts/ledger-schema-gate.mjs" || exit 1');
+    log('      node "$(git rev-parse --show-toplevel)/.jidoka/scripts/meta-honesty.mjs" || exit 1');
+    log('      node "$(git rev-parse --show-toplevel)/.jidoka/scripts/meta-audit.mjs"   || exit 1');
+    log('    and to pre-push: node "$(git rev-parse --show-toplevel)/.jidoka/scripts/pre-publish-guard.mjs" || exit 1');
+    log('    and (if docs/NORTH_STAR.md exists): node "$(git rev-parse --show-toplevel)/.jidoka/scripts/northstar-check.mjs" --doc docs/NORTH_STAR.md || exit 1');
+    log('    and (if docs/PROJECT_CHARTER.md exists): node "$(git rev-parse --show-toplevel)/.jidoka/scripts/charter-check.mjs" --doc docs/PROJECT_CHARTER.md || exit 1');
+    log('    and (spec-drift gate, soft until .sdd-config driftDetection.hardBlockEnabled=true): node "$(git rev-parse --show-toplevel)/.jidoka/scripts/spec-drift-check.mjs" --root "$(git rev-parse --show-toplevel)" || exit 1\x1b[0m');
+  } else {
+    mkdirSync(T('.githooks'), { recursive: true });
+    const preCommit = `#!/bin/sh
 # jidoka pre-commit — ledger schema + signal honesty + recurrence/regression gate (all pass on empty ledger).
 ROOT="$(git rev-parse --show-toplevel)"
 node "$ROOT/.jidoka/scripts/ledger-schema-gate.mjs" || exit 1
@@ -333,7 +337,7 @@ node "$ROOT/.jidoka/scripts/ac-coverage-check.mjs" --staged --root "$ROOT" || ex
 node "$ROOT/.jidoka/scripts/spec-amendment-gate.mjs" --staged --root "$ROOT" || exit 1
 exit 0
 `;
-  const prePush = `#!/bin/sh
+    const prePush = `#!/bin/sh
 # jidoka pre-push — secret/PII guard + North Star completeness (only if the product has one).
 ROOT="$(git rev-parse --show-toplevel)"
 node "$ROOT/.jidoka/scripts/pre-publish-guard.mjs" || exit 1
@@ -349,60 +353,61 @@ else
 fi
 exit 0
 `;
-  writeFileSync(T('.githooks/pre-commit'), preCommit); chmodSync(T('.githooks/pre-commit'), 0o755);
-  writeFileSync(T('.githooks/pre-push'), prePush); chmodSync(T('.githooks/pre-push'), 0o755);
-  execSync('git config core.hooksPath .githooks', { cwd: target });
-  log('  ✓ installed .githooks (pre-commit, pre-push) + set core.hooksPath');
-}
-
-// ── 5. Wire npm scripts if package.json exists ───────────────────────────────
-if (existsSync(T('package.json'))) {
-  const pkgRaw = readFileSync(T('package.json'), 'utf8');
-  const pkg = JSON.parse(pkgRaw);
-  pkg.scripts ||= {};
-  const add = {
-    'jidoka:audit': 'node .jidoka/scripts/meta-audit.mjs',
-    'jidoka:honesty': 'node .jidoka/scripts/meta-honesty.mjs',
-    'jidoka:trend': 'node .jidoka/scripts/meta-trend.mjs',
-    'jidoka:log': 'node .jidoka/scripts/meta-log.mjs',
-    'jidoka:premortem': 'node .jidoka/scripts/meta-premortem.mjs',
-    'jidoka:guard': 'node .jidoka/scripts/pre-publish-guard.mjs',
-  };
-  let added = 0;
-  for (const [k, v] of Object.entries(add)) if (!pkg.scripts[k]) { pkg.scripts[k] = v; added++; }
-  if (added) {
-    // PRESERVE the target's existing indentation (tab vs N spaces) instead of forcing 2-space. Forcing
-    // it reformats the whole file → a 300-line whitespace diff on a shared file (the real noise hit on
-    // the Mosco install, fixed by hand). Detect the first indented line; reuse its indent. Only rewrite
-    // when something was actually added, so a re-run is a true no-op (idempotent, zero churn).
-    const m = pkgRaw.match(/\n([\t ]+)\S/);
-    const indent = m ? (m[1].includes('\t') ? '\t' : m[1].length) : 2;
-    writeFileSync(T('package.json'), JSON.stringify(pkg, null, indent) + (pkgRaw.endsWith('\n') ? '\n' : ''));
-    log(`  ✓ wired ${added} npm script(s) (indent preserved): npm run jidoka:audit / honesty / trend / log / premortem / guard`);
-  } else {
-    log('  ✓ npm scripts already wired (jidoka:*) — package.json untouched (idempotent)');
+    writeFileSync(T('.githooks/pre-commit'), preCommit); chmodSync(T('.githooks/pre-commit'), 0o755);
+    writeFileSync(T('.githooks/pre-push'), prePush); chmodSync(T('.githooks/pre-push'), 0o755);
+    execSync('git config core.hooksPath .githooks', { cwd: target });
+    log('  ✓ installed .githooks (pre-commit, pre-push) + set core.hooksPath');
   }
-} else {
-  log('  • no package.json → run engines directly: node .jidoka/scripts/meta-audit.mjs');
-}
 
-// ── 6. Report ────────────────────────────────────────────────────────────────
-log(`\n\x1b[32m✓ jidoka core installed into ${target}\x1b[0m`);
-log('  Next: log a mistake → `node .jidoka/scripts/meta-log.mjs <class> "<claimed>" "<real>" <caught_by>`');
-log('        then `node .jidoka/scripts/meta-audit.mjs` to see the closed loop.');
-if (isFrontend) log('  Frontend: structural gate not auto-installed (needs a baseline) — port scripts/check-structural.sh manually if wanted.');
+  // ── 5. Wire npm scripts if package.json exists ───────────────────────────────
+  if (existsSync(T('package.json'))) {
+    const pkgRaw = readFileSync(T('package.json'), 'utf8');
+    const pkg = JSON.parse(pkgRaw);
+    pkg.scripts ||= {};
+    const add = {
+      'jidoka:audit': 'node .jidoka/scripts/meta-audit.mjs',
+      'jidoka:honesty': 'node .jidoka/scripts/meta-honesty.mjs',
+      'jidoka:trend': 'node .jidoka/scripts/meta-trend.mjs',
+      'jidoka:log': 'node .jidoka/scripts/meta-log.mjs',
+      'jidoka:premortem': 'node .jidoka/scripts/meta-premortem.mjs',
+      'jidoka:guard': 'node .jidoka/scripts/pre-publish-guard.mjs',
+    };
+    let added = 0;
+    for (const [k, v] of Object.entries(add)) if (!pkg.scripts[k]) { pkg.scripts[k] = v; added++; }
+    if (added) {
+      // PRESERVE the target's existing indentation (tab vs N spaces) instead of forcing 2-space. Forcing
+      // it reformats the whole file → a 300-line whitespace diff on a shared file (the real noise hit on
+      // the Mosco install, fixed by hand). Detect the first indented line; reuse its indent. Only rewrite
+      // when something was actually added, so a re-run is a true no-op (idempotent, zero churn).
+      const m = pkgRaw.match(/\n([\t ]+)\S/);
+      const indent = m ? (m[1].includes('\t') ? '\t' : m[1].length) : 2;
+      writeFileSync(T('package.json'), JSON.stringify(pkg, null, indent) + (pkgRaw.endsWith('\n') ? '\n' : ''));
+      log(`  ✓ wired ${added} npm script(s) (indent preserved): npm run jidoka:audit / honesty / trend / log / premortem / guard`);
+    } else {
+      log('  ✓ npm scripts already wired (jidoka:*) — package.json untouched (idempotent)');
+    }
+  } else {
+    log('  • no package.json → run engines directly: node .jidoka/scripts/meta-audit.mjs');
+  }
 
-// ── 7. Footprint audit (self-policing) — did this install land on something LIVE? ─────────────
-// The mirror of instantiation-audit, for the install direction. An installed file with no caller is
-// dead-on-arrival; if the target already has its own framework, this whole install is duplication.
-// This is the gate that would have caught Mosco (45 dead of 51) AT INSTALL TIME instead of months later.
-const fp = auditInstall(target);
-log(`\n\x1b[1m▌ footprint audit\x1b[0m — ${fp.wired.length}/${fp.installed.length} installed scripts reach a live trigger (hook/CI/npm)`);
-if (fp.verdict.level === 'OK') {
-  log('  \x1b[32m✓ no dead duplication — installed gates are reachable\x1b[0m');
-} else {
-  log(`  \x1b[33m▌ ${fp.verdict.level}\x1b[0m — ${fp.verdict.msg}`);
-  log(`  \x1b[33m${fp.dead.length} script(s) have no caller in this target (${Math.round(fp.deadRatio * 100)}% dead-on-arrival).\x1b[0m`);
-  log(`  Re-audit anytime: node ${join(HERE, 'scripts', 'footprint-audit.mjs')} --target ${target}`);
+  // ── 6. Report ────────────────────────────────────────────────────────────────
+  log(`\n\x1b[32m✓ jidoka core installed into ${target}\x1b[0m`);
+  log('  Next: log a mistake → `node .jidoka/scripts/meta-log.mjs <class> "<claimed>" "<real>" <caught_by>`');
+  log('        then `node .jidoka/scripts/meta-audit.mjs` to see the closed loop.');
+  if (isFrontend) log('  Frontend: structural gate not auto-installed (needs a baseline) — port scripts/check-structural.sh manually if wanted.');
+
+  // ── 7. Footprint audit (self-policing) — did this install land on something LIVE? ─────────────
+  // The mirror of instantiation-audit, for the install direction. An installed file with no caller is
+  // dead-on-arrival; if the target already has its own framework, this whole install is duplication.
+  // This is the gate that would have caught Mosco (45 dead of 51) AT INSTALL TIME instead of months later.
+  const fp = auditInstall(target);
+  log(`\n\x1b[1m▌ footprint audit\x1b[0m — ${fp.wired.length}/${fp.installed.length} installed scripts reach a live trigger (hook/CI/npm)`);
+  if (fp.verdict.level === 'OK') {
+    log('  \x1b[32m✓ no dead duplication — installed gates are reachable\x1b[0m');
+  } else {
+    log(`  \x1b[33m▌ ${fp.verdict.level}\x1b[0m — ${fp.verdict.msg}`);
+    log(`  \x1b[33m${fp.dead.length} script(s) have no caller in this target (${Math.round(fp.deadRatio * 100)}% dead-on-arrival).\x1b[0m`);
+    log(`  Re-audit anytime: node ${join(HERE, 'scripts', 'footprint-audit.mjs')} --target ${target}`);
+  }
+  process.exit(0);
 }
-process.exit(0);

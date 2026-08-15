@@ -18,6 +18,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 const HOME = homedir();
 const LIST_PATH = process.env.CL_PROJECTS_LIST || join(HOME, '.claude/projects.list');
@@ -262,4 +263,9 @@ function main() {
   }
 }
 
-main();
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  main();
+}

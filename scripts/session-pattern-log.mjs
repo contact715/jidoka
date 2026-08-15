@@ -168,9 +168,14 @@ function selfTest() {
 
 const [cmd, ...rest] = process.argv.slice(2);
 let code = 0;
-if (cmd === 'log') code = cmdLog(rest);
-else if (cmd === 'report') code = cmdReport(rest);
-else if (cmd === 'resolve') code = cmdResolve(rest);
-else if (cmd === '--self-test' || cmd === 'self-test') code = selfTest();
-else { console.error(`session-pattern-log — usage:\n  log <class> "<note>" [--session id]\n  report [--session id]\n  resolve <class> "<fix>" [--session id]\n  --self-test`); code = 2; }
-process.exit(code);
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  if (cmd === 'log') code = cmdLog(rest);
+  else if (cmd === 'report') code = cmdReport(rest);
+  else if (cmd === 'resolve') code = cmdResolve(rest);
+  else if (cmd === '--self-test' || cmd === 'self-test') code = selfTest();
+  else { console.error(`session-pattern-log — usage:\n  log <class> "<note>" [--session id]\n  report [--session id]\n  resolve <class> "<fix>" [--session id]\n  --self-test`); code = 2; }
+  process.exit(code);
+}

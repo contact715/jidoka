@@ -101,41 +101,46 @@ function watchProjects() {
 
 // CLI: `--emit-html [project]` prints the GDoc-ready HTML snapshot to stdout (for the Claude/cron
 // MCP push into a real Google Doc), then exits without starting the server. Default: the framework.
-if (process.argv.includes('--emit-html')) {
-  const arg = process.argv[process.argv.indexOf('--emit-html') + 1];
-  const list = projects();
-  const p = (arg && !arg.startsWith('--')) ? byName(arg) : (list.find((x) => x.kind === 'framework') || list[0]);
-  if (!p) { console.error('emit-html: no project found'); process.exit(1); }
-  const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
-  process.stdout.write(snapshotHtml(p, collectProject(p.path), stamp));
-  process.exit(0);
-}
 
-// Auto-fallback: if the default port is taken (a stray server, another app), step to the next free
-// one instead of crashing on EADDRINUSE — so `npm run dashboard` always comes up.
-let boundPort = PORT;
-server.on('error', (e) => {
-  if (e.code === 'EADDRINUSE' && !EXPLICIT_PORT && boundPort < PORT + 12) {
-    console.log(`  ⚠ port ${boundPort} busy — trying ${boundPort + 1}…`);
-    boundPort += 1;
-    setTimeout(() => server.listen(boundPort), 120);
-  } else {
-    console.error(`  dashboard could not start: ${e.message}`);
-    process.exit(1);
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  if (process.argv.includes('--emit-html')) {
+    const arg = process.argv[process.argv.indexOf('--emit-html') + 1];
+    const list = projects();
+    const p = (arg && !arg.startsWith('--')) ? byName(arg) : (list.find((x) => x.kind === 'framework') || list[0]);
+    if (!p) { console.error('emit-html: no project found'); process.exit(1); }
+    const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+    process.stdout.write(snapshotHtml(p, collectProject(p.path), stamp));
+    process.exit(0);
   }
-});
-server.listen(boundPort, () => {
-  const watched = watchProjects();
-  const target = `http://localhost:${boundPort}`;
-  console.log(`\n  🦞 jidoka dashboard → ${target}`);
-  // LAN address so the board opens on an iPad / phone on the same Wi-Fi (server binds all interfaces).
-  const lan = Object.values(networkInterfaces()).flat().find((i) => i && i.family === 'IPv4' && !i.internal);
-  if (lan) console.log(`  📱 iPad / телефон (та же Wi-Fi): http://${lan.address}:${boundPort}`);
-  console.log(`  ${projects().length} projects · ${watched} live watchers · Ctrl-C to stop\n`);
-  // Auto-open the browser so the dashboard is never just a URL in a log (opt out: JIDOKA_DASHBOARD_NO_OPEN=1).
-  // Skip under the preview harness (PORT set) — it renders the page itself, no extra browser window.
-  if (!process.env.JIDOKA_DASHBOARD_NO_OPEN && !process.env.PORT) {
-    const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start ""' : 'xdg-open';
-    exec(`${opener} ${target}`, () => { /* best-effort; headless/no-DISPLAY is fine */ });
-  }
-});
+
+  // Auto-fallback: if the default port is taken (a stray server, another app), step to the next free
+  // one instead of crashing on EADDRINUSE — so `npm run dashboard` always comes up.
+  let boundPort = PORT;
+  server.on('error', (e) => {
+    if (e.code === 'EADDRINUSE' && !EXPLICIT_PORT && boundPort < PORT + 12) {
+      console.log(`  ⚠ port ${boundPort} busy — trying ${boundPort + 1}…`);
+      boundPort += 1;
+      setTimeout(() => server.listen(boundPort), 120);
+    } else {
+      console.error(`  dashboard could not start: ${e.message}`);
+      process.exit(1);
+    }
+  });
+  server.listen(boundPort, () => {
+    const watched = watchProjects();
+    const target = `http://localhost:${boundPort}`;
+    console.log(`\n  🦞 jidoka dashboard → ${target}`);
+    // LAN address so the board opens on an iPad / phone on the same Wi-Fi (server binds all interfaces).
+    const lan = Object.values(networkInterfaces()).flat().find((i) => i && i.family === 'IPv4' && !i.internal);
+    if (lan) console.log(`  📱 iPad / телефон (та же Wi-Fi): http://${lan.address}:${boundPort}`);
+    console.log(`  ${projects().length} projects · ${watched} live watchers · Ctrl-C to stop\n`);
+    // Auto-open the browser so the dashboard is never just a URL in a log (opt out: JIDOKA_DASHBOARD_NO_OPEN=1).
+    // Skip under the preview harness (PORT set) — it renders the page itself, no extra browser window.
+    if (!process.env.JIDOKA_DASHBOARD_NO_OPEN && !process.env.PORT) {
+      const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'start ""' : 'xdg-open';
+      exec(`${opener} ${target}`, () => { /* best-effort; headless/no-DISPLAY is fine */ });
+    }
+  });
+}

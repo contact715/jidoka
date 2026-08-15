@@ -527,7 +527,12 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  process.stderr.write(`[run-container-scan] Unhandled error: ${err.message}\n`);
-  process.exit(1);
-});
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  main().catch((err) => {
+    process.stderr.write(`[run-container-scan] Unhandled error: ${err.message}\n`);
+    process.exit(1);
+  });
+}

@@ -28,6 +28,7 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { recordTrip } from './meta-lib.mjs';
+import { fileURLToPath } from 'node:url';
 
 // Files that legitimately contain pattern *definitions*, doc examples, or PII-shaped
 // test fixtures — skip these so the guard does not flag its own detection patterns or
@@ -74,46 +75,51 @@ function classify(line, r, scope) {
   (r.severity === 'block' ? blockFindings : warnFindings).push(entry);
 }
 
-for (const r of RULES) {
-  for (const scope of r.scopes) {
-    for (const line of SCAN[scope](r.re).split('\n')) classify(line, r, scope);
-  }
-}
 
-// Optional deny-list: brand names, personal names — one term per line, # for comments.
-// Block-severity, tree + history (a name/brand leak is publish-sensitive like a secret).
-if (existsSync('.jidoka-denylist')) {
-  const terms = readFileSync('.jidoka-denylist', 'utf8').split('\n').map(s => s.trim()).filter(s => s && !s.startsWith('#'));
-  for (const term of terms) {
-    const esc = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    for (const scope of ['tree', 'history']) {
-      for (const line of SCAN[scope](esc).split('\n')) {
-        if (line.trim() && !SELF_REFERENCE.test(line)) blockFindings.push(`[${scope}] deny '${term}': ${line.trim().slice(0, 100)}`);
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  for (const r of RULES) {
+    for (const scope of r.scopes) {
+      for (const line of SCAN[scope](r.re).split('\n')) classify(line, r, scope);
+    }
+  }
+
+  // Optional deny-list: brand names, personal names — one term per line, # for comments.
+  // Block-severity, tree + history (a name/brand leak is publish-sensitive like a secret).
+  if (existsSync('.jidoka-denylist')) {
+    const terms = readFileSync('.jidoka-denylist', 'utf8').split('\n').map(s => s.trim()).filter(s => s && !s.startsWith('#'));
+    for (const term of terms) {
+      const esc = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      for (const scope of ['tree', 'history']) {
+        for (const line of SCAN[scope](esc).split('\n')) {
+          if (line.trim() && !SELF_REFERENCE.test(line)) blockFindings.push(`[${scope}] deny '${term}': ${line.trim().slice(0, 100)}`);
+        }
       }
     }
   }
-}
 
-if (warnFindings.length) {
-  console.error('\n\x1b[33m⚠ pre-publish-guard warnings (non-blocking) — local home paths; parameterise with $HOME when you touch these files:\x1b[0m');
-  for (const f of warnFindings.slice(0, 20)) console.error('  ' + f);
-  if (warnFindings.length > 20) console.error(`  … and ${warnFindings.length - 20} more`);
-}
+  if (warnFindings.length) {
+    console.error('\n\x1b[33m⚠ pre-publish-guard warnings (non-blocking) — local home paths; parameterise with $HOME when you touch these files:\x1b[0m');
+    for (const f of warnFindings.slice(0, 20)) console.error('  ' + f);
+    if (warnFindings.length > 20) console.error(`  … and ${warnFindings.length - 20} more`);
+  }
 
-if (blockFindings.length) {
-  recordTrip('tree-not-history', 'scripts/pre-publish-guard.mjs'); // gate fired: a publish was blocked
-  console.error('\n\x1b[31m✗ pre-publish-guard BLOCKED this push — a real secret was found:\x1b[0m\n');
-  for (const f of blockFindings.slice(0, 40)) console.error('  ' + f);
-  if (blockFindings.length > 40) console.error(`  … and ${blockFindings.length - 40} more`);
-  console.error('\n  Rotate the secret, remove it from the TREE, then scrub HISTORY (orphan-commit');
-  console.error('  rewrite — force-push alone leaks dangling commits reachable by SHA).');
-  console.error('  See .claude/skills/pre-publish-checklist.md.\n');
-  process.exit(1);
-}
+  if (blockFindings.length) {
+    recordTrip('tree-not-history', 'scripts/pre-publish-guard.mjs'); // gate fired: a publish was blocked
+    console.error('\n\x1b[31m✗ pre-publish-guard BLOCKED this push — a real secret was found:\x1b[0m\n');
+    for (const f of blockFindings.slice(0, 40)) console.error('  ' + f);
+    if (blockFindings.length > 40) console.error(`  … and ${blockFindings.length - 40} more`);
+    console.error('\n  Rotate the secret, remove it from the TREE, then scrub HISTORY (orphan-commit');
+    console.error('  rewrite — force-push alone leaks dangling commits reachable by SHA).');
+    console.error('  See .claude/skills/pre-publish-checklist.md.\n');
+    process.exit(1);
+  }
 
-console.error(
-  '\x1b[32m✓ pre-publish-guard: no real secrets in tree or history' +
-  (warnFindings.length ? ` (${warnFindings.length} home-path warning${warnFindings.length > 1 ? 's' : ''})` : '') +
-  '\x1b[0m',
-);
-process.exit(0);
+  console.error(
+    '\x1b[32m✓ pre-publish-guard: no real secrets in tree or history' +
+    (warnFindings.length ? ` (${warnFindings.length} home-path warning${warnFindings.length > 1 ? 's' : ''})` : '') +
+    '\x1b[0m',
+  );
+  process.exit(0);
+}

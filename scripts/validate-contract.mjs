@@ -112,166 +112,170 @@ async function fetchWithTimeout(url, timeoutMs) {
 }
 
 // ── Load registry ─────────────────────────────────────────────────────────────
-if (!fs.existsSync(REGISTRY_PATH)) {
-  log(`○ N/A — ${REGISTRY_PATH} absent; this repo exposes no HTTP API (framework/CLI engine). The contract gate is for product repos that declare an API surface — not a gap here.`);
-  process.exit(0);
-}
 
-/** @type {any} */
-let registry;
-try {
-  registry = JSON.parse(fs.readFileSync(REGISTRY_PATH, 'utf8'));
-} catch (err) {
-  log(`[contract] FATAL — registry JSON parse failed: ${err.message}`);
-  process.exit(1);
-}
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-if (!Array.isArray(registry.entries)) {
-  log(`[contract] FATAL — registry missing top-level "entries" array`);
-  process.exit(1);
-}
+if (isMain) {
+  if (!fs.existsSync(REGISTRY_PATH)) {
+    log(`○ N/A — ${REGISTRY_PATH} absent; this repo exposes no HTTP API (framework/CLI engine). The contract gate is for product repos that declare an API surface — not a gap here.`);
+    process.exit(0);
+  }
 
-const entries = registry.entries;
-
-// ── --update-snapshot mode ────────────────────────────────────────────────────
-if (isUpdateSnapshot) {
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  const openapiUrl = `${apiBase}/openapi.json`;
-  log(`[contract] --update-snapshot: fetching ${openapiUrl} ...`);
-  const spec = await fetchWithTimeout(openapiUrl, 5000);
-  if (!spec) {
-    log(`[contract] ABORT: could not reach ${openapiUrl} — snapshot not updated.`);
+  /** @type {any} */
+  let registry;
+  try {
+    registry = JSON.parse(fs.readFileSync(REGISTRY_PATH, 'utf8'));
+  } catch (err) {
+    log(`[contract] FATAL — registry JSON parse failed: ${err.message}`);
     process.exit(1);
   }
-  fs.mkdirSync(path.dirname(SNAPSHOT_PATH), { recursive: true });
-  fs.writeFileSync(SNAPSHOT_PATH, JSON.stringify(spec, null, 2), 'utf8');
-  log(`[contract] Snapshot written to ${SNAPSHOT_PATH}`);
-  log(`[contract] Run contract:validate to validate the registry against the snapshot.`);
-  process.exit(0);
-}
 
-// ── Mode detection ─────────────────────────────────────────────────────────────
-const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const openapiUrl = `${apiBase}/openapi.json`;
+  if (!Array.isArray(registry.entries)) {
+    log(`[contract] FATAL — registry missing top-level "entries" array`);
+    process.exit(1);
+  }
 
-// Try LIVE mode first (2s timeout per spec D3)
-const liveSpec = await fetchWithTimeout(openapiUrl, 2000);
+  const entries = registry.entries;
 
-/** @type {'LIVE'|'SNAPSHOT'|'DOC-BASED'} */
-let mode;
-/** @type {object|null} */
-let openApiPaths = null;
-
-if (liveSpec && liveSpec.paths && typeof liveSpec.paths === 'object') {
-  mode = 'LIVE';
-  openApiPaths = liveSpec.paths;
-} else {
-  // Try SNAPSHOT mode
-  const snapshotExists = fs.existsSync(SNAPSHOT_PATH);
-  let snapshotSpec = null;
-  if (snapshotExists) {
-    try {
-      snapshotSpec = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, 'utf8'));
-    } catch {
-      snapshotSpec = null;
+  // ── --update-snapshot mode ────────────────────────────────────────────────────
+  if (isUpdateSnapshot) {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const openapiUrl = `${apiBase}/openapi.json`;
+    log(`[contract] --update-snapshot: fetching ${openapiUrl} ...`);
+    const spec = await fetchWithTimeout(openapiUrl, 5000);
+    if (!spec) {
+      log(`[contract] ABORT: could not reach ${openapiUrl} — snapshot not updated.`);
+      process.exit(1);
     }
+    fs.mkdirSync(path.dirname(SNAPSHOT_PATH), { recursive: true });
+    fs.writeFileSync(SNAPSHOT_PATH, JSON.stringify(spec, null, 2), 'utf8');
+    log(`[contract] Snapshot written to ${SNAPSHOT_PATH}`);
+    log(`[contract] Run contract:validate to validate the registry against the snapshot.`);
+    process.exit(0);
   }
 
-  if (snapshotSpec && snapshotSpec.paths && typeof snapshotSpec.paths === 'object') {
-    mode = 'SNAPSHOT';
-    openApiPaths = snapshotSpec.paths;
+  // ── Mode detection ─────────────────────────────────────────────────────────────
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const openapiUrl = `${apiBase}/openapi.json`;
+
+  // Try LIVE mode first (2s timeout per spec D3)
+  const liveSpec = await fetchWithTimeout(openapiUrl, 2000);
+
+  /** @type {'LIVE'|'SNAPSHOT'|'DOC-BASED'} */
+  let mode;
+  /** @type {object|null} */
+  let openApiPaths = null;
+
+  if (liveSpec && liveSpec.paths && typeof liveSpec.paths === 'object') {
+    mode = 'LIVE';
+    openApiPaths = liveSpec.paths;
   } else {
-    mode = 'DOC-BASED';
-  }
-}
-
-// ── Mode announcement (MUST be first output line per AC-3) ────────────────────
-log(`[contract] MODE: ${mode}`);
-
-// ── DOC-BASED without real snapshot → flag for post-loop abort ────────────────
-// Honesty bar (AC-3, D3): DOC-BASED without a real snapshot exits 1, BUT only
-// AFTER the per-entry loop runs so that DRIFT + SKIP lines print first (AC-2, AC-5).
-let docBasedPlaceholderAbort = false;
-if (mode === 'DOC-BASED') {
-  // Check whether the snapshot file is a real spec (non-empty paths) or placeholder
-  const snapshotExists = fs.existsSync(SNAPSHOT_PATH);
-  let snapshotIsPlaceholder = true;
-  if (snapshotExists) {
-    try {
-      const s = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, 'utf8'));
-      if (s && s.paths && typeof s.paths === 'object' && Object.keys(s.paths).length > 0) {
-        snapshotIsPlaceholder = false;
+    // Try SNAPSHOT mode
+    const snapshotExists = fs.existsSync(SNAPSHOT_PATH);
+    let snapshotSpec = null;
+    if (snapshotExists) {
+      try {
+        snapshotSpec = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, 'utf8'));
+      } catch {
+        snapshotSpec = null;
       }
-    } catch {
-      snapshotIsPlaceholder = true;
     }
-  }
 
-  if (snapshotIsPlaceholder) {
-    // Do NOT exit here — let the per-entry loop run so findings print first.
-    docBasedPlaceholderAbort = true;
-  }
-}
-
-// ── Accumulators ──────────────────────────────────────────────────────────────
-/** @type {string[]} */
-const driftLines = [];
-/** @type {string[]} */
-const passLines = [];
-/** @type {string[]} */
-const skipLines = [];
-/** @type {string[]} */
-const undocumentedLines = [];
-
-// ── Per-entry validation ───────────────────────────────────────────────────────
-for (const entry of entries) {
-  const id = entry.endpoint || '(missing endpoint)';
-
-  // AC-5: stubs are skipped
-  if (entry.status === 'stub') {
-    skipLines.push(`[contract] SKIP (stub) ${id} — ${entry.source_anchor}`);
-    continue;
-  }
-
-  // AC-2 / D5: entries with a drift_note always surface as DRIFT in any mode
-  // The three confirmed drift candidates are: workflow.getConfig (/api/company-config),
-  // pipeline.* (/api/v1/pipeline/), and assistant.* (/api/v1/assistant/*)
-  if (entry.drift_note && entry.drift_note.startsWith('DRIFT')) {
-    driftLines.push(`[contract] DRIFT ${id} — ${entry.path} — ${entry.source_anchor}`);
-    driftLines.push(`           ${entry.drift_note}`);
-    continue;
-  }
-
-  const entryPath = entry.path;
-  if (!entryPath) {
-    // non-stub with no path is an honesty violation — treat as drift
-    driftLines.push(`[contract] DRIFT ${id} — path is null/missing for active entry — ${entry.source_anchor}`);
-    continue;
-  }
-
-  if (mode === 'LIVE' || mode === 'SNAPSHOT') {
-    // Check whether the path exists in the OpenAPI paths object.
-    // OpenAPI paths use exact strings; parameterized paths use {param} notation.
-    // We normalize by stripping trailing slashes and dynamic segments for comparison.
-    const pathExists = checkPathInOpenApi(entryPath, openApiPaths);
-    if (pathExists) {
-      passLines.push(`[contract] PASS ${id} — ${entryPath} — found in ${mode} spec`);
+    if (snapshotSpec && snapshotSpec.paths && typeof snapshotSpec.paths === 'object') {
+      mode = 'SNAPSHOT';
+      openApiPaths = snapshotSpec.paths;
     } else {
-      undocumentedLines.push(`[contract] UNDOCUMENTED ${id} — ${entryPath} — not found in ${mode} OpenAPI paths`);
-    }
-  } else {
-    // DOC-BASED: check prefix against CLAUDE.md documented prefixes
-    const prefixFound = CLAUDE_MD_PREFIXES.some(prefix => entryPath.startsWith(prefix));
-    if (prefixFound) {
-      passLines.push(`[contract] PASS ${id} — ${entryPath} — prefix matches CLAUDE.md documented surface`);
-    } else {
-      undocumentedLines.push(`[contract] UNDOCUMENTED ${id} — ${entryPath} — prefix not in CLAUDE.md documented endpoints`);
+      mode = 'DOC-BASED';
     }
   }
-}
 
-// ── Path existence check helper ────────────────────────────────────────────────
-/**
+  // ── Mode announcement (MUST be first output line per AC-3) ────────────────────
+  log(`[contract] MODE: ${mode}`);
+
+  // ── DOC-BASED without real snapshot → flag for post-loop abort ────────────────
+  // Honesty bar (AC-3, D3): DOC-BASED without a real snapshot exits 1, BUT only
+  // AFTER the per-entry loop runs so that DRIFT + SKIP lines print first (AC-2, AC-5).
+  let docBasedPlaceholderAbort = false;
+  if (mode === 'DOC-BASED') {
+    // Check whether the snapshot file is a real spec (non-empty paths) or placeholder
+    const snapshotExists = fs.existsSync(SNAPSHOT_PATH);
+    let snapshotIsPlaceholder = true;
+    if (snapshotExists) {
+      try {
+        const s = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, 'utf8'));
+        if (s && s.paths && typeof s.paths === 'object' && Object.keys(s.paths).length > 0) {
+          snapshotIsPlaceholder = false;
+        }
+      } catch {
+        snapshotIsPlaceholder = true;
+      }
+    }
+
+    if (snapshotIsPlaceholder) {
+      // Do NOT exit here — let the per-entry loop run so findings print first.
+      docBasedPlaceholderAbort = true;
+    }
+  }
+
+  // ── Accumulators ──────────────────────────────────────────────────────────────
+  /** @type {string[]} */
+  const driftLines = [];
+  /** @type {string[]} */
+  const passLines = [];
+  /** @type {string[]} */
+  const skipLines = [];
+  /** @type {string[]} */
+  const undocumentedLines = [];
+
+  // ── Per-entry validation ───────────────────────────────────────────────────────
+  for (const entry of entries) {
+    const id = entry.endpoint || '(missing endpoint)';
+
+    // AC-5: stubs are skipped
+    if (entry.status === 'stub') {
+      skipLines.push(`[contract] SKIP (stub) ${id} — ${entry.source_anchor}`);
+      continue;
+    }
+
+    // AC-2 / D5: entries with a drift_note always surface as DRIFT in any mode
+    // The three confirmed drift candidates are: workflow.getConfig (/api/company-config),
+    // pipeline.* (/api/v1/pipeline/), and assistant.* (/api/v1/assistant/*)
+    if (entry.drift_note && entry.drift_note.startsWith('DRIFT')) {
+      driftLines.push(`[contract] DRIFT ${id} — ${entry.path} — ${entry.source_anchor}`);
+      driftLines.push(`           ${entry.drift_note}`);
+      continue;
+    }
+
+    const entryPath = entry.path;
+    if (!entryPath) {
+      // non-stub with no path is an honesty violation — treat as drift
+      driftLines.push(`[contract] DRIFT ${id} — path is null/missing for active entry — ${entry.source_anchor}`);
+      continue;
+    }
+
+    if (mode === 'LIVE' || mode === 'SNAPSHOT') {
+      // Check whether the path exists in the OpenAPI paths object.
+      // OpenAPI paths use exact strings; parameterized paths use {param} notation.
+      // We normalize by stripping trailing slashes and dynamic segments for comparison.
+      const pathExists = checkPathInOpenApi(entryPath, openApiPaths);
+      if (pathExists) {
+        passLines.push(`[contract] PASS ${id} — ${entryPath} — found in ${mode} spec`);
+      } else {
+        undocumentedLines.push(`[contract] UNDOCUMENTED ${id} — ${entryPath} — not found in ${mode} OpenAPI paths`);
+      }
+    } else {
+      // DOC-BASED: check prefix against CLAUDE.md documented prefixes
+      const prefixFound = CLAUDE_MD_PREFIXES.some(prefix => entryPath.startsWith(prefix));
+      if (prefixFound) {
+        passLines.push(`[contract] PASS ${id} — ${entryPath} — prefix matches CLAUDE.md documented surface`);
+      } else {
+        undocumentedLines.push(`[contract] UNDOCUMENTED ${id} — ${entryPath} — prefix not in CLAUDE.md documented endpoints`);
+      }
+    }
+  }
+
+  // ── Path existence check helper ────────────────────────────────────────────────
+  /**
  * Check whether a registry path exists in the OpenAPI paths object.
  * Handles:
  *   - Exact match
@@ -281,85 +285,86 @@ for (const entry of entries) {
  * @param {object} openapiPaths
  * @returns {boolean}
  */
-function checkPathInOpenApi(registryPath, openapiPaths) {
-  if (!openapiPaths) return false;
+  function checkPathInOpenApi(registryPath, openapiPaths) {
+    if (!openapiPaths) return false;
 
-  const normalize = (p) => p.replace(/\/+$/, ''); // strip trailing slash
+    const normalize = (p) => p.replace(/\/+$/, ''); // strip trailing slash
 
-  const normalized = normalize(registryPath);
+    const normalized = normalize(registryPath);
 
-  // Exact match first
-  if (normalized in openapiPaths || registryPath in openapiPaths) return true;
+    // Exact match first
+    if (normalized in openapiPaths || registryPath in openapiPaths) return true;
 
-  // Strip query-string from registry path (registry paths may contain ?param=x for docs clarity)
-  const pathOnly = normalized.split('?')[0];
-  if (pathOnly in openapiPaths) return true;
+    // Strip query-string from registry path (registry paths may contain ?param=x for docs clarity)
+    const pathOnly = normalized.split('?')[0];
+    if (pathOnly in openapiPaths) return true;
 
-  // Check each OpenAPI path for structural match (parameter segments)
-  // Convert both to segment arrays and compare, treating {.*} as wildcard
-  for (const openapiPath of Object.keys(openapiPaths)) {
-    if (pathsStructurallyMatch(pathOnly, openapiPath)) return true;
+    // Check each OpenAPI path for structural match (parameter segments)
+    // Convert both to segment arrays and compare, treating {.*} as wildcard
+    for (const openapiPath of Object.keys(openapiPaths)) {
+      if (pathsStructurallyMatch(pathOnly, openapiPath)) return true;
+    }
+
+    return false;
   }
 
-  return false;
-}
-
-/**
+  /**
  * Compare two paths structurally, treating {param} segments as wildcards.
  * @param {string} a
  * @param {string} b
  * @returns {boolean}
  */
-function pathsStructurallyMatch(a, b) {
-  const segsA = a.replace(/\/+$/, '').split('/');
-  const segsB = b.replace(/\/+$/, '').split('/');
-  if (segsA.length !== segsB.length) return false;
-  return segsA.every((seg, i) => {
-    const bSeg = segsB[i];
-    // Either segment is a parameter placeholder — treat as match
-    if (seg.startsWith('{') || bSeg.startsWith('{')) return true;
-    return seg === bSeg;
-  });
-}
+  function pathsStructurallyMatch(a, b) {
+    const segsA = a.replace(/\/+$/, '').split('/');
+    const segsB = b.replace(/\/+$/, '').split('/');
+    if (segsA.length !== segsB.length) return false;
+    return segsA.every((seg, i) => {
+      const bSeg = segsB[i];
+      // Either segment is a parameter placeholder — treat as match
+      if (seg.startsWith('{') || bSeg.startsWith('{')) return true;
+      return seg === bSeg;
+    });
+  }
 
-// ── Print results (mirrors validate-dr-catalog.mjs output order) ──────────────
-for (const line of passLines) log(line);
-for (const line of skipLines) log(line);
-for (const line of undocumentedLines) log(line);
-for (const line of driftLines) log(line);
+  // ── Print results (mirrors validate-dr-catalog.mjs output order) ──────────────
+  for (const line of passLines) log(line);
+  for (const line of skipLines) log(line);
+  for (const line of undocumentedLines) log(line);
+  for (const line of driftLines) log(line);
 
-// ── Summary ────────────────────────────────────────────────────────────────────
-const activeCount = entries.filter(e => e.status !== 'stub').length;
-const stubCount = entries.filter(e => e.status === 'stub').length;
-const driftCount = driftLines.filter(l => l.startsWith('[contract] DRIFT')).length;
-const undocumentedCount = undocumentedLines.length;
-const passCount = passLines.length;
+  // ── Summary ────────────────────────────────────────────────────────────────────
+  const activeCount = entries.filter(e => e.status !== 'stub').length;
+  const stubCount = entries.filter(e => e.status === 'stub').length;
+  const driftCount = driftLines.filter(l => l.startsWith('[contract] DRIFT')).length;
+  const undocumentedCount = undocumentedLines.length;
+  const passCount = passLines.length;
 
-log('');
-log(`[contract] SUMMARY: mode=${mode}, entries=${entries.length} (${activeCount} active, ${stubCount} stub)`);
-log(`[contract]          PASS=${passCount}, UNDOCUMENTED=${undocumentedCount}, DRIFT=${driftCount}, SKIP=${skipLines.length}`);
+  log('');
+  log(`[contract] SUMMARY: mode=${mode}, entries=${entries.length} (${activeCount} active, ${stubCount} stub)`);
+  log(`[contract]          PASS=${passCount}, UNDOCUMENTED=${undocumentedCount}, DRIFT=${driftCount}, SKIP=${skipLines.length}`);
 
-// ── Exit semantics (AC-3, AC-10) ──────────────────────────────────────────────
-// Exit 1 if: any DRIFT, OR mode is DOC-BASED without a real snapshot.
-// The DOC-BASED abort message is emitted HERE (after findings), not before the loop.
-if (isDry) {
-  log(`[contract] --dry mode: findings printed, exit forced 0.`);
+  // ── Exit semantics (AC-3, AC-10) ──────────────────────────────────────────────
+  // Exit 1 if: any DRIFT, OR mode is DOC-BASED without a real snapshot.
+  // The DOC-BASED abort message is emitted HERE (after findings), not before the loop.
+  if (isDry) {
+    log(`[contract] --dry mode: findings printed, exit forced 0.`);
+    process.exit(0);
+  }
+
+  if (driftCount > 0) {
+    log(`[contract] FAIL — ${driftCount} DRIFT finding(s) detected. Resolve before this exits 0.`);
+    process.exit(1);
+  }
+
+  if (docBasedPlaceholderAbort) {
+    // Honesty bar: DOC-BASED without real snapshot is incomplete validation.
+    // Findings (DRIFT/SKIP/UNDOCUMENTED) already printed above; now emit the abort.
+    log(`[contract] ABORT: no backend reachable and no snapshot committed — run contract:snapshot first`);
+    log(`[contract] DOC-BASED mode without a real snapshot cannot confirm live drift. This is an incomplete validation state.`);
+    log(`[contract] To produce a snapshot: npm run contract:snapshot (requires backend at ${apiBase})`);
+    process.exit(1);
+  }
+
+  log(`[contract] PASS — ${mode} mode, zero DRIFT entries.`);
   process.exit(0);
 }
-
-if (driftCount > 0) {
-  log(`[contract] FAIL — ${driftCount} DRIFT finding(s) detected. Resolve before this exits 0.`);
-  process.exit(1);
-}
-
-if (docBasedPlaceholderAbort) {
-  // Honesty bar: DOC-BASED without real snapshot is incomplete validation.
-  // Findings (DRIFT/SKIP/UNDOCUMENTED) already printed above; now emit the abort.
-  log(`[contract] ABORT: no backend reachable and no snapshot committed — run contract:snapshot first`);
-  log(`[contract] DOC-BASED mode without a real snapshot cannot confirm live drift. This is an incomplete validation state.`);
-  log(`[contract] To produce a snapshot: npm run contract:snapshot (requires backend at ${apiBase})`);
-  process.exit(1);
-}
-
-log(`[contract] PASS — ${mode} mode, zero DRIFT entries.`);
-process.exit(0);

@@ -31,54 +31,59 @@ function listQueue() {
 
 const args = process.argv.slice(2);
 
-if (args.includes('--list') || args.length === 0) {
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  if (args.includes('--list') || args.length === 0) {
+    const items = listQueue();
+    if (items.length === 0) {
+      console.log('[reflexion] queue empty — no pending adversarial reviews.');
+    } else {
+      console.log(`[reflexion] ${items.length} pending:`);
+      for (const f of items) console.log(`  ${f.replace('.md', '')}`);
+    }
+    process.exit(0);
+  }
+
+  const reviewed = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--reviewed') {
+      const sha = args[i + 1];
+      if (sha && !sha.startsWith('--')) reviewed.push(sha);
+    }
+  }
+
+  if (reviewed.length === 0) {
+    console.error('[reflexion] no --reviewed <sha> given. Use --list to see the backlog.');
+    process.exit(1);
+  }
+
+  let removed = 0;
   const items = listQueue();
-  if (items.length === 0) {
-    console.log('[reflexion] queue empty — no pending adversarial reviews.');
-  } else {
-    console.log(`[reflexion] ${items.length} pending:`);
-    for (const f of items) console.log(`  ${f.replace('.md', '')}`);
+  for (const sha of reviewed) {
+    const short = sha.slice(0, 7);
+    const match = items.find((f) => f.startsWith(short) || f.replace('.md', '') === sha);
+    if (match) {
+      const full = path.join(QUEUE, match);
+      // reasoning-bank (Part A): keep the reviewed reflexion artifact before its queue
+      // marker is unlinked — the reviewed trajectory is otherwise unrecoverable.
+      try {
+        const content = fs.readFileSync(full, 'utf8');
+        persistArtifact({
+          source: 'reflexion',
+          kind: 'reviewed',
+          key: match.replace('.md', ''),
+          content,
+          meta: { queueFile: match },
+        });
+      } catch { /* best-effort — never block the dequeue on a memory write */ }
+      fs.unlinkSync(full);
+      console.log(`[reflexion] dequeued ${match.replace('.md', '')} (reviewed).`);
+      removed++;
+    } else {
+      console.warn(`[reflexion] no queue item matched "${sha}" — skipped.`);
+    }
   }
-  process.exit(0);
+  console.log(`[reflexion] done — ${removed} dequeued, ${listQueue().length} remaining.`);
 }
-
-const reviewed = [];
-for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--reviewed') {
-    const sha = args[i + 1];
-    if (sha && !sha.startsWith('--')) reviewed.push(sha);
-  }
-}
-
-if (reviewed.length === 0) {
-  console.error('[reflexion] no --reviewed <sha> given. Use --list to see the backlog.');
-  process.exit(1);
-}
-
-let removed = 0;
-const items = listQueue();
-for (const sha of reviewed) {
-  const short = sha.slice(0, 7);
-  const match = items.find((f) => f.startsWith(short) || f.replace('.md', '') === sha);
-  if (match) {
-    const full = path.join(QUEUE, match);
-    // reasoning-bank (Part A): keep the reviewed reflexion artifact before its queue
-    // marker is unlinked — the reviewed trajectory is otherwise unrecoverable.
-    try {
-      const content = fs.readFileSync(full, 'utf8');
-      persistArtifact({
-        source: 'reflexion',
-        kind: 'reviewed',
-        key: match.replace('.md', ''),
-        content,
-        meta: { queueFile: match },
-      });
-    } catch { /* best-effort — never block the dequeue on a memory write */ }
-    fs.unlinkSync(full);
-    console.log(`[reflexion] dequeued ${match.replace('.md', '')} (reviewed).`);
-    removed++;
-  } else {
-    console.warn(`[reflexion] no queue item matched "${sha}" — skipped.`);
-  }
-}
-console.log(`[reflexion] done — ${removed} dequeued, ${listQueue().length} remaining.`);

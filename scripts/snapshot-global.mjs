@@ -9,49 +9,55 @@
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const HOME = homedir();
 const SRC = join(HOME, '.claude');
 const DEST = 'global-setup';
-mkdirSync(join(DEST, 'hooks'), { recursive: true });
-mkdirSync(join(DEST, 'skills', 'dev-pipeline'), { recursive: true });
-mkdirSync(join(DEST, 'commands'), { recursive: true });
 
-const FILES = [
-  'CLAUDE.md',
-  'hooks/jidoka-guard.sh',
-  'hooks/jidoka-feature-reminder.sh',
-  'hooks/policy-enforce-hook.mjs',
-  'skills/dev-pipeline/SKILL.md',
-  'statusline-jidoka.mjs',
-  'commands/jidoka-health.md',
-  'commands/jidoka-eval.md',
-  'commands/jidoka-audit.md',
-  'commands/jidoka-steward.md',
-  'commands/jidoka-new-project.md',
-  'commands/jidoka-plan.md',
-  'commands/jidoka-build.md',
-  'commands/jidoka-verify.md',
-  'commands/jidoka-resume.md',
-  'commands/jidoka-ship.md',
-  'commands/jidoka-debate.md',
-];
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-let n = 0;
-for (const rel of FILES) {
-  const sp = join(SRC, rel);
-  if (!existsSync(sp)) { console.error(`  ⚠ missing on disk, skipped: ${rel}`); continue; }
-  const content = readFileSync(sp, 'utf8').split(HOME).join('$HOME'); // de-machine paths
-  writeFileSync(join(DEST, rel), content);
-  n++;
+if (isMain) {
+  mkdirSync(join(DEST, 'hooks'), { recursive: true });
+  mkdirSync(join(DEST, 'skills', 'dev-pipeline'), { recursive: true });
+  mkdirSync(join(DEST, 'commands'), { recursive: true });
+
+  const FILES = [
+    'CLAUDE.md',
+    'hooks/jidoka-guard.sh',
+    'hooks/jidoka-feature-reminder.sh',
+    'hooks/policy-enforce-hook.mjs',
+    'skills/dev-pipeline/SKILL.md',
+    'statusline-jidoka.mjs',
+    'commands/jidoka-health.md',
+    'commands/jidoka-eval.md',
+    'commands/jidoka-audit.md',
+    'commands/jidoka-steward.md',
+    'commands/jidoka-new-project.md',
+    'commands/jidoka-plan.md',
+    'commands/jidoka-build.md',
+    'commands/jidoka-verify.md',
+    'commands/jidoka-resume.md',
+    'commands/jidoka-ship.md',
+    'commands/jidoka-debate.md',
+  ];
+
+  let n = 0;
+  for (const rel of FILES) {
+    const sp = join(SRC, rel);
+    if (!existsSync(sp)) { console.error(`  ⚠ missing on disk, skipped: ${rel}`); continue; }
+    const content = readFileSync(sp, 'utf8').split(HOME).join('$HOME'); // de-machine paths
+    writeFileSync(join(DEST, rel), content);
+    n++;
+  }
+
+  // settings hooks fragment (hooks only — never the whole settings with permissions)
+  if (existsSync(join(SRC, 'settings.json'))) {
+    const s = JSON.parse(readFileSync(join(SRC, 'settings.json'), 'utf8'));
+    const frag = JSON.stringify({ hooks: s.hooks || {} }, null, 2).split(HOME).join('$HOME');
+    writeFileSync(join(DEST, 'settings-hooks-fragment.json'), frag + '\n');
+  }
+
+  console.log(`snapshot-global: captured ${n} file(s) + settings hooks → ${DEST}/ (paths de-machined to $HOME)`);
+  console.log('Next: git add global-setup && git commit -m "chore: re-snapshot global setup" && git push');
 }
-
-// settings hooks fragment (hooks only — never the whole settings with permissions)
-if (existsSync(join(SRC, 'settings.json'))) {
-  const s = JSON.parse(readFileSync(join(SRC, 'settings.json'), 'utf8'));
-  const frag = JSON.stringify({ hooks: s.hooks || {} }, null, 2).split(HOME).join('$HOME');
-  writeFileSync(join(DEST, 'settings-hooks-fragment.json'), frag + '\n');
-}
-
-console.log(`snapshot-global: captured ${n} file(s) + settings hooks → ${DEST}/ (paths de-machined to $HOME)`);
-console.log('Next: git add global-setup && git commit -m "chore: re-snapshot global setup" && git push');

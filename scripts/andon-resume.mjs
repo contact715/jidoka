@@ -120,91 +120,96 @@ function validateField(name, value, minLen) {
 // ---------------------------------------------------------------------------
 
 const args = process.argv.slice(2);
-const flags = parseArgs(args);
-const forceFlag = flags['force-clear'] === true;
 
-// ── Verify halt state exists ────────────────────────────────────────────────
-if (!fs.existsSync(HALT_STATE_PATH)) {
-  info('No active halt state found (.sdd-halt-state.json does not exist). Nothing to resume.');
-  process.exit(0);
-}
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-let haltState;
-try {
-  haltState = JSON.parse(fs.readFileSync(HALT_STATE_PATH, 'utf8'));
-} catch (err) {
-  fail(`Could not parse .sdd-halt-state.json: ${err.message}`);
-}
+if (isMain) {
+  const flags = parseArgs(args);
+  const forceFlag = flags['force-clear'] === true;
 
-const activeHalt = haltState?.active;
-if (!activeHalt) {
-  info('Halt state file exists but active is null. Cleaning up.');
-  fs.unlinkSync(HALT_STATE_PATH);
-  process.exit(0);
-}
+  // ── Verify halt state exists ────────────────────────────────────────────────
+  if (!fs.existsSync(HALT_STATE_PATH)) {
+    info('No active halt state found (.sdd-halt-state.json does not exist). Nothing to resume.');
+    process.exit(0);
+  }
 
-// ── Force-clear path (A9, D4) ───────────────────────────────────────────────
-if (forceFlag) {
+  let haltState;
+  try {
+    haltState = JSON.parse(fs.readFileSync(HALT_STATE_PATH, 'utf8'));
+  } catch (err) {
+    fail(`Could not parse .sdd-halt-state.json: ${err.message}`);
+  }
+
+  const activeHalt = haltState?.active;
+  if (!activeHalt) {
+    info('Halt state file exists but active is null. Cleaning up.');
+    fs.unlinkSync(HALT_STATE_PATH);
+    process.exit(0);
+  }
+
+  // ── Force-clear path (A9, D4) ───────────────────────────────────────────────
+  if (forceFlag) {
+    const ts = new Date().toISOString();
+    appendHaltEvent({
+      timestamp: ts,
+      event: 'FORCED_RESUME',
+      wave: activeHalt.wave ?? 'unknown',
+      agent: activeHalt.agent ?? 'unknown',
+      reason: 'force-clear flag used — field validation skipped',
+      approver: null,
+      rootCause: null,
+      exitCode: null,
+    });
+    fs.unlinkSync(HALT_STATE_PATH);
+    info('FORCED_RESUME logged. Halt state cleared.');
+    process.exit(0);
+  }
+
+  // ── Field validation (T3 — min 10 chars each) ───────────────────────────────
+  const approver = flags['approver'];
+  const reason = flags['reason'];
+  const rootCause = flags['root-cause'];
+
+  validateField('approver', approver, 10);
+  validateField('reason', reason, 10);
+  validateField('root-cause', rootCause, 10);
+
+  const wave = typeof flags['wave'] === 'string' ? flags['wave'] : (activeHalt.wave ?? 'unknown');
   const ts = new Date().toISOString();
+
+  // ── Append RESUME record (append-only) ─────────────────────────────────────
   appendHaltEvent({
     timestamp: ts,
-    event: 'FORCED_RESUME',
-    wave: activeHalt.wave ?? 'unknown',
+    event: 'RESUME',
+    wave,
     agent: activeHalt.agent ?? 'unknown',
-    reason: 'force-clear flag used — field validation skipped',
-    approver: null,
-    rootCause: null,
+    reason: /** @type {string} */ (reason),
+    approver: /** @type {string} */ (approver),
+    rootCause: /** @type {string} */ (rootCause),
     exitCode: null,
   });
-  fs.unlinkSync(HALT_STATE_PATH);
-  info('FORCED_RESUME logged. Halt state cleared.');
+
+  // ── Promote queue or delete halt-state ──────────────────────────────────────
+  const queue = haltState.queue ?? [];
+
+  if (queue.length === 0) {
+    // No queued halts — delete the sentinel file
+    fs.unlinkSync(HALT_STATE_PATH);
+    info(`RESUME — halt cleared. wave=${wave} approver=${approver}`);
+  } else {
+    // Promote queue[0] to active, preserve remaining queue
+    const [nextActive, ...remainingQueue] = queue;
+    const nextState = { active: nextActive, queue: remainingQueue };
+
+    fs.writeFileSync(HALT_STATE_TMP, JSON.stringify(nextState, null, 2), 'utf8');
+    fs.renameSync(HALT_STATE_TMP, HALT_STATE_PATH);
+
+    info(
+      `RESUME — active halt cleared. wave=${wave} approver=${approver}\n` +
+      `  Next halt promoted from queue: agent=${nextActive.agent} wave=${nextActive.wave}\n` +
+      `  Run this command again to address the queued halt.`
+    );
+  }
+
   process.exit(0);
 }
-
-// ── Field validation (T3 — min 10 chars each) ───────────────────────────────
-const approver = flags['approver'];
-const reason = flags['reason'];
-const rootCause = flags['root-cause'];
-
-validateField('approver', approver, 10);
-validateField('reason', reason, 10);
-validateField('root-cause', rootCause, 10);
-
-const wave = typeof flags['wave'] === 'string' ? flags['wave'] : (activeHalt.wave ?? 'unknown');
-const ts = new Date().toISOString();
-
-// ── Append RESUME record (append-only) ─────────────────────────────────────
-appendHaltEvent({
-  timestamp: ts,
-  event: 'RESUME',
-  wave,
-  agent: activeHalt.agent ?? 'unknown',
-  reason: /** @type {string} */ (reason),
-  approver: /** @type {string} */ (approver),
-  rootCause: /** @type {string} */ (rootCause),
-  exitCode: null,
-});
-
-// ── Promote queue or delete halt-state ──────────────────────────────────────
-const queue = haltState.queue ?? [];
-
-if (queue.length === 0) {
-  // No queued halts — delete the sentinel file
-  fs.unlinkSync(HALT_STATE_PATH);
-  info(`RESUME — halt cleared. wave=${wave} approver=${approver}`);
-} else {
-  // Promote queue[0] to active, preserve remaining queue
-  const [nextActive, ...remainingQueue] = queue;
-  const nextState = { active: nextActive, queue: remainingQueue };
-
-  fs.writeFileSync(HALT_STATE_TMP, JSON.stringify(nextState, null, 2), 'utf8');
-  fs.renameSync(HALT_STATE_TMP, HALT_STATE_PATH);
-
-  info(
-    `RESUME — active halt cleared. wave=${wave} approver=${approver}\n` +
-    `  Next halt promoted from queue: agent=${nextActive.agent} wave=${nextActive.wave}\n` +
-    `  Run this command again to address the queued halt.`
-  );
-}
-
-process.exit(0);

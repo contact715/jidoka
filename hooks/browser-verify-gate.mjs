@@ -20,6 +20,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from 'node:url';
 
 function readStdin() {
   try {
@@ -130,8 +131,13 @@ function main() {
   process.exit(2);
 }
 
-try {
-  main();
-} catch {
-  process.exit(0);
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  try {
+    main();
+  } catch {
+    process.exit(0);
+  }
 }

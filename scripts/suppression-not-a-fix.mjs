@@ -125,30 +125,35 @@ function самопроверка() {
 const запущенНапрямую =
   process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
-if (запущенНапрямую) {
-  if (process.argv.includes('--self-test')) process.exit(самопроверка() ? 0 : 1);
 
-  let diff = '';
-  try {
-    diff = execSync('git diff --cached --unified=0', { encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 });
-  } catch {
-    process.exit(0); // не репозиторий или нет индекса — не наше дело (fail-open)
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  if (запущенНапрямую) {
+    if (process.argv.includes('--self-test')) process.exit(самопроверка() ? 0 : 1);
+
+    let diff = '';
+    try {
+      diff = execSync('git diff --cached --unified=0', { encoding: 'utf8', maxBuffer: 20 * 1024 * 1024 });
+    } catch {
+      process.exit(0); // не репозиторий или нет индекса — не наше дело (fail-open)
+    }
+
+    const претензии = молчаливыеПодавления(добавленныеСтроки(diff));
+    if (претензии.length === 0) {
+      process.stdout.write('[suppression] ✓ молчаливых подавлений не добавлено\n');
+      process.exit(0);
+    }
+
+    process.stderr.write('[suppression] ПОДАВЛЕНИЕ — ЭТО НЕ ПОЧИНКА:\n');
+    for (const п of претензии) process.stderr.write(`  • ${п}\n`);
+    process.stderr.write(
+      '\nПосле такой правки «типы зелёные» и «тесты прошли» больше ничего не доказывают:\n' +
+      'ошибку не убрали, а заткнули. Класс declaration-over-implementation, повтор\n' +
+      '2026-06-10 — раунд фиксов отчитался «сделано», починкой был маскирующий каст.\n' +
+      '\nЕсли подавление ЗАКОННО (чужой тип врёт, тест ждёт бэкенда) — объясни это\n' +
+      'комментарием рядом, от 25 символов. Гейт не запрещает, он требует причину.\n',
+    );
+    process.exit(1);
   }
-
-  const претензии = молчаливыеПодавления(добавленныеСтроки(diff));
-  if (претензии.length === 0) {
-    process.stdout.write('[suppression] ✓ молчаливых подавлений не добавлено\n');
-    process.exit(0);
-  }
-
-  process.stderr.write('[suppression] ПОДАВЛЕНИЕ — ЭТО НЕ ПОЧИНКА:\n');
-  for (const п of претензии) process.stderr.write(`  • ${п}\n`);
-  process.stderr.write(
-    '\nПосле такой правки «типы зелёные» и «тесты прошли» больше ничего не доказывают:\n' +
-    'ошибку не убрали, а заткнули. Класс declaration-over-implementation, повтор\n' +
-    '2026-06-10 — раунд фиксов отчитался «сделано», починкой был маскирующий каст.\n' +
-    '\nЕсли подавление ЗАКОННО (чужой тип врёт, тест ждёт бэкенда) — объясни это\n' +
-    'комментарием рядом, от 25 символов. Гейт не запрещает, он требует причину.\n',
-  );
-  process.exit(1);
 }

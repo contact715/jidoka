@@ -59,6 +59,10 @@ jobs:
       # standing caller is a file, not a defence.
       - name: change-ceremony + spec-amendment (were dead weight until 2026-08-15)
         run: npm run gate:ceremony && npm run gate:amendment
+      # 2026-08-15: импорт модуля запускал его CLI — 86 модулей печатали при импорте,
+      # один зависал, 19 файлов репозитория переписывались сами. Проверяется вся область.
+      - name: import-safety (модуль импортируется без последствий)
+        run: npm run gate:import-safety
       # ledger-pollution regression (2026-07-04): a judge-calibration/debias run streams
       # position-sensitivity telemetry — it must land in its sidecar, NEVER in the mistake ledger.
       # Prove it: run the debias-writing self-tests, assert the ledger is byte-unchanged, then that

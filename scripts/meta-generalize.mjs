@@ -19,55 +19,61 @@
 
 import { loadLedger, groupByClass } from './meta-lib.mjs';
 import { REMEDIES } from './meta-remedies.mjs';
+import { fileURLToPath } from 'node:url';
 
 // adjacent class -> the gated parent classes whose gate also covers it
 const coveredBy = {};
-for (const [parent, r] of Object.entries(REMEDIES)) {
-  for (const fam of r.family || []) (coveredBy[fam] ??= []).push(parent);
-}
 
-const arg = process.argv.slice(2).join(' ').trim();
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-if (arg) {
-  if (REMEDIES[arg]) {
-    console.log(`\x1b[32m✓ "${arg}" is directly gated by ${REMEDIES[arg].mechanism ?? 'a documented gate'}.\x1b[0m`);
-    process.exit(0);
+if (isMain) {
+  for (const [parent, r] of Object.entries(REMEDIES)) {
+    for (const fam of r.family || []) (coveredBy[fam] ??= []).push(parent);
   }
-  const parents = coveredBy[arg];
-  if (parents?.length) {
-    console.log(`\x1b[32m✓ "${arg}" is already in the family of: ${parents.join(', ')}\x1b[0m`);
-    for (const p of parents) {
-      console.log(`     → reuse ${REMEDIES[p].mechanism ?? 'the documented gate'} of "${p}" — do not build a new gate for the same lesson.`);
+
+  const arg = process.argv.slice(2).join(' ').trim();
+
+  if (arg) {
+    if (REMEDIES[arg]) {
+      console.log(`\x1b[32m✓ "${arg}" is directly gated by ${REMEDIES[arg].mechanism ?? 'a documented gate'}.\x1b[0m`);
+      process.exit(0);
     }
-    process.exit(0);
-  }
-  console.log(`\x1b[33m✗ "${arg}" is not covered by any existing gate or family.\x1b[0m`);
-  console.log(`   It needs its own gate — or, if it is a variant of a gated class, add it to that`);
-  console.log(`   class's family in scripts/meta-remedies.mjs so the existing lesson generalizes.`);
-  process.exit(1);
-}
-
-// ---- overview ----
-console.log(`meta-generalize: lesson families across ${Object.keys(REMEDIES).length} gate(s)\n`);
-for (const [parent, r] of Object.entries(REMEDIES)) {
-  console.log(`  \x1b[1m${parent}\x1b[0m  ·  gate: ${r.mechanism ?? '(documented-only)'}`);
-  console.log(`    └─ also covers: ${(r.family || []).join(', ') || '(no family registered)'}`);
-}
-
-const rows = loadLedger();
-if (rows.length) {
-  console.log(`\n  ledger classes (${rows.length} incident(s)):`);
-  let orphans = 0;
-  for (const cls of Object.keys(groupByClass(rows))) {
-    if (REMEDIES[cls]) {
-      console.log(`    \x1b[32m${cls}\x1b[0m → directly gated`);
-    } else if (coveredBy[cls]?.length) {
-      console.log(`    \x1b[36m${cls}\x1b[0m → covered by family of ${coveredBy[cls].join(', ')} (reuse that gate)`);
-    } else {
-      orphans++;
-      console.log(`    \x1b[33m${cls}\x1b[0m → ORPHAN: no gate, not in any family — needs a new lesson`);
+    const parents = coveredBy[arg];
+    if (parents?.length) {
+      console.log(`\x1b[32m✓ "${arg}" is already in the family of: ${parents.join(', ')}\x1b[0m`);
+      for (const p of parents) {
+        console.log(`     → reuse ${REMEDIES[p].mechanism ?? 'the documented gate'} of "${p}" — do not build a new gate for the same lesson.`);
+      }
+      process.exit(0);
     }
+    console.log(`\x1b[33m✗ "${arg}" is not covered by any existing gate or family.\x1b[0m`);
+    console.log(`   It needs its own gate — or, if it is a variant of a gated class, add it to that`);
+    console.log(`   class's family in scripts/meta-remedies.mjs so the existing lesson generalizes.`);
+    process.exit(1);
   }
-  console.log(`\n  ${orphans} orphan class(es); every other ledger class is covered directly or by family.`);
+
+  // ---- overview ----
+  console.log(`meta-generalize: lesson families across ${Object.keys(REMEDIES).length} gate(s)\n`);
+  for (const [parent, r] of Object.entries(REMEDIES)) {
+    console.log(`  \x1b[1m${parent}\x1b[0m  ·  gate: ${r.mechanism ?? '(documented-only)'}`);
+    console.log(`    └─ also covers: ${(r.family || []).join(', ') || '(no family registered)'}`);
+  }
+
+  const rows = loadLedger();
+  if (rows.length) {
+    console.log(`\n  ledger classes (${rows.length} incident(s)):`);
+    let orphans = 0;
+    for (const cls of Object.keys(groupByClass(rows))) {
+      if (REMEDIES[cls]) {
+        console.log(`    \x1b[32m${cls}\x1b[0m → directly gated`);
+      } else if (coveredBy[cls]?.length) {
+        console.log(`    \x1b[36m${cls}\x1b[0m → covered by family of ${coveredBy[cls].join(', ')} (reuse that gate)`);
+      } else {
+        orphans++;
+        console.log(`    \x1b[33m${cls}\x1b[0m → ORPHAN: no gate, not in any family — needs a new lesson`);
+      }
+    }
+    console.log(`\n  ${orphans} orphan class(es); every other ledger class is covered directly or by family.`);
+  }
+  process.exit(0);
 }
-process.exit(0);

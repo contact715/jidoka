@@ -141,60 +141,65 @@ function selfTest() {
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
-if (process.argv.includes('--self-test')) selfTest();
 
-const rows = buildRows();
-const summary = summarize(rows);
-const run = process.argv.includes('--run');
-const strict = process.argv.includes('--strict');
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-// --run: execute every self/engine AC and record pass/fail (real executable proof).
-let runResults = [];
-let runFails = 0;
-if (run) {
-  const seen = new Set(); // dedupe identical commands (many ACs share `--self-test`)
-  for (const r of rows) {
-    if ((r.kind !== 'self' && r.kind !== 'engine') || seen.has(r.command)) continue;
-    seen.add(r.command);
-    try {
-      execSync(r.command, { cwd: ROOT, stdio: 'pipe' });
-      runResults.push({ command: r.command, ok: true });
-    } catch {
-      runResults.push({ command: r.command, ok: false });
-      runFails++;
+if (isMain) {
+  if (process.argv.includes('--self-test')) selfTest();
+
+  const rows = buildRows();
+  const summary = summarize(rows);
+  const run = process.argv.includes('--run');
+  const strict = process.argv.includes('--strict');
+
+  // --run: execute every self/engine AC and record pass/fail (real executable proof).
+  let runResults = [];
+  let runFails = 0;
+  if (run) {
+    const seen = new Set(); // dedupe identical commands (many ACs share `--self-test`)
+    for (const r of rows) {
+      if ((r.kind !== 'self' && r.kind !== 'engine') || seen.has(r.command)) continue;
+      seen.add(r.command);
+      try {
+        execSync(r.command, { cwd: ROOT, stdio: 'pipe' });
+        runResults.push({ command: r.command, ok: true });
+      } catch {
+        runResults.push({ command: r.command, ok: false });
+        runFails++;
+      }
     }
   }
-}
 
-if (process.argv.includes('--json')) {
-  console.log(JSON.stringify({ summary, rows, runResults }, null, 2));
-} else {
-  console.log(`ac-verify-map: ${summary.total} ACs across ${moduleSpecs().length} module specs`);
-  console.log(`  executable (self/engine): ${summary.executable}   cli: ${summary.byKind.cli}   manual: ${summary.byKind.manual}`);
-  console.log(`  wired (command → real file, or manual): ${summary.wired}/${summary.total}`);
-  if (run) {
-    const ok = runResults.filter(r => r.ok).length;
-    console.log(`  --run: executed ${runResults.length} unique self/engine checks → ${ok} passed, ${runFails} failed`);
-    for (const r of runResults.filter(r => !r.ok)) console.log(`    \x1b[31m✗ ${r.command}\x1b[0m`);
+  if (process.argv.includes('--json')) {
+    console.log(JSON.stringify({ summary, rows, runResults }, null, 2));
+  } else {
+    console.log(`ac-verify-map: ${summary.total} ACs across ${moduleSpecs().length} module specs`);
+    console.log(`  executable (self/engine): ${summary.executable}   cli: ${summary.byKind.cli}   manual: ${summary.byKind.manual}`);
+    console.log(`  wired (command → real file, or manual): ${summary.wired}/${summary.total}`);
+    if (run) {
+      const ok = runResults.filter(r => r.ok).length;
+      console.log(`  --run: executed ${runResults.length} unique self/engine checks → ${ok} passed, ${runFails} failed`);
+      for (const r of runResults.filter(r => !r.ok)) console.log(`    \x1b[31m✗ ${r.command}\x1b[0m`);
+    }
   }
-}
 
-writeFileSync(OUT, JSON.stringify({ generated: 'spec-tree-overhaul', summary, rows, runResults }, null, 2) + '\n');
+  writeFileSync(OUT, JSON.stringify({ generated: 'spec-tree-overhaul', summary, rows, runResults }, null, 2) + '\n');
 
-// strict: a real spec must give every AC a command, and every command that names a
-// script must resolve. This blocks a NEW L3 spec whose ACs are unverifiable prose.
-if (strict) {
-  const broken = rows.filter(r => r.script && !r.wired);
-  if (broken.length) {
-    console.error(`\x1b[31m✗ ${broken.length} AC(s) reference a script that does not exist:\x1b[0m`);
-    for (const b of broken) console.error(`    ${b.spec} ${b.id}: ${b.command}`);
+  // strict: a real spec must give every AC a command, and every command that names a
+  // script must resolve. This blocks a NEW L3 spec whose ACs are unverifiable prose.
+  if (strict) {
+    const broken = rows.filter(r => r.script && !r.wired);
+    if (broken.length) {
+      console.error(`\x1b[31m✗ ${broken.length} AC(s) reference a script that does not exist:\x1b[0m`);
+      for (const b of broken) console.error(`    ${b.spec} ${b.id}: ${b.command}`);
+      process.exit(1);
+    }
+  }
+
+  if (run && runFails > 0) {
+    console.error(`\x1b[31m✗ ac-verify-map --run: ${runFails} acceptance check(s) FAILED\x1b[0m`);
     process.exit(1);
   }
-}
 
-if (run && runFails > 0) {
-  console.error(`\x1b[31m✗ ac-verify-map --run: ${runFails} acceptance check(s) FAILED\x1b[0m`);
-  process.exit(1);
+  process.exit(0);
 }
-
-process.exit(0);

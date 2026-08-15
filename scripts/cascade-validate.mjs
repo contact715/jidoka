@@ -199,7 +199,10 @@ function fingerprintSelfTest() {
   console.log('\n\x1b[32m✓ cascade-validate: parent-content fingerprint catches an edit the version number hides\x1b[0m');
   process.exit(0);
 }
-if (process.argv.includes('--self-test')) fingerprintSelfTest();
+// самопроверка — только при прямом запуске: импортирующий CLI со своим
+// --self-test не должен запускать чужую
+const isMainCascade = process.argv[1] === fileURLToPath(import.meta.url);
+if (isMainCascade && process.argv.includes('--self-test')) fingerprintSelfTest();
 
 // ── Semver comparison ──────────────────────────────────────────────────
 // Returns { major, minor, patch } from "MAJOR.MINOR.PATCH" string.

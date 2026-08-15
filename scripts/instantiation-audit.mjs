@@ -34,6 +34,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { dirname, resolve as resolvePath, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const warnOnly = process.argv.includes('--warn');
 
@@ -58,122 +59,127 @@ const honestSkips = needle => { try {
 let ghosts = 0, dormant = 0;
 
 // ── Class 1 — ghost automation ────────────────────────────────────────────────
-console.log('\x1b[1m▌ Class 1 — ghost automation (declared in docs/code, not on disk)\x1b[0m');
-const autoRefs = [...new Set(
-  grepLines('\\.(github/workflows/[A-Za-z0-9_.-]+\\.ya?ml|husky/[A-Za-z0-9_.-]+|githooks/[A-Za-z0-9_.-]+)')
-    .map(r => r.replace(/[.\s]+$/, ''))                          // strip trailing prose dots/space
-    .filter(r => /workflows\/.+\.ya?ml$|(?:husky|githooks)\/[A-Za-z0-9_-]+$/.test(r)) // real file name, not "..."
-)];
-let c1 = 0;
-for (const ref of autoRefs) {
-  if (existsSync(ref)) continue;
-  c1++; ghosts++;
-  console.log(`  \x1b[31m👻 ${ref}\x1b[0m — cited in ${refFile(ref) || '(docs)'} but not on disk`);
-}
-if (c1 === 0) console.log('  \x1b[32m✓ every cited workflow/hook exists\x1b[0m');
 
-// ── Class 2 — doc-count drift ─────────────────────────────────────────────────
-console.log('\n\x1b[1m▌ Class 2 — doc-count drift (published claims vs reality)\x1b[0m');
-// Scanned documents. README was the only one until 2026-08-15, and HONEST_SYSTEM_STATE.md —
-// the document whose entire purpose is to be honest about the system — sat 76 days stale
-// publishing "28 агентов-ролей", "14 тестов" and "21/21 eval-кейсов" against a reality of
-// 48, 75 and 97. A hand-maintained number guarding a property a machine can read is exactly
-// the shape this class exists to catch; it just was not pointed at the second file.
-const COUNT_DOCS = ['README.md', 'docs/HONEST_SYSTEM_STATE.md'];
-const real = { agent: count('.claude/agents'), skill: count('.claude/skills'), script: count('scripts', '.mjs') + count('scripts', '.sh') };
-const labels = { agent: /(\d+)(\+?)\s*(?:агент|agent)/i, skill: /(\d+)(\+?)\s*(?:навык|skill)/i, script: /(\d+)(\+?)\s*(?:скрипт|script)/i };
-let c2 = 0;
-for (const doc of COUNT_DOCS) {
-  const text = existsSync(doc) ? readFileSync(doc, 'utf8') : '';
-  if (!text) continue;
-  // An EXPLICIT machine-readable claim wins over prose. Guessing the claim from prose is how this
-  // check fired on its own fix: the sentence "измерены 10 из 11 агентов" was read as "claims 11
-  // agents". A document states its counts on purpose or it states none — it is never inferred.
-  //   <!-- counts: agents=47 skills=0 scripts=242 -->
-  const explicit = /<!--\s*counts:([^>]*)-->/.exec(text);
-  if (explicit) {
-    for (const [key] of Object.entries(labels)) {
-      const em = new RegExp(`\\b${key}s?\\s*=\\s*(\\d+)`).exec(explicit[1]);
-      if (!em) continue;
-      const claimed = +em[1], actual = real[key];
-      if (claimed !== actual) { c2++; ghosts++; console.log(`  \x1b[31m👻 ${key}s: ${doc} declares ${claimed}, real ${actual}\x1b[0m`); }
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  console.log('\x1b[1m▌ Class 1 — ghost automation (declared in docs/code, not on disk)\x1b[0m');
+  const autoRefs = [...new Set(
+    grepLines('\\.(github/workflows/[A-Za-z0-9_.-]+\\.ya?ml|husky/[A-Za-z0-9_.-]+|githooks/[A-Za-z0-9_.-]+)')
+      .map(r => r.replace(/[.\s]+$/, ''))                          // strip trailing prose dots/space
+      .filter(r => /workflows\/.+\.ya?ml$|(?:husky|githooks)\/[A-Za-z0-9_-]+$/.test(r)) // real file name, not "..."
+  )];
+  let c1 = 0;
+  for (const ref of autoRefs) {
+    if (existsSync(ref)) continue;
+    c1++; ghosts++;
+    console.log(`  \x1b[31m👻 ${ref}\x1b[0m — cited in ${refFile(ref) || '(docs)'} but not on disk`);
+  }
+  if (c1 === 0) console.log('  \x1b[32m✓ every cited workflow/hook exists\x1b[0m');
+
+  // ── Class 2 — doc-count drift ─────────────────────────────────────────────────
+  console.log('\n\x1b[1m▌ Class 2 — doc-count drift (published claims vs reality)\x1b[0m');
+  // Scanned documents. README was the only one until 2026-08-15, and HONEST_SYSTEM_STATE.md —
+  // the document whose entire purpose is to be honest about the system — sat 76 days stale
+  // publishing "28 агентов-ролей", "14 тестов" and "21/21 eval-кейсов" against a reality of
+  // 48, 75 and 97. A hand-maintained number guarding a property a machine can read is exactly
+  // the shape this class exists to catch; it just was not pointed at the second file.
+  const COUNT_DOCS = ['README.md', 'docs/HONEST_SYSTEM_STATE.md'];
+  const real = { agent: count('.claude/agents'), skill: count('.claude/skills'), script: count('scripts', '.mjs') + count('scripts', '.sh') };
+  const labels = { agent: /(\d+)(\+?)\s*(?:агент|agent)/i, skill: /(\d+)(\+?)\s*(?:навык|skill)/i, script: /(\d+)(\+?)\s*(?:скрипт|script)/i };
+  let c2 = 0;
+  for (const doc of COUNT_DOCS) {
+    const text = existsSync(doc) ? readFileSync(doc, 'utf8') : '';
+    if (!text) continue;
+    // An EXPLICIT machine-readable claim wins over prose. Guessing the claim from prose is how this
+    // check fired on its own fix: the sentence "измерены 10 из 11 агентов" was read as "claims 11
+    // agents". A document states its counts on purpose or it states none — it is never inferred.
+    //   <!-- counts: agents=47 skills=0 scripts=242 -->
+    const explicit = /<!--\s*counts:([^>]*)-->/.exec(text);
+    if (explicit) {
+      for (const [key] of Object.entries(labels)) {
+        const em = new RegExp(`\\b${key}s?\\s*=\\s*(\\d+)`).exec(explicit[1]);
+        if (!em) continue;
+        const claimed = +em[1], actual = real[key];
+        if (claimed !== actual) { c2++; ghosts++; console.log(`  \x1b[31m👻 ${key}s: ${doc} declares ${claimed}, real ${actual}\x1b[0m`); }
+      }
+      continue;
     }
-    continue;
+    for (const [key, re] of Object.entries(labels)) {
+      const m = text.match(re);
+      if (!m) continue;
+      const claimed = +m[1], plus = m[2] === '+', actual = real[key];
+      const drifted = plus ? actual < claimed : actual !== claimed;
+      if (drifted) { c2++; ghosts++; console.log(`  \x1b[31m👻 ${key}s: ${doc} says ${claimed}${plus ? '+' : ''}, real ${actual}\x1b[0m`); }
+    }
   }
-  for (const [key, re] of Object.entries(labels)) {
-    const m = text.match(re);
+  if (c2 === 0) console.log(`  \x1b[32m✓ published counts match reality in ${COUNT_DOCS.join(', ')} (or they make no claim)\x1b[0m`);
+
+  // ── Class 3 — registry ghosts (curated manifest of required INPUT objects) ─────
+  console.log('\n\x1b[1m▌ Class 3 — registry ghosts (validators whose required object is absent)\x1b[0m');
+  const MANIFEST = [
+    ['docs/evals',                              'golden datasets for run-evals.mjs (agent quality regression)'],
+    ['docs/security/dr-scenario-catalog.json',  'DR catalog required by validate-dr-catalog.mjs'],
+    ['docs/security/api-contract-registry.json','API surface required by validate-contract.mjs', 'product'],
+    ['docs/governance/agent-access-registry.json','tool grants required by validate-agent-access.mjs'],
+    ['docs/governance/raci.json',               'RACI matrix required by validate-raci.mjs'],
+    ['docs/quality/slo-definitions.json',       'SLO definitions required by compute-slos.mjs'],
+    ['docs/quality/dora-definitions.json',      'DORA definitions required by compute-dora.mjs'],
+    ['docs/specs/_LINEAGE.json',                'spec lineage required by query-graph.mjs'],
+  ];
+  let c3 = 0, naCount = 0;
+  for (const [path, note, scope] of MANIFEST) {
+    if (existsSync(path)) continue;
+    const base = path.split('/').pop();
+    if (refCount(base) === '0') continue; // nothing references it → not a live expectation
+    if (scope === 'product') {
+      naCount++;
+      console.log(`  \x1b[2m○ ${path}\x1b[0m — ${note}; N/A: this repo exposes no HTTP API (product-repo gate, not a framework gap)`);
+      continue;
+    }
+    if (honestSkips(base)) {
+      dormant++;
+      console.log(`  \x1b[36m⊘ ${path}\x1b[0m — ${note}; absent, but validator honest-skips (DORMANT, not a hidden crash)`);
+      continue;
+    }
+    c3++; ghosts++;
+    console.log(`  \x1b[31m👻 ${path}\x1b[0m — ${note}; absent AND validator crashes (hidden ghost)`);
+  }
+  if (c3 === 0 && dormant === 0 && naCount === 0) console.log('  \x1b[32m✓ every manifest registry is present\x1b[0m');
+  else if (c3 === 0) console.log(`  \x1b[36m${dormant} dormant (awaiting seed)\x1b[0m\x1b[2m, ${naCount} n/a (product-repo gate) — none blocking\x1b[0m`);
+  console.log(`  \x1b[2m(Class 3 checks a curated manifest of ${MANIFEST.length} critical registries, not a full auto-scan.)\x1b[0m`);
+
+  // ── Class 4 — broken imports (a script imports a relative module not on disk) ──
+  console.log('\n\x1b[1m▌ Class 4 — broken imports (script imports a module not on disk)\x1b[0m');
+  let c4 = 0;
+  // Match only REAL import/export statements (the line, after indentation, starts with import|export) —
+  // NOT a `from '...mjs'` that sits inside a comment (`//`) or a string literal. This scan bit a fixture
+  // and a doc-comment that merely mentioned an import; the anchor removes that false-ghost class.
+  const importLines = (() => { try { return execSync(`git grep -noE "^[[:space:]]*(import|export)[^']*from '[^']+\\.mjs'" -- scripts ${SELF} 2>/dev/null || true`, { encoding: 'utf8' }).split('\n').filter(Boolean); } catch { return []; } })();
+  const seenImports = new Set();
+  for (const line of importLines) {
+    const m = line.match(/^(scripts\/[^:]+):\d+:.*\bfrom '([^']+\.mjs)'$/);
     if (!m) continue;
-    const claimed = +m[1], plus = m[2] === '+', actual = real[key];
-    const drifted = plus ? actual < claimed : actual !== claimed;
-    if (drifted) { c2++; ghosts++; console.log(`  \x1b[31m👻 ${key}s: ${doc} says ${claimed}${plus ? '+' : ''}, real ${actual}\x1b[0m`); }
+    const [, srcFile, imp] = m;
+    if (!imp.startsWith('.')) continue; // only relative imports resolve to a file on disk
+    const target = relative('.', resolvePath(dirname(srcFile), imp));
+    if (existsSync(target) || seenImports.has(target)) continue;
+    seenImports.add(target);
+    c4++; ghosts++;
+    console.log(`  \x1b[31m👻 ${target}\x1b[0m — imported by ${srcFile} but not on disk (ERR_MODULE_NOT_FOUND at load)`);
   }
-}
-if (c2 === 0) console.log(`  \x1b[32m✓ published counts match reality in ${COUNT_DOCS.join(', ')} (or they make no claim)\x1b[0m`);
+  if (c4 === 0) console.log('  \x1b[32m✓ every relative .mjs import resolves\x1b[0m');
 
-// ── Class 3 — registry ghosts (curated manifest of required INPUT objects) ─────
-console.log('\n\x1b[1m▌ Class 3 — registry ghosts (validators whose required object is absent)\x1b[0m');
-const MANIFEST = [
-  ['docs/evals',                              'golden datasets for run-evals.mjs (agent quality regression)'],
-  ['docs/security/dr-scenario-catalog.json',  'DR catalog required by validate-dr-catalog.mjs'],
-  ['docs/security/api-contract-registry.json','API surface required by validate-contract.mjs', 'product'],
-  ['docs/governance/agent-access-registry.json','tool grants required by validate-agent-access.mjs'],
-  ['docs/governance/raci.json',               'RACI matrix required by validate-raci.mjs'],
-  ['docs/quality/slo-definitions.json',       'SLO definitions required by compute-slos.mjs'],
-  ['docs/quality/dora-definitions.json',      'DORA definitions required by compute-dora.mjs'],
-  ['docs/specs/_LINEAGE.json',                'spec lineage required by query-graph.mjs'],
-];
-let c3 = 0, naCount = 0;
-for (const [path, note, scope] of MANIFEST) {
-  if (existsSync(path)) continue;
-  const base = path.split('/').pop();
-  if (refCount(base) === '0') continue; // nothing references it → not a live expectation
-  if (scope === 'product') {
-    naCount++;
-    console.log(`  \x1b[2m○ ${path}\x1b[0m — ${note}; N/A: this repo exposes no HTTP API (product-repo gate, not a framework gap)`);
-    continue;
+  // ── verdict ───────────────────────────────────────────────────────────────────
+  console.log(`\n\x1b[1m— instantiation-audit summary —\x1b[0m`);
+  console.log(`  ghosts: ${ghosts}  (class1 automation: ${c1}, class2 doc-drift: ${c2}, class3 registries: ${c3}, class4 imports: ${c4})`);
+  if (dormant > 0 || naCount > 0) console.log(`  \x1b[36mdormant: ${dormant}\x1b[0m\x1b[2m, n/a (product-scope): ${naCount} — neither is a ghost\x1b[0m`);
+  if (ghosts > 0) {
+    console.log(`\n\x1b[31m${ghosts} ghost(s). The scaffolding is real; the objects are not. This is`);
+    console.log(`declaration-over-implementation at framework scale — fill the object or delete the claim.\x1b[0m`);
+    if (warnOnly) { console.log('\x1b[2m(--warn: soft trial, exiting 0)\x1b[0m'); process.exit(0); }
+    process.exit(1);
   }
-  if (honestSkips(base)) {
-    dormant++;
-    console.log(`  \x1b[36m⊘ ${path}\x1b[0m — ${note}; absent, but validator honest-skips (DORMANT, not a hidden crash)`);
-    continue;
-  }
-  c3++; ghosts++;
-  console.log(`  \x1b[31m👻 ${path}\x1b[0m — ${note}; absent AND validator crashes (hidden ghost)`);
+  console.log('\n\x1b[32m✓ every declared mechanism points at something that exists.\x1b[0m');
+  process.exit(0);
 }
-if (c3 === 0 && dormant === 0 && naCount === 0) console.log('  \x1b[32m✓ every manifest registry is present\x1b[0m');
-else if (c3 === 0) console.log(`  \x1b[36m${dormant} dormant (awaiting seed)\x1b[0m\x1b[2m, ${naCount} n/a (product-repo gate) — none blocking\x1b[0m`);
-console.log(`  \x1b[2m(Class 3 checks a curated manifest of ${MANIFEST.length} critical registries, not a full auto-scan.)\x1b[0m`);
-
-// ── Class 4 — broken imports (a script imports a relative module not on disk) ──
-console.log('\n\x1b[1m▌ Class 4 — broken imports (script imports a module not on disk)\x1b[0m');
-let c4 = 0;
-// Match only REAL import/export statements (the line, after indentation, starts with import|export) —
-// NOT a `from '...mjs'` that sits inside a comment (`//`) or a string literal. This scan bit a fixture
-// and a doc-comment that merely mentioned an import; the anchor removes that false-ghost class.
-const importLines = (() => { try { return execSync(`git grep -noE "^[[:space:]]*(import|export)[^']*from '[^']+\\.mjs'" -- scripts ${SELF} 2>/dev/null || true`, { encoding: 'utf8' }).split('\n').filter(Boolean); } catch { return []; } })();
-const seenImports = new Set();
-for (const line of importLines) {
-  const m = line.match(/^(scripts\/[^:]+):\d+:.*\bfrom '([^']+\.mjs)'$/);
-  if (!m) continue;
-  const [, srcFile, imp] = m;
-  if (!imp.startsWith('.')) continue; // only relative imports resolve to a file on disk
-  const target = relative('.', resolvePath(dirname(srcFile), imp));
-  if (existsSync(target) || seenImports.has(target)) continue;
-  seenImports.add(target);
-  c4++; ghosts++;
-  console.log(`  \x1b[31m👻 ${target}\x1b[0m — imported by ${srcFile} but not on disk (ERR_MODULE_NOT_FOUND at load)`);
-}
-if (c4 === 0) console.log('  \x1b[32m✓ every relative .mjs import resolves\x1b[0m');
-
-// ── verdict ───────────────────────────────────────────────────────────────────
-console.log(`\n\x1b[1m— instantiation-audit summary —\x1b[0m`);
-console.log(`  ghosts: ${ghosts}  (class1 automation: ${c1}, class2 doc-drift: ${c2}, class3 registries: ${c3}, class4 imports: ${c4})`);
-if (dormant > 0 || naCount > 0) console.log(`  \x1b[36mdormant: ${dormant}\x1b[0m\x1b[2m, n/a (product-scope): ${naCount} — neither is a ghost\x1b[0m`);
-if (ghosts > 0) {
-  console.log(`\n\x1b[31m${ghosts} ghost(s). The scaffolding is real; the objects are not. This is`);
-  console.log(`declaration-over-implementation at framework scale — fill the object or delete the claim.\x1b[0m`);
-  if (warnOnly) { console.log('\x1b[2m(--warn: soft trial, exiting 0)\x1b[0m'); process.exit(0); }
-  process.exit(1);
-}
-console.log('\n\x1b[32m✓ every declared mechanism points at something that exists.\x1b[0m');
-process.exit(0);

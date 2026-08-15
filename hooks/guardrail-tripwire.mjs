@@ -123,9 +123,12 @@ function selfTest() {
 
 // ── wiring ──────────────────────────────────────────────────────────────────
 let realDetect = null;
-try {
-  ({ coreSubstitutionSignals: realDetect } = await import(path.join(ROOT, 'scripts', 'replan-ledger.mjs')));
-} catch { /* detector unavailable → the hook fails open below */ }
+// подгрузка детектора — работа, поэтому только при прямом запуске хука
+async function loadDetector() {
+  try {
+    ({ coreSubstitutionSignals: realDetect } = await import(path.join(ROOT, 'scripts', 'replan-ledger.mjs')));
+  } catch { /* detector unavailable → the hook fails open below */ }
+}
 
 
 
@@ -166,6 +169,7 @@ function main() {
 // program half may do work.
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
+  await loadDetector();
   if (process.argv.includes('--self-test')) selfTest();
   main();
 }

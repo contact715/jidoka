@@ -551,11 +551,15 @@ export function emitTelemetry(eventType, fields) {
 // Reads all 15 JSONL streams, rewrites prev_hash forward from wave-148.
 // Legacy records (prev_hash: null) are untouched. Atomic write via .tmp file.
 
-if (process.argv[2] === 'hash-chain') {
-  runHashChain();
-}
 
-/**
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  if (process.argv[2] === 'hash-chain') {
+    runHashChain();
+  }
+
+  /**
  * Batch hash-chain computation for all 5 JSONL streams.
  * Each stream is processed independently.
  * Writes to a .tmp file then renames atomically (per wave-158 pattern).
@@ -574,89 +578,90 @@ if (process.argv[2] === 'hash-chain') {
  *
  * @returns {void}
  */
-function runHashChain() {
-  let totalUpdated = 0;
+  function runHashChain() {
+    let totalUpdated = 0;
 
-  for (const streamPath of ALL_STREAM_PATHS) {
-    if (!fs.existsSync(streamPath)) {
-      process.stdout.write(`[hash-chain] SKIP ${path.basename(streamPath)} — file does not exist\n`);
-      continue;
-    }
-
-    const records = readJsonlStream(streamPath);
-    if (records.length === 0) {
-      process.stdout.write(`[hash-chain] SKIP ${path.basename(streamPath)} — empty stream\n`);
-      continue;
-    }
-
-    // Find the first non-null record — this is where the chain begins
-    const chainStartIdx = records.findIndex(
-      r => r.prev_hash !== null && r.prev_hash !== undefined
-    );
-
-    if (chainStartIdx === -1) {
-      // All records are legacy null — nothing to chain, nothing to write
-      process.stdout.write(`[hash-chain] SKIP ${path.basename(streamPath)} — all records are legacy (prev_hash: null)\n`);
-      continue;
-    }
-
-    let updated = 0;
-    /** @type {object | null} */
-    let prevRecord = null;
-    let chainStarted = false;
-
-    const updated_records = records.map((rec, idx) => {
-      // Pre-chain prefix: any record with prev_hash: null is legacy — never touch
-      if (rec.prev_hash === null || rec.prev_hash === undefined) {
-        return rec;
+    for (const streamPath of ALL_STREAM_PATHS) {
+      if (!fs.existsSync(streamPath)) {
+        process.stdout.write(`[hash-chain] SKIP ${path.basename(streamPath)} — file does not exist\n`);
+        continue;
       }
 
-      // First non-null record — chain anchor
-      if (!chainStarted) {
-        const expectedPrevHash = 'genesis';
+      const records = readJsonlStream(streamPath);
+      if (records.length === 0) {
+        process.stdout.write(`[hash-chain] SKIP ${path.basename(streamPath)} — empty stream\n`);
+        continue;
+      }
+
+      // Find the first non-null record — this is where the chain begins
+      const chainStartIdx = records.findIndex(
+        r => r.prev_hash !== null && r.prev_hash !== undefined
+      );
+
+      if (chainStartIdx === -1) {
+        // All records are legacy null — nothing to chain, nothing to write
+        process.stdout.write(`[hash-chain] SKIP ${path.basename(streamPath)} — all records are legacy (prev_hash: null)\n`);
+        continue;
+      }
+
+      let updated = 0;
+      /** @type {object | null} */
+      let prevRecord = null;
+      let chainStarted = false;
+
+      const updated_records = records.map((rec, idx) => {
+        // Pre-chain prefix: any record with prev_hash: null is legacy — never touch
+        if (rec.prev_hash === null || rec.prev_hash === undefined) {
+          return rec;
+        }
+
+        // First non-null record — chain anchor
+        if (!chainStarted) {
+          const expectedPrevHash = 'genesis';
+          const newRec = rec.prev_hash === expectedPrevHash
+            ? rec
+            : { ...rec, prev_hash: expectedPrevHash };
+          if (newRec.prev_hash !== rec.prev_hash) updated++;
+          prevRecord = newRec;
+          chainStarted = true;
+          return newRec;
+        }
+
+        // Subsequent chained record — compute expected hash from prev
+        const expectedPrevHash = prevRecord !== null
+          ? 'sha256:' + crypto.createHash('sha256').update(JSON.stringify(prevRecord)).digest('hex')
+          : 'genesis';
+
         const newRec = rec.prev_hash === expectedPrevHash
           ? rec
           : { ...rec, prev_hash: expectedPrevHash };
+
         if (newRec.prev_hash !== rec.prev_hash) updated++;
         prevRecord = newRec;
-        chainStarted = true;
         return newRec;
+      });
+
+      if (updated === 0) {
+        process.stdout.write(`[hash-chain] OK ${path.basename(streamPath)} — chain already consistent\n`);
+        continue;
       }
 
-      // Subsequent chained record — compute expected hash from prev
-      const expectedPrevHash = prevRecord !== null
-        ? 'sha256:' + crypto.createHash('sha256').update(JSON.stringify(prevRecord)).digest('hex')
-        : 'genesis';
-
-      const newRec = rec.prev_hash === expectedPrevHash
-        ? rec
-        : { ...rec, prev_hash: expectedPrevHash };
-
-      if (newRec.prev_hash !== rec.prev_hash) updated++;
-      prevRecord = newRec;
-      return newRec;
-    });
-
-    if (updated === 0) {
-      process.stdout.write(`[hash-chain] OK ${path.basename(streamPath)} — chain already consistent\n`);
-      continue;
+      // Atomic write via .tmp then rename
+      const tmpPath = streamPath + '.tmp';
+      try {
+        const content = updated_records.map(r => JSON.stringify(r)).join('\n') + '\n';
+        fs.writeFileSync(tmpPath, content, 'utf8');
+        fs.renameSync(tmpPath, streamPath);
+        totalUpdated += updated;
+        process.stdout.write(
+          `[hash-chain] UPDATED ${path.basename(streamPath)} — ${updated} record(s) hashed\n`
+        );
+      } catch (err) {
+        process.stderr.write(`[hash-chain] ERROR ${path.basename(streamPath)}: ${err}\n`);
+        // Leave .tmp in place for inspection
+      }
     }
 
-    // Atomic write via .tmp then rename
-    const tmpPath = streamPath + '.tmp';
-    try {
-      const content = updated_records.map(r => JSON.stringify(r)).join('\n') + '\n';
-      fs.writeFileSync(tmpPath, content, 'utf8');
-      fs.renameSync(tmpPath, streamPath);
-      totalUpdated += updated;
-      process.stdout.write(
-        `[hash-chain] UPDATED ${path.basename(streamPath)} — ${updated} record(s) hashed\n`
-      );
-    } catch (err) {
-      process.stderr.write(`[hash-chain] ERROR ${path.basename(streamPath)}: ${err}\n`);
-      // Leave .tmp in place for inspection
-    }
+    process.stdout.write(`[hash-chain] DONE — ${totalUpdated} total record(s) updated across all streams\n`);
   }
-
-  process.stdout.write(`[hash-chain] DONE — ${totalUpdated} total record(s) updated across all streams\n`);
 }

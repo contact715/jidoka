@@ -66,128 +66,133 @@ function log(msg) { process.stdout.write(msg + '\n'); }
 
 // ── Load catalog ───────────────────────────────────────────────────────────────
 
-if (!fs.existsSync(CATALOG_PATH)) {
-  log(`⊘ DORMANT — ${CATALOG_PATH} not seeded yet; DR-catalog gate inactive, not failed. Seed the catalog to activate.`);
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  if (!fs.existsSync(CATALOG_PATH)) {
+    log(`⊘ DORMANT — ${CATALOG_PATH} not seeded yet; DR-catalog gate inactive, not failed. Seed the catalog to activate.`);
+    process.exit(0);
+  }
+
+  /** @type {any} */
+  let catalog;
+  try {
+    catalog = JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf8'));
+  } catch (err) {
+    log(`[VIOLATION] — catalog JSON parse failed: ${err.message}`);
+    process.exit(1);
+  }
+
+  if (!Array.isArray(catalog.scenarios)) {
+    log(`[VIOLATION] — catalog missing top-level "scenarios" array`);
+    process.exit(1);
+  }
+
+  const scenarios = catalog.scenarios;
+
+  // ── Invariant accumulators ─────────────────────────────────────────────────────
+  /** @type {string[]} */
+  const violations = [];
+  /** @type {string[]} */
+  const warnings = [];
+  /** @type {string[]} */
+  const passes = [];
+
+  // ── DR-V2: unique scenario_id ─────────────────────────────────────────────────
+  const seenIds = new Set();
+  for (const scenario of scenarios) {
+    const id = scenario.scenario_id ?? '(missing scenario_id)';
+    if (seenIds.has(id)) {
+      violations.push(`[VIOLATION] ${id} — duplicate scenario_id`);
+    }
+    seenIds.add(id);
+  }
+
+  // ── DR-V1 + DR-V4: recovery_script resolves + label/script contradiction ──────
+  for (const scenario of scenarios) {
+    const id = scenario.scenario_id ?? '(missing scenario_id)';
+    const label = scenario.recovery_label;
+    const script = scenario.recovery_script;
+
+    // DR-V4: automated + "manual" recovery_script is a contradiction
+    if (label === 'automated' && script === 'manual') {
+      violations.push(
+        `[VIOLATION] ${id} — recovery_label automated contradicts recovery_script manual`
+      );
+      continue; // no point checking file existence for "manual"
+    }
+
+    // DR-V1: automated scenario must have recovery_script that resolves to a real file
+    if (label === 'automated') {
+      if (!script || typeof script !== 'string' || script.trim() === '') {
+        violations.push(`[VIOLATION] ${id} — recovery_script is empty or missing`);
+        continue;
+      }
+      const absPath = path.resolve(ROOT, script);
+      if (!fs.existsSync(absPath)) {
+        violations.push(
+          `[VIOLATION] ${id} — recovery_script path does not resolve: "${script}"`
+        );
+      } else {
+        passes.push(`[PASS] ${id} — recovery_script resolves: "${script}"`);
+      }
+    }
+
+    // manual-only with "manual" script: valid by design (DR-CHAIN-01, DR-TELEM-01)
+    if (label === 'manual-only') {
+      if (script === 'manual') {
+        passes.push(`[PASS] ${id} — recovery_label manual-only, recovery_script "manual" (expected)`);
+      } else if (script && typeof script === 'string' && script.trim() !== '') {
+        // manual-only pointing at a file path is allowed (informational reference)
+        passes.push(`[PASS] ${id} — recovery_label manual-only, recovery_script ref: "${script}"`);
+      }
+    }
+  }
+
+  // ── DR-V3: TBD targets (WARN only, no EXIT-1) ─────────────────────────────────
+  for (const scenario of scenarios) {
+    const id = scenario.scenario_id ?? '(missing scenario_id)';
+    const rto = scenario.rto_target ?? '';
+    const rpo = scenario.rpo_target ?? '';
+    if (String(rto).includes('TBD')) {
+      warnings.push(
+        `[WARN] ${id} — rto_target contains "TBD" — measurement gap: run a real drill and record RTA`
+      );
+    }
+    if (String(rpo).includes('TBD')) {
+      warnings.push(
+        `[WARN] ${id} — rpo_target contains "TBD" — measurement gap: run a real drill and record RPO`
+      );
+    }
+  }
+
+  // ── Print results ──────────────────────────────────────────────────────────────
+  if (isDry) {
+    log('[validate-dr-catalog] --dry mode: validation only, no writes.');
+  }
+
+  for (const pass of passes) {
+    log(pass);
+  }
+  for (const warn of warnings) {
+    log(warn);
+  }
+  for (const violation of violations) {
+    log(violation);
+  }
+
+  const scenarioCount = scenarios.length;
+
+  if (violations.length > 0) {
+    log(
+      `\nFAIL — ${scenarioCount} scenario(s), ${violations.length} violation(s), ${warnings.length} warning(s).`
+    );
+    process.exit(1);
+  }
+
+  log(
+    `\nPASS — ${scenarioCount} scenario(s), 0 violations, ${warnings.length} warning(s).`
+  );
   process.exit(0);
 }
-
-/** @type {any} */
-let catalog;
-try {
-  catalog = JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf8'));
-} catch (err) {
-  log(`[VIOLATION] — catalog JSON parse failed: ${err.message}`);
-  process.exit(1);
-}
-
-if (!Array.isArray(catalog.scenarios)) {
-  log(`[VIOLATION] — catalog missing top-level "scenarios" array`);
-  process.exit(1);
-}
-
-const scenarios = catalog.scenarios;
-
-// ── Invariant accumulators ─────────────────────────────────────────────────────
-/** @type {string[]} */
-const violations = [];
-/** @type {string[]} */
-const warnings = [];
-/** @type {string[]} */
-const passes = [];
-
-// ── DR-V2: unique scenario_id ─────────────────────────────────────────────────
-const seenIds = new Set();
-for (const scenario of scenarios) {
-  const id = scenario.scenario_id ?? '(missing scenario_id)';
-  if (seenIds.has(id)) {
-    violations.push(`[VIOLATION] ${id} — duplicate scenario_id`);
-  }
-  seenIds.add(id);
-}
-
-// ── DR-V1 + DR-V4: recovery_script resolves + label/script contradiction ──────
-for (const scenario of scenarios) {
-  const id = scenario.scenario_id ?? '(missing scenario_id)';
-  const label = scenario.recovery_label;
-  const script = scenario.recovery_script;
-
-  // DR-V4: automated + "manual" recovery_script is a contradiction
-  if (label === 'automated' && script === 'manual') {
-    violations.push(
-      `[VIOLATION] ${id} — recovery_label automated contradicts recovery_script manual`
-    );
-    continue; // no point checking file existence for "manual"
-  }
-
-  // DR-V1: automated scenario must have recovery_script that resolves to a real file
-  if (label === 'automated') {
-    if (!script || typeof script !== 'string' || script.trim() === '') {
-      violations.push(`[VIOLATION] ${id} — recovery_script is empty or missing`);
-      continue;
-    }
-    const absPath = path.resolve(ROOT, script);
-    if (!fs.existsSync(absPath)) {
-      violations.push(
-        `[VIOLATION] ${id} — recovery_script path does not resolve: "${script}"`
-      );
-    } else {
-      passes.push(`[PASS] ${id} — recovery_script resolves: "${script}"`);
-    }
-  }
-
-  // manual-only with "manual" script: valid by design (DR-CHAIN-01, DR-TELEM-01)
-  if (label === 'manual-only') {
-    if (script === 'manual') {
-      passes.push(`[PASS] ${id} — recovery_label manual-only, recovery_script "manual" (expected)`);
-    } else if (script && typeof script === 'string' && script.trim() !== '') {
-      // manual-only pointing at a file path is allowed (informational reference)
-      passes.push(`[PASS] ${id} — recovery_label manual-only, recovery_script ref: "${script}"`);
-    }
-  }
-}
-
-// ── DR-V3: TBD targets (WARN only, no EXIT-1) ─────────────────────────────────
-for (const scenario of scenarios) {
-  const id = scenario.scenario_id ?? '(missing scenario_id)';
-  const rto = scenario.rto_target ?? '';
-  const rpo = scenario.rpo_target ?? '';
-  if (String(rto).includes('TBD')) {
-    warnings.push(
-      `[WARN] ${id} — rto_target contains "TBD" — measurement gap: run a real drill and record RTA`
-    );
-  }
-  if (String(rpo).includes('TBD')) {
-    warnings.push(
-      `[WARN] ${id} — rpo_target contains "TBD" — measurement gap: run a real drill and record RPO`
-    );
-  }
-}
-
-// ── Print results ──────────────────────────────────────────────────────────────
-if (isDry) {
-  log('[validate-dr-catalog] --dry mode: validation only, no writes.');
-}
-
-for (const pass of passes) {
-  log(pass);
-}
-for (const warn of warnings) {
-  log(warn);
-}
-for (const violation of violations) {
-  log(violation);
-}
-
-const scenarioCount = scenarios.length;
-
-if (violations.length > 0) {
-  log(
-    `\nFAIL — ${scenarioCount} scenario(s), ${violations.length} violation(s), ${warnings.length} warning(s).`
-  );
-  process.exit(1);
-}
-
-log(
-  `\nPASS — ${scenarioCount} scenario(s), 0 violations, ${warnings.length} warning(s).`
-);
-process.exit(0);

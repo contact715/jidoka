@@ -205,4 +205,9 @@ function main() {
   process.exit(1);
 }
 
-main();
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  main();
+}

@@ -45,75 +45,80 @@ const nameArg = args.find((a) => a.startsWith('--name='))?.slice(7) ?? null;
 const isJson = args.includes('--json');
 
 // ── load registry ────────────────────────────────────────────────────
-if (!fs.existsSync(REGISTRY_PATH)) {
-  console.error(`✗ Registry not found: ${REGISTRY_PATH}`);
-  process.exit(2);
-}
-const registry = JSON.parse(fs.readFileSync(REGISTRY_PATH, 'utf8'));
-if (!Array.isArray(registry.outcomes)) {
-  console.error('✗ Registry malformed: outcomes array missing');
-  process.exit(2);
-}
 
-// ── filter ───────────────────────────────────────────────────────────
-const targets = nameArg
-  ? registry.outcomes.filter((o) => o.name === nameArg)
-  : registry.outcomes;
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-if (nameArg && targets.length === 0) {
-  console.error(`✗ Unknown outcome: ${nameArg}`);
-  console.error('Available:');
-  for (const o of registry.outcomes) console.error(`  - ${o.name}`);
-  process.exit(2);
-}
-
-// ── run checks ───────────────────────────────────────────────────────
-const results = [];
-for (const outcome of targets) {
-  let met = false;
-  let error = null;
-  try {
-    execSync(outcome.check, { cwd: ROOT, stdio: 'pipe' });
-    met = true;
-  } catch (e) {
-    met = false;
-    error = (e.stderr?.toString() ?? e.message ?? '').slice(0, 200);
+if (isMain) {
+  if (!fs.existsSync(REGISTRY_PATH)) {
+    console.error(`✗ Registry not found: ${REGISTRY_PATH}`);
+    process.exit(2);
   }
-  results.push({ name: outcome.name, met, description: outcome.description, error });
-}
+  const registry = JSON.parse(fs.readFileSync(REGISTRY_PATH, 'utf8'));
+  if (!Array.isArray(registry.outcomes)) {
+    console.error('✗ Registry malformed: outcomes array missing');
+    process.exit(2);
+  }
 
-// ── output ───────────────────────────────────────────────────────────
-const anyUnmet = results.some((r) => !r.met);
+  // ── filter ───────────────────────────────────────────────────────────
+  const targets = nameArg
+    ? registry.outcomes.filter((o) => o.name === nameArg)
+    : registry.outcomes;
 
-if (isJson) {
-  process.stdout.write(JSON.stringify({ results, allMet: !anyUnmet }, null, 2) + '\n');
+  if (nameArg && targets.length === 0) {
+    console.error(`✗ Unknown outcome: ${nameArg}`);
+    console.error('Available:');
+    for (const o of registry.outcomes) console.error(`  - ${o.name}`);
+    process.exit(2);
+  }
+
+  // ── run checks ───────────────────────────────────────────────────────
+  const results = [];
+  for (const outcome of targets) {
+    let met = false;
+    let error = null;
+    try {
+      execSync(outcome.check, { cwd: ROOT, stdio: 'pipe' });
+      met = true;
+    } catch (e) {
+      met = false;
+      error = (e.stderr?.toString() ?? e.message ?? '').slice(0, 200);
+    }
+    results.push({ name: outcome.name, met, description: outcome.description, error });
+  }
+
+  // ── output ───────────────────────────────────────────────────────────
+  const anyUnmet = results.some((r) => !r.met);
+
+  if (isJson) {
+    process.stdout.write(JSON.stringify({ results, allMet: !anyUnmet }, null, 2) + '\n');
+    process.exit(anyUnmet ? 1 : 0);
+  }
+
+  const banner = '─'.repeat(70);
+  process.stdout.write(`\n${banner}\n`);
+  process.stdout.write(`Outcome check — ${nameArg ? `single: ${nameArg}` : `all (${results.length})`}\n`);
+  process.stdout.write(`${banner}\n\n`);
+  for (const r of results) {
+    const mark = r.met ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m';
+    process.stdout.write(`  ${mark}  ${r.name}\n`);
+    process.stdout.write(`     ${r.description}\n`);
+    if (!r.met && r.error) {
+      process.stdout.write(`     reason: ${r.error.split('\n')[0]}\n`);
+    }
+    process.stdout.write('\n');
+  }
+
+  const met = results.filter((r) => r.met).length;
+  process.stdout.write(`${banner}\n`);
+  process.stdout.write(`${met} of ${results.length} outcomes met.\n`);
+  if (anyUnmet) {
+    process.stdout.write(`\nDispatch loop pattern (for orchestrator):\n`);
+    process.stdout.write(`  while ! npm run outcome:check -- --name=<unmet>; do\n`);
+    process.stdout.write(`    dispatch_agent_for_<unmet>\n`);
+    process.stdout.write(`    ((iter++)); [ "$iter" -ge "$BUDGET" ] && break\n`);
+    process.stdout.write(`  done\n`);
+  }
+  process.stdout.write(`${banner}\n\n`);
+
   process.exit(anyUnmet ? 1 : 0);
 }
-
-const banner = '─'.repeat(70);
-process.stdout.write(`\n${banner}\n`);
-process.stdout.write(`Outcome check — ${nameArg ? `single: ${nameArg}` : `all (${results.length})`}\n`);
-process.stdout.write(`${banner}\n\n`);
-for (const r of results) {
-  const mark = r.met ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m';
-  process.stdout.write(`  ${mark}  ${r.name}\n`);
-  process.stdout.write(`     ${r.description}\n`);
-  if (!r.met && r.error) {
-    process.stdout.write(`     reason: ${r.error.split('\n')[0]}\n`);
-  }
-  process.stdout.write('\n');
-}
-
-const met = results.filter((r) => r.met).length;
-process.stdout.write(`${banner}\n`);
-process.stdout.write(`${met} of ${results.length} outcomes met.\n`);
-if (anyUnmet) {
-  process.stdout.write(`\nDispatch loop pattern (for orchestrator):\n`);
-  process.stdout.write(`  while ! npm run outcome:check -- --name=<unmet>; do\n`);
-  process.stdout.write(`    dispatch_agent_for_<unmet>\n`);
-  process.stdout.write(`    ((iter++)); [ "$iter" -ge "$BUDGET" ] && break\n`);
-  process.stdout.write(`  done\n`);
-}
-process.stdout.write(`${banner}\n\n`);
-
-process.exit(anyUnmet ? 1 : 0);

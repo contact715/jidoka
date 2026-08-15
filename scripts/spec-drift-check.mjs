@@ -37,6 +37,7 @@
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { resolve, dirname, join, relative, basename, isAbsolute } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 // Extensions we treat as "a reference to a real project file". A backtick token that
 // ends in one of these (or contains a path separator) is a candidate; anything else
@@ -301,64 +302,69 @@ function selfTest() {
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────────
-if (process.argv.includes('--self-test')) selfTest();
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-const root = resolve(arg('--root') || process.cwd());
-const quiet = process.argv.includes('--quiet');
-const configPath = arg('--config') || join(root, '.sdd-config.json');
-const cfg = readConfig(configPath);
-const hard = process.argv.includes('--hard') || cfg.hardBlockEnabled === true;
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-const DEFAULT_SPEC_PATHS = ['docs', 'whatsapp_agent', 'specs', 'SPEC.md', 'README.md'];
-const specPaths = arg('--specs') ? arg('--specs').split(',').map(s => s.trim())
-  : (Array.isArray(cfg.specPaths) && cfg.specPaths.length ? cfg.specPaths : DEFAULT_SPEC_PATHS);
+if (isMain) {
+  if (process.argv.includes('--self-test')) selfTest();
 
-// Prefer the committed tree (deterministic across CI / local); fall back to a filesystem
-// walk on non-git trees so the portable script still works outside a repo.
-const { rel, names } = trackedIndex(root) || walkIndex(root);
-const has = (p) => rel.has(p);
-// Scan only specs that exist in the same (committed, when available) tree the oracle uses,
-// so a runtime-generated doc on disk (e.g. docs/CURRENT_WAVE.md) is never scanned in a warm
-// tree but skipped in CI — same set of specs scanned everywhere.
-const specs = listSpecs(root, specPaths).filter(s => rel.has(s));
+  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+  const root = resolve(arg('--root') || process.cwd());
+  const quiet = process.argv.includes('--quiet');
+  const configPath = arg('--config') || join(root, '.sdd-config.json');
+  const cfg = readConfig(configPath);
+  const hard = process.argv.includes('--hard') || cfg.hardBlockEnabled === true;
 
-if (specs.length === 0) {
-  console.log(`\x1b[2mspec-drift-check: no spec files found under ${specPaths.join(', ')} (root: ${relative(process.cwd(), root) || '.'}) — nothing to check.\x1b[0m`);
-  process.exit(0);
-}
+  const DEFAULT_SPEC_PATHS = ['docs', 'whatsapp_agent', 'specs', 'SPEC.md', 'README.md'];
+  const specPaths = arg('--specs') ? arg('--specs').split(',').map(s => s.trim())
+    : (Array.isArray(cfg.specPaths) && cfg.specPaths.length ? cfg.specPaths : DEFAULT_SPEC_PATHS);
 
-const rawFindings = [];
-for (const s of specs) {
-  let content; try { content = readFileSync(join(root, s), 'utf8'); } catch { continue; }
-  rawFindings.push(...analyzeSpec(s, content, has, names));
-}
+  // Prefer the committed tree (deterministic across CI / local); fall back to a filesystem
+  // walk on non-git trees so the portable script still works outside a repo.
+  const { rel, names } = trackedIndex(root) || walkIndex(root);
+  const has = (p) => rel.has(p);
+  // Scan only specs that exist in the same (committed, when available) tree the oracle uses,
+  // so a runtime-generated doc on disk (e.g. docs/CURRENT_WAVE.md) is never scanned in a warm
+  // tree but skipped in CI — same set of specs scanned everywhere.
+  const specs = listSpecs(root, specPaths).filter(s => rel.has(s));
 
-// Deterministic exclusion: a reference to a gitignored runtime artifact is not drift —
-// see excludeIgnored. Evaluated against committed .gitignore patterns so the count is
-// identical in a fresh CI checkout and a warmed local tree (the bug this gate had).
-const ignored = gitIgnoredPaths(root, rawFindings.flatMap(f => f.tries || []));
-const findings = excludeIgnored(rawFindings, ignored);
-
-const high = findings.filter(f => f.severity === 'high');
-if (!quiet) {
-  console.log(`spec-drift-check: scanned ${specs.length} spec(s) — ${findings.length} drift finding(s) [mode: ${hard ? 'HARD' : 'soft/warn'}]`);
-  for (const f of findings) {
-    const tag = f.kind === 'missing-parent' ? 'parent missing' : 'reference missing';
-    console.log(`  ${hard ? '\x1b[31m✗\x1b[0m' : '\x1b[33m⚠\x1b[0m'} ${f.spec}: ${tag} → \x1b[1m${f.ref}\x1b[0m`);
+  if (specs.length === 0) {
+    console.log(`\x1b[2mspec-drift-check: no spec files found under ${specPaths.join(', ')} (root: ${relative(process.cwd(), root) || '.'}) — nothing to check.\x1b[0m`);
+    process.exit(0);
   }
-}
 
-if (findings.length === 0) {
-  console.log('\x1b[32m✓ no spec→file drift: every referenced file and declared parent exists.\x1b[0m');
-  console.log('  \x1b[2msemantic match (does the prose still describe what the code DOES) is the agent\'s call — not automated here.\x1b[0m');
+  const rawFindings = [];
+  for (const s of specs) {
+    let content; try { content = readFileSync(join(root, s), 'utf8'); } catch { continue; }
+    rawFindings.push(...analyzeSpec(s, content, has, names));
+  }
+
+  // Deterministic exclusion: a reference to a gitignored runtime artifact is not drift —
+  // see excludeIgnored. Evaluated against committed .gitignore patterns so the count is
+  // identical in a fresh CI checkout and a warmed local tree (the bug this gate had).
+  const ignored = gitIgnoredPaths(root, rawFindings.flatMap(f => f.tries || []));
+  const findings = excludeIgnored(rawFindings, ignored);
+
+  const high = findings.filter(f => f.severity === 'high');
+  if (!quiet) {
+    console.log(`spec-drift-check: scanned ${specs.length} spec(s) — ${findings.length} drift finding(s) [mode: ${hard ? 'HARD' : 'soft/warn'}]`);
+    for (const f of findings) {
+      const tag = f.kind === 'missing-parent' ? 'parent missing' : 'reference missing';
+      console.log(`  ${hard ? '\x1b[31m✗\x1b[0m' : '\x1b[33m⚠\x1b[0m'} ${f.spec}: ${tag} → \x1b[1m${f.ref}\x1b[0m`);
+    }
+  }
+
+  if (findings.length === 0) {
+    console.log('\x1b[32m✓ no spec→file drift: every referenced file and declared parent exists.\x1b[0m');
+    console.log('  \x1b[2msemantic match (does the prose still describe what the code DOES) is the agent\'s call — not automated here.\x1b[0m');
+    process.exit(0);
+  }
+
+  if (hard && high.length) {
+    console.error(`\n\x1b[31m✗ spec-drift-check BLOCKED: ${high.length} spec(s) reference a file that does not exist. Fix the spec or restore the file.\x1b[0m`);
+    process.exit(1);
+  }
+  console.log(`\n\x1b[33m○ soft mode: ${findings.length} finding(s) reported, not blocking. Set driftDetection.hardBlockEnabled=true to enforce after the trial.\x1b[0m`);
+  console.log('  \x1b[2msemantic drift (status vs real progress) — hand to meta-process-auditor / chief-architect.\x1b[0m');
   process.exit(0);
 }
-
-if (hard && high.length) {
-  console.error(`\n\x1b[31m✗ spec-drift-check BLOCKED: ${high.length} spec(s) reference a file that does not exist. Fix the spec or restore the file.\x1b[0m`);
-  process.exit(1);
-}
-console.log(`\n\x1b[33m○ soft mode: ${findings.length} finding(s) reported, not blocking. Set driftDetection.hardBlockEnabled=true to enforce after the trial.\x1b[0m`);
-console.log('  \x1b[2msemantic drift (status vs real progress) — hand to meta-process-auditor / chief-architect.\x1b[0m');
-process.exit(0);

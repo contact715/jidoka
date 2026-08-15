@@ -339,4 +339,9 @@ Scaffolding:
   );
 }
 
-main();
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  main();
+}

@@ -39,6 +39,7 @@
  */
 
 import { execFileSync } from "node:child_process";
+import { fileURLToPath } from 'node:url';
 
 const ПОРОГ_МИНУТ_ПО_УМОЛЧАНИЮ = 30;
 const ПОРОГ_ПРОЦЕССОРА = 1.0; // %
@@ -303,4 +304,9 @@ function main() {
     }
 }
 
-main();
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  main();
+}

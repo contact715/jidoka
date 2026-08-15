@@ -24,6 +24,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from 'node:url';
 
 // ---------- нормализация ----------
 
@@ -260,4 +261,9 @@ function main() {
   console.log(`\nЭто кандидаты на пропуск. Каждый проверить глазами: относится к теме или шум.`);
 }
 
-main();
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  main();
+}

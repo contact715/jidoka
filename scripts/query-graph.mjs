@@ -543,38 +543,43 @@ function cmdAntiPatternsOf(waveArg) {
 }
 
 // ── Main dispatch ──────────────────────────────────────────────────────
-if (!subcommand) {
-  process.stderr.write(
-    'Usage: node scripts/query-graph.mjs <subcommand> [args] [--table]\n\n' +
-    'Subcommands:\n' +
-    '  waves-touching <file-path>     — waves that touched a file\n' +
-    '  lineage <spec-path>            — transitive ancestor chain\n' +
-    '  supersedes <adr-id>            — ADR supersedes relationships\n' +
-    '  anti-patterns-of <wave-id>     — anti-patterns attributed to a wave\n\n' +
-    'Options:\n' +
-    '  --table                        — human-readable tabular output\n\n' +
-    'Run kg:build before querying to ensure _LINEAGE.json is fresh.\n'
-  );
-  process.exit(1);
-}
 
-switch (subcommand) {
-  case 'waves-touching':
-    cmdWavesTouching(arg1);
-    break;
-  case 'lineage':
-    cmdLineage(arg1, args[2]);
-    break;
-  case 'supersedes':
-    cmdSupersedes(arg1);
-    break;
-  case 'anti-patterns-of':
-    cmdAntiPatternsOf(arg1);
-    break;
-  default:
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  if (!subcommand) {
     process.stderr.write(
-      `[query-graph] ERROR — unknown subcommand: "${subcommand}"\n` +
-      `  Valid: waves-touching, lineage, supersedes, anti-patterns-of\n`
+      'Usage: node scripts/query-graph.mjs <subcommand> [args] [--table]\n\n' +
+      'Subcommands:\n' +
+      '  waves-touching <file-path>     — waves that touched a file\n' +
+      '  lineage <spec-path>            — transitive ancestor chain\n' +
+      '  supersedes <adr-id>            — ADR supersedes relationships\n' +
+      '  anti-patterns-of <wave-id>     — anti-patterns attributed to a wave\n\n' +
+      'Options:\n' +
+      '  --table                        — human-readable tabular output\n\n' +
+      'Run kg:build before querying to ensure _LINEAGE.json is fresh.\n'
     );
     process.exit(1);
+  }
+
+  switch (subcommand) {
+    case 'waves-touching':
+      cmdWavesTouching(arg1);
+      break;
+    case 'lineage':
+      cmdLineage(arg1, args[2]);
+      break;
+    case 'supersedes':
+      cmdSupersedes(arg1);
+      break;
+    case 'anti-patterns-of':
+      cmdAntiPatternsOf(arg1);
+      break;
+    default:
+      process.stderr.write(
+        `[query-graph] ERROR — unknown subcommand: "${subcommand}"\n` +
+        `  Valid: waves-touching, lineage, supersedes, anti-patterns-of\n`
+      );
+      process.exit(1);
+  }
 }

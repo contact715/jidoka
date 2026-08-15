@@ -6,6 +6,7 @@
 // Usage:  echo '{"agent":{"name":"backend-agent"},"model":{"display_name":"Sonnet 4.6"}}' | node statusline-subagent.mjs
 
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const C = {
   mint:  s => `\x1b[38;5;49m${s}\x1b[0m`,
@@ -36,4 +37,9 @@ export function render(ctx) {
 
 let raw = ''; try { raw = readFileSync(0, 'utf8'); } catch { /* no stdin */ }
 let ctx = {}; try { ctx = JSON.parse(raw || '{}'); } catch { /* none */ }
-process.stdout.write(render(ctx));
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  process.stdout.write(render(ctx));
+}

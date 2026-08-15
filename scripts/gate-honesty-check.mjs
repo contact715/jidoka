@@ -145,19 +145,24 @@ function самопроверка() {
 const запущенНапрямую =
   process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
-if (запущенНапрямую) {
-  if (process.argv.includes('--self-test')) process.exit(самопроверка() ? 0 : 1);
 
-  const претензии = проверить();
-  if (претензии.length === 0) {
-    process.stdout.write('[gate-honesty] ✓ гейты не лгут о блокировке\n');
-    process.exit(0);
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  if (запущенНапрямую) {
+    if (process.argv.includes('--self-test')) process.exit(самопроверка() ? 0 : 1);
+
+    const претензии = проверить();
+    if (претензии.length === 0) {
+      process.stdout.write('[gate-honesty] ✓ гейты не лгут о блокировке\n');
+      process.exit(0);
+    }
+    process.stderr.write('[gate-honesty] ГЕЙТ ОБЪЯВЛЯЕТ БЛОКИРОВКУ, НО ПРОПУСКАЕТ:\n');
+    for (const п of претензии) process.stderr.write(`  • ${п}\n`);
+    process.stderr.write(
+      '\nЛгущий гейт хуже отсутствующего: отсутствующий виден, а этот создаёт\n' +
+      'уверенность. Добавь `|| exit $?` к вызову или ненулевой выход в скрипт.\n',
+    );
+    process.exit(1);
   }
-  process.stderr.write('[gate-honesty] ГЕЙТ ОБЪЯВЛЯЕТ БЛОКИРОВКУ, НО ПРОПУСКАЕТ:\n');
-  for (const п of претензии) process.stderr.write(`  • ${п}\n`);
-  process.stderr.write(
-    '\nЛгущий гейт хуже отсутствующего: отсутствующий виден, а этот создаёт\n' +
-    'уверенность. Добавь `|| exit $?` к вызову или ненулевой выход в скрипт.\n',
-  );
-  process.exit(1);
 }

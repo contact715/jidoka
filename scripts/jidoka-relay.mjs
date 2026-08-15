@@ -599,21 +599,26 @@ Defaults:
 }
 
 const command = process.argv[2];
-try {
-  if (has('--self-test')) selfTest();
-  if (!command || command === '-h' || command === '--help') help();
-  else if (command === 'start') commandStart();
-  else if (command === 'auto') commandAuto();
-  else if (command === 'list') commandList();
-  else if (command === 'next') commandNext();
-  else if (command === 'prompt') commandPrompt();
-  else if (command === 'run') commandRun();
-  else if (command === 'watch') commandWatch();
-  else if (command === 'start-watchers') commandStartWatchers();
-  else if (command === 'watcher-status') commandWatcherStatus();
-  else if (command === 'stop-watchers') commandStopWatchers();
-  else { console.error(`unknown command: ${command}`); help(); process.exit(2); }
-} catch (e) {
-  console.error(`jidoka-relay: ${e.message}`);
-  process.exit(1);
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  try {
+    if (has('--self-test')) selfTest();
+    if (!command || command === '-h' || command === '--help') help();
+    else if (command === 'start') commandStart();
+    else if (command === 'auto') commandAuto();
+    else if (command === 'list') commandList();
+    else if (command === 'next') commandNext();
+    else if (command === 'prompt') commandPrompt();
+    else if (command === 'run') commandRun();
+    else if (command === 'watch') commandWatch();
+    else if (command === 'start-watchers') commandStartWatchers();
+    else if (command === 'watcher-status') commandWatcherStatus();
+    else if (command === 'stop-watchers') commandStopWatchers();
+    else { console.error(`unknown command: ${command}`); help(); process.exit(2); }
+  } catch (e) {
+    console.error(`jidoka-relay: ${e.message}`);
+    process.exit(1);
+  }
 }

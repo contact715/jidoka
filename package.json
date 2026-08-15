@@ -73,6 +73,7 @@
     "trace:reqs": "node scripts/req-trace.mjs",
     "gate:e2e": "node scripts/e2e-run-gate.mjs",
     "gate:selftest": "node scripts/selftest-reality.mjs",
+    "gate:import-safety": "node scripts/import-safety.mjs --self-test && node scripts/import-safety.mjs --all",
     "gate:ledger-schema": "node scripts/ledger-schema-gate.mjs",
     "gate:waves": "node scripts/run-state.mjs --audit-closed",
     "red:team": "node scripts/red-team.mjs",

@@ -27,6 +27,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const QUEUE = process.env.TASK_QUEUE || path.join(os.homedir(), '.jidoka', 'task-queue', 'queue.jsonl');
 
@@ -168,5 +169,10 @@ function main() {
   process.exit(2);
 }
 
-if (process.argv.includes('--self-test')) selfTest();
-main();
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  if (process.argv.includes('--self-test')) selfTest();
+  main();
+}

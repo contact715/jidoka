@@ -14,6 +14,7 @@
 
 import { readFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const AGENTS_DIR = '.claude/agents';
 const ROSTER = 'docs/AGENT_ROSTER.md';
@@ -64,25 +65,30 @@ function getLine(slug) {
 }
 
 const agents = [];
-for (const f of readdirSync(AGENTS_DIR).filter(f => f.endsWith('.md')).sort()) {
-  const slug = f.replace(/\.md$/, '');
-  const tools = extractTools(readFileSync(`${AGENTS_DIR}/${f}`, 'utf8'));
-  if (tools === null) continue; // body-only agent: no grant to declare, skip cleanly
-  agents.push({
-    slug,
-    declared_tools: tools,
-    write_scope: WRITE_SCOPES[slug] ?? null,
-    line: getLine(slug),
-    blast_radius: 'low',
-    llm06_category: 'none',
-  });
-}
 
-mkdirSync(dirname(OUT), { recursive: true });
-writeFileSync(OUT, JSON.stringify({
-  _generated_by: 'scripts/generate-agent-access-registry.mjs',
-  _source: '.claude/agents/*.md tools: frontmatter + docs/AGENT_ROSTER.md Line cells',
-  _note: 'declared_tools mirror .md exactly (I0 by construction); write_scope set only where role is scope-contradicting (I1), null elsewhere (I2 warn, non-blocking)',
-  agents,
-}, null, 2) + '\n');
-console.log(`generated ${OUT}: ${agents.length} agents (write_scope set for ${Object.keys(WRITE_SCOPES).length})`);
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  for (const f of readdirSync(AGENTS_DIR).filter(f => f.endsWith('.md')).sort()) {
+    const slug = f.replace(/\.md$/, '');
+    const tools = extractTools(readFileSync(`${AGENTS_DIR}/${f}`, 'utf8'));
+    if (tools === null) continue; // body-only agent: no grant to declare, skip cleanly
+    agents.push({
+      slug,
+      declared_tools: tools,
+      write_scope: WRITE_SCOPES[slug] ?? null,
+      line: getLine(slug),
+      blast_radius: 'low',
+      llm06_category: 'none',
+    });
+  }
+
+  mkdirSync(dirname(OUT), { recursive: true });
+  writeFileSync(OUT, JSON.stringify({
+    _generated_by: 'scripts/generate-agent-access-registry.mjs',
+    _source: '.claude/agents/*.md tools: frontmatter + docs/AGENT_ROSTER.md Line cells',
+    _note: 'declared_tools mirror .md exactly (I0 by construction); write_scope set only where role is scope-contradicting (I1), null elsewhere (I2 warn, non-blocking)',
+    agents,
+  }, null, 2) + '\n');
+  console.log(`generated ${OUT}: ${agents.length} agents (write_scope set for ${Object.keys(WRITE_SCOPES).length})`);
+}

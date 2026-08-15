@@ -25,6 +25,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from 'node:url';
 
 const VERIFIER = path.join(os.homedir(), ".claude", "jidoka", "scripts", "verify-claims.mjs");
 const MAX_TEXT = 200_000;
@@ -232,4 +233,9 @@ async function main() {
   return preToolUse(payload);
 }
 
-main().catch(() => process.exit(0));
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  main().catch(() => process.exit(0));
+}

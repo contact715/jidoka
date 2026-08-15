@@ -22,27 +22,33 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, basename } from 'node:path';
 import { LEDGER, validateLedgerEntry } from './meta-lib.mjs';
+import { fileURLToPath } from 'node:url';
 
 const [, , cls, claimed, real, caught = 'user', kind = 'incident'] = process.argv;
-if (!cls || !claimed || !real) {
-  console.error('usage: meta-log.mjs <class> <claimed> <real> [caught_by] [kind]');
-  process.exit(2);
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  if (!cls || !claimed || !real) {
+    console.error('usage: meta-log.mjs <class> <claimed> <real> [caught_by] [kind]');
+    process.exit(2);
+  }
+
+  const date = new Date().toISOString().slice(0, 10);
+  const project = basename(process.cwd());
+  const entry = { date, class: cls, claimed, real, caught_by: caught, project, kind };
+
+  // ledger-pollution write-path guard: a row that does not carry the full mistake schema
+  // (date/class/claimed/real/caught_by, all non-empty) is rejected HERE, not caught later
+  // by meta-honesty. Telemetry belongs in its own sidecar stream, never in this ledger.
+  const problems = validateLedgerEntry(entry);
+  if (problems.length) {
+    console.error('meta-log: REJECTED — row violates the ledger schema (ledger-pollution guard):');
+    for (const p of problems) console.error(`  ✗ ${p}`);
+    process.exit(2);
+  }
+
+  mkdirSync(dirname(LEDGER), { recursive: true });
+  appendFileSync(LEDGER, JSON.stringify(entry) + '\n');
+  console.log(`logged [${cls}] from project "${project}" → ${LEDGER} — run meta-audit to check for recurrence`);
 }
-
-const date = new Date().toISOString().slice(0, 10);
-const project = basename(process.cwd());
-const entry = { date, class: cls, claimed, real, caught_by: caught, project, kind };
-
-// ledger-pollution write-path guard: a row that does not carry the full mistake schema
-// (date/class/claimed/real/caught_by, all non-empty) is rejected HERE, not caught later
-// by meta-honesty. Telemetry belongs in its own sidecar stream, never in this ledger.
-const problems = validateLedgerEntry(entry);
-if (problems.length) {
-  console.error('meta-log: REJECTED — row violates the ledger schema (ledger-pollution guard):');
-  for (const p of problems) console.error(`  ✗ ${p}`);
-  process.exit(2);
-}
-
-mkdirSync(dirname(LEDGER), { recursive: true });
-appendFileSync(LEDGER, JSON.stringify(entry) + '\n');
-console.log(`logged [${cls}] from project "${project}" → ${LEDGER} — run meta-audit to check for recurrence`);

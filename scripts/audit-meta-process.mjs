@@ -269,10 +269,15 @@ function main() {
   process.exit(0);
 }
 
-try {
-  main();
-} catch (e) {
-  // fail-closed: a crash in the auditor must not read as PASS (andon — stop the line).
-  log(`FAIL: unhandled exception — ${/** @type {Error} */ (e).message ?? String(e)}`);
-  process.exit(1);
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  try {
+    main();
+  } catch (e) {
+    // fail-closed: a crash in the auditor must not read as PASS (andon — stop the line).
+    log(`FAIL: unhandled exception — ${/** @type {Error} */ (e).message ?? String(e)}`);
+    process.exit(1);
+  }
 }

@@ -175,42 +175,47 @@ function selfTest() {
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
-if (process.argv.includes('--self-test')) selfTest();
 
-const current = measure();
-const baseline = readBaseline();
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-if (process.argv.includes('--update')) {
-  writeBaseline(current, 'Spec-tree structural ceiling. Lower is better; the gate blocks any increase. Auto-tightens when a metric drops.');
-  console.log(`[spec-structural] baseline updated → ${JSON.stringify(current)}`);
+if (isMain) {
+  if (process.argv.includes('--self-test')) selfTest();
+
+  const current = measure();
+  const baseline = readBaseline();
+
+  if (process.argv.includes('--update')) {
+    writeBaseline(current, 'Spec-tree structural ceiling. Lower is better; the gate blocks any increase. Auto-tightens when a metric drops.');
+    console.log(`[spec-structural] baseline updated → ${JSON.stringify(current)}`);
+    process.exit(0);
+  }
+
+  const { regressions, improvements, verdict } = ratchet(baseline, current);
+
+  if (process.argv.includes('--json')) {
+    console.log(JSON.stringify({ baseline, current, regressions, improvements, verdict }, null, 2));
+  }
+
+  if (!baseline) {
+    writeBaseline(current, 'Spec-tree structural ceiling. Lower is better; the gate blocks any increase. Auto-tightens when a metric drops.');
+    console.log(`[spec-structural] seeded baseline → ${JSON.stringify(current)} (first run, not blocking)`);
+    process.exit(0);
+  }
+
+  if (verdict === 'BLOCK') {
+    console.error('\x1b[31m✗ spec-structural-gate BLOCK — new spec-tree breakage:\x1b[0m');
+    for (const r of regressions) console.error(`    ${r.metric}: ${r.baseline} → ${r.current} (must not increase)`);
+    console.error('  Fix the new breakage, or if intentional debt, justify and run --update.');
+    process.exit(1);
+  }
+
+  if (verdict === 'TIGHTEN') {
+    writeBaseline(current, 'Spec-tree structural ceiling. Lower is better; the gate blocks any increase. Auto-tightens when a metric drops.');
+    console.log('\x1b[32m✓ spec-structural-gate — debt paid down, baseline tightened:\x1b[0m');
+    for (const i of improvements) console.log(`    ${i.metric}: ${i.baseline} → ${i.current}`);
+    process.exit(0);
+  }
+
+  console.log(`\x1b[32m✓ spec-structural-gate PASS — no regression (${JSON.stringify(current)})\x1b[0m`);
   process.exit(0);
 }
-
-const { regressions, improvements, verdict } = ratchet(baseline, current);
-
-if (process.argv.includes('--json')) {
-  console.log(JSON.stringify({ baseline, current, regressions, improvements, verdict }, null, 2));
-}
-
-if (!baseline) {
-  writeBaseline(current, 'Spec-tree structural ceiling. Lower is better; the gate blocks any increase. Auto-tightens when a metric drops.');
-  console.log(`[spec-structural] seeded baseline → ${JSON.stringify(current)} (first run, not blocking)`);
-  process.exit(0);
-}
-
-if (verdict === 'BLOCK') {
-  console.error('\x1b[31m✗ spec-structural-gate BLOCK — new spec-tree breakage:\x1b[0m');
-  for (const r of regressions) console.error(`    ${r.metric}: ${r.baseline} → ${r.current} (must not increase)`);
-  console.error('  Fix the new breakage, or if intentional debt, justify and run --update.');
-  process.exit(1);
-}
-
-if (verdict === 'TIGHTEN') {
-  writeBaseline(current, 'Spec-tree structural ceiling. Lower is better; the gate blocks any increase. Auto-tightens when a metric drops.');
-  console.log('\x1b[32m✓ spec-structural-gate — debt paid down, baseline tightened:\x1b[0m');
-  for (const i of improvements) console.log(`    ${i.metric}: ${i.baseline} → ${i.current}`);
-  process.exit(0);
-}
-
-console.log(`\x1b[32m✓ spec-structural-gate PASS — no regression (${JSON.stringify(current)})\x1b[0m`);
-process.exit(0);

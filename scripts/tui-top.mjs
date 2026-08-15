@@ -17,9 +17,9 @@ const args = process.argv.slice(2);
 const argVal = (k) => { const i = args.indexOf(k); return i !== -1 ? args[i + 1] : null; };
 const hasFlag = (k) => args.includes(k);
 
-// Strip --self-test from argv BEFORE imports — collectors.mjs calls selfTest() unconditionally
-// when it sees --self-test in process.argv; prevent that by removing it first.
-if (hasFlag('--self-test')) { const i = process.argv.indexOf('--self-test'); if (i !== -1) process.argv.splice(i, 1); }
+// Раньше здесь вырезался --self-test из argv: collectors.mjs запускал свою
+// самопроверку при импорте. Теперь она под сторожем, и обход не нужен.
+const isMainTui = process.argv[1] === fileURLToPath(import.meta.url);
 
 const { collectProject, discoverProjects } = await import('./dashboard/collectors.mjs');
 const { renderFrame, renderFlat } = await import('./dashboard/tui-render.mjs');
@@ -84,9 +84,13 @@ function restore() {
   if (_inAltScreen) process.stdout.write('\x1b[?25h\x1b[?1049l');
   try { if (process.stdin.isTTY && typeof process.stdin.setRawMode === 'function') process.stdin.setRawMode(false); } catch { /* non-TTY guard */ }
 }
-process.on('exit', restore);
-process.on('uncaughtException', (e) => { restore(); process.stderr.write('tui-top crash: ' + (e?.message || e) + '\n'); process.exit(1); });
-process.on('unhandledRejection', (r) => { restore(); process.stderr.write('tui-top unhandled rejection: ' + (r?.message || r) + '\n'); process.exit(1); });
+// обработчики процесса — только при прямом запуске: импортирующему они
+// достались бы вместе с alt-screen и перехватом падений
+if (isMainTui) {
+  process.on('exit', restore);
+  process.on('uncaughtException', (e) => { restore(); process.stderr.write('tui-top crash: ' + (e?.message || e) + '\n'); process.exit(1); });
+  process.on('unhandledRejection', (r) => { restore(); process.stderr.write('tui-top unhandled rejection: ' + (r?.message || r) + '\n'); process.exit(1); });
+}
 
 // ── repaint: compose raw frame lines into a stdout write with erase sequences ──
 // Pure renderer returns clean string[]. We add \x1b[K (erase to end of line) after each
@@ -291,4 +295,7 @@ async function selfTest() {
   process.exit(0);
 }
 
-if (hasFlag('--self-test')) await selfTest(); else runLive(projectPath());
+if (isMainTui) {
+  if (hasFlag('--self-test')) await selfTest();
+  else runLive(projectPath());
+}

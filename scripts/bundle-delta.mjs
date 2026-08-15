@@ -11,8 +11,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const target = path.join(__dirname, 'bundle-size-check.mjs');
 const args = process.argv.slice(2).join(' ');
 
-try {
-  execSync(`node "${target}" ${args}`, { stdio: 'inherit' });
-} catch (err) {
-  process.exit(err.status ?? 1);
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  try {
+    execSync(`node "${target}" ${args}`, { stdio: 'inherit' });
+  } catch (err) {
+    process.exit(err.status ?? 1);
+  }
 }

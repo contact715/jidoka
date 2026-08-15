@@ -30,6 +30,7 @@
 
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const args = process.argv.slice(2);
 const staged = args.includes('--staged');
@@ -120,4 +121,9 @@ function main() {
   process.exit(0);
 }
 
-main();
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  main();
+}

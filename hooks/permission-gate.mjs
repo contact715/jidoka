@@ -17,6 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const LEDGER = process.env.JIDOKA_PERMISSIONS || join(homedir(), '.jidoka', 'permissions.jsonl');
 
@@ -76,85 +77,90 @@ function selfTest() {
   console.log('\n\x1b[32m✓ permission-gate: detects the ACTION, not a mention of it\x1b[0m');
   process.exit(0);
 }
-if (process.argv.includes('--self-test')) selfTest();
 
-const readStdin = () => new Promise((res) => {
-  let d = '';
-  process.stdin.on('data', (c) => { d += c; });
-  process.stdin.on('end', () => res(d));
-  setTimeout(() => res(d), 2000);
-});
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-function scopeCovers(grantScope, target) {
-  if (!grantScope) return false;
-  if (grantScope === '*') return true;
-  if (!target) return false;
-  const g = String(grantScope).replace(/\/+$/, '');
-  const t = String(target).replace(/\/+$/, '');
-  return t === g || t.startsWith(`${g}/`);
-}
+if (isMain) {
+  if (process.argv.includes('--self-test')) selfTest();
 
-function check(action, scope) {
-  if (!existsSync(LEDGER)) return { allowed: false, reason: 'never granted (no permission ledger yet)' };
-  const events = readFileSync(LEDGER, 'utf8').split('\n').filter(Boolean)
-    .map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
-  const byId = new Map();
-  for (const e of events) {
-    if (!e || !e.id) continue;
-    if (e.type === 'grant') byId.set(e.id, e);
-    else if (e.type === 'revoke') byId.delete(e.id);
+  const readStdin = () => new Promise((res) => {
+    let d = '';
+    process.stdin.on('data', (c) => { d += c; });
+    process.stdin.on('end', () => res(d));
+    setTimeout(() => res(d), 2000);
+  });
+
+  function scopeCovers(grantScope, target) {
+    if (!grantScope) return false;
+    if (grantScope === '*') return true;
+    if (!target) return false;
+    const g = String(grantScope).replace(/\/+$/, '');
+    const t = String(target).replace(/\/+$/, '');
+    return t === g || t.startsWith(`${g}/`);
   }
-  const now = Date.now();
-  const live = [...byId.values()].filter((g) => typeof g.expiresAt === 'number' && g.expiresAt > now);
-  const hit = live.find((g) => g.action === action && scopeCovers(g.scope, scope));
-  if (hit) return { allowed: true, reason: `granted by ${hit.by || '?'}: "${hit.reason || ''}"` };
-  const expired = events.filter((e) => e.type === 'grant' && e.action === action && scopeCovers(e.scope, scope) && e.expiresAt <= now);
-  if (expired.length) {
-    const last = expired.sort((a, b) => b.expiresAt - a.expiresAt)[0];
-    return { allowed: false, expiredBefore: true, reason: `это уже разрешали однажды (${new Date(last.at).toISOString().slice(0, 10)}, «${last.reason || 'без причины'}»), и то разрешение истекло` };
-  }
-  return { allowed: false, reason: 'такого разрешения не давали' };
-}
 
-(async () => {
-  let input = '';
-  try { input = await readStdin(); } catch { process.exit(0); }
-  let cmd = '', cwd = '';
-  try {
-    const j = JSON.parse(input);
-    if (j.tool_name && j.tool_name !== 'Bash') process.exit(0);
-    cmd = (j.tool_input && j.tool_input.command) || '';
-    cwd = j.cwd || process.cwd();
-  } catch { process.exit(0); }
-  if (!cmd) process.exit(0);
-
-  let repo = cwd;
-  try {
-    repo = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', timeout: 4000 }).trim() || cwd;
-  } catch { /* not a git repo: fall back to cwd */ }
-
-  const skeleton = commandSkeleton(cmd);
-  for (const g of GUARDED) {
-    let hit = false;
-    try { hit = g.test(skeleton); } catch { hit = false; }
-    if (!hit) continue;
-    let verdict;
-    try { verdict = check(g.action, repo); } catch { process.exit(0); } // fail-open
-    if (verdict.allowed) {
-      console.error(`permission-gate: ${g.action} разрешён (${verdict.reason})`);
-      process.exit(0);
+  function check(action, scope) {
+    if (!existsSync(LEDGER)) return { allowed: false, reason: 'never granted (no permission ledger yet)' };
+    const events = readFileSync(LEDGER, 'utf8').split('\n').filter(Boolean)
+      .map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+    const byId = new Map();
+    for (const e of events) {
+      if (!e || !e.id) continue;
+      if (e.type === 'grant') byId.set(e.id, e);
+      else if (e.type === 'revoke') byId.delete(e.id);
     }
-    console.error([
-      `permission-gate: ${g.what} заблокирован.`,
-      `  ${verdict.reason}.`,
-      verdict.expiredBefore
-        ? '  Прошлое «да» не делает разрешение постоянным. Нужно спросить заново.'
-        : '  Это действие требует явного разрешения владельца, с областью и сроком.',
-      '  Если владелец согласен, разрешение записывается так:',
-      `    node ~/.claude/jidoka/scripts/permission-ledger.mjs grant ${g.action} --scope "${repo}" --hours 6 --by <кто> --reason "<почему именно сейчас>"`,
-      '  Без записи обходить проверки нельзя: именно так одноразовое разрешение тихо становится правилом.',
-    ].join('\n'));
-    process.exit(2);
+    const now = Date.now();
+    const live = [...byId.values()].filter((g) => typeof g.expiresAt === 'number' && g.expiresAt > now);
+    const hit = live.find((g) => g.action === action && scopeCovers(g.scope, scope));
+    if (hit) return { allowed: true, reason: `granted by ${hit.by || '?'}: "${hit.reason || ''}"` };
+    const expired = events.filter((e) => e.type === 'grant' && e.action === action && scopeCovers(e.scope, scope) && e.expiresAt <= now);
+    if (expired.length) {
+      const last = expired.sort((a, b) => b.expiresAt - a.expiresAt)[0];
+      return { allowed: false, expiredBefore: true, reason: `это уже разрешали однажды (${new Date(last.at).toISOString().slice(0, 10)}, «${last.reason || 'без причины'}»), и то разрешение истекло` };
+    }
+    return { allowed: false, reason: 'такого разрешения не давали' };
   }
-  process.exit(0);
-})();
+
+  (async () => {
+    let input = '';
+    try { input = await readStdin(); } catch { process.exit(0); }
+    let cmd = '', cwd = '';
+    try {
+      const j = JSON.parse(input);
+      if (j.tool_name && j.tool_name !== 'Bash') process.exit(0);
+      cmd = (j.tool_input && j.tool_input.command) || '';
+      cwd = j.cwd || process.cwd();
+    } catch { process.exit(0); }
+    if (!cmd) process.exit(0);
+
+    let repo = cwd;
+    try {
+      repo = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8', timeout: 4000 }).trim() || cwd;
+    } catch { /* not a git repo: fall back to cwd */ }
+
+    const skeleton = commandSkeleton(cmd);
+    for (const g of GUARDED) {
+      let hit = false;
+      try { hit = g.test(skeleton); } catch { hit = false; }
+      if (!hit) continue;
+      let verdict;
+      try { verdict = check(g.action, repo); } catch { process.exit(0); } // fail-open
+      if (verdict.allowed) {
+        console.error(`permission-gate: ${g.action} разрешён (${verdict.reason})`);
+        process.exit(0);
+      }
+      console.error([
+        `permission-gate: ${g.what} заблокирован.`,
+        `  ${verdict.reason}.`,
+        verdict.expiredBefore
+          ? '  Прошлое «да» не делает разрешение постоянным. Нужно спросить заново.'
+          : '  Это действие требует явного разрешения владельца, с областью и сроком.',
+        '  Если владелец согласен, разрешение записывается так:',
+        `    node ~/.claude/jidoka/scripts/permission-ledger.mjs grant ${g.action} --scope "${repo}" --hours 6 --by <кто> --reason "<почему именно сейчас>"`,
+        '  Без записи обходить проверки нельзя: именно так одноразовое разрешение тихо становится правилом.',
+      ].join('\n'));
+      process.exit(2);
+    }
+    process.exit(0);
+  })();
+}

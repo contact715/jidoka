@@ -410,19 +410,24 @@ function countLines(p) {
 }
 
 // ── main ─────────────────────────────────────────────────────────────
-console.log('\x1b[1mwave-tui-top acceptance harness\x1b[0m — 28 ACs (18 base + 10 kanban-port: 5 ported-feature + 5 focus/hook)\n');
-await groupRunState();
-await groupRender();
-await groupLive();
-await groupInteractive();
-await groupEntry();
 
-const pass = results.filter((r) => r.pass).length;
-const fail = results.length - pass;
-console.log(`\n${'─'.repeat(56)}`);
-if (fail) {
-  console.log(`\x1b[31m${fail} FAIL\x1b[0m / ${pass} PASS  —  ${results.filter((r) => !r.pass).map((r) => r.id).join(', ')}`);
-  process.exit(1);
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  console.log('\x1b[1mwave-tui-top acceptance harness\x1b[0m — 28 ACs (18 base + 10 kanban-port: 5 ported-feature + 5 focus/hook)\n');
+  await groupRunState();
+  await groupRender();
+  await groupLive();
+  await groupInteractive();
+  await groupEntry();
+
+  const pass = results.filter((r) => r.pass).length;
+  const fail = results.length - pass;
+  console.log(`\n${'─'.repeat(56)}`);
+  if (fail) {
+    console.log(`\x1b[31m${fail} FAIL\x1b[0m / ${pass} PASS  —  ${results.filter((r) => !r.pass).map((r) => r.id).join(', ')}`);
+    process.exit(1);
+  }
+  console.log(`\x1b[32mALL ${pass} ACs PASS\x1b[0m`);
+  process.exit(0);
 }
-console.log(`\x1b[32mALL ${pass} ACs PASS\x1b[0m`);
-process.exit(0);

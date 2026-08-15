@@ -116,77 +116,82 @@ function generateFileContent(entries) {
 
 // Load registry
 let registry;
-try {
-  const raw = fs.readFileSync(REGISTRY_PATH, 'utf8');
-  registry = JSON.parse(raw);
-} catch (err) {
-  process.stderr.write(`[types] ERROR: Failed to read registry at ${REGISTRY_PATH}\n  ${err.message}\n`);
-  process.exit(1);
-}
 
-const entries = registry.entries;
-if (!Array.isArray(entries)) {
-  process.stderr.write(`[types] ERROR: registry.entries is not an array.\n`);
-  process.exit(1);
-}
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-const activeEntries = entries.filter((e) => e.status === 'active');
-const qualifying = activeEntries.filter(
-  (e) => Array.isArray(e.response_fields) && e.response_fields.length > 0
-);
-const skipped = entries.length - qualifying.length;
-
-// Generate content
-const generated = generateFileContent(entries);
-
-if (isCheck) {
-  // ── Check mode: compare buffer vs committed file ───────────────────────────
-  // Mirrors the validate-contract.mjs:1-46 load → compare → exit skeleton.
-  let committed;
+if (isMain) {
   try {
-    committed = fs.readFileSync(OUT_PATH, 'utf8');
+    const raw = fs.readFileSync(REGISTRY_PATH, 'utf8');
+    registry = JSON.parse(raw);
   } catch (err) {
-    process.stderr.write(
-      `[types] [FAIL] Cannot read committed file at ${OUT_PATH}\n  ${err.message}\n`
-    );
-    process.stderr.write(
-      `[types] Hint: run \`npm run types:generate\` to create the initial file.\n`
-    );
+    process.stderr.write(`[types] ERROR: Failed to read registry at ${REGISTRY_PATH}\n  ${err.message}\n`);
     process.exit(1);
   }
 
-  // Normalize timestamps in both strings for a stable comparison.
-  // The "Generated: <ISO>" line changes on every run; strip it for comparison.
-  const normalize = (s) => s.replace(/^\/\/ Generated: .+$/m, '// Generated: <NORMALIZED>');
+  const entries = registry.entries;
+  if (!Array.isArray(entries)) {
+    process.stderr.write(`[types] ERROR: registry.entries is not an array.\n`);
+    process.exit(1);
+  }
 
-  if (normalize(generated) === normalize(committed)) {
+  const activeEntries = entries.filter((e) => e.status === 'active');
+  const qualifying = activeEntries.filter(
+    (e) => Array.isArray(e.response_fields) && e.response_fields.length > 0
+  );
+  const skipped = entries.length - qualifying.length;
+
+  // Generate content
+  const generated = generateFileContent(entries);
+
+  if (isCheck) {
+    // ── Check mode: compare buffer vs committed file ───────────────────────────
+    // Mirrors the validate-contract.mjs:1-46 load → compare → exit skeleton.
+    let committed;
+    try {
+      committed = fs.readFileSync(OUT_PATH, 'utf8');
+    } catch (err) {
+      process.stderr.write(
+        `[types] [FAIL] Cannot read committed file at ${OUT_PATH}\n  ${err.message}\n`
+      );
+      process.stderr.write(
+        `[types] Hint: run \`npm run types:generate\` to create the initial file.\n`
+      );
+      process.exit(1);
+    }
+
+    // Normalize timestamps in both strings for a stable comparison.
+    // The "Generated: <ISO>" line changes on every run; strip it for comparison.
+    const normalize = (s) => s.replace(/^\/\/ Generated: .+$/m, '// Generated: <NORMALIZED>');
+
+    if (normalize(generated) === normalize(committed)) {
+      process.stdout.write(
+        `[types] [PASS] Committed api-contract.gen.ts matches fresh regeneration.\n` +
+        `[types] Scanned ${entries.length} entries, ${activeEntries.length} active, ` +
+        `${qualifying.length} interfaces, ${skipped} skipped (empty response_fields or non-active).\n`
+      );
+      process.exit(0);
+    } else {
+      process.stdout.write(
+        `[types] [FAIL] Committed api-contract.gen.ts is STALE — it does not match a fresh regeneration.\n` +
+        `[types] Run \`npm run types:generate\` to update the committed file, then re-commit.\n` +
+        `[types] Scanned ${entries.length} entries, ${activeEntries.length} active, ` +
+        `${qualifying.length} interfaces (fresh), ${skipped} skipped.\n`
+      );
+      process.exit(1);
+    }
+  } else {
+    // ── Write mode ─────────────────────────────────────────────────────────────
+    // Ensure directory exists (first run after wave ships)
+    fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
+    fs.writeFileSync(OUT_PATH, generated, 'utf8');
+
     process.stdout.write(
-      `[types] [PASS] Committed api-contract.gen.ts matches fresh regeneration.\n` +
-      `[types] Scanned ${entries.length} entries, ${activeEntries.length} active, ` +
-      `${qualifying.length} interfaces, ${skipped} skipped (empty response_fields or non-active).\n`
+      `[types] [PASS] Wrote ${OUT_PATH}\n` +
+      `[types] Scanned ${entries.length} entries total.\n` +
+      `[types] Active entries: ${activeEntries.length}\n` +
+      `[types] Interfaces emitted: ${qualifying.length}\n` +
+      `[types] Skipped (empty response_fields or non-active): ${skipped}\n`
     );
     process.exit(0);
-  } else {
-    process.stdout.write(
-      `[types] [FAIL] Committed api-contract.gen.ts is STALE — it does not match a fresh regeneration.\n` +
-      `[types] Run \`npm run types:generate\` to update the committed file, then re-commit.\n` +
-      `[types] Scanned ${entries.length} entries, ${activeEntries.length} active, ` +
-      `${qualifying.length} interfaces (fresh), ${skipped} skipped.\n`
-    );
-    process.exit(1);
   }
-} else {
-  // ── Write mode ─────────────────────────────────────────────────────────────
-  // Ensure directory exists (first run after wave ships)
-  fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
-  fs.writeFileSync(OUT_PATH, generated, 'utf8');
-
-  process.stdout.write(
-    `[types] [PASS] Wrote ${OUT_PATH}\n` +
-    `[types] Scanned ${entries.length} entries total.\n` +
-    `[types] Active entries: ${activeEntries.length}\n` +
-    `[types] Interfaces emitted: ${qualifying.length}\n` +
-    `[types] Skipped (empty response_fields or non-active): ${skipped}\n`
-  );
-  process.exit(0);
 }

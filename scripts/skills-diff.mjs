@@ -98,14 +98,21 @@ function githubToken() {
   } catch { return null; }
 }
 
-const TOKEN = githubToken();
-const HEAD = { Accept: 'application/vnd.github+json', 'User-Agent': 'jidoka-skills-diff', ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}) };
+// лениво: githubToken() запускает подпроцесс `gh auth token`, и при импорте
+// этого делать нельзя
+let _head = null;
+function reqHeaders() {
+  if (_head) return _head;
+  const token = githubToken();
+  _head = { Accept: 'application/vnd.github+json', 'User-Agent': 'jidoka-skills-diff', ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  return _head;
+}
 
 async function fetchJson(url, timeoutMs = 20000) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const r = await fetch(url, { headers: HEAD, signal: ctrl.signal });
+    const r = await fetch(url, { headers: reqHeaders(), signal: ctrl.signal });
     if (!r.ok) return null;
     return await r.json();
   } catch { return null; } finally { clearTimeout(t); }

@@ -372,4 +372,9 @@ function main() {
   log(`[glossary] PASS — ${terms.length} terms, ${conflicts.length} conflict(s) surfaced (exit 0), ${warns.length} warn(s), 0 violations.`);
 }
 
-main();
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  main();
+}

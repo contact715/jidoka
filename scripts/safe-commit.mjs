@@ -297,12 +297,17 @@ function selfTest() {
 const arg = (k) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : undefined; };
 const has = (k) => process.argv.includes(k);
 
-if (has('--self-test')) selfTest();
-else {
-  const r = await run({
-    repo: arg('--repo'), message: arg('--message') || arg('-m'), session: arg('--session'),
-    target: arg('--target'), noPush: has('--no-push'), dryRun: has('--dry-run'), wait: Number(arg('--wait')) || 120,
-    onlyStaged: has('--only-staged'), forceSweep: has('--force-sweep'),
-  });
-  process.exit(r.ok ? 0 : 1);
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  if (has('--self-test')) selfTest();
+  else {
+    const r = await run({
+      repo: arg('--repo'), message: arg('--message') || arg('-m'), session: arg('--session'),
+      target: arg('--target'), noPush: has('--no-push'), dryRun: has('--dry-run'), wait: Number(arg('--wait')) || 120,
+      onlyStaged: has('--only-staged'), forceSweep: has('--force-sweep'),
+    });
+    process.exit(r.ok ? 0 : 1);
+  }
 }

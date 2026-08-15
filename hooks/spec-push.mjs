@@ -16,6 +16,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const CANDIDATE_ROOTS = [
   join(homedir(), 'jidoka-framework'),
@@ -44,32 +45,37 @@ function selfTest() {
   console.log('\n\x1b[32m✓ spec-push: путь сопоставляется корню верно\x1b[0m');
   process.exit(0);
 }
-if (process.argv.includes('--self-test')) selfTest();
 
-let raw = '';
-process.stdin.on('data', (c) => { raw += c; });
-process.stdin.on('end', () => {
-  try {
-    const input = JSON.parse(raw || '{}');
-    const file = (input.tool_input && input.tool_input.file_path) || (input.tool_response && input.tool_response.filePath) || '';
-    if (!file) process.exit(0);
-    const rel = relativeToRoot(file, CANDIDATE_ROOTS);
-    if (!rel) process.exit(0);
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-    const idxPath = CANDIDATE_ROOTS.map((r) => join(r, 'docs/audits/spec-path-index.json')).find(existsSync);
-    if (!idxPath) process.exit(0);
-    const idx = JSON.parse(readFileSync(idxPath, 'utf8'));
-    const hits = idx[rel];
-    if (!hits || !hits.length) process.exit(0);
+if (isMain) {
+  if (process.argv.includes('--self-test')) selfTest();
 
-    const top = hits[0];
-    console.log(JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: 'PostToolUse',
-        additionalContext: `Файл ${rel} регулируется спекой ${top.spec} (назван в ней ${top.mentions} раз). Если правка меняет ПОВЕДЕНИЕ, сверься с её требованиями, прежде чем считать работу сделанной.`,
-      },
-    }));
-  } catch { /* fail-open: never interfere with an edit */ }
-  process.exit(0);
-});
-setTimeout(() => process.exit(0), 3000);
+  let raw = '';
+  process.stdin.on('data', (c) => { raw += c; });
+  process.stdin.on('end', () => {
+    try {
+      const input = JSON.parse(raw || '{}');
+      const file = (input.tool_input && input.tool_input.file_path) || (input.tool_response && input.tool_response.filePath) || '';
+      if (!file) process.exit(0);
+      const rel = relativeToRoot(file, CANDIDATE_ROOTS);
+      if (!rel) process.exit(0);
+
+      const idxPath = CANDIDATE_ROOTS.map((r) => join(r, 'docs/audits/spec-path-index.json')).find(existsSync);
+      if (!idxPath) process.exit(0);
+      const idx = JSON.parse(readFileSync(idxPath, 'utf8'));
+      const hits = idx[rel];
+      if (!hits || !hits.length) process.exit(0);
+
+      const top = hits[0];
+      console.log(JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PostToolUse',
+          additionalContext: `Файл ${rel} регулируется спекой ${top.spec} (назван в ней ${top.mentions} раз). Если правка меняет ПОВЕДЕНИЕ, сверься с её требованиями, прежде чем считать работу сделанной.`,
+        },
+      }));
+    } catch { /* fail-open: never interfere with an edit */ }
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(0), 3000);
+}

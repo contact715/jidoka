@@ -55,6 +55,23 @@ if [ $rc -ne 0 ]; then
 fi
 echo "✓ pre-commit · instantiation-audit: no ghosts"
 
+# import-safety — BLOCKS if a staged .mjs does work at import time. Замер 2026-08-15:
+# 86 модулей печатали при импорте, один зависал, 19 файлов репозитория переписывались
+# сами. Проверяются ТОЛЬКО файлы этой правки: гейт соразмерен изменению.
+staged_mjs=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(scripts|hooks|lib|global-setup)/.*\.mjs$' | grep -v '__tests__' || true)
+if [ -n "$staged_mjs" ]; then
+  out=$(node "$ROOT/scripts/import-safety.mjs" $staged_mjs 2>&1); rc=$?
+  if [ $rc -ne 0 ]; then
+    echo "$out"
+    echo "✗ pre-commit BLOCKED by import-safety (работа на верхнем уровне: импорт запустит её)."
+    echo "  починить: node scripts/import-safety.mjs <файл> --fix"
+    exit 1
+  fi
+  echo "✓ pre-commit · import-safety: $(echo "$staged_mjs" | wc -l | tr -d ' ') модул(ей) импортируются без последствий"
+else
+  echo "✓ pre-commit · import-safety: модули движка не менялись — пропуск"
+fi
+
 # clarify-gate — WARN by default: a staged master spec must have complete business-question
 # coverage (clarify-engine). Soft trial; promote to --block via gate-graduation once stable.
 out=$(node "$ROOT/scripts/clarify-gate.mjs" --staged 2>&1)

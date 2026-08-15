@@ -133,13 +133,18 @@ function walkPlaywrightSuite(suite, file) {
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────
-parseVitest();
-parsePlaywright();
 
-if (totalFails > 0) {
-  console.log(`\nTotal failures: ${totalFails}`);
-} else {
-  console.log('No failures found in test results.');
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  parseVitest();
+  parsePlaywright();
+
+  if (totalFails > 0) {
+    console.log(`\nTotal failures: ${totalFails}`);
+  } else {
+    console.log('No failures found in test results.');
+  }
+
+  process.exit(0); // always 0 — failures are reported as output, not exit code
 }
-
-process.exit(0); // always 0 — failures are reported as output, not exit code

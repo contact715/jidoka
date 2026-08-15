@@ -238,4 +238,9 @@ _Total: ${rows.length} module specs indexed._
   process.stdout.write(`[modules-index] wrote ${rows.length} rows → docs/specs/modules/_MODULE_INDEX.md\n`);
 }
 
-main();
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  main();
+}

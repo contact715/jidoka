@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { fileURLToPath } from 'node:url';
 // gdoc-export.mjs — render a shareable snapshot of a project's jidoka state (DASHBOARD_SPEC AC6).
 // snapshotMarkdown(): plain snapshot serve.mjs writes to docs/dashboard-snapshot.md.
 // snapshotHtml(): rich HTML the Google Drive MCP imports straight into a real Google Doc
@@ -101,4 +102,9 @@ function selfTest() {
   console.log('\n\x1b[32m✓ gdoc-export: markdown + html snapshots correct\x1b[0m'); process.exit(0);
 }
 
-if (process.argv.includes('--self-test')) selfTest();
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  if (process.argv.includes('--self-test')) selfTest();
+}
