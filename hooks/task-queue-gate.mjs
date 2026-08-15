@@ -47,9 +47,19 @@ export function commandSyntaxOnly(cmd = '') {
     .replace(/"[^"]*"/g, ' ');
 }
 
-/** Did this session actually work the queue? Pure over the collected Bash commands. */
+// A command that points TASK_QUEUE somewhere else is not driving the REAL queue — it is exercising
+// the tool against a fixture. Caught on 2026-08-15 by this hook firing on the very session that
+// wrote it: the end-to-end test of the stale-lock thaw ran `TASK_QUEUE=$Q ... next` against a
+// mktemp file, and the hook read it as abandoned work. Same family as the mention-vs-action defect
+// it already guards: the command was real, the TARGET was not.
+const REDIRECTS_QUEUE = /\bTASK_QUEUE\s*=/;
+
+/** Did this session actually work the REAL queue? Pure over the collected Bash commands. */
 export function workedTheQueue(commands = []) {
-  return commands.some((c) => DRIVES_QUEUE.test(commandSyntaxOnly(c)));
+  return commands.some((c) => {
+    const syntax = commandSyntaxOnly(c);
+    return DRIVES_QUEUE.test(syntax) && !REDIRECTS_QUEUE.test(syntax);
+  });
 }
 
 /**
@@ -95,6 +105,13 @@ function selfTest() {
     workedTheQueue(['git commit -m "describe task-queue.mjs next behaviour"']) === false);
   ok('the phrase inside a heredoc commit message does NOT count either',
     workedTheQueue([["git commit -F - <<'EOF'", 'run task-queue.mjs next after this', 'EOF'].join('\n')]) === false);
+  // the hook's own first false positive (2026-08-15): a fixture run is not queue work
+  ok('a run against a TEMP queue is not working the real one',
+    workedTheQueue(['TASK_QUEUE="/tmp/x/q.jsonl" node scripts/task-queue.mjs next']) === false);
+  ok('the redirect is caught with or without quotes',
+    workedTheQueue(['TASK_QUEUE=/tmp/q.jsonl node scripts/task-queue.mjs done abc']) === false);
+  ok('but a plain run against the DEFAULT queue still counts',
+    workedTheQueue(['node scripts/task-queue.mjs next']) === true);
   ok('an unrelated session is untouched', queueVerdict(['npm test'], queued).block === false);
 
   ok('worked the queue + items still waiting → block', queueVerdict(['node scripts/task-queue.mjs next'], queued).block === true);
