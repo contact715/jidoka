@@ -99,8 +99,17 @@ export function cohesionPartition(files = {}) {
  * @returns {{ok:boolean, order:string[], levels:string[][], criticalPath:string[], cpw:Object, error?:string, cycle?:string[]}}
  * @throws {Error} if a dependency names an unknown node or the graph has a cycle.
  */
-export function scheduleDAG(nodes = []) {
+export function scheduleDAG(nodes = [], { completed = [] } = {}) {
   if (!Array.isArray(nodes)) throw new Error('scheduleDAG: nodes must be an array');
+  // crash-resume (2026-W30-R1): nodes the checkpoint log says already finished are dropped from
+  // the schedule, not re-dispatched. Their dependants keep working, because a finished dependency
+  // is satisfied — dropping the EDGE too would make the rest of the graph look unreachable.
+  const doneSet = new Set(completed);
+  if (doneSet.size) {
+    nodes = nodes
+      .filter((n) => !doneSet.has(n?.id))
+      .map((n) => ({ ...n, dependsOn: (n.dependsOn || []).filter((d) => !doneSet.has(d)) }));
+  }
   const byId = new Map();
   for (const n of nodes) {
     if (!n || typeof n.id !== 'string' || !n.id) throw new Error('scheduleDAG: every node needs a string id');
@@ -218,6 +227,19 @@ if (isMain && process.argv.includes('--self-test')) {
   // Empty is valid (no sub-tasks → empty schedule).
   const empty = scheduleDAG([]);
   ok('empty DAG is valid and empty', empty.ok && empty.order.length === 0);
+
+  // ── crash-resume: the schedule skips what the checkpoint log finished (2026-W30-R1) ─────
+  ok('a completed node is dropped from the schedule', (() => {
+    const r = scheduleDAG([{ id: 'a', agent: 'x' }, { id: 'b', agent: 'y', dependsOn: ['a'] }], { completed: ['a'] });
+    return r.ok && r.order.join() === 'b';
+  })());
+  // dropping the node without dropping the EDGE would make the rest of the graph unreachable
+  ok('its dependants still run — a finished dependency is SATISFIED, not missing',
+    scheduleDAG([{ id: 'a', agent: 'x' }, { id: 'b', agent: 'y', dependsOn: ['a'] }], { completed: ['a'] }).ok === true);
+  ok('with nothing completed the schedule is unchanged',
+    scheduleDAG([{ id: 'a', agent: 'x' }, { id: 'b', agent: 'y', dependsOn: ['a'] }], { completed: [] }).order.join() === 'a,b');
+  ok('everything completed → an empty, valid schedule',
+    scheduleDAG([{ id: 'a', agent: 'x' }], { completed: ['a'] }).order.length === 0);
 
 // ── cohesionPartition: edges from real imports (2026-W28-R4) ──────────────
   const islands = { 'a.mjs': "import x from './b.mjs';", 'b.mjs': '', 'c.mjs': "import y from './d.mjs';", 'd.mjs': '' };

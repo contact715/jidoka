@@ -167,7 +167,8 @@
     "gate:settings": "node scripts/settings-integrity.mjs",
     "skills:freshness": "node scripts/skills-freshness.mjs",
     "routine:daily": "bash scripts/routine-daily.sh",
-    "skills:diff": "node scripts/skills-diff.mjs"
+    "skills:diff": "node scripts/skills-diff.mjs",
+    "gate:checkpoint": "node scripts/checkpoint.mjs --self-test"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

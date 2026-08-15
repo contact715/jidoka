@@ -45,6 +45,11 @@ jobs:
       # on disk, so a wave closed outside `--advance` can no longer sit "complete" unverified.
       - name: waves-closed-with-a-verdict (standing check, not only at the transition)
         run: npm run gate:waves
+      # crash-resume + HITL (2026-W30-R1): the recommendation demanded an EXECUTABLE proof that a
+      # run killed mid-DAG resumes past finished nodes and parks on an interrupt. Without it the
+      # feature would be scaffolding claiming crash-resume.
+      - name: checkpoint (crash-resume skips finished nodes, interrupt parks the run)
+        run: npm run gate:checkpoint
       # ledger-pollution regression (2026-07-04): a judge-calibration/debias run streams
       # position-sensitivity telemetry — it must land in its sidecar, NEVER in the mistake ledger.
       # Prove it: run the debias-writing self-tests, assert the ledger is byte-unchanged, then that
