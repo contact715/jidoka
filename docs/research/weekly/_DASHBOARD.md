@@ -1,8 +1,8 @@
-# Kaizen Dashboard — 2026-W33
+# Kaizen Dashboard — 2026-W34
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 100% · shipped 94/94, open 0, regressed 0, ~1.29w to ship**
+**adoption 84% · shipped 94/112, open 18, regressed 0, ~1.29w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -104,3 +104,21 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W33-S1 | Форма pointOfIntegration проверяется НА ЗАПИСИ, плюс backfill 17 голых маркеров | scripts/kaizen-ledger.mjs#validatePointOfIntegration | present (symbol): scripts/kaizen-ledger.mjs#validatePointOfIntegration |
 | shipped | 2026-W33-S2 | Словарь терминов измерения: два прибора не могут звать «measured» разные планки | docs/METRICS_GLOSSARY.md#one-word-one-bar | present (code): docs/METRICS_GLOSSARY.md#one-word-one-bar |
 | shipped | 2026-W33-Q1 | Метрика длины горизонта (CS329A лекция 17) — крупная ставка СЛЕДУЮЩЕЙ недели | scripts/horizon-length.mjs#horizons | present (symbol): scripts/horizon-length.mjs#horizons |
+| open | 2026-W34-R1 | Исполнитель задачи — ЗАПИСЬ с живым хозяином (owner{pid} + делегирование session-lock#classify), а не строка с таймером | scripts/task-queue.mjs#ownerLease | not yet present: scripts/task-queue.mjs#ownerLease |
+| open | 2026-W34-R2 | Квитанция исполнения: contentHash(title/prompt/repo) + approval{hash}; pickNext отказывает при расхождении | scripts/task-queue.mjs#contentHash | not yet present: scripts/task-queue.mjs#contentHash |
+| open | 2026-W34-R3 | Ответ на уточняющий вопрос пишется В СПЕКУ с отпечатком; clarify-gate блокирует при расхождении | scripts/clarify-engine.mjs#writeBackToSpec | not yet present: scripts/clarify-engine.mjs#writeBackToSpec |
+| open | 2026-W34-R4 | Паспорт стоимости гейта: маркер @scope + пятый инвариант карты гейтов (из разбора сессий, рецидив 2026-08-17) | scripts/gate-audit.mjs#scopeAudit | not yet present: scripts/gate-audit.mjs#scopeAudit |
+| open | 2026-W34-R5 | human_minutes как обязательное поле корпуса бенчмарка; без подгонки кривой | scripts/agent-benchmark.mjs#toBenchmarkTask | not yet present: scripts/agent-benchmark.mjs#toBenchmarkTask |
+| open | 2026-W34-R6 | Возраст старшей записи очереди в стартовой сводке; эскалация без блокировки (из разбора сессий; ложится и в jidoka, и в ~/.claude) | scripts/task-queue.mjs#oldestAge | not yet present: scripts/task-queue.mjs#oldestAge |
+| open | 2026-W34-R7 | Гейт полноты сдачи опознаёт ТИП РЕЗУЛЬТАТА, а не расширение файла (11 случаев за август, гейт видит 1; ложится и в jidoka, и в ~/.claude) | hooks/synthesis-coverage-gate.mjs#deliverableKind | not yet present: hooks/synthesis-coverage-gate.mjs#deliverableKind |
+| open | 2026-W34-R8 | Критерий приёмки как машинный контракт: ратчет по ОТСУТСТВИЮ КОМАНДЫ, не по слову SHALL | scripts/map-ac-coverage.mjs#extractAcLabels | not yet present: scripts/map-ac-coverage.mjs#extractAcLabels |
+| open | 2026-W34-R9 | Журнал ПОКАЗОВ урока: внешний фальсификатор памяти (автор не равен судье по построению) | hooks/session-start-digest.mjs#recordSurfacing | not yet present: hooks/session-start-digest.mjs#recordSurfacing |
+| open | 2026-W34-R10 | Внешний размеченный корпус ReqElicitBench по ссылке и контрольной сумме, без вендоринга (нужно решение владельца по лицензии) | scripts/elicitation-gym.mjs#loadExternalCorpus | not yet present: scripts/elicitation-gym.mjs#loadExternalCorpus |
+| open | 2026-W34-R11 | Внешний измерительный прибор вне репозитория: ПИЛОТ прежде постройки, строить только при красном неизвестного класса | docs/benchmarks/_tasks.jsonl#external-harness-pilot | not yet present: docs/benchmarks/_tasks.jsonl#external-harness-pilot |
+| open | 2026-W34-K1 | КИЛЛЕР-ФИЧА: реестр незакрытых ЧЕЛОВЕЧЕСКИХ шагов с возрастом (7 регистраций стоят 7 дней; ложится и в jidoka, и в ~/.claude) | scripts/pending-human.mjs#pendingSteps | not yet present: scripts/pending-human.mjs#pendingSteps |
+| open | 2026-W34-K2 | КИЛЛЕР-ФИЧА: гейт полноты сдачи по типу результата (закрывает completeness-claimed-without-self-audit) | scripts/synthesis-coverage-audit.mjs#auditByKind | not yet present: scripts/synthesis-coverage-audit.mjs#auditByKind |
+| open | 2026-W34-K3 | КИЛЛЕР-ФИЧА: паспорт стоимости гейта — свойство проверяется у КАЖДОГО проекта на движке | scripts/gate-audit.mjs#scopeAudit | not yet present: scripts/gate-audit.mjs#scopeAudit |
+| open | 2026-W34-Q1 | БЫСТРАЯ ПОБЕДА: снять --dry с regenerate-coverage-report в CI и починить глоб map-ac-coverage (0 спек из 14) | scripts/map-ac-coverage.mjs#extractAcLabels | not yet present: scripts/map-ac-coverage.mjs#extractAcLabels |
+| open | 2026-W34-Q2 | БЫСТРАЯ ПОБЕДА: три контрольные руки в memory-eval (без памяти, весь контекст, только лексика) + отказ печатать выигрыш без них | scripts/memory-eval.mjs#controlArms | not yet present: scripts/memory-eval.mjs#controlArms |
+| open | 2026-W34-R12 | Приёмка обязана различать СОЗДАНИЕ символа и ИЗМЕНЕНИЕ существующего: сегодня рекомендация-правка читается как уже внедрённая (найдено собственными записями этой недели) | scripts/kaizen-audit.mjs#changeKind | not yet present: scripts/kaizen-audit.mjs#changeKind |
+| open | 2026-W34-R13 | Тупик гейта: ledger-sync-gate блокирует пуш, а его собственное лечение --sync ничего не абсорбирует, потому что внутрисессионный журнал пишет записи без обязательного поля kind | scripts/session-pattern-log.mjs#emitIncident | not yet present: scripts/session-pattern-log.mjs#emitIncident |
