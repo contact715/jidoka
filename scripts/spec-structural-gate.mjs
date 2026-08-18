@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// @scope: all
+// @scope-ok: связность дерева спек ломается родителем, которого правка не трогала, 0,29 с
 // spec-structural-gate — a RATCHET gate over the spec tree's structural health.
 //
 // The problem it solves: the tree carries legacy debt (broken refs in old docs,

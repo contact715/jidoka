@@ -167,6 +167,7 @@
     "gate:ledger-sync": "node scripts/ledger-sync-gate.mjs",
     "gate:settings": "node scripts/settings-integrity.mjs",
     "skills:freshness": "node scripts/skills-freshness.mjs",
+    "pending:human": "node scripts/pending-human.mjs",
     "routine:daily": "bash scripts/routine-daily.sh",
     "skills:diff": "node scripts/skills-diff.mjs",
     "gate:checkpoint": "node scripts/checkpoint.mjs --self-test",

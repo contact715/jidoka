@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @scope: staged
 /**
  * dup-guard — survey-before-scaffold as an enforced gate, not a discipline.
  *

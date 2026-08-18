@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @scope: staged
 // spec-amendment-gate — portable, zero-dep gate: code governed by a LIVING spec
 // cannot change without the spec changing with it (or an explicit waiver).
 //

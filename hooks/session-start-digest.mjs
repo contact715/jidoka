@@ -230,6 +230,7 @@ if (isMain) {
     // пятнадцати «живых рисков» пять были закрыты работающим механизмом. Считаем дёшево и
     // молча падаем в пустую строку, чтобы не задерживать старт сессии.
     let pendingLine = '';
+    let humanLine = '';
     try {
       const [ga, { REMEDIES }] = await Promise.all([
         import(pathToFileURL(join(jidoka, 'scripts', 'gate-audit.mjs')).href),
@@ -245,6 +246,15 @@ if (isMain) {
       if (rev.pending.length) {
         pendingLine = `ждут регистрации в реестре классов: ${rev.pending.length} (${rev.pending.map((p) => p.cls).join(', ')}) — гейт работает, метрики его не видят; node scripts/gate-audit.mjs даст блок для вставки`;
       }
+      // ВОЗРАСТ, а не только факт. Строка выше печаталась семь дней подряд неизменной, и
+      // именно неизменность делала её невидимой: «7» вчера и «7» сегодня читаются одинаково,
+      // а «старшему 7 дн.» читается как просрочка. Сводка НИЧЕГО НЕ ПИШЕТ (она стартует в
+      // каждой сессии, запись здесь была бы гонкой) — возраст берётся из реестра, который
+      // наполняет ежедневная рутина. Если рутина ещё не отработала, шаг всё равно виден,
+      // просто с честным «возраст неизвестен» вместо выдуманного нуля.
+      const ph = await import(pathToFileURL(join(jidoka, 'scripts', 'pending-human.mjs')).href);
+      const merged = ph.mergeGatePending(rev.pending.map((pnd) => pnd.cls), ph.loadLedger(jidoka));
+      humanLine = ph.digestLine(ph.pendingSteps(merged));
     } catch { /* fail-open: нет строки лучше, чем задержанный старт */ }
 
     // 4) чужие свежие клеймы wave-id в проекте этой сессии (cwd хука = корень проекта)
@@ -294,6 +304,7 @@ if (isMain) {
       lessons.length ? `активные уроки (🔴): ${lessons.join(', ')}` : '',
       live.total ? `БЕЗ гейта (живой риск, ${live.total}): ${live.shown.join(', ')}${live.total > live.shown.length ? ` и ещё ${live.total - live.shown.length}` : ''}` : '',
       pendingLine,
+      humanLine,
       claims.length ? `⚠️ занятые wave-id (клеймы <24ч): ${claims.join(', ')} — свой номер бери через claim-wave-id.mjs` : '',
       'полный дайджест: ~/.claude/jidoka/memory-consolidated.md',
     ].filter(Boolean).join('\n');

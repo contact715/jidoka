@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// @scope: all
+// @scope-ok: вход это один settings.json, 0,07 с
 // settings-integrity — checks that every hook the harness is told to run actually exists
 // (2026-W32-R4, proposed as W31-R4 and not built for a week).
 //

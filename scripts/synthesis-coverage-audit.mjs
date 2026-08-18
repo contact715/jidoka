@@ -126,6 +126,79 @@ export function checkCoverage(entities, docText) {
   return { covered, missing };
 }
 
+// ---------- полнота по ТИПУ СДАЧИ ----------
+//
+// Замер 2026-08-17 (недельный прогон W34). Поиск по журналу сессий на строку «ты точно»
+// дал ОДИННАДЦАТЬ разных сессий за август, в пяти проектах. Под опознавание
+// документа-синтеза (расширение файла плюс имя) попадает примерно один случай из
+// одиннадцати. Остальные десять этот инструмент не мог проверить по построению, потому
+// что сдача была не документом:
+//   «так ты точно все применил в инбоксе с фигмы? все стили и spatial?»  → перенос дизайна
+//   «Ты точно скачал весь бэк-энд на компьютер? Всё скачал?»              → перенос чужого кода
+//   «Ты точно в этом плане всё покрыл? Все сценарии, исходы, кнопки»      → план в переписке
+//   «ты точно все нашел, чтобы звук был неотличим»                        → ресёрч под качество
+//
+// Берём ДВА типа, у которых источник истины механически сверяем, и не берём два, у которых
+// он живёт в переписке. Это осознанный недобор: гейт, у которого нет исполнимого лечения,
+// блокирует работу и не даёт способа разблокироваться — ровно тот тупик, который движок
+// поймал на себе в этот же день (класс gate-remedy-cannot-satisfy-the-gate).
+
+/** Типы сдачи, у которых полнота проверяема машиной. */
+export const AUDITABLE_KINDS = new Set(['doc-synthesis', 'design-port', 'code-import']);
+
+const SKIP_DIR = /(^|\/)(\.git|node_modules|\.next|dist|build|\.turbo|coverage|__pycache__|\.venv)(\/|$)/;
+
+/** Рекурсивный список путей относительно корня. Отсортирован, поэтому сравним. */
+export function listFiles(root, read = fs.readdirSync, stat = fs.statSync, base = root, out = []) {
+  let entries = [];
+  try { entries = read(root); } catch { return out; }
+  for (const e of entries) {
+    const abs = path.join(root, e);
+    const rel = path.relative(base, abs);
+    if (SKIP_DIR.test(rel)) continue;
+    let st;
+    try { st = stat(abs); } catch { continue; }
+    if (st.isDirectory()) listFiles(abs, read, stat, base, out);
+    else out.push(rel);
+  }
+  return out.sort();
+}
+
+/**
+ * Разница множеств файлов: что есть в источнике и НЕ доехало в цель. Пустая.
+ * Именно этот вопрос стоит за «ты точно скачал весь бэкенд?».
+ */
+export function fileSetDiff(sourceList = [], targetList = []) {
+  const have = new Set(targetList);
+  const missing = sourceList.filter((f) => !have.has(f));
+  const extra = targetList.filter((f) => !new Set(sourceList).has(f));
+  return { missing, extra, total: sourceList.length, covered: sourceList.length - missing.length };
+}
+
+/**
+ * Полнота сдачи по типу. Пустая: на вход подаётся уже прочитанный текст либо списки путей.
+ *
+ * doc-synthesis — сущности источника против текста документа (прежнее поведение);
+ * design-port   — сущности инвентаря дизайна (токены, названия стилей и слоёв) против
+ *                 текста ИЗМЕНЁННОГО КОДА, потому что «применил ли ты стили» это вопрос
+ *                 о коде, а не о документе;
+ * code-import   — разница множеств файлов, без извлечения сущностей: у переноса чужого
+ *                 кода полнота измеряется файлами, а не словами.
+ */
+export function auditByKind({ kind, sourceText = '', targetText = '', sourceList = null, targetList = null } = {}) {
+  if (!AUDITABLE_KINDS.has(kind)) {
+    return { kind, auditable: false, reason: `тип "${kind}" не проверяется машиной — источник истины живёт в переписке`, missing: [], total: 0 };
+  }
+  if (kind === 'code-import') {
+    if (!sourceList || !targetList) return { kind, auditable: false, reason: 'нужны списки файлов источника и цели', missing: [], total: 0 };
+    const d = fileSetDiff(sourceList, targetList);
+    return { kind, auditable: true, missing: d.missing.map((f) => ({ term: f, kind: 'файл', count: 1 })), total: d.total, covered: d.covered, extra: d.extra };
+  }
+  const entities = extractEntities(sourceText);
+  const { covered, missing } = checkCoverage(entities, targetText);
+  return { kind, auditable: true, missing, covered, total: entities.length };
+}
+
 // ---------- сбор источников ----------
 
 function readSources(spec) {
@@ -187,6 +260,35 @@ function selfTest() {
   ok("пустой источник не падает", extractEntities("").length === 0);
   ok("пустой документ не падает", checkCoverage([], "").missing.length === 0);
 
+  // ---- полнота по типу сдачи ----
+  ok("известный тип проверяем", auditByKind({ kind: 'doc-synthesis', sourceText: 'Boulevard', targetText: 'Boulevard' }).auditable === true);
+  ok("неизвестный тип честно объявлен непроверяемым", auditByKind({ kind: 'plan-in-chat' }).auditable === false);
+  ok("непроверяемый тип называет причину", /переписке/.test(auditByKind({ kind: 'plan-in-chat' }).reason));
+
+  // перенос дизайна: инвентарь против КОДА, а не против документа
+  const design = auditByKind({ kind: 'design-port', sourceText: 'Градиент Aurora, отступ spacing-6, радиус radius-xl', targetText: 'className="rounded-xl gap-6"' });
+  ok("перенос дизайна проверяем", design.auditable === true);
+  ok("неперенесённый токен виден как пропуск", design.missing.some((m) => /aurora/i.test(m.term)));
+  ok("перенесённый токен не считается пропуском", !design.missing.some((m) => /radius/i.test(m.term)));
+
+  // перенос чужого кода: полнота меряется ФАЙЛАМИ
+  const d = fileSetDiff(['a.js', 'src/b.js', 'src/c.js'], ['a.js', 'src/b.js']);
+  ok("недоехавший файл виден", d.missing.length === 1 && d.missing[0] === 'src/c.js');
+  ok("покрытие считается по файлам", d.covered === 2 && d.total === 3);
+  ok("лишний файл в цели назван отдельно", fileSetDiff(['a.js'], ['a.js', 'x.js']).extra[0] === 'x.js');
+  ok("полное совпадение не даёт пропусков", fileSetDiff(['a.js'], ['a.js']).missing.length === 0);
+  ok("пустой источник не даёт ложных пропусков", fileSetDiff([], ['a.js']).missing.length === 0);
+  const ci = auditByKind({ kind: 'code-import', sourceList: ['a', 'b'], targetList: ['a'] });
+  ok("перенос кода отдаёт пропуски в общей форме", ci.missing[0].term === 'b' && ci.missing[0].kind === 'файл');
+  ok("перенос кода без списков честно непроверяем", auditByKind({ kind: 'code-import' }).auditable === false);
+
+  // обход дерева
+  const fakeRead = (dir) => ({ '/r': ['a.js', 'node_modules', 'sub'], '/r/sub': ['b.js'], '/r/node_modules': ['junk.js'] })[dir] || [];
+  const fakeStat = (p) => ({ isDirectory: () => p === '/r/sub' || p === '/r/node_modules' });
+  const listed = listFiles('/r', fakeRead, fakeStat, '/r');
+  ok("обход дерева находит вложенные файлы", listed.includes('sub/b.js'));
+  ok("node_modules не попадает в список", !listed.some((f) => /node_modules/.test(f)));
+
   const failed = checks.filter((c) => !c.pass);
   for (const c of checks) console.log(`${c.pass ? "  ok  " : " FAIL "} ${c.name}`);
   console.log(`\n${checks.length - failed.length}/${checks.length} проверок пройдено`);
@@ -209,8 +311,41 @@ function main() {
   const asJson = argv.includes("--json");
   const limit = Number(get("--limit") || 40);
 
+  // Режим по ТИПУ СДАЧИ. Отдельная ветка, потому что у переноса кода полнота меряется
+  // файлами, а не словами, и склеивать это с извлечением сущностей значило бы врать
+  // одним числом про две разные величины.
+  const kind = get("--kind");
+  if (kind) {
+    const src = get("--source");
+    const tgt = get("--target");
+    if (!src || !tgt) {
+      console.error('использование: --kind <design-port|code-import|doc-synthesis> --source <файл|папка> --target <файл|папка> [--json]');
+      process.exit(1);
+    }
+    const readAll = (spec) => readSources(spec).map((f) => { try { return fs.readFileSync(f, "utf8"); } catch { return ""; } }).join("\n");
+    let res;
+    if (kind === 'code-import') {
+      const isDir = (p2) => { try { return fs.statSync(p2).isDirectory(); } catch { return false; } };
+      if (!isDir(src) || !isDir(tgt)) { console.error('для code-import и --source, и --target должны быть папками'); process.exit(1); }
+      res = auditByKind({ kind, sourceList: listFiles(src), targetList: listFiles(tgt) });
+    } else {
+      res = auditByKind({ kind, sourceText: readAll(src), targetText: readAll(tgt) });
+    }
+    if (asJson) { console.log(JSON.stringify(res, null, 2)); process.exit(0); }
+    if (!res.auditable) { console.log(`\x1b[33m⚠ ${res.reason}\x1b[0m`); process.exit(0); }
+    const pct = res.total ? Math.round(((res.total - res.missing.length) / res.total) * 100) : 100;
+    console.log(`сверка «${kind}»: покрыто ${res.total - res.missing.length} из ${res.total} (${pct}%)`);
+    if (!res.missing.length) { console.log('\x1b[32m✓ непокрытого не найдено\x1b[0m'); process.exit(0); }
+    console.log(`\n\x1b[33mНЕ доехало (${res.missing.length}), проверить глазами каждую строку:\x1b[0m`);
+    for (const m of res.missing.slice(0, limit)) console.log(`  · ${m.term}${m.kind && m.kind !== 'файл' ? `  [${m.kind}]` : ''}`);
+    if (res.missing.length > limit) console.log(`  … и ещё ${res.missing.length - limit}`);
+    if (res.extra && res.extra.length) console.log(`\n  (в цели есть ${res.extra.length} файл(ов), которых нет в источнике — это нормально, если вы добавляли своё)`);
+    process.exit(0);
+  }
+
   if (!docPath || !sourcesSpec) {
     console.error("использование: --doc <файл> --sources <файлы через запятую или папка> [--json] [--limit N]");
+    console.error("            либо: --kind <design-port|code-import> --source <файл|папка> --target <файл|папка>");
     process.exit(1);
   }
 

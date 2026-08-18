@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// @scope: all
+// @scope-ok: рецидив виден только на всей истории классов, 0,09 с
 // Meta-Mistake Engine — the system that improves itself.
 //
 // Reads a ledger of PROCESS mistakes (things a human or a check caught that the

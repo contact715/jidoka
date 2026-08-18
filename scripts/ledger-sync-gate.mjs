@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// @scope: all
+// @scope-ok: сравнивает два реестра целиком, иначе расхождение не видно, 0,07 с
 // ledger-sync-gate — keeps the learning ledger from living two lives (2026-W32-R2).
 //
 // THE DEFECT IT CLOSES. meta-lib decides the ledger address by where the engine file sits:

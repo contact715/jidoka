@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// @scope: all
+// @scope-ok: строит очередь тревог из ретро и каталога антипаттернов — вход не связан с правкой; 5,25 с, поэтому post-commit зовёт его В ФОНЕ и коммит его не ждёт
 // @ts-check
 /**
  * Wave-155 — Proactive Surfacing Agent script

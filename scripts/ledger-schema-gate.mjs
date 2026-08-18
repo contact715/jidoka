@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 // @closes-class: ledger-pollution
+// @scope: all
+// @scope-ok: весь вход это ОДИН файл реестра, 0,09 с — «весь» здесь не дерево
 // ledger-schema-gate — mechanical schema gate for the meta-mistake ledger (2026-W28-G3).
 //
 // Class it gates: ledger-pollution (2× on 2026-06-06 — wave-judge-debias telemetry rows

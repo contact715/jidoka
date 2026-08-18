@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 // @closes-class: reward-hacking
+// @scope: all
+// @scope-ok: читает тот же один реестр ошибок, 0,08 с
 // meta-honesty — adversarial audit of the SIGNAL the engine learns from.
 //
 // Every other engine in the family trusts the ledger. But a learning loop is only

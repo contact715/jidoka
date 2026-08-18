@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// @scope: all
+// @scope-ok: фиксированный короткий список L0-документов, 0,08 с
 // l0-content-guard — the normative documents are watched by their CONTENT, not by their version.
 //
 // l0-normative-fingerprint (2026-W31-R5)

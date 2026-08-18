@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @scope: staged
 /**
  * clarify-gate — the forcing function that makes clarify-engine non-voluntary.
  *

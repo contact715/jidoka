@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @closes-class: gate-cost-not-proportional-to-change
 // gate-audit — the single map of every gate: which LAYER enforces it (CI / PreToolUse / runtime
 // dispatch / product pre-push / LLM-judge) and its MODE (hard-block / soft-warn / proxy / kernel /
 // measured / degrade-skip). Then it VERIFIES the claims: a gate marked CI must actually appear in a
@@ -218,7 +219,16 @@ export function callerTexts(root, settingsRaw = '', read = readFileSync, exists 
   const pkg = exists(pkgPath) ? readIf(pkgPath) : '';
   const wfDir = join(root, '.github', 'workflows');
   const wfs = exists(wfDir) ? readdirSync(wfDir).map((f) => readIf(join(wfDir, f))).join('\n') : '';
-  return [settingsRaw, wfs, gh, pkg, readIf(join(root, 'scripts', 'install-into.mjs'))];
+  // Периодические рутины — тоже ПОСТОЯННЫЕ вызывающие: routine-daily.sh запускает launchd
+  // в 09:00 через ~/Library/LaunchAgents/com.mityamit.claude-daily-digest.plist →
+  // hooks/daily-digest.sh → эта рутина. Раньше их здесь не было, и механизм, подключённый
+  // ТОЛЬКО к рутине, читался как сирота, хотя он работает каждый день. Слепое пятно
+  // вскрылось 2026-08-17 на pending-human.mjs.
+  const scriptsDir = join(root, 'scripts');
+  const routines = exists(scriptsDir)
+    ? readdirSync(scriptsDir).filter((f) => /^routine-.*\.sh$/.test(f)).map((f) => readIf(join(scriptsDir, f))).join('\n')
+    : '';
+  return [settingsRaw, wfs, gh, pkg, routines, readIf(join(root, 'scripts', 'install-into.mjs'))];
 }
 
 /** Render the exact entries a human pastes into the L0 registry. Empty string when nothing pends. */
@@ -337,6 +347,86 @@ export function findSeverityMismatches(hooksText = '', workflowsText = '') {
     if (localSoft && !ci.get(script)) out.push(script);
   }
   return out.sort();
+}
+
+// ── FIFTH INVARIANT: a gate on the change path must cost in proportion to the change ──
+// Origin: the owner, 2026-08-17, on projectx-app — "через Gate не нужно гонять все там.
+// Ты там 2000 гоняешь файлов, 3000 все файлы, 1800 файлов и так далее." The rule itself was
+// written 2026-07-27 (docs/GATES_MUST_SCALE_WITH_THE_CHANGE.md), implemented by hand in ONE
+// project, and recurred three weeks later. A rule that lives only in prose is re-litigated
+// every project; this makes it a checkable property of every mechanism, everywhere.
+//
+// The declaration alone would be a self-issued label (the class we closed on 2026-08-11), so
+// the audit does not trust it: it DERIVES the scope a hook actually grants from the
+// invocation line and fails on a mismatch. That half cannot be rubber-stamped. The `all`
+// half can only be justified in writing, which keeps the cost visible rather than settled.
+//
+// `all` is not automatically wrong: meta-honesty reads ONE small ledger, settings-integrity
+// reads ONE file. Cost is work volume, not repo size. What is forbidden is `all` that nobody
+// had to justify, and a declaration that contradicts the invocation.
+export const SCOPE_TAG = /@scope:[ \t]*(staged|changed|all)\b/;
+export const SCOPE_OK = /@scope-ok:[ \t]*(\S[^\r\n]*)/;
+
+/** Read `// @scope:` / `// @scope-ok:` off mechanism files. Input: [{path, text}]. Pure. */
+export function scopeTags(files = []) {
+  return files.map((f) => {
+    const m = SCOPE_TAG.exec(f.text || '');
+    const j = SCOPE_OK.exec(f.text || '');
+    return { path: f.path, scope: m ? m[1] : null, justification: j ? j[1].trim() : null };
+  });
+}
+
+/**
+ * Which mechanisms a local git hook invokes, and with what arguments. Pure.
+ * Returns Map<'scripts/x.mjs', argsString>.
+ */
+export function hookInvocations(hookText = '') {
+  const out = new Map();
+  const re = /node\s+"\$ROOT\/((?:scripts|hooks)\/[A-Za-z0-9._-]+\.mjs)"([^\n]*)/g;
+  let m;
+  while ((m = re.exec(hookText))) {
+    const raw = m[2];
+    const args = raw.replace(/;\s*rc=\$\?.*$/, '').replace(/2>&1/g, '');
+    // A backgrounded invocation (`… &`) does not make the developer WAIT, but it still burns
+    // the machine on every commit — which is the other half of the same 2026-08-17 complaint
+    // ("из-за этого виснет весь компьютер"). So it is judged, and reported as background.
+    const background = /&\s*$/.test(raw.replace(/#.*$/, '').trim());
+    if (!out.has(m[1])) out.set(m[1], { args, background });
+  }
+  return out;
+}
+
+/**
+ * The scope a hook ACTUALLY grants, read off the invocation rather than off the comment.
+ * A shell variable passed as an argument is a file list; `$?` is an exit code, not a file.
+ * Pure. Returns 'staged' | 'changed' | 'all'.
+ */
+export function derivedScope(args = '') {
+  if (/--staged\b/.test(args)) return 'staged';
+  if (/--changed\b/.test(args)) return 'changed';
+  if (/--scope[= ]auto\b/.test(args)) return 'changed';
+  if (/\$\{?[A-Za-z_][A-Za-z0-9_]*/.test(args)) return 'staged';
+  return 'all';
+}
+
+/**
+ * The invariant. Judges ONLY mechanisms standing on the change path (a local git hook),
+ * because those are the ones whose cost is paid on every commit. Pure.
+ * Returns { judged, undeclared, mismatched, unjustified }.
+ */
+export function scopeAudit({ files = [], hookText = '' } = {}) {
+  const invocations = hookInvocations(hookText);
+  const judged = [], undeclared = [], mismatched = [], unjustified = [];
+  for (const f of scopeTags(files)) {
+    if (!invocations.has(f.path)) continue;
+    const { args, background } = invocations.get(f.path);
+    const actual = derivedScope(args);
+    if (!f.scope) { undeclared.push({ mechanism: f.path, actual, background }); continue; }
+    judged.push({ ...f, actual, background });
+    if (f.scope !== actual) mismatched.push({ mechanism: f.path, declared: f.scope, actual });
+    else if (actual === 'all' && !f.justification) unjustified.push({ mechanism: f.path });
+  }
+  return { judged, undeclared, mismatched, unjustified };
 }
 
 function workflowsText(root = process.cwd()) {
@@ -493,6 +583,47 @@ function selfTest() {
       ] } };
       return verifyPreToolUse(JSON.stringify(cfg)).missing.some((m) => /mcp__/.test(m));
     })()],
+    // ── fifth invariant: gate cost proportional to the change (owner, 2026-08-17) ──
+    ['a @scope tag is read off the mechanism',
+      scopeTags([{ path: 'scripts/x.mjs', text: '// @scope: staged\ncode' }])[0].scope === 'staged'],
+    ['a mechanism with no @scope reads null (absent, not assumed)',
+      scopeTags([{ path: 'scripts/x.mjs', text: 'code' }])[0].scope === null],
+    ['a @scope-ok justification is read',
+      scopeTags([{ path: 'scripts/x.mjs', text: '// @scope: all\n// @scope-ok: reads one small ledger' }])[0].justification === 'reads one small ledger'],
+    ['hook invocations are parsed with their arguments',
+      hookInvocations('out=$(node "$ROOT/scripts/a.mjs" --staged 2>&1)').get('scripts/a.mjs').args.includes('--staged')],
+    ['a blocking invocation is not marked background',
+      hookInvocations('out=$(node "$ROOT/scripts/a.mjs" 2>&1)').get('scripts/a.mjs').background === false],
+    ['a backgrounded invocation is marked background (burns the machine, does not block)',
+      hookInvocations('node "$ROOT/scripts/a.mjs" >/dev/null 2>&1 &').get('scripts/a.mjs').background === true],
+    ['a background gate is still judged for scope',
+      scopeAudit({ files: [{ path: 'scripts/a.mjs', text: 'code' }], hookText: 'node "$ROOT/scripts/a.mjs" &' }).undeclared.length === 1],
+    ['a mechanism the hook never calls is absent from invocations',
+      hookInvocations('out=$(node "$ROOT/scripts/a.mjs" 2>&1)').has('scripts/b.mjs') === false],
+    ['--staged derives scope staged', derivedScope(' --staged ') === 'staged'],
+    ['a passed file list derives scope staged', derivedScope(' $staged_mjs ') === 'staged'],
+    ['--scope auto derives changed', derivedScope(' --scope=auto ') === 'changed'],
+    ['no file argument derives scope all', derivedScope(' ') === 'all'],
+    ['an exit-code $? is not mistaken for a file list', derivedScope('; rc=$?') === 'all'],
+    ['a hook-path mechanism with no @scope is caught',
+      scopeAudit({ files: [{ path: 'scripts/a.mjs', text: 'code' }], hookText: 'node "$ROOT/scripts/a.mjs" 2>&1' }).undeclared.length === 1],
+    ['a mechanism OFF the change path is not judged at all',
+      scopeAudit({ files: [{ path: 'scripts/b.mjs', text: 'code' }], hookText: 'node "$ROOT/scripts/a.mjs" 2>&1' }).undeclared.length === 0],
+    ['a DECLARATION that contradicts the invocation is caught (cannot be rubber-stamped)',
+      scopeAudit({ files: [{ path: 'scripts/a.mjs', text: '// @scope: staged' }], hookText: 'node "$ROOT/scripts/a.mjs" 2>&1' }).mismatched[0].actual === 'all'],
+    ['a truthful staged declaration passes',
+      scopeAudit({ files: [{ path: 'scripts/a.mjs', text: '// @scope: staged' }], hookText: 'node "$ROOT/scripts/a.mjs" --staged 2>&1' }).mismatched.length === 0],
+    ['scope all with NO written justification is caught',
+      scopeAudit({ files: [{ path: 'scripts/a.mjs', text: '// @scope: all' }], hookText: 'node "$ROOT/scripts/a.mjs" 2>&1' }).unjustified.length === 1],
+    ['scope all WITH a justification passes (all is not automatically wrong)',
+      scopeAudit({ files: [{ path: 'scripts/a.mjs', text: '// @scope: all\n// @scope-ok: one small ledger' }], hookText: 'node "$ROOT/scripts/a.mjs" 2>&1' }).unjustified.length === 0],
+    ['an unjustified-but-mismatched gate is reported once, as the mismatch',
+      scopeAudit({ files: [{ path: 'scripts/a.mjs', text: '// @scope: staged' }], hookText: 'node "$ROOT/scripts/a.mjs" 2>&1' }).unjustified.length === 0],
+    ['empty inputs judge nothing', scopeAudit({}).judged.length === 0],
+    ['a mechanism called ONLY from a periodic routine counts as wired (not an orphan)',
+      wiredSetFrom([{ path: 'scripts/x.mjs' }], ['', '', '', '', 'node scripts/x.mjs']).has('x.mjs')],
+    ['a mechanism nobody calls is still unwired',
+      wiredSetFrom([{ path: 'scripts/x.mjs' }], ['', '', '', '', 'node scripts/other.mjs']).has('x.mjs') === false],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
@@ -566,6 +697,29 @@ if (isMain) {
 
   // ── reverse axis: does the LEARNING REGISTRY know about every gate that runs? ──
   const mechFiles = collectMechanisms(process.cwd());
+
+  // ── fifth invariant: does every gate on the CHANGE PATH cost in proportion to the change? ──
+  const sc = scopeAudit({ files: mechFiles, hookText: hooksText });
+  if (sc.undeclared.length) {
+    console.error(`\n\x1b[31m✗ ${sc.undeclared.length} mechanism(s) stand on the change path without declaring a scope:\x1b[0m`);
+    for (const u of sc.undeclared) console.error(`    ${u.mechanism} — the hook grants it "${u.actual}"; add \`// @scope: ${u.actual}\``);
+    console.error('    A gate whose cost nobody declared is the gate that gets bypassed (owner, 2026-08-17).');
+    process.exit(1);
+  }
+  if (sc.mismatched.length) {
+    console.error(`\n\x1b[31m✗ ${sc.mismatched.length} mechanism(s) DECLARE a scope the invocation contradicts:\x1b[0m`);
+    for (const m of sc.mismatched) console.error(`    ${m.mechanism} declares "${m.declared}" but the hook grants it "${m.actual}"`);
+    console.error('    The declaration is not evidence — the invocation is. Fix one of the two.');
+    process.exit(1);
+  }
+  if (sc.unjustified.length) {
+    console.error(`\n\x1b[31m✗ ${sc.unjustified.length} whole-repo gate(s) on the change path with no written justification:\x1b[0m`);
+    for (const u of sc.unjustified) console.error(`    ${u.mechanism} — add \`// @scope-ok: <why the whole repo, in one line>\``);
+    process.exit(1);
+  }
+  const wide = sc.judged.filter((j) => j.actual === 'all');
+  console.log(`  \x1b[32m✓ scope declared for all ${sc.judged.length} change-path gate(s); ${wide.length} run wide, each justified in writing.\x1b[0m`);
+  for (const w of wide) console.log(`      ${w.path}${w.background ? ' (в фоне)' : ''} — ${w.justification}`);
   const tags = closesClassTags(mechFiles);
   const wired = wiredSetFrom(mechFiles, callerTexts(process.cwd(), settingsRaw));
   let REMEDIES = {};
@@ -596,6 +750,22 @@ if (isMain) {
     for (const p of rev.pending) console.log(`      ${p.cls}  ←  ${p.mechanism}`);
     console.log('\n    Paste into scripts/meta-remedies.mjs (L0 — human edit by design), before the closing };\n');
     console.log(remedyPasteBlock(rev.pending));
+    // The paste block has been printed every run for seven days and pasted zero times
+    // (measured 2026-08-17). Printing is not a queue: it has no age and no counter, so the
+    // overdue human step stays invisible. Hand it to one, opt-in so CI stays read-only.
+    if (process.argv.includes('--emit-pending')) {
+      const { loadLedger: loadPending, upsertRows, saveLedger: savePending } = await import('./pending-human.mjs');
+      const rows = rev.pending.map((pnd) => ({
+        id: `register-class:${pnd.cls}`,
+        what: `вставить блок регистрации класса "${pnd.cls}" в scripts/meta-remedies.mjs`,
+        why: 'гейт работает, но метрики его не видят: сводка зовёт класс живым риском, meta-trend занижает покрытие',
+        source: `gate-audit#reverseRemedyAudit ← ${pnd.mechanism}`,
+        since: pnd.since || today,
+      }));
+      const before = loadPending(process.cwd());
+      savePending(upsertRows(before, rows), process.cwd());
+      console.log(`\n  \x1b[33m→ ${rows.length} шаг(ов) поставлено в очередь человеку: node scripts/pending-human.mjs\x1b[0m`);
+    }
   } else {
     console.log('  \x1b[32m✓ every live, wired gate is known to the learning registry (no invisible gate).\x1b[0m');
   }

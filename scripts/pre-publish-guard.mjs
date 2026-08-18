@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 // @closes-class: tree-not-history
+// @scope: all
+// @scope-ok: САМЫЙ ДОРОГОЙ на пути правки, 4,28 с: секрет в неизменённом файле и в старом коммите утекает так же, поэтому нужны и дерево, и вся история git
 // Pre-publish guard — a MECHANICAL andon for irreversible publication.
 //
 // Per-rule severity + scope, so the guard protects what actually matters without

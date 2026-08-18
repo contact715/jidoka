@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// @scope: all
+// @scope-ok: призрак появляется от ЧУЖОЙ строки: заявление в неизменённом файле может указывать на удалённый объект, сузить до правки нельзя, 0,25 с
 // instantiation-audit — does the framework's scaffolding point at things that exist?
 //
 // A holistic audit of this repo found a systemic pattern: validators, gates, and

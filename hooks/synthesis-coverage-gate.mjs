@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @closes-class: synthesis-shipped-without-coverage-audit
+// @closes-class: synthesis-shipped-without-coverage-audit, completeness-claimed-without-self-audit
 /**
  * synthesis-coverage-gate — Stop-хук против сдачи документа-синтеза без сверки с источниками.
  *
@@ -111,6 +111,96 @@ export function isSemanticReview(tool) {
   return mentionsSources && mentionsGap;
 }
 
+// ---------- ТИП СДАЧИ ----------
+//
+// Замер 2026-08-17: поиск по журналу сессий на «ты точно» дал 11 разных сессий за август в
+// пяти проектах. Под опознавание документа-синтеза попадает ОДИН случай из одиннадцати:
+// остальные десять были сдачей другого рода, и расширение файла про них ничего не знает.
+//
+// Берём два типа, у которых источник истины сверяем машиной, и НЕ берём два, у которых он
+// живёт в переписке (план в чате, ресёрч под заданное качество). Это осознанный недобор:
+// гейт, у которого нет исполнимого лечения, блокирует работу и не даёт способа
+// разблокироваться. Движок поймал ровно такой тупик на себе в этот же день
+// (класс gate-remedy-cannot-satisfy-the-gate), и повторять его здесь нельзя.
+//
+// Точность важнее полноты и внутри самих правил: одна правка после открытия макета это не
+// перенос дизайна, поэтому нужен порог. Ложная блокировка учит обходу быстрее, чем
+// пропущенный случай учит внимательности.
+
+/** Инструменты, дающие ИСТОЧНИК дизайна: макет, токены, снимок экрана макета. */
+export function isDesignSource(tool) {
+  return /figma|design_context|get_variable_defs|get_screenshot|get_design/i.test(String(tool.name || ''));
+}
+
+const UI_FILE = /\.(tsx|jsx|vue|svelte|css|scss|sass|less)$/i;
+
+/**
+ * Строка команды без КАВЫЧЕК и комментариев. Пустая.
+ *
+ * Против класса `guard-fires-on-mention-not-action` (2026-08-08): сторож разрешений уже
+ * блокировал собственный коммит, потому что запрещённый флаг встретился ВНУТРИ текста
+ * сообщения. Тот же капкан здесь: `echo "сначала git clone, потом..."` это рассказ о
+ * команде, а не команда. Смотрим на синтаксис, а не на вхождение подстроки.
+ */
+export function commandSkeleton(cmd = '') {
+  return String(cmd)
+    .replace(/'[^']*'/g, "''")
+    .replace(/"[^"]*"/g, '""')
+    .replace(/#.*$/gm, '');
+}
+
+/** Перенос ЧУЖОГО кода к себе: клон, скачивание архива, копирование дерева. */
+export function isCodeImport(tool) {
+  if (tool.name !== 'Bash') return false;
+  const cmd = commandSkeleton(tool.input?.command || '');
+  if (/\bgit\s+clone\b/.test(cmd)) return true;
+  if (/\bgh\s+repo\s+clone\b/.test(cmd)) return true;
+  if (/\bdegit\b|\bsvn\s+checkout\b/.test(cmd)) return true;
+  if (/\bscp\s+-r\b|\brsync\s+-[a-z]*a/.test(cmd)) return true;
+  if (/\bcurl\b.*-[oO]\b.*\.(zip|tar\.gz|tgz)\b/.test(cmd)) return true;
+  return false;
+}
+
+/** Сверка по типу: тот же инструмент, что и для документов, но в режиме --kind. */
+export function isKindAudit(tool, kind) {
+  if (tool.name !== 'Bash') return false;
+  const cmd = String(tool.input?.command || '');
+  return /synthesis-coverage-audit/i.test(cmd) && new RegExp(`--kind[= ]${kind}`).test(cmd);
+}
+
+/** Сколько правок UI-файлов нужно, чтобы считать это переносом дизайна, а не точечной правкой. */
+export const DESIGN_PORT_MIN_EDITS = 2;
+
+/**
+ * Какие типы сдачи произошли в сессии и когда в последний раз. Пустая.
+ * Возвращает [{kind, lastIdx, evidence}].
+ */
+export function deliverableKind(tools = []) {
+  const out = [];
+
+  // перенос дизайна: сначала открыли источник, ПОТОМ правили интерфейс (порядок важен —
+  // открыть макет после правки это проверка, а не перенос)
+  const firstDesignIdx = tools.findIndex(isDesignSource);
+  if (firstDesignIdx >= 0) {
+    const uiEdits = [];
+    tools.forEach((t, i) => {
+      if (i <= firstDesignIdx || !EDIT_TOOLS.has(t.name)) return;
+      const fp = String(t.input?.file_path || '');
+      if (UI_FILE.test(fp)) uiEdits.push(i);
+    });
+    if (uiEdits.length >= DESIGN_PORT_MIN_EDITS) {
+      out.push({ kind: 'design-port', lastIdx: uiEdits[uiEdits.length - 1], evidence: `${uiEdits.length} правок интерфейса после открытия макета` });
+    }
+  }
+
+  // перенос чужого кода
+  let lastImport = -1;
+  tools.forEach((t, i) => { if (isCodeImport(t)) lastImport = i; });
+  if (lastImport >= 0) out.push({ kind: 'code-import', lastIdx: lastImport, evidence: 'скачивание чужого дерева кода' });
+
+  return out;
+}
+
 /**
  * Главное решение: писали синтез и не сверяли его после этого?
  *
@@ -151,6 +241,51 @@ export function decide(tools) {
     hadMechanical,
     hadSemantic,
   };
+}
+
+/**
+ * Полное решение по ВСЕМ типам сдачи, а не только по документам. Пустая.
+ *
+ * Документ разбирается прежней функцией (её поведение не меняется ни на йоту — у неё 
+ * одиннадцать собственных проверок, и ломать их ради расширения нельзя). Новые типы
+ * добавляются рядом: у каждого своя последняя точка и своя засчитываемая сверка.
+ *
+ * Возвращает { shouldBlock, doc, kinds:[{kind, satisfied, evidence}] }.
+ */
+export function decideAll(tools = []) {
+  const doc = decide(tools);
+  const kinds = deliverableKind(tools).map((k) => {
+    const after = tools.slice(k.lastIdx + 1);
+    // засчитываем и машинную сверку своего типа, и смысловую: на переносе дизайна
+    // субагент, сравнивший макет с кодом, отвечает на тот же вопрос
+    const satisfied = after.some((t) => isKindAudit(t, k.kind)) || after.some(isSemanticReview);
+    return { ...k, satisfied };
+  });
+  return {
+    shouldBlock: doc.shouldBlock || kinds.some((k) => !k.satisfied),
+    doc,
+    kinds,
+  };
+}
+
+/** Текст блокировки для типа сдачи: команда, которой из неё выходят. Пустая. */
+export function remedyFor(kind) {
+  if (kind === 'design-port') {
+    return [
+      '  перенос дизайна в код — проверить, что доехали ВСЕ стили, а не только те, что бросились в глаза:',
+      '    node ~/.claude/jidoka/scripts/synthesis-coverage-audit.mjs \\',
+      '      --kind design-port --source <файл с инвентарём макета> --target <папка с изменёнными компонентами>',
+      '    (инвентарь — это то, что уже отдал макет: токены, названия стилей и слоёв, сохранённые в файл)',
+    ].join('\n');
+  }
+  if (kind === 'code-import') {
+    return [
+      '  перенос чужого кода — проверить, что доехали ВСЕ файлы:',
+      '    node ~/.claude/jidoka/scripts/synthesis-coverage-audit.mjs \\',
+      '      --kind code-import --source <папка-источник> --target <папка, куда переносили>',
+    ].join('\n');
+  }
+  return `  тип "${kind}": машинной сверки нет, назовите вслух, что осталось непроверенным`;
 }
 
 function markerPath(sessionId) {
@@ -206,6 +341,59 @@ function selfTest() {
     decide([write("/x/ТЗ.md"), audit, write("/x/ТЗ.md")]).shouldBlock === true
   );
 
+  // ---- типы сдачи (замер 2026-08-17: 11 сессий, гейт видел 1) ----
+  const fig = { name: "mcp__figma__get_design_context", input: {} };
+  const edit = (p) => ({ name: "Edit", input: { file_path: p } });
+  const clone = { name: "Bash", input: { command: "git clone https://github.com/x/back.git ./back" } };
+  const kindAudit = (k) => ({ name: "Bash", input: { command: `node scripts/synthesis-coverage-audit.mjs --kind ${k} --source a --target b` } });
+
+  ok("источник дизайна опознаётся", isDesignSource(fig));
+  ok("обычный инструмент не считается источником дизайна", !isDesignSource({ name: "Read" }));
+  ok("git clone опознаётся как перенос кода", isCodeImport(clone));
+  ok("gh repo clone опознаётся", isCodeImport({ name: "Bash", input: { command: "gh repo clone org/back" } }));
+  ok("скачивание архива опознаётся", isCodeImport({ name: "Bash", input: { command: "curl -O https://x/y.tar.gz" } }));
+  ok("обычная команда не считается переносом", !isCodeImport({ name: "Bash", input: { command: "npm test" } }));
+  ok("git clone ВНУТРИ кавычек не срабатывает (упоминание, а не действие)",
+    !isCodeImport({ name: "Bash", input: { command: "echo 'сначала git clone, потом сборка'" } }));
+  ok("git clone в двойных кавычках не срабатывает",
+    !isCodeImport({ name: "Bash", input: { command: 'git commit -m "описал git clone в доке"' } }));
+  ok("git clone в комментарии не срабатывает",
+    !isCodeImport({ name: "Bash", input: { command: "npm test  # git clone делали вчера" } }));
+  ok("настоящий git clone после кавычек всё равно срабатывает",
+    isCodeImport({ name: "Bash", input: { command: "echo 'готовлю' && git clone https://x/y.git" } }));
+
+  // перенос дизайна: нужен порог, одна правка это не перенос
+  ok("одна правка после макета НЕ считается переносом",
+    deliverableKind([fig, edit("/a/x.tsx")]).length === 0);
+  ok("две правки интерфейса после макета считаются переносом",
+    deliverableKind([fig, edit("/a/x.tsx"), edit("/a/y.tsx")]).some((k) => k.kind === "design-port"));
+  ok("правки НЕ интерфейса переносом не считаются",
+    deliverableKind([fig, edit("/a/x.ts"), edit("/a/y.mjs")]).length === 0);
+  ok("макет, открытый ПОСЛЕ правок, переносом не считается (это проверка, а не перенос)",
+    deliverableKind([edit("/a/x.tsx"), edit("/a/y.tsx"), fig]).length === 0);
+  ok("перенос кода опознаётся как тип", deliverableKind([clone]).some((k) => k.kind === "code-import"));
+  ok("пустая сессия не даёт типов", deliverableKind([]).length === 0);
+
+  // блокировка и выход из неё
+  ok("перенос дизайна без сверки блокирует",
+    decideAll([fig, edit("/a/x.tsx"), edit("/a/y.tsx")]).shouldBlock === true);
+  ok("перенос дизайна со сверкой СВОЕГО типа проходит",
+    decideAll([fig, edit("/a/x.tsx"), edit("/a/y.tsx"), kindAudit("design-port")]).shouldBlock === false);
+  ok("сверка ЧУЖОГО типа не засчитывается",
+    decideAll([fig, edit("/a/x.tsx"), edit("/a/y.tsx"), kindAudit("code-import")]).shouldBlock === true);
+  ok("перенос кода без сверки блокирует", decideAll([clone]).shouldBlock === true);
+  ok("перенос кода со сверкой проходит", decideAll([clone, kindAudit("code-import")]).shouldBlock === false);
+  ok("смысловая сверка тоже засчитывается",
+    decideAll([clone, { name: "Agent", input: { prompt: "сверь источник и цель, что не отражено, пропуски" } }]).shouldBlock === false);
+  ok("сверка ДО переноса не засчитывается",
+    decideAll([kindAudit("code-import"), clone]).shouldBlock === true);
+  ok("обычная сессия без сдачи не блокируется", decideAll([{ name: "Bash", input: { command: "npm test" } }]).shouldBlock === false);
+  ok("прежнее поведение по документам не изменилось",
+    decideAll([write("/x/ТЗ.md")]).doc.shouldBlock === true && decideAll([write("/x/ТЗ.md")]).shouldBlock === true);
+  ok("лечение называет исполнимую команду", /synthesis-coverage-audit/.test(remedyFor("design-port")));
+  ok("лечение переноса кода называет свой режим", /--kind code-import/.test(remedyFor("code-import")));
+  ok("непроверяемый тип честно не обещает команду", /машинной сверки нет/.test(remedyFor("plan-in-chat")));
+
   const failed = checks.filter((c) => !c.pass);
   for (const c of checks) console.log(`${c.pass ? "  ok  " : " FAIL "} ${c.name}`);
   console.log(`\n${checks.length - failed.length}/${checks.length} проверок пройдено`);
@@ -244,14 +432,32 @@ function main() {
     process.exit(0);
   }
 
-  const { shouldBlock, docs } = decide(tools);
-  if (!shouldBlock) process.exit(0);
+  const verdict = decideAll(tools);
+  if (!verdict.shouldBlock) process.exit(0);
 
   try {
     fs.writeFileSync(marker, String(Date.now()));
   } catch {}
 
-  const list = docs.slice(0, 3).join(", ");
+  // Новые типы сдачи блокируют отдельным, коротким текстом: у них другой вопрос и другая
+  // команда выхода. Длинная лекция про документ-синтез здесь была бы не по делу.
+  const unmet = verdict.kinds.filter((k) => !k.satisfied);
+  if (!verdict.doc.shouldBlock && unmet.length) {
+    const names = { 'design-port': 'перенос дизайна в код', 'code-import': 'перенос чужого кода' };
+    process.stderr.write(
+      `СТОП: сдача без проверки полноты.\n\n` +
+        unmet.map((k) => `Что произошло: ${names[k.kind] || k.kind} (${k.evidence})`).join('\n') + `\n\n` +
+        `Полнота такой сдачи не проверяется чтением: «применил ли все стили» и «доехали ли\n` +
+        `все файлы» это вопросы к списку, а не к памяти. Прогони сверку:\n\n` +
+        unmet.map((k) => remedyFor(k.kind)).join('\n\n') + `\n\n` +
+        `Если это НЕ перенос (правил своё, макет открывал для справки) — скажи это прямо\n` +
+        `в ответе владельцу, и на этом всё. Гейт блокирует один раз за сессию.\n\n` +
+        `Затем отдельно назови: что проверено, что нашли, и чего проверить нельзя.\n`
+    );
+    process.exit(2);
+  }
+
+  const list = verdict.doc.docs.slice(0, 3).join(", ");
   process.stderr.write(
     `СТОП: документ-синтез сдаётся без сверки с источниками.\n\n` +
       `Изменено: ${list}\n\n` +
