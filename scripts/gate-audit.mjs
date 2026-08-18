@@ -635,6 +635,37 @@ function selfTest() {
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
   if (process.argv.includes('--self-test')) selfTest();
+
+  // --emit-pending работает ОТДЕЛЬНОЙ, ранней веткой намеренно.
+  //
+  // Полный аудит это инструмент РЕПОЗИТОРИЯ: он требует .github/workflows и падает раньше
+  // остального там, где каталога нет — например в установленной копии ~/.claude/jidoka.
+  // А ежедневная рутина живёт именно в установленной копии. Если бы наполнение очереди
+  // висело в хвосте главного прохода, оно молча не выполнялось бы каждый день, и очередь
+  // человеческих шагов протухла бы — тот самый класс, против которого она и заведена.
+  // Наполнение не зависит ни от одной из репозиторных проверок, поэтому идёт до них.
+  if (process.argv.includes('--emit-pending')) {
+    let settingsEarly = '';
+    try { settingsEarly = readFileSync(join(homedir(), '.claude', 'settings.json'), 'utf8'); } catch { /* no global config */ }
+    const files = collectMechanisms(process.cwd(), { extraDirs: [join(homedir(), '.claude', 'hooks')] });
+    let REG = {};
+    try { ({ REMEDIES: REG } = await import('./meta-remedies.mjs')); } catch { /* registry unreadable → emit nothing rather than guess */ }
+    const wiredEarly = wiredSetFrom(files, callerTexts(process.cwd(), settingsEarly));
+    const day = new Date().toISOString().slice(0, 10);
+    const revEarly = reverseRemedyAudit({ tags: closesClassTags(files), remedies: REG, wired: wiredEarly, today: day, settingsAvailable: settingsEarly !== '' });
+    const ph = await import('./pending-human.mjs');
+    const rows = revEarly.pending.map((pnd) => ({
+      id: `register-class:${pnd.cls}`,
+      what: `вставить блок регистрации класса "${pnd.cls}" в scripts/meta-remedies.mjs`,
+      why: 'гейт работает, но метрики его не видят: сводка зовёт класс живым риском, meta-trend занижает покрытие',
+      source: `gate-audit#reverseRemedyAudit ← ${pnd.mechanism}`,
+      since: pnd.since || day,
+    }));
+    ph.saveLedger(ph.upsertRows(ph.loadLedger(process.cwd()), rows), process.cwd());
+    console.log(`pending-human: объявлено ${rows.length} шаг(ов) (возраст известных сохранён)`);
+    process.exit(0);
+  }
+
   const wf = workflowsText();
   const ci = verifyCI(GATES, wf);
   const ghosts = ci.filter(c => !c.present);
@@ -753,19 +784,6 @@ if (isMain) {
     // The paste block has been printed every run for seven days and pasted zero times
     // (measured 2026-08-17). Printing is not a queue: it has no age and no counter, so the
     // overdue human step stays invisible. Hand it to one, opt-in so CI stays read-only.
-    if (process.argv.includes('--emit-pending')) {
-      const { loadLedger: loadPending, upsertRows, saveLedger: savePending } = await import('./pending-human.mjs');
-      const rows = rev.pending.map((pnd) => ({
-        id: `register-class:${pnd.cls}`,
-        what: `вставить блок регистрации класса "${pnd.cls}" в scripts/meta-remedies.mjs`,
-        why: 'гейт работает, но метрики его не видят: сводка зовёт класс живым риском, meta-trend занижает покрытие',
-        source: `gate-audit#reverseRemedyAudit ← ${pnd.mechanism}`,
-        since: pnd.since || today,
-      }));
-      const before = loadPending(process.cwd());
-      savePending(upsertRows(before, rows), process.cwd());
-      console.log(`\n  \x1b[33m→ ${rows.length} шаг(ов) поставлено в очередь человеку: node scripts/pending-human.mjs\x1b[0m`);
-    }
   } else {
     console.log('  \x1b[32m✓ every live, wired gate is known to the learning registry (no invisible gate).\x1b[0m');
   }
