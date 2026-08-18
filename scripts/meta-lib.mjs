@@ -348,9 +348,23 @@ export function validateLedgerEntry(e) {
   // kind: required, so a repair note can never again be counted as a second mistake (W32-R8)
   if (!('kind' in e)) problems.push('missing required field "kind" (incident | remediation)');
   else if (!LEDGER_KINDS.has(e.kind)) problems.push(`field "kind" must be one of ${[...LEDGER_KINDS].join(' | ')} (got "${e.kind}")`);
-  // mastMode: optional second axis, but if present it must be a real MAST id, not an invention
-  if ('mastMode' in e && e.mastMode !== null && !MAST_IDS.has(e.mastMode)) {
+  // mastMode: ОБЯЗАТЕЛЬНАЯ вторая ось (2026-08-18). Раньше поле было необязательным, и
+  // разметка держалась на 28% (20 записей из 72). Пока доля неполная, распределение режимов
+  // отказа посчитать нельзя, а без распределения нечем ответить на вопрос «что чинить первым»
+  // иначе как впечатлением. Ручной разбор 2026-08-18 (docs/ERROR_ANALYSIS_2026-08.md) довёл
+  // разметку до 100% и показал, ради чего это: 65% наших отказов приходится на проверку
+  // результата, причём оба верификационных режима перепредставлены вчетверо против источника.
+  //
+  // ОТСУТСТВИЕ ключа теперь ошибка, а `null` — законный ответ «режим рассмотрен и не подошёл».
+  // Разница принципиальная: молчание нельзя отличить от «не думал», а явный null с причиной
+  // можно проверить и оспорить. Поэтому при null объяснение ОБЯЗАТЕЛЬНО — иначе null стал бы
+  // бесплатной кнопкой «пропустить», и поле вернулось бы к необязательному по факту.
+  if (!('mastMode' in e)) {
+    problems.push('missing required field "mastMode" (MAST id FM-1.1 … FM-3.3, or null with mastNote)');
+  } else if (e.mastMode !== null && !MAST_IDS.has(e.mastMode)) {
     problems.push(`field "mastMode" must be a MAST id (FM-1.1 … FM-3.3) or null (got "${e.mastMode}")`);
+  } else if (e.mastMode === null && (typeof e.mastNote !== 'string' || e.mastNote.trim() === '')) {
+    problems.push('mastMode is null, so "mastNote" must say in one line why no failure mode fits');
   }
   return problems;
 }

@@ -82,7 +82,21 @@ if (isMain) {
   console.log(`    gate coverage ......... ${pct(coverage)} (${gatedRecurring.length}/${recurring.length} recurring classes gated)   want ↑`);
   console.log(`    mean time-to-gate ..... ${meanTTG === null ? 'n/a' : meanTTG + 'd'} (first incident → gate live)            want ↓`);
   const evalBase = existsSync('docs/evals/_baseline.json') ? JSON.parse(readFileSync('docs/evals/_baseline.json', 'utf8')) : null;
-  if (evalBase) console.log(`    eval fitness .......... ${(evalBase.pass_rate * 100).toFixed(0)}% (${evalBase.passed}/${evalBase.total} engine mechanisms pass to spec)   want ↑`);
+  // Слово «eval» здесь не пишется: прибор меряет детерминированное соответствие механизмов
+  // своим же кейсам, модели в кейсе нет вовсе (docs/METRICS_GLOSSARY.md, 2026-08-18).
+  if (evalBase) console.log(`    механизмы к спеке ..... ${(evalBase.pass_rate * 100).toFixed(0)}% (${evalBase.passed}/${evalBase.total} детерминированных кейсов)   want ↑`);
+  // Разметка режимов отказа. Поле обязательно с 2026-08-18, но `null` остаётся законным
+  // ответом «режим рассмотрен и не подошёл». Без этой строки null тихо стал бы умолчанием и
+  // разметка вернулась бы к декоративной: формально 100%, содержательно ноль.
+  // Две РАЗНЫЕ величины, и смешивать их нельзя: «поле заполнено» это то, что требует гейт,
+  // а «режим назван» это то, ради чего поле заведено. Если печатать только первую, разметка
+  // выглядит стопроцентной в тот самый момент, когда все ответы стали null.
+  const hasField = rows.filter((e) => 'mastMode' in e).length;
+  const named = rows.filter((e) => e.mastMode).length;
+  const nulled = hasField - named;
+  const fieldPct = rows.length ? Math.round((100 * hasField) / rows.length) : 100;
+  const namedPct = rows.length ? Math.round((100 * named) / rows.length) : 0;
+  console.log(`    режимы отказа ......... поле у ${pct(fieldPct)} (${hasField}/${rows.length}), режим назван у ${pct(namedPct)} (${named}), вне таксономии ${nulled}   want ↑`);
   console.log(`    regression rate ....... ${pct(regRate)} (${leaked.length}/${gated.length} gates leaked after going live)   want ↓`);
   console.log(`    incident frequency .... ${freq.join(' → ')}   ${arrow}`);
 

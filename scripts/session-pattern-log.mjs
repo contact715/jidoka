@@ -121,15 +121,32 @@ function cmdResolve(rest) {
   });
   writeFileSync(ledgerPath(), out.length ? out.map((r) => JSON.stringify(r)).join('\n') + '\n' : '');
   // Feed the cross-wave meta-engine so the lesson joins meta-trend / meta-audit.
+  //
+  // Режим отказа стал обязательным полем реестра 2026-08-18. Этот вызывающий не может знать
+  // режим: он видит только имя класса и текст починки. Поэтому он передаёт `none` с честным
+  // объяснением, а настоящий режим проставляется на разборе ошибок. Позвать `--mode` можно и
+  // отсюда: `resolve <class> "<fix>" --mode FM-3.2`, и это предпочтительнее.
+  //
+  // stdio больше НЕ гасится, и отказ больше не проглатывается. Раньше здесь стояло
+  // stdio:'ignore' внутри catch, и при отказе схемы урок молча не доезжал до реестра — ровно
+  // тот класс, который 2026-08-17 заблокировал публикацию лечением, которое не лечит.
   let fed = false;
   if (!process.env.ISK_NO_META) {
-    try {
-      const metaLog = join(HERE, 'meta-log.mjs');
-      if (existsSync(metaLog)) {
-        execFileSync('node', [metaLog, cls, `recurred ${changed}x within one session`, `systemic fix: ${fix}`, 'in-session-kaizen'], { stdio: 'ignore' });
+    const metaLog = join(HERE, 'meta-log.mjs');
+    if (existsSync(metaLog)) {
+      const mi = rest.indexOf('--mode');
+      const mode = mi >= 0 ? rest[mi + 1] : 'none';
+      const args = [metaLog, cls, `recurred ${changed}x within one session`, `systemic fix: ${fix}`, 'in-session-kaizen', 'incident', '--mode', mode];
+      if (mode === 'none') args.push('--note', 'внутрисессионный повтор: режим отказа зависит от класса, проставляется на разборе ошибок');
+      try {
+        execFileSync('node', args, { stdio: 'pipe' });
         fed = true;
+      } catch (e) {
+        const why = String(e.stderr || e.message || '').trim().split('\n').slice(0, 4).join('\n  ');
+        console.error(`⚠ урок НЕ доехал до мета-реестра — meta-log отказал:\n  ${why}`);
+        console.error(`  повтори вручную: node scripts/meta-log.mjs ${cls} "..." "..." in-session-kaizen incident --mode <FM-x.y>`);
       }
-    } catch { /* meta-log is an optional sibling */ }
+    }
   }
   console.log(`resolved ${changed} open "${cls}" entr${changed === 1 ? 'y' : 'ies'}${fed ? ' (fed to meta-ledger)' : ''}.`);
   return 0;

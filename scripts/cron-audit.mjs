@@ -49,7 +49,7 @@ if (isMain) {
   mkdirSync('docs/audits', { recursive: true });
   appendFileSync('docs/audits/cron-runs.jsonl', JSON.stringify(row) + '\n');
   const icon = row.ok ? '\x1b[32m🟢\x1b[0m' : '\x1b[31m🔴\x1b[0m';
-  console.log(`${icon} cron-audit ${today}: eval ${row.evalPct}% · ghosts ${row.ghosts} · regressions ${row.regressions} → docs/audits/cron-runs.jsonl`);
+  console.log(`${icon} cron-audit ${today}: механизмы ${row.evalPct}% · ghosts ${row.ghosts} · regressions ${row.regressions} → docs/audits/cron-runs.jsonl`);
   if (!row.ok) { console.error('  ✗ something regressed — surface it (this is why cron exists).'); process.exit(1); }
   process.exit(0);
 }

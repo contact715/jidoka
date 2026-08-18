@@ -207,8 +207,19 @@ if (isMain) {
         const baselinePaths = [join(jidoka, 'docs/evals/_baseline.json'), join(homedir(), 'jidoka-framework/docs/evals/_baseline.json')];
         const found = baselinePaths.find((p) => existsSync(p));
         if (!found) throw new Error('no baseline anywhere');
-        const pct = Math.round(JSON.parse(readFileSync(found, 'utf8')).pass_rate * 100);
-        health = pct === 100 ? `🟢 eval ${pct}%` : `🟡 eval ${pct}%`;
+        const base = JSON.parse(readFileSync(found, 'utf8'));
+        const pct = Math.round(base.pass_rate * 100);
+        // Слово «eval» здесь не пишется намеренно (docs/METRICS_GLOSSARY.md, 2026-08-18).
+        // Прибор меряет ДЕТЕРМИНИРОВАННОЕ соответствие механизмов своим кейсам: фиксированный
+        // вход, запуск, сравнение с ожидаемым выходом. Модели в кейсе нет вовсе. Строка
+        // «eval 100%» читалась как «система оценена», хотя по оси оценки ПОВЕДЕНИЯ у нас
+        // сегодня ноль измерений. Планка названа в самой строке, чтобы её нельзя было
+        // прочитать шире, чем она есть.
+        // читаем passed/total напрямую: восстанавливать число из округлённого процента
+        // значит терять точность там, где точное значение лежит в соседнем поле
+        const total = Number(base.total || 0), passed = Number(base.passed || 0);
+        const bar = total ? `механизмы ${passed}/${total}` : `механизмы ${pct}%`;
+        health = pct === 100 ? `🟢 ${bar}` : `🟡 ${bar}`;
       } catch { /* keep default */ }
     }
 

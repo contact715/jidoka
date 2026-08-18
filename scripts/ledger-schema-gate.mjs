@@ -44,10 +44,21 @@ export function auditLedgerText(text) {
 function selfTest() {
   const fails = [];
   const ok = (n, c) => { if (!c) fails.push(n); console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };
-  const valid = { date: '2026-06-06', class: 'ledger-pollution', claimed: 'telemetry writer fixed', real: 'it still appended run1/run2 rows into the ledger', caught_by: 'meta-honesty', kind: 'incident', project: 'jidoka' };
+  const valid = { date: '2026-06-06', class: 'ledger-pollution', claimed: 'telemetry writer fixed', real: 'it still appended run1/run2 rows into the ledger', caught_by: 'meta-honesty', kind: 'incident', project: 'jidoka', mastMode: 'FM-1.1' };
   const telemetry = { ts: '2026-06-06T05:26:00Z', wave: 'wave-judge-debias', class: 'position-sensitive', run1: 'PASS', run2: 'BLOCK' };
 
   ok('valid row passes', validateLedgerEntry(valid).length === 0);
+  // mastMode стал обязательным 2026-08-18 — вторая ось разбора ошибок
+  ok('строка без mastMode отклоняется',
+    validateLedgerEntry({ ...valid, mastMode: undefined }).some((m) => /mastMode/.test(m)));
+  ok('выдуманный режим отклоняется',
+    validateLedgerEntry({ ...valid, mastMode: 'FM-9.9' }).some((m) => /must be a MAST id/.test(m)));
+  ok('null БЕЗ объяснения отклоняется (иначе null это бесплатная кнопка «пропустить»)',
+    validateLedgerEntry({ ...valid, mastMode: null }).some((m) => /mastNote/.test(m)));
+  ok('null С объяснением проходит (режим рассмотрен и не подошёл)',
+    validateLedgerEntry({ ...valid, mastMode: null, mastNote: 'дефект среды, не поведения агента' }).length === 0);
+  ok('пустое объяснение при null не считается объяснением',
+    validateLedgerEntry({ ...valid, mastMode: null, mastNote: '   ' }).length > 0);
   ok('telemetry row (the 2026-06-06 incident shape) is rejected', validateLedgerEntry(telemetry).length >= 3);
   ok('telemetry rejection names the missing fields', validateLedgerEntry(telemetry).join(' ').includes('"claimed"'));
   ok('missing caught_by is rejected', validateLedgerEntry({ ...valid, caught_by: undefined }).length === 1);
