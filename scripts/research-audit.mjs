@@ -42,7 +42,7 @@ const URL_RE = /https?:\/\/[^\s<>()\[\]"'`]+/g;
 const PATH_WITH_LINE_RE = /[\w./@-]+\.(?:tsx?|jsx?|mjs|cjs|py|go|rs|java|rb|php|css|scss|json|ya?ml|md|sql|sh)\s*:\s*\d+/i;
 
 /** Раздел «чего не проверил» — принимаем любую из живых формулировок. */
-const NOT_CHECKED_RE = /(чего\s+не\s+пров|что\s+не\s+пров|не\s+пров(ерено|ерял|еряем)|непровер|not\s+(checked|covered|verified)|чего\s+не\s+хват\w*\s+в\s+пров)/i;
+const NOT_CHECKED_RE = /(не\s+\S*\s*провер|не\s+провер|непровер|not\s+(checked|covered|verified))/i;
 
 /** Признаки того, что в документе вынесены приговоры. */
 const VERDICT_RE = /(приговор|вердикт|verdict|берём|отклоня|отклад)/i;
@@ -263,6 +263,11 @@ function selfTest() {
     codes(CLEAN.replace('## Чего не проверил и почему', '## Итоги')).includes('NO-UNCHECKED-SECTION'));
   check('формулировка «не проверено» тоже засчитывается',
     !codes(CLEAN.replace('Чего не проверил и почему', 'Что не проверено')).includes('NO-UNCHECKED-SECTION'));
+  check('«чего эта волна не проверила» засчитывается',
+    !codes(CLEAN.replace('Чего не проверил и почему', 'Чего эта волна не проверила')).includes('NO-UNCHECKED-SECTION'),
+    'форма глагола не должна решать');
+  check('раздела нет вовсе — по-прежнему ловится',
+    codes(CLEAN.replace('## Чего не проверил и почему', '## Выводы')).includes('NO-UNCHECKED-SECTION'));
   check('английская формулировка засчитывается',
     !codes(CLEAN.replace('Чего не проверил и почему', 'Not checked')).includes('NO-UNCHECKED-SECTION'));
 
