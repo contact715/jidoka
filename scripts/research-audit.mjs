@@ -28,7 +28,14 @@ export const STRENGTH_TOKENS = ['первоисточник', 'сторонни�
 export const STATUSES_NEEDING_EVIDENCE = ['есть', 'частично'];
 
 /** Заглушки, которых не должно быть в сданном документе. */
-export const PLACEHOLDER_TOKENS = ['TODO', 'TBD', 'XXX', 'FIXME', 'допишу', 'дописать', 'lorem ipsum'];
+/**
+ * Заглушки. Слова здесь обязаны быть ОДНОЗНАЧНЫМИ маркерами незаконченности.
+ * Инфинитив «дописать» из списка убран сознательно: он живёт в законной прозе
+ * («что дописать в задачу», «осталось дописать раздел»), и на нём прибор
+ * срабатывал на УПОМИНАНИЕ, а не на действие — класс guard-fires-on-mention-not-action.
+ * «допишу» первым лицом остаётся: это всегда обещание доделать позже.
+ */
+export const PLACEHOLDER_TOKENS = ['TODO', 'TBD', 'XXX', 'FIXME', 'допишу', 'lorem ipsum'];
 
 const URL_RE = /https?:\/\/[^\s<>()\[\]"'`]+/g;
 /** путь/до/файла.ext:НОМЕР — адрес с точностью до строки. */
@@ -260,7 +267,11 @@ function selfTest() {
     !codes(CLEAN.replace('Чего не проверил и почему', 'Not checked')).includes('NO-UNCHECKED-SECTION'));
 
   // Заглушки
-  check('TODO ловится', codes(`${CLEAN}\n\nTODO: дописать`).includes('PLACEHOLDER'));
+  check('TODO ловится', codes(`${CLEAN}\n\nTODO: заполнить`).includes('PLACEHOLDER'));
+  check('«допишу» ловится', codes(`${CLEAN}\n\nэто допишу завтра`).includes('PLACEHOLDER'));
+  check('инфинитив «дописать» в прозе НЕ ловится',
+    !codes(`${CLEAN}\n\n| Задача | Что дописать |`).includes('PLACEHOLDER'),
+    'заголовок столбца это не заглушка');
   check('одна строка с двумя заглушками даёт одно нарушение',
     auditText(`${CLEAN}\n\nTODO TBD`, 'light').violations.filter((v) => v.code === 'PLACEHOLDER').length === 1);
 
