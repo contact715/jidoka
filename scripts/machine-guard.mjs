@@ -58,6 +58,46 @@ export const LAUNCHER_RE = /^\/bin\/(zsh|sh|bash|dash)\s+-[a-z]*c\b/;
 export const LOG_PATH = path.join(os.homedir(), '.jidoka', 'machine-pressure.jsonl');
 
 /**
+ * Разбор vm_stat. НА macOS СВОБОДНЫЙ ПРОЦЕНТ — СЛАБЫЙ СИГНАЛ.
+ *
+ * Замер 2026-08-22, живая машина владельца: сторож печатал «свободно 35%», и это звучало
+ * терпимо. В ту же секунду система держала 21 ГБ данных, ужатых в 6,35 ГБ сжатого пула, и за
+ * ОДИН ЧАС выбросила в своп 557 181 страницу — 8,5 ГБ. Владелец в это время перезагружал
+ * компьютер пятый раз. То есть прибор говорил «терпимо» ровно в момент аварии: он мерил не ту
+ * величину. Это наш главный режим отказа (FM-3.3, подгруппа «оракул мерит не ту величину»),
+ * и он повторился внутри механизма, построенного час назад против него же.
+ *
+ * Настоящий признак беды на macOS — РАБОТА подсистемы памяти, а не остаток: сколько страниц
+ * ушло в своп и насколько раздут сжатый пул. Свободный процент остаётся третьим сигналом.
+ */
+export function parseVmStat(text) {
+  const pg = Number((/page size of (\d+) bytes/.exec(text) || [, 16384])[1]);
+  const num = (re) => Number((re.exec(text) || [, 0])[1]);
+  return {
+    pageSize: pg,
+    compressorBytes: num(/Pages occupied by compressor:\s+(\d+)/) * pg,
+    storedBytes: num(/Pages stored in compressor:\s+(\d+)/) * pg,
+    swapoutPages: num(/Swapouts:\s+(\d+)/),
+    swapinPages: num(/Swapins:\s+(\d+)/),
+    wiredBytes: num(/Pages wired down:\s+(\d+)/) * pg,
+  };
+}
+
+/**
+ * Вердикт по ДАВЛЕНИЮ, а не по остатку. Пороги от наблюдённого:
+ * сжатый пул выше трети физической памяти означает, что система уже борется;
+ * выше половины — что она проигрывает.
+ */
+export function pressureVerdict({ totalBytes, compressorBytes = 0, storedBytes = 0 }) {
+  if (!totalBytes) return { level: 'unknown', reason: '' };
+  const compPct = Math.round((compressorBytes / totalBytes) * 100);
+  const ratio = compressorBytes > 0 ? storedBytes / compressorBytes : 0;
+  if (compPct >= 50) return { level: 'critical', compPct, ratio, reason: `сжатый пул ${compPct}% памяти` };
+  if (compPct >= 30) return { level: 'tight', compPct, ratio, reason: `сжатый пул ${compPct}% памяти` };
+  return { level: 'ok', compPct, ratio, reason: '' };
+}
+
+/**
  * Вердикт по состоянию памяти. Чистая функция — вся арифметика проверяется без запуска ps.
  *
  * Пороги выбраны от НАБЛЮДЁННОГО, а не от красивых чисел: базовая занятость Claude 42%,
@@ -120,6 +160,8 @@ export function availableBytes(totalBytes, probe = null) {
 function readMemory() {
   const totalBytes = os.totalmem();
   let freeBytes = availableBytes(totalBytes);
+  let vm = null;
+  try { vm = parseVmStat(execSync('vm_stat', { encoding: 'utf8', timeout: 5000 })); } catch { /* не macOS */ }
   let swapUsedBytes = 0, swapTotalBytes = 0;
   try {
     const s = execSync('sysctl -n vm.swapusage', { encoding: 'utf8', timeout: 5000 });
@@ -127,7 +169,7 @@ function readMemory() {
     if (t) swapTotalBytes = parseFloat(t[1]) * 1048576;
     if (u) swapUsedBytes = parseFloat(u[1]) * 1048576;
   } catch { /* не macOS или sysctl недоступен — своп просто не учитывается */ }
-  return { totalBytes, freeBytes, swapUsedBytes, swapTotalBytes };
+  return { totalBytes, freeBytes, swapUsedBytes, swapTotalBytes, vm };
 }
 
 function snapshot() {
@@ -137,6 +179,15 @@ function snapshot() {
     heavy = parseHeavy(execSync('ps -Ao pid=,ppid=,rss=,args=', { encoding: 'utf8', timeout: 10000, maxBuffer: 8 * 1024 * 1024 }));
   } catch { /* fail-open: без списка процессов судим только по памяти */ }
   const verdict = memoryVerdict({ ...mem, heavyCount: heavy.length });
+  // давление сжатия УСИЛИВАЕТ вердикт, но никогда не смягчает его
+  if (mem.vm) {
+    const pv = pressureVerdict({ totalBytes: mem.totalBytes, ...mem.vm });
+    if (pv.level === 'critical' || (pv.level === 'tight' && verdict.level === 'ok')) {
+      verdict.level = pv.level === 'critical' ? 'critical' : 'tight';
+      verdict.reason = [verdict.reason, pv.reason].filter(Boolean).join(', ');
+    }
+    verdict.compPct = pv.compPct;
+  }
   return { mem, heavy, verdict };
 }
 
@@ -148,6 +199,13 @@ function cmdCheck() {
   console.log(`${icon} machine-guard: ${verdict.level.toUpperCase()} — ${verdict.reason}\x1b[0m`);
   console.log(`  память: ${fmtGb(mem.freeBytes)} свободно из ${fmtGb(mem.totalBytes)}` +
     (mem.swapTotalBytes ? `, своп ${fmtGb(mem.swapUsedBytes)} из ${fmtGb(mem.swapTotalBytes)}` : ''));
+  // сжатый пул печатается ВСЕГДА, когда он есть: именно он объясняет «в мониторе 50 ГБ»
+  if (mem.vm && mem.vm.compressorBytes > 0) {
+    const ratio = mem.vm.storedBytes / mem.vm.compressorBytes;
+    console.log(`  сжатый пул: ${fmtGb(mem.vm.compressorBytes)} держит ${fmtGb(mem.vm.storedBytes)} данных` +
+      ` (сжатие ×${ratio.toFixed(1)}) — монитор показывает именно эту сумму`);
+    console.log(`  выброшено в своп с загрузки: ${fmtGb(mem.vm.swapoutPages * mem.vm.pageSize)}`);
+  }
   if (heavy.length) {
     console.log(`  тяжёлых шагов: ${heavy.length}`);
     for (const h of heavy.slice(0, 6)) console.log(`    ${(h.rssBytes / 1048576).toFixed(0)}МБ pid=${h.pid} ${h.args.slice(0, 70)}`);
@@ -201,6 +259,27 @@ function selfTest() {
     memoryVerdict({ totalBytes: 0, freeBytes: 0 }).level === 'unknown');
   ok('своп не учитывается, если его нет вовсе (swapTotal=0)',
     memoryVerdict({ totalBytes: 18 * GB, freeBytes: 12 * GB, swapUsedBytes: 0, swapTotalBytes: 0 }).level === 'ok');
+  // давление сжатия — настоящий сигнал macOS (замер 2026-08-22)
+  const vmText = [
+    'Mach Virtual Memory Statistics: (page size of 16384 bytes)',
+    'Pages wired down:                             206163.',
+    'Pages stored in compressor:                  1371610.',
+    'Pages occupied by compressor:                 416255.',
+    'Swapins:                                      205857.',
+    'Swapouts:                                     557181.',
+  ].join('\n');
+  const vm = parseVmStat(vmText);
+  ok('vm_stat: размер страницы прочитан', vm.pageSize === 16384);
+  ok('vm_stat: сжатый пул посчитан в байтах', Math.round(vm.compressorBytes / 1073741824 * 100) / 100 === 6.35);
+  ok('vm_stat: выброшено в своп посчитано', vm.swapoutPages === 557181);
+  ok('сжатый пул 35% памяти → tight (машина уже борется)',
+    pressureVerdict({ totalBytes: 18 * GB, compressorBytes: 6.35 * GB, storedBytes: 21 * GB }).level === 'tight');
+  ok('сжатый пул 55% памяти → critical (машина проигрывает)',
+    pressureVerdict({ totalBytes: 18 * GB, compressorBytes: 10 * GB, storedBytes: 30 * GB }).level === 'critical');
+  ok('пустой сжатый пул → ok',
+    pressureVerdict({ totalBytes: 18 * GB, compressorBytes: 0.5 * GB, storedBytes: 1 * GB }).level === 'ok');
+  ok('vm_stat: мусор не роняет разбор', parseVmStat('вообще не vm_stat').compressorBytes === 0);
+
   ok('причина всегда названа словами',
     /свободно/.test(memoryVerdict({ totalBytes: 18 * GB, freeBytes: 12 * GB }).reason));
 
