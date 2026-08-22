@@ -46,6 +46,15 @@ import { fileURLToPath } from 'node:url';
 export const HEAVY_RE = /(\bnext[ /-](build|dev)\b|\bnext-server\b|\btsc\b|tsc\.js|\bvitest\b|\besbuild\b|\bwebpack\b|\bjest\b)/i;
 export const NOT_HEAVY_RE = /(mcp|-devtools|language-server|\bgrep\b|machine-guard)/i;
 
+/**
+ * Оболочки-запускатели. Пойманы на живой машине 2026-08-22: в счёт тяжёлых шагов попал
+ * `/bin/zsh -c source ...` на 1 МБ — просто потому, что в его командной строке дальше по тексту
+ * стояло имя тяжёлой команды. Оболочка это НЕ работа, а способ её позвать; считать её отдельным
+ * шагом значит удваивать счёт и объявлять КРИТИЧНО там, где идёт один процесс. Тот же класс
+ * `guard-fires-on-mention-not-action`, второй заход за один час.
+ */
+export const LAUNCHER_RE = /^\/bin\/(zsh|sh|bash|dash)\s+-[a-z]*c\b/;
+
 export const LOG_PATH = path.join(os.homedir(), '.jidoka', 'machine-pressure.jsonl');
 
 /**
@@ -79,6 +88,7 @@ export function parseHeavy(psText) {
     const [, pid, ppid, rssKb, args] = m;
     if (!HEAVY_RE.test(args)) continue;
     if (NOT_HEAVY_RE.test(args)) continue;   // сервер инструментов не тяжёлый шаг
+    if (LAUNCHER_RE.test(args)) continue;    // оболочка зовёт работу, но сама ею не является
     out.push({ pid: Number(pid), ppid: Number(ppid), rssBytes: Number(rssKb) * 1024, args: args.slice(0, 120) });
   }
   return out;
@@ -218,6 +228,12 @@ function selfTest() {
     parseHeavy('  702   1  20000 /usr/bin/node scripts/machine-guard.mjs --watch').length === 0);
   ok('настоящий next build по-прежнему опознан',
     parseHeavy('  703   1 3670016 /usr/bin/node next build').length === 1);
+  ok('оболочка /bin/zsh -c НЕ считается шагом (поймано на живой машине)',
+    parseHeavy('  704   1   1024 /bin/zsh -c source /home/.claude/snapshot && npx vitest run').length === 0);
+  ok('оболочка /bin/bash -c тоже не считается',
+    parseHeavy('  705   1   1024 /bin/bash -c npm run build').length === 0);
+  ok('node, запущенный ИЗ оболочки, считается — он и есть работа',
+    parseHeavy('  706   1 200000 /usr/bin/node node_modules/.bin/vitest run').length === 1);
 
   // availableBytes: на macOS берём memory_pressure, а не freemem
   const GB2 = 18 * GB;
