@@ -76,5 +76,5 @@ fi
 # пересечения, но НЕ падает: доска советует, решение за человеком.
 if [ -f scripts/session-board.mjs ]; then
   echo ""
-  node scripts/session-board.mjs --conflicts || true
+  node scripts/teamlead.mjs || true
 fi

@@ -178,7 +178,11 @@
     "guard:machine:watch": "node scripts/machine-guard.mjs --watch",
     "audit:research": "node scripts/research-audit.mjs",
     "board": "node scripts/session-board.mjs --list",
-    "board:conflicts": "node scripts/session-board.mjs --conflicts"
+    "board:conflicts": "node scripts/session-board.mjs --conflicts",
+    "teamlead": "node scripts/teamlead.mjs",
+    "teamlead:escalate": "node scripts/teamlead.mjs --escalate",
+    "mail": "node scripts/session-mail.mjs --inbox",
+    "mail:open": "node scripts/session-mail.mjs --open"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

@@ -305,34 +305,28 @@ if (isMain) {
       }
     } catch { /* fail-open: сторож машины не обязан быть установлен */ }
 
-    // 5c) ДОСКА СЕССИЙ (2026-08-22). Роль тимлида начинается с фактов: кто ещё работает,
-    // над чем и не столкнёмся ли мы. Раньше это выяснялось перепиской вручную, и один раз
-    // закончилось неверной атрибуцией — по git различить сессии НЕЛЬЗЯ, все пишут под одной
-    // учётной записью (замер: 100 коммитов, 1 автор). Печатаем ТОЛЬКО когда есть соседи:
-    // строка про одиночество никому не нужна.
+    // 5c) ТИМЛИД (2026-08-22). Сводка показывает НЕ сырые столкновения, а то, с чем никто
+    // ничего не сделал. Разница принципиальная: прибор, каждый день печатающий один и тот же
+    // список найденного, обучают пролистывать — так у нас девять классов ждут регистрации
+    // семь дней подряд. Поднимается только то, где механизм сам больше ничего не может.
     let boardLine = '';
     try {
-      const sb = join(jidoka, 'scripts/session-board.mjs');
-      if (existsSync(sb)) {
-        // ВАЖНО: --conflicts выходит с кодом 1 при высоком конфликте, а execSync на ненулевом
-        // коде БРОСАЕТ. Первая версия ловила это общим catch, и строка молчала ровно тогда,
-        // когда конфликт есть, — прибор был слеп именно в том случае, ради которого написан.
-        // Поэтому вывод забираем и из исключения тоже.
+      const tl = join(jidoka, 'scripts/teamlead.mjs');
+      if (existsSync(tl)) {
+        // --escalate выходит с кодом 1, когда есть что поднять, а execSync на ненулевом коде
+        // БРОСАЕТ. Забираем вывод и из исключения: иначе строка молчала бы ровно тогда, когда
+        // она нужна (этот дефект уже был пойман на доске сессий часом раньше).
         let raw = '';
-        try { raw = sh(`node ${JSON.stringify(sb)} --conflicts`, jidoka) || ''; }
+        try { raw = sh(`node ${JSON.stringify(tl)} --escalate`, jidoka) || ''; }
         catch (e) { raw = String(e?.stdout || ''); }
         const plain = raw.replace(/\x1b\[[0-9;]*m/g, '');
-        const live = (/живых сессий (\d+)|доска: (\d+) живых/.exec(plain) || []).slice(1).find(Boolean);
-        const high = (plain.match(/\[high\]/g) || []).length;
-        const med = (plain.match(/\[medium\]/g) || []).length;
-        if (Number(live) > 1 || high || med) {
-          const parts = [`соседних сессий: ${live || '?'}`];
-          if (high) parts.push(`${high} столкновени(я) — правки перетрут друг друга`);
-          if (med) parts.push(`${med} гонк(и) при отправке`);
-          boardLine = `${high ? '🔴' : '🟡'} доска: ${parts.join(', ')} — node scripts/session-board.mjs --conflicts`;
+        const m = /требует человека — (\d+)/.exec(plain);
+        if (m) {
+          const kinds = [...plain.matchAll(/^ {2}([^\n]+?) — /gm)].map((x) => x[1]).slice(0, 2);
+          boardLine = `🔴 тимлид: ${m[1]} требует тебя${kinds.length ? ` (${kinds.join('; ')})` : ''} — node scripts/teamlead.mjs`;
         }
       }
-    } catch { /* fail-open: доска не обязана быть установлена */ }
+    } catch { /* fail-open: тимлид не обязан быть установлен */ }
 
     // 6) real CI verdict for the engine's own main branch, cached 30 min, silent on any failure
     let ci = '';
