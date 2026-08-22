@@ -173,7 +173,10 @@
     "gate:checkpoint": "node scripts/checkpoint.mjs --self-test",
     "gate:benchmark": "node scripts/agent-benchmark.mjs --verify",
     "gate:ceremony": "node scripts/change-ceremony.mjs --self-test",
-    "gate:amendment": "node scripts/spec-amendment-gate.mjs --self-test"
+    "gate:amendment": "node scripts/spec-amendment-gate.mjs --self-test",
+    "guard:machine": "node scripts/machine-guard.mjs --check",
+    "guard:machine:watch": "node scripts/machine-guard.mjs --watch",
+    "audit:research": "node scripts/research-audit.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

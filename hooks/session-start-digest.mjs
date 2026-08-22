@@ -286,6 +286,25 @@ if (isMain) {
       }
     } catch { /* no queue */ }
 
+    // 5b) СОСТОЯНИЕ МАШИНЫ (2026-08-22). Владелец перезагружал компьютер пять раз за сутки:
+    // Claude уходил в 50 ГБ при 18 ГБ физической памяти. Ни один наш сторож этого не видел —
+    // очередь тяжёлых задач привязана к КАТАЛОГУ (common-launcher ROOT, tsc-guard cwd), а
+    // рабочих копий несколько, значит замков несколько и сборки идут параллельно. Плюс сам
+    // Claude занимает 7,5 ГБ на чистой машине (47 процессов MCP, 6 сессий, 29 процессов
+    // приложения). Строка печатается ТОЛЬКО когда тесно или критично: сторож, который говорит
+    // «всё хорошо» в каждой сессии, перестаёт читаться.
+    let machine = '';
+    try {
+      const mg = join(jidoka, 'scripts/machine-guard.mjs');
+      if (existsSync(mg)) {
+        const out = sh(`node ${JSON.stringify(mg)} --check`, jidoka) || '';
+        const m = /machine-guard: (OK|TIGHT|CRITICAL) — (.+)/.exec(out.replace(/\x1b\[[0-9;]*m/g, ''));
+        if (m && m[1] !== 'OK') {
+          machine = `${m[1] === 'CRITICAL' ? '🔴' : '🟡'} машина: ${m[2].trim()} — тяжёлый шаг сейчас уведёт в своп`;
+        }
+      }
+    } catch { /* fail-open: сторож машины не обязан быть установлен */ }
+
     // 6) real CI verdict for the engine's own main branch, cached 30 min, silent on any failure
     let ci = '';
     try {
@@ -309,6 +328,7 @@ if (isMain) {
     const out = [
       '[session-start digest]',
       `jidoka: ${health}`,
+      machine,
       ci,
       ages,
       queueLine,
