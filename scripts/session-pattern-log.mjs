@@ -122,6 +122,13 @@ function cmdResolve(rest) {
   writeFileSync(ledgerPath(), out.length ? out.map((r) => JSON.stringify(r)).join('\n') + '\n' : '');
   // Feed the cross-wave meta-engine so the lesson joins meta-trend / meta-audit.
   //
+  // kind = remediation, НЕ incident (исправлено 2026-08-22). Здесь пишется запись о ПОЧИНКЕ:
+  // claimed это «повторилось N раз за сессию», real это «systemic fix: …». Пометка incident
+  // превращала каждую починку во ВТОРУЮ ошибку того же класса, и meta-audit считал её
+  // протечкой гейта: после регистрации классов 2026-08-22 два гейта из шестнадцати попали в
+  // «REGRESSION» именно так, хотя протечки не было. Поле kind заведено ровно против этого
+  // (W32-R8), и три дня оно заполнялось неверно из этой строки.
+  //
   // Режим отказа стал обязательным полем реестра 2026-08-18. Этот вызывающий не может знать
   // режим: он видит только имя класса и текст починки. Поэтому он передаёт `none` с честным
   // объяснением, а настоящий режим проставляется на разборе ошибок. Позвать `--mode` можно и
@@ -136,7 +143,7 @@ function cmdResolve(rest) {
     if (existsSync(metaLog)) {
       const mi = rest.indexOf('--mode');
       const mode = mi >= 0 ? rest[mi + 1] : 'none';
-      const args = [metaLog, cls, `recurred ${changed}x within one session`, `systemic fix: ${fix}`, 'in-session-kaizen', 'incident', '--mode', mode];
+      const args = [metaLog, cls, `recurred ${changed}x within one session`, `systemic fix: ${fix}`, 'in-session-kaizen', 'remediation', '--mode', mode];
       if (mode === 'none') args.push('--note', 'внутрисессионный повтор: режим отказа зависит от класса, проставляется на разборе ошибок');
       try {
         execFileSync('node', args, { stdio: 'pipe' });

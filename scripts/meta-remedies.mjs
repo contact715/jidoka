@@ -273,4 +273,157 @@ export const REMEDIES = {
       'Происхождение: projectx-app 2026-06-28 — Календарь в ряду режимов делали тремя заходами, ' +
       'потому что писали новый вариант вместо клона соседа.',
   },
+
+  // ── Зарегистрировано 2026-08-22 по прямому указанию владельца («зарегистрируй классы») ──
+  // Шестнадцать механизмов работали и были подключены, но реестр их не знал. Следствие было
+  // не косметическим: стартовая сводка звала эти классы «живым риском», meta-trend занижал
+  // покрытие, а август получил семнадцать инцидентов при НУЛЕ зарегистрированных гейтов.
+  //
+  // Поле since у каждой записи — РЕАЛЬНАЯ дата появления механизма из git log, а не дата
+  // вставки. Готовый блок от gate-audit подставляет сегодняшнее число и сам предупреждает,
+  // что иначе время-до-гейта врёт; подставить его значило бы записать в прибор ложь ради
+  // удобства. Для gate-cost взята дата появления scopeAudit (2026-08-17), а не дата
+  // создания файла gate-audit.mjs (2026-06-01): классу соответствует механизм, а не файл.
+
+  'core-property-substituted-by-scaffold': {
+    // projectx 2026-07-04: программа объявлена завершённой, а «недетерминированная среда»
+    // была регэксп-триггерами. Владелец поймал сам.
+    since: '2026-08-14',
+    mechanism: 'hooks/guardrail-tripwire.mjs',
+    family: ['declaration-over-implementation'],
+    gate: 'останавливает прогон, когда несущее свойство задачи подменено каркасом',
+  },
+
+  'fabricated-plausible-detail': {
+    // projectx 2026-07-24: выдуманный адрес перенаправления в письме партнёру. Владелец поймал.
+    since: '2026-07-24',
+    mechanism: 'hooks/outbound-claims-gate.mjs + scripts/verify-claims.mjs',
+    family: ['unverified-dead-claim'],
+    gate: 'не выпускает наружу проверяемую деталь, пока она не проверена: DNS, живой запрос, маршрут в коде',
+  },
+
+  'precedent-generalized-into-standing-permission': {
+    // Разбор 2026-08-03: за четыре недели шесть встреч с --no-verify, три обхода,
+    // два обоснованы прецедентом, а не живым разрешением.
+    since: '2026-08-07',
+    mechanism: 'hooks/permission-gate.mjs + scripts/permission-ledger.mjs',
+    family: ['gate-bypass'],
+    gate: 'разовое разрешение не становится постоянным правом: нужна живая запись с областью и сроком',
+  },
+
+  'synthesis-shipped-without-coverage-audit': {
+    // Rejuvenation Nation 2026-08-03: четыре раза подряд «ты точно всё учёл?», и каждый раз
+    // находились пропуски — 15 блоков в ТЗ, потом ещё Yelp, оплата, мониторинг.
+    since: '2026-08-04',
+    mechanism: 'hooks/synthesis-coverage-gate.mjs + scripts/synthesis-coverage-audit.mjs',
+    family: ['completeness-claimed-without-self-audit', 'research-completeness-not-self-audited'],
+    gate: 'документ-синтез не сдаётся без механической сверки с источниками',
+  },
+
+  'completeness-claimed-without-self-audit': {
+    // Замер 2026-08-17: одиннадцать случаев «ты точно всё?» за август в пяти проектах.
+    // Гейт покрывает те из них, где источник истины сверяется машиной.
+    since: '2026-08-04',
+    mechanism: 'hooks/synthesis-coverage-gate.mjs',
+    family: ['synthesis-shipped-without-coverage-audit'],
+    gate: 'полнота сдачи доказывается сверкой, а не вопросом владельца',
+  },
+
+  'stopped-mid-queue-reported-instead': {
+    // 2026-08-03: сессия взяла задачу из очереди, сделала одну и остановилась отчитаться.
+    since: '2026-08-14',
+    mechanism: 'hooks/task-queue-gate.mjs',
+    family: [],
+    gate: 'не даёт остановиться, когда очередь ещё не пуста, а сессия её уже трогала',
+  },
+
+  'gate-cost-not-proportional-to-change': {
+    // Правило записано 2026-07-27, рецидивы 2026-08-17 и 2026-08-21 («ты там 2000 гоняешь
+    // файлов»). Механизм — маркер области рядом с @closes-class и проверка расхождения.
+    since: '2026-08-17',
+    // механизм — функция scopeAudit внутри gate-audit.mjs; в поле путь БЕЗ решётки:
+    // проверка существования механизма ищет файл, и адрес с символом ей не резолвится
+    mechanism: 'scripts/gate-audit.mjs',
+    family: ['every-agent-runs-the-full-check', 'heavy-steps-stack-across-worktrees'],
+    gate: 'гейт объявляет свою область, и аудит краснеет, когда она шире изменения',
+  },
+
+  'gate-run-claimed-not-proven': {
+    // 2026-08-22: слой качества не мог отличить «гейты прогнаны» от «сказано, что прогнаны».
+    since: '2026-08-22',
+    mechanism: 'scripts/gate-receipt.mjs',
+    family: ['declaration-over-implementation', 'evidence-is-self-issued-label'],
+    gate: 'квитанцию пишет обёртка гейта, а не исполнитель, и она просрочена при любой правке кода',
+  },
+
+  'work-runs-at-import-time': {
+    // Замер 2026-08-15: 86 модулей из 240 выполняли работу при импорте, один зависал,
+    // 19 файлов репозитория переписывались сами.
+    since: '2026-08-15',
+    mechanism: 'scripts/import-safety.mjs',
+    family: ['cli-side-effect-on-import'],
+    gate: 'верхний уровень модуля объявляет, а не работает: импорт не должен ничего запускать',
+  },
+
+  'heavy-steps-stack-across-worktrees': {
+    // 2026-08-22: пять перезагрузок за сутки. Очередь тяжёлых задач привязана к КАТАЛОГУ,
+    // рабочих копий несколько, значит замков несколько и сборки идут параллельно.
+    since: '2026-08-22',
+    mechanism: 'scripts/machine-guard.mjs',
+    family: ['gate-cost-not-proportional-to-change', 'guards-measure-size-blind-to-count'],
+    gate: 'смотрит на память ВСЕЙ машины и на все тяжёлые шаги, а не на свою папку',
+  },
+
+  'mechanism-built-human-step-never-taken': {
+    // 2026-08-17: обратная ось реестра печатала готовый блок регистрации семь дней подряд,
+    // и вставки не было ни разу. Эта запись — закрытие ровно того случая.
+    since: '2026-08-17',
+    mechanism: 'scripts/pending-human.mjs',
+    family: [],
+    gate: 'у незакрытого человеческого шага есть очередь, возраст и счётчик просрочки',
+  },
+
+  'research-claim-without-evidence': {
+    // Правило о пропорциональном ресёрче 2026-07-29: утверждение о нашем коде без адреса
+    // файла и источник без метки силы — это мнение, а не результат.
+    since: '2026-08-18',
+    mechanism: 'scripts/research-audit.mjs',
+    family: ['fabricated-plausible-detail'],
+    gate: 'документ ресёрча не сдаётся с утверждениями без источника, адреса и раздела непроверенного',
+  },
+
+  'parallel-work-invisible-across-sessions': {
+    // 2026-08-22: сессии перетирали работу друг друга, а восстановить авторство постфактум
+    // нельзя — 100 коммитов, один автор contact715.
+    since: '2026-08-22',
+    mechanism: 'scripts/session-board.mjs',
+    family: ['conflict-found-but-nobody-acted', 'reset-hard-wiped-parallel-session-work'],
+    gate: 'сессия объявляет намерение и заявленные пути в момент работы, а не выводит их из следов потом',
+  },
+
+  'agreement-lives-only-in-chat': {
+    // 2026-08-22: договорённость двух сессий о владении зоной жила только в переписке.
+    since: '2026-08-22',
+    mechanism: 'scripts/session-mail.mjs',
+    family: ['project-change-not-journaled'],
+    gate: 'вопрос о владении висит в журнале, пока на него не ответили, и переживает сворачивание контекста',
+  },
+
+  'installed-copy-drifts-from-upstream': {
+    // Замер 2026-08-11: 14 официальных скиллов из 17 устарели, узнали из поста в соцсети.
+    since: '2026-08-11',
+    mechanism: 'scripts/skills-freshness.mjs',
+    family: [],
+    gate: 'сверяет установленные копии чужого кода с источником по SHA блобов, частичную проверку не выдаёт за полную',
+  },
+
+  'conflict-found-but-nobody-acted': {
+    // 2026-08-22: доска находила столкновение, но найденный конфликт и конфликт, с которым
+    // что-то сделали, — разные вещи. Прибор, печатающий один список каждый день, пролистывают.
+    since: '2026-08-22',
+    mechanism: 'scripts/teamlead.mjs',
+    family: ['mechanism-built-human-step-never-taken', 'parallel-work-invisible-across-sessions'],
+    gate: 'различает «никто не спросил», «ждём ответа» и «решено», человеку поднимает только первое и протухшее',
+  },
+
 };

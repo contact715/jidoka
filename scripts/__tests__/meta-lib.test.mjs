@@ -109,3 +109,30 @@ test('blocked merges stay VISIBLE with their reason, never silently dropped', ()
   assert.equal(blocked.length, 1);
   assert.ok(blocked[0].reason.length > 10, 'a blocked merge must say why');
 });
+
+
+test('recurrencesAfter: запись о ПОЧИНКЕ протечкой не считается', () => {
+  // Поле kind заведено (W32-R8), чтобы заметка о ремонте не считалась второй ошибкой, но
+  // функция, решающая «протёк ли гейт», его не читала. Вскрылось 2026-08-22: два гейта попали
+  // в REGRESSION из-за собственных записей о починке, датированных на день позже даты гейта.
+  const items = [
+    { date: '2026-07-25', kind: 'remediation', class: 'x', real: 'systemic fix: построен гейт' },
+    { date: '2026-07-26', kind: 'incident', class: 'x', real: 'снова случилось' },
+  ];
+  const leaks = recurrencesAfter(items, '2026-07-24');
+  assert.equal(leaks.length, 1, 'починка не должна попадать в протечки');
+  assert.equal(leaks[0].date, '2026-07-26');
+});
+
+test('recurrencesAfter: запись без kind считается инцидентом (старые строки не теряются)', () => {
+  const leaks = recurrencesAfter([{ date: '2026-07-25', class: 'x' }], '2026-07-24');
+  assert.equal(leaks.length, 1);
+});
+
+test('recurrencesAfter: только починки после гейта означают ноль протечек', () => {
+  const items = [
+    { date: '2026-08-20', kind: 'remediation', class: 'y' },
+    { date: '2026-08-21', kind: 'remediation', class: 'y' },
+  ];
+  assert.equal(recurrencesAfter(items, '2026-08-17').length, 0);
+});

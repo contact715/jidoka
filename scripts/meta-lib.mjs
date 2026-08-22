@@ -249,7 +249,20 @@ export function groupByClassExact(rows) {
 // failed to stop. Same-day incidents are what provoked the gate (a "before" case).
 export function recurrencesAfter(items, since) {
   if (!since) return [];
-  return items.filter(it => it.date > since).sort((a, b) => a.date.localeCompare(b.date));
+  // Записи о ПОЧИНКЕ протечкой не являются (исправлено 2026-08-22).
+  //
+  // Поле `kind` заведено 2026-W32-R8 ровно с этой целью — «чтобы заметка о ремонте больше
+  // никогда не считалась второй ошибкой», — но функция, которая РЕШАЕТ, протёк ли гейт, его
+  // не читала. Поле добавили, потребителя не тронули; классический случай «механизм построен,
+  // но не подключён к месту, где это решается».
+  //
+  // Вскрылось при регистрации шестнадцати классов 2026-08-22: два гейта попали в REGRESSION
+  // из-за собственных записей о починке, датированных на день позже даты гейта. Протечки не
+  // было ни одной, а прибор велел «усилить механизм» вместо настоящей работы.
+  return items
+    .filter(it => (it.kind || 'incident') === 'incident')
+    .filter(it => it.date > since)
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 // ── Ledger row schema (ledger-pollution write-path gate) ─────────────────────
