@@ -35,11 +35,37 @@ import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readBoard, conflicts, isStale } from './session-board.mjs';
 import { readMail, unanswered } from './session-mail.mjs';
+import { readReceipts, treeFingerprint, classifyReceipt } from './gate-receipt.mjs';
 
 /** Сколько вопрос может ждать ответа, прежде чем это станет делом человека. */
 export const WAITING_LIMIT_MS = 30 * 60 * 1000;
 /** Сколько незакоммиченная работа может стареть, прежде чем это станет риском. */
 export const DIRTY_LIMIT_MS = 4 * 60 * 60 * 1000;
+
+/**
+ * Обоснованность работы сессии: есть ли доказательство прогона гейтов НА ТЕКУЩЕМ коде.
+ * Чистая функция — проверяется без git и без файлов.
+ *
+ * Намеренно НЕ решает, какие гейты обязательны: набор разный у движка, у продукта и у сайта,
+ * и зашить один список значило бы врать в двух проектах из трёх. Здесь отвечают на более
+ * скромный и честный вопрос: есть ли вообще основание под тем, что лежит в копии сейчас.
+ */
+export function provenanceFor(session, receipts, currentFingerprint) {
+  const mine = (receipts || []).filter((r) => r && (r.session === session.session || r.cwd === session.worktree));
+  const out = { fresh: 0, stale: 0, failed: 0, gates: [] };
+  const latest = new Map();
+  for (const r of mine) {
+    const prev = latest.get(r.gate);
+    if (!prev || (r.at || 0) > (prev.at || 0)) latest.set(r.gate, r);
+  }
+  for (const [gate, r] of latest) {
+    const v = classifyReceipt(r, currentFingerprint);
+    if (v === 'proven') { out.fresh++; out.gates.push(gate); }
+    else if (v === 'stale') out.stale++;
+    else if (v === 'failed') out.failed++;
+  }
+  return out;
+}
 
 const between = (m, a, b) => (m.from === a && m.to === b) || (m.from === b && m.to === a) || m.to === 'all';
 
@@ -67,7 +93,7 @@ export function arbitrate(conflictList, messages, now = Date.now()) {
  * Что поднимать человеку. НЕ всё найденное: если поднимать всё, человек перестанет читать.
  * Только то, где механизм сам ничего больше сделать не может.
  */
-export function escalations(arbitrated, openQuestions = [], dirty = [], now = Date.now(), limits = {}) {
+export function escalations(arbitrated, openQuestions = [], dirty = [], now = Date.now(), limits = {}, unproven = []) {
   const waitLimit = limits.waiting ?? WAITING_LIMIT_MS;
   const dirtyLimit = limits.dirty ?? DIRTY_LIMIT_MS;
   const out = [];
@@ -87,6 +113,12 @@ export function escalations(arbitrated, openQuestions = [], dirty = [], now = Da
     if (d.ageMs > dirtyLimit) {
       out.push({ kind: 'незакоммиченная работа стареет', who: d.session, detail: `${d.files} файл(ов) в ${d.worktree}, ${Math.round(d.ageMs / 3600000)} ч`, action: 'закоммитить через safe-commit или объяснить, почему висит' });
     }
+  }
+  for (const u of unproven || []) {
+    out.push({ kind: 'работа не доказана', who: u.session,
+      detail: u.stale ? `${u.files} файл(ов) правок, ${u.stale} квитанц(ий) просрочено — гонялось на другом коде`
+                      : `${u.files} файл(ов) правок, ни одной квитанции прогона`,
+      action: 'node scripts/gate-receipt.mjs --gate <имя> --run "<команда>"' });
   }
   return out;
 }
@@ -119,11 +151,22 @@ function collect() {
   const arb = arbitrate(cs, mail, now);
   const open = unanswered(mail, now);
   const dirty = dirtyWork(live);
-  return { now, live, arb, open, dirty, esc: escalations(arb, open, dirty, now) };
+  // Обоснованность спрашиваем ТОЛЬКО у сессий с незакоммиченной работой: у чистой копии
+  // доказывать нечего, и требовать квитанцию там значило бы кричать без повода.
+  const receipts = readReceipts();
+  const unproven = [];
+  for (const d of dirty) {
+    let fp = null;
+    try { fp = treeFingerprint(d.worktree); } catch { /* не репозиторий — молчим */ }
+    if (!fp) continue;
+    const pr = provenanceFor({ session: d.session, worktree: d.worktree }, receipts, fp);
+    if (pr.fresh === 0) unproven.push({ session: d.session, files: d.files, stale: pr.stale, failed: pr.failed });
+  }
+  return { now, live, arb, open, dirty, unproven, esc: escalations(arb, open, dirty, now, {}, unproven) };
 }
 
 function cmdReport() {
-  const { live, arb, open, dirty, esc } = collect();
+  const { live, arb, open, dirty, unproven, esc } = collect();
   console.log(`тимлид: живых сессий ${live.length}, столкновений ${arb.length}, вопросов без ответа ${open.length}`);
   if (!live.length) return console.log('  доска пуста — сессии не объявляют, чем заняты (node scripts/session-board.mjs --publish)');
 
@@ -137,8 +180,12 @@ function cmdReport() {
     }
   }
   if (dirty.length) {
-    console.log('\nнезакоммиченная работа:');
-    for (const d of dirty) console.log(`  ${d.session}: ${d.files} файл(ов) в ${d.worktree}, ${fmtAge(d.ageMs)}`);
+    console.log('\nнезакоммиченная работа и её обоснованность:');
+    for (const d of dirty) {
+      const u = unproven.find((x) => x.session === d.session);
+      const mark = !u ? 'доказана прогоном' : u.stale ? `НЕ доказана (${u.stale} квитанц. просрочено)` : 'НЕ доказана (квитанций нет)';
+      console.log(`  ${d.session}: ${d.files} файл(ов), ${fmtAge(d.ageMs)} — ${mark}`);
+    }
   }
   if (esc.length) {
     console.log(`\nТРЕБУЕТ ЧЕЛОВЕКА: ${esc.length}`);
@@ -196,6 +243,27 @@ function selfTest() {
     escalations([], [], [{ session: 's', worktree: '/w', files: 3, ageMs: 1000 }], now).length === 0);
   ok('пороги настраиваются извне (иначе проверяема одна сторона из двух)',
     escalations([], [], [{ session: 's', worktree: '/w', files: 1, ageMs: 5000 }], now, { dirty: 1000 }).length === 1);
+
+  // обоснованность работы: доказательство прогона на ТЕКУЩЕМ коде
+  const RC = (o) => ({ session: 's', gate: 'tsc', at: now, fingerprint: 'aaa', outcome: 'pass', ...o });
+  ok('свежая квитанция считается доказательством',
+    provenanceFor({ session: 's' }, [RC()], 'aaa').fresh === 1);
+  ok('квитанция с другого кода в доказательство НЕ идёт',
+    provenanceFor({ session: 's' }, [RC({ fingerprint: 'иной' })], 'aaa').fresh === 0);
+  ok('просроченная квитанция считается отдельно',
+    provenanceFor({ session: 's' }, [RC({ fingerprint: 'иной' })], 'aaa').stale === 1);
+  ok('провал не считается доказательством',
+    provenanceFor({ session: 's' }, [RC({ outcome: 'fail' })], 'aaa').fresh === 0);
+  ok('чужая квитанция не засчитывается',
+    provenanceFor({ session: 's' }, [RC({ session: 'другая', cwd: '/чужое' })], 'aaa').fresh === 0);
+  ok('квитанция по рабочей копии засчитывается даже при другом имени сессии',
+    provenanceFor({ session: 's', worktree: '/w' }, [RC({ session: 'иная', cwd: '/w' })], 'aaa').fresh === 1);
+  ok('берётся самая свежая квитанция на гейт',
+    provenanceFor({ session: 's' }, [RC({ at: now - 1000, fingerprint: 'старый' }), RC({ at: now })], 'aaa').fresh === 1);
+  ok('недоказанная работа поднимается человеку',
+    escalations([], [], [], now, {}, [{ session: 's', files: 3, stale: 0 }]).length === 1);
+  ok('в тексте эскалации названа причина: просрочка или отсутствие',
+    /просрочено/.test(escalations([], [], [], now, {}, [{ session: 's', files: 3, stale: 2 }])[0].detail));
 
   const failed = checks.filter((c) => !c.pass);
   for (const c of checks) console.log(`${c.pass ? '  ok ' : '  ХХ '} ${c.n}`);

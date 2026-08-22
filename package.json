@@ -182,7 +182,9 @@
     "teamlead": "node scripts/teamlead.mjs",
     "teamlead:escalate": "node scripts/teamlead.mjs --escalate",
     "mail": "node scripts/session-mail.mjs --inbox",
-    "mail:open": "node scripts/session-mail.mjs --open"
+    "mail:open": "node scripts/session-mail.mjs --open",
+    "receipt": "node scripts/gate-receipt.mjs --list",
+    "receipt:verify": "node scripts/gate-receipt.mjs --verify"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
