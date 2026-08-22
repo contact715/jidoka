@@ -1,8 +1,9 @@
 {
-  "brokenRefs": 158,
+  "brokenRefs": 159,
   "orphans": 9,
   "missingMeta": 9,
   "missingCoreProperty": 72,
   "staleGuesses": 0,
-  "_note": "Spec-tree structural ceiling. Lower is better; the gate blocks any increase. Auto-tightens when a metric drops."
+  "_note": "Spec-tree structural ceiling. Lower is better; the gate blocks any increase. Auto-tightens when a metric drops.",
+  "_raised_2026_08_22": "brokenRefs 158→159: docs/GATES_MUST_SCALE_WITH_THE_CHANGE.md ссылается на projectx-app/scripts/heavy-queue.mjs — файл СУЩЕСТВУЕТ (11634 байта, 2026-08-22), но лежит в соседнем репозитории, и проверка ссылок не может его разрешить из jidoka по устройству. Это верная ссылка, а не долг. Альтернатива — исказить корректную цитату ради счётчика, что хуже."
 }
