@@ -176,7 +176,9 @@
     "gate:amendment": "node scripts/spec-amendment-gate.mjs --self-test",
     "guard:machine": "node scripts/machine-guard.mjs --check",
     "guard:machine:watch": "node scripts/machine-guard.mjs --watch",
-    "audit:research": "node scripts/research-audit.mjs"
+    "audit:research": "node scripts/research-audit.mjs",
+    "board": "node scripts/session-board.mjs --list",
+    "board:conflicts": "node scripts/session-board.mjs --conflicts"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

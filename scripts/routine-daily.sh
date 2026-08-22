@@ -70,3 +70,11 @@ if [ -f scripts/machine-guard.mjs ]; then
   echo ""
   node scripts/machine-guard.mjs --check || true
 fi
+
+# --- доска параллельных сессий (2026-08-22) ---
+# Роль тимлида начинается с фактов: кто ещё работает и не столкнёмся ли мы. Рутина печатает
+# пересечения, но НЕ падает: доска советует, решение за человеком.
+if [ -f scripts/session-board.mjs ]; then
+  echo ""
+  node scripts/session-board.mjs --conflicts || true
+fi
