@@ -92,7 +92,9 @@ export function pressureVerdict({ totalBytes, compressorBytes = 0, storedBytes =
   if (!totalBytes) return { level: 'unknown', reason: '' };
   const compPct = Math.round((compressorBytes / totalBytes) * 100);
   const ratio = compressorBytes > 0 ? storedBytes / compressorBytes : 0;
-  if (compPct >= 50) return { level: 'critical', compPct, ratio, reason: `сжатый пул ${compPct}% памяти` };
+  // сжатый пул — тоже УРОВЕНЬ, а не скорость, поэтому сам по себе критичным не считается:
+  // раздутый пул после пройденного пика держится долго и точно так же кричал бы впустую
+  if (compPct >= 50) return { level: 'tight', compPct, ratio, reason: `сжатый пул ${compPct}% памяти` };
   if (compPct >= 30) return { level: 'tight', compPct, ratio, reason: `сжатый пул ${compPct}% памяти` };
   return { level: 'ok', compPct, ratio, reason: '' };
 }
@@ -113,10 +115,38 @@ export function memoryVerdict({ totalBytes, freeBytes, swapUsedBytes = 0, swapTo
   let level = 'ok';
   if (freePct < 20) { level = 'critical'; reasons.push(`свободно ${freePct}% памяти`); }
   else if (freePct < 35) { level = 'tight'; reasons.push(`свободно ${freePct}% памяти`); }
-  if (swapTotalBytes > 0 && swapPct >= 70) { level = 'critical'; reasons.push(`своп занят на ${swapPct}%`); }
+  // ЗАНЯТОСТЬ СВОПА НАМЕРЕННО НЕ ЯВЛЯЕТСЯ ТРИГГЕРОМ (исправлено 2026-08-22, тот же день).
+  // На macOS занятость свопа НАКОПИТЕЛЬНА: страницы, выброшенные час назад, остаются
+  // числиться занятыми, пока их не прочитают обратно или не освободят. Замер по журналу
+  // наблюдателя: за восемь минут свободная память выросла с 34% до 50%, сжатый пул упал с
+  // 6,6 до 5,1 ГБ, выброс в своп за 20 секунд — НОЛЬ, а сторож печатал КРИТИЧНО во всех
+  // шестнадцати снимках из шестнадцати. Машина восстанавливалась, прибор кричал.
+  //
+  // Это третий за день случай одного класса (оракул мерит не ту величину) и худший из трёх:
+  // я сам написал часом раньше, что сторож, кричащий всегда, будет отключён, и построил
+  // ровно такой. Уровень заменён на СКОРОСТЬ — см. rateVerdict ниже.
   if (heavyCount >= 2) { level = 'critical'; reasons.push(`тяжёлых шагов уже ${heavyCount}`); }
   else if (heavyCount === 1 && level === 'ok') { level = 'tight'; reasons.push('один тяжёлый шаг уже идёт'); }
   return { level, freePct, swapPct, heavyCount, reason: reasons.join(', ') || `свободно ${freePct}% памяти, тяжёлых шагов нет` };
+}
+
+/**
+ * Вердикт по СКОРОСТИ выброса в своп между двумя замерами.
+ *
+ * Единственный признак, который отличает «машина душится СЕЙЧАС» от «машина душилась час
+ * назад»: растёт ли число выброшенных страниц. Уровень занятости этого не различает.
+ *
+ * Пороги от наблюдённого: в час настоящей аварии ушло 8,5 ГБ за полтора часа, то есть около
+ * 1,6 МБ/с в среднем и заметно больше на пиках. Поэтому 2 МБ/с считается началом давления,
+ * 10 МБ/с — состоянием, при котором запускать тяжёлый шаг нельзя.
+ */
+export function rateVerdict({ swapoutPagesA, swapoutPagesB, pageSize = 16384, elapsedMs }) {
+  if (!elapsedMs || elapsedMs <= 0) return { level: 'unknown', mbPerSec: 0, reason: '' };
+  const deltaPages = Math.max(0, swapoutPagesB - swapoutPagesA);
+  const mbPerSec = (deltaPages * pageSize) / 1048576 / (elapsedMs / 1000);
+  if (mbPerSec >= 10) return { level: 'critical', mbPerSec, reason: `в своп уходит ${mbPerSec.toFixed(1)} МБ/с` };
+  if (mbPerSec >= 2) return { level: 'tight', mbPerSec, reason: `в своп уходит ${mbPerSec.toFixed(1)} МБ/с` };
+  return { level: 'ok', mbPerSec, reason: '' };
 }
 
 /** Разбор вывода ps. Отдельно от запуска, поэтому проверяется на фиксированной строке. */
@@ -172,29 +202,51 @@ function readMemory() {
   return { totalBytes, freeBytes, swapUsedBytes, swapTotalBytes, vm };
 }
 
-function snapshot() {
+/** Два замера vm_stat с паузой — единственный способ увидеть СКОРОСТЬ, а не уровень. */
+function sampleRate(ms = 3000) {
+  try {
+    const a = parseVmStat(execSync('vm_stat', { encoding: 'utf8', timeout: 5000 }));
+    execSync(`sleep ${ms / 1000}`, { timeout: ms + 5000 });
+    const b = parseVmStat(execSync('vm_stat', { encoding: 'utf8', timeout: 5000 }));
+    return rateVerdict({ swapoutPagesA: a.swapoutPages, swapoutPagesB: b.swapoutPages, pageSize: a.pageSize, elapsedMs: ms });
+  } catch {
+    return { level: 'unknown', mbPerSec: 0, reason: '' };   // fail-open: молчим, а не гадаем
+  }
+}
+
+function snapshot({ withRate = true } = {}) {
   const mem = readMemory();
   let heavy = [];
   try {
     heavy = parseHeavy(execSync('ps -Ao pid=,ppid=,rss=,args=', { encoding: 'utf8', timeout: 10000, maxBuffer: 8 * 1024 * 1024 }));
   } catch { /* fail-open: без списка процессов судим только по памяти */ }
   const verdict = memoryVerdict({ ...mem, heavyCount: heavy.length });
-  // давление сжатия УСИЛИВАЕТ вердикт, но никогда не смягчает его
+  // сжатый пул — предупреждение, не приговор: это уровень, а не скорость
   if (mem.vm) {
     const pv = pressureVerdict({ totalBytes: mem.totalBytes, ...mem.vm });
-    if (pv.level === 'critical' || (pv.level === 'tight' && verdict.level === 'ok')) {
-      verdict.level = pv.level === 'critical' ? 'critical' : 'tight';
+    if (pv.level === 'tight' && verdict.level === 'ok') {
+      verdict.level = 'tight';
       verdict.reason = [verdict.reason, pv.reason].filter(Boolean).join(', ');
     }
     verdict.compPct = pv.compPct;
   }
-  return { mem, heavy, verdict };
+  // СКОРОСТЬ выброса в своп — единственный признак «душится СЕЙЧАС». Только она поднимает
+  // вердикт до критичного, и только она снимает подозрение, когда уровни высоки, а работы нет.
+  const rate = withRate ? sampleRate() : { level: 'unknown', mbPerSec: 0, reason: '' };
+  if (rate.level === 'critical') {
+    verdict.level = 'critical';
+    verdict.reason = [rate.reason, verdict.reason].filter(Boolean).join(', ');
+  } else if (rate.level === 'tight' && verdict.level === 'ok') {
+    verdict.level = 'tight';
+    verdict.reason = [rate.reason, verdict.reason].filter(Boolean).join(', ');
+  }
+  return { mem, heavy, verdict, rate };
 }
 
 function fmtGb(b) { return (b / 1073741824).toFixed(1) + ' ГБ'; }
 
 function cmdCheck() {
-  const { mem, heavy, verdict } = snapshot();
+  const { mem, heavy, verdict, rate } = snapshot();
   const icon = verdict.level === 'critical' ? '\x1b[31m✗' : verdict.level === 'tight' ? '\x1b[33m⚠' : '\x1b[32m✓';
   console.log(`${icon} machine-guard: ${verdict.level.toUpperCase()} — ${verdict.reason}\x1b[0m`);
   console.log(`  память: ${fmtGb(mem.freeBytes)} свободно из ${fmtGb(mem.totalBytes)}` +
@@ -204,7 +256,9 @@ function cmdCheck() {
     const ratio = mem.vm.storedBytes / mem.vm.compressorBytes;
     console.log(`  сжатый пул: ${fmtGb(mem.vm.compressorBytes)} держит ${fmtGb(mem.vm.storedBytes)} данных` +
       ` (сжатие ×${ratio.toFixed(1)}) — монитор показывает именно эту сумму`);
-    console.log(`  выброшено в своп с загрузки: ${fmtGb(mem.vm.swapoutPages * mem.vm.pageSize)}`);
+    console.log(`  выброшено в своп с загрузки: ${fmtGb(mem.vm.swapoutPages * mem.vm.pageSize)} (накопительно, вниз не идёт)`);
+    console.log(`  СЕЙЧАС уходит в своп: ${rate.mbPerSec.toFixed(1)} МБ/с` +
+      (rate.mbPerSec < 2 ? ' — активного давления нет' : ' ← давление идёт'));
   }
   if (heavy.length) {
     console.log(`  тяжёлых шагов: ${heavy.length}`);
@@ -224,10 +278,11 @@ function cmdWatch() {
   console.log(`machine-guard: пишу снимок раз в ${everyMs / 1000}с → ${LOG_PATH}`);
   console.log('Следующее зависание будет объяснимо: в файле останется, кто занимал память.');
   const tick = () => {
-    const { mem, heavy, verdict } = snapshot();
+    const { mem, heavy, verdict, rate } = snapshot();
     const row = {
       at: new Date().toISOString(),
       freePct: verdict.freePct, swapPct: verdict.swapPct, level: verdict.level,
+      swapOutMbPerSec: Number(rate.mbPerSec.toFixed(2)), compPct: verdict.compPct,
       heavy: heavy.sort((a, b) => b.rssBytes - a.rssBytes).slice(0, 5)
         .map((h) => ({ mb: Math.round(h.rssBytes / 1048576), args: h.args.slice(0, 80) })),
     };
@@ -249,8 +304,13 @@ function selfTest() {
     memoryVerdict({ totalBytes: 18 * GB, freeBytes: 3.2 * GB }).level === 'critical');
   ok('свободно 30% → tight, но не critical',
     memoryVerdict({ totalBytes: 18 * GB, freeBytes: 5.4 * GB }).level === 'tight');
-  ok('своп занят на 70% → critical даже при свободной памяти',
-    memoryVerdict({ totalBytes: 18 * GB, freeBytes: 9 * GB, swapUsedBytes: 7 * GB, swapTotalBytes: 10 * GB }).level === 'critical');
+  // ЭТОТ ТЕСТ ПЕРЕВЁРНУТ 2026-08-22 И ЭТО НЕ ОСЛАБЛЕНИЕ. Раньше он требовал critical на
+  // занятости свопа 70%. Замер по журналу наблюдателя показал, что такое правило даёт
+  // ложную тревогу в 16 снимках из 16, пока машина ВОССТАНАВЛИВАЕТСЯ: занятость свопа на
+  // macOS накопительна и вниз сама не идёт. Критичность теперь определяет СКОРОСТЬ
+  // (rateVerdict), а занятость печатается как справка.
+  ok('занятость свопа 70% САМА ПО СЕБЕ не критична — она накопительная',
+    memoryVerdict({ totalBytes: 18 * GB, freeBytes: 9 * GB, swapUsedBytes: 7 * GB, swapTotalBytes: 10 * GB }).level === 'ok');
   ok('два тяжёлых шага → critical (это и есть наложение по копиям)',
     memoryVerdict({ totalBytes: 18 * GB, freeBytes: 12 * GB, heavyCount: 2 }).level === 'critical');
   ok('один тяжёлый шаг → tight',
@@ -274,11 +334,30 @@ function selfTest() {
   ok('vm_stat: выброшено в своп посчитано', vm.swapoutPages === 557181);
   ok('сжатый пул 35% памяти → tight (машина уже борется)',
     pressureVerdict({ totalBytes: 18 * GB, compressorBytes: 6.35 * GB, storedBytes: 21 * GB }).level === 'tight');
-  ok('сжатый пул 55% памяти → critical (машина проигрывает)',
-    pressureVerdict({ totalBytes: 18 * GB, compressorBytes: 10 * GB, storedBytes: 30 * GB }).level === 'critical');
+  // Тот же разворот и по той же причине: раздутый пул держится долго ПОСЛЕ пройденного пика.
+  ok('сжатый пул 55% памяти → tight, а не critical (уровень, а не скорость)',
+    pressureVerdict({ totalBytes: 18 * GB, compressorBytes: 10 * GB, storedBytes: 30 * GB }).level === 'tight');
   ok('пустой сжатый пул → ok',
     pressureVerdict({ totalBytes: 18 * GB, compressorBytes: 0.5 * GB, storedBytes: 1 * GB }).level === 'ok');
   ok('vm_stat: мусор не роняет разбор', parseVmStat('вообще не vm_stat').compressorBytes === 0);
+
+  // СКОРОСТЬ, а не уровень — исправление того же дня, после ложных 16 из 16
+  ok('нулевой прирост выброса → ok, даже если своп занят на 89%',
+    rateVerdict({ swapoutPagesA: 557181, swapoutPagesB: 557181, elapsedMs: 3000 }).level === 'ok');
+  ok('прирост 1 МБ/с → tight, не critical',
+    rateVerdict({ swapoutPagesA: 0, swapoutPagesB: 200, elapsedMs: 3000 }).level === 'ok');
+  ok('прирост около 5 МБ/с → tight',
+    rateVerdict({ swapoutPagesA: 0, swapoutPagesB: 1000, elapsedMs: 3000 }).level === 'tight');
+  ok('прирост около 30 МБ/с → critical',
+    rateVerdict({ swapoutPagesA: 0, swapoutPagesB: 6000, elapsedMs: 3000 }).level === 'critical');
+  ok('счётчик не может уменьшиться — отрицательная скорость не бывает',
+    rateVerdict({ swapoutPagesA: 100, swapoutPagesB: 50, elapsedMs: 3000 }).mbPerSec === 0);
+  ok('нулевой интервал → unknown, а не деление на ноль',
+    rateVerdict({ swapoutPagesA: 0, swapoutPagesB: 100, elapsedMs: 0 }).level === 'unknown');
+  ok('высокая занятость свопа САМА ПО СЕБЕ больше не критична',
+    memoryVerdict({ totalBytes: 18 * GB, freeBytes: 9 * GB, swapUsedBytes: 6.2 * GB, swapTotalBytes: 7 * GB }).level === 'ok');
+  ok('раздутый сжатый пул сам по себе не критичен, только tight',
+    pressureVerdict({ totalBytes: 18 * GB, compressorBytes: 10 * GB, storedBytes: 30 * GB }).level === 'tight');
 
   ok('причина всегда названа словами',
     /свободно/.test(memoryVerdict({ totalBytes: 18 * GB, freeBytes: 12 * GB }).reason));
