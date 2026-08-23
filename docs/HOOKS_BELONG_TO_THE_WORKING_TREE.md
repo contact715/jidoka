@@ -1,7 +1,7 @@
 # Гейт принадлежит ДЕРЕВУ, а не репозиторию
 
 **Класс:** `hooks-resolved-outside-the-pushing-tree` · **Заведён:** 2026-08-23 (projectx-app)
-**Рабочая реализация:** установщик `install-git-hooks.mjs` (каталог scripts репозитория projectx-app)
+**Рабочая реализация:** установщик git-хуков в репозитории projectx-app (см. его собственный разбор GIT_HOOKS_ARE_PER_WORKTREE)
 
 ## Форма дефекта
 
