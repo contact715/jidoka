@@ -50,14 +50,61 @@ export function classifyMiss(expected, got, hasRun) {
   return 'wrong-verdict';
 }
 
-export function score(goldenRows, runRows) {
-  const byId = Object.fromEntries(runRows.map(r => [r.case_id, r]));
+/**
+ * 2026-W35-B3 — сгруппировать прогоны по кейсу, НЕ схлопывая их.
+ *
+ * Раньше здесь стояло `Object.fromEntries(runRows.map(r => [r.case_id, r]))`. У этой
+ * записи есть тихое свойство: при нескольких прогонах одного кейса остаётся ПОСЛЕДНИЙ,
+ * остальные молча исчезают. Прибор при этом печатает законную на вид точность,
+ * посчитанную по одному произвольному прогону из N. Один прогон недетерминированной
+ * системы это не измерение, а анекдот.
+ *
+ * @param {Array<{case_id:string}>} runRows
+ * @returns {Map<string, object[]>}
+ */
+export function groupRuns(runRows = []) {
+  const m = new Map();
+  for (const r of runRows) {
+    if (!r || !r.case_id) continue;
+    if (!m.has(r.case_id)) m.set(r.case_id, []);
+    m.get(r.case_id).push(r);
+  }
+  return m;
+}
+
+/**
+ * 2026-W35-B3 — свести прогоны кейса по ИМЕНОВАННОМУ правилу.
+ * Умолчание `all`: кейс засчитан, только если совпали ВСЕ прогоны. Самое строгое, а не
+ * самое удобное — мягкое умолчание тихо превратилось бы в новое «не менее одного из двух».
+ * @param {boolean[]} matches
+ * @param {'all'|'majority'|'any'} rule
+ */
+export function reduceCase(matches = [], rule = 'all') {
+  const n = matches.length, passed = matches.filter(Boolean).length;
+  if (n === 0) return { match: false, rule, n, passed };
+  if (rule === 'any') return { match: passed > 0, rule, n, passed };
+  if (rule === 'majority') return { match: passed * 2 > n, rule, n, passed };
+  return { match: passed === n, rule, n, passed };
+}
+
+export function score(goldenRows, runRows, opts = {}) {
+  const rule = opts.rule || 'all';
+  const grouped = groupRuns(runRows);
   const results = goldenRows.map(g => {
     const expected = extractVerdict(g.expected_output ?? g.expected);
-    const run = byId[g.case_id];
+    const runs = grouped.get(g.case_id) || [];
+    const run = runs[runs.length - 1] || null; // для диагностики берём последний
+    // ВСЕ прогоны кейса, а не последний: доля считается по именованному правилу.
+    const perRun = runs.map(r => {
+      const v = extractVerdict(r.verdict ?? r.output);
+      return v !== null && v === expected;
+    });
+    const red = reduceCase(perRun, rule);
     const got = run ? extractVerdict(run.verdict ?? run.output) : null;
-    const match = got !== null && got === expected;
-    const row = { case_id: g.case_id, expected, got, match };
+    const match = red.match;
+    // trials/rule печатаются рядом с исходом: без них «совпало» не отличить от
+    // «совпало в одном прогоне из трёх».
+    const row = { case_id: g.case_id, expected, got, match, trials: red.n, agreed: red.passed, rule: red.rule };
     if (!match) {
       row.missKind = classifyMiss(expected, got, !!run);
       // the agent's own words about this case, which is the only input a patch can be derived
@@ -119,6 +166,25 @@ function selfTest() {
       score(golden, missing).misses[0].diagnosis === null],
     ['whitespace in reasoning is normalised, not dropped',
       score([{ case_id: 'a', expected_output: 'PASS' }], [{ case_id: 'a', verdict: 'BLOCK', reasoning: 'строка\n\nвторая   строка' }]).misses[0].diagnosis === 'строка вторая строка'],
+
+    // ── 2026-W35-B3: эпохи больше не схлопываются «последний победил» ──────────
+    ['несколько прогонов одного кейса СОХРАНЯЮТСЯ, а не схлопываются',
+      groupRuns([{ case_id: 'a', verdict: 'PASS' }, { case_id: 'a', verdict: 'BLOCK' }]).get('a').length === 2],
+    ['РАСХОЖДЕНИЕ: последний прогон совпал, но совпали не все — кейс НЕ засчитан',
+      score([{ case_id: 'a', expected_output: 'PASS' }],
+        [{ case_id: 'a', verdict: 'BLOCK' }, { case_id: 'a', verdict: 'PASS' }]).matches === 0],
+    ['со старым правилом «последний победил» этот же вход дал бы совпадение',
+      extractVerdict('PASS') === extractVerdict([{ case_id: 'a', verdict: 'BLOCK' }, { case_id: 'a', verdict: 'PASS' }].at(-1).verdict)],
+    ['все прогоны совпали — кейс засчитан',
+      score([{ case_id: 'a', expected_output: 'PASS' }],
+        [{ case_id: 'a', verdict: 'PASS' }, { case_id: 'a', verdict: 'PASS' }]).matches === 1],
+    ['правило majority: два из трёх засчитывают кейс',
+      score([{ case_id: 'a', expected_output: 'PASS' }],
+        [{ case_id: 'a', verdict: 'PASS' }, { case_id: 'a', verdict: 'BLOCK' }, { case_id: 'a', verdict: 'PASS' }],
+        { rule: 'majority' }).matches === 1],
+    ['число прогонов и правило едут вместе с исходом',
+      (() => { const r = score([{ case_id: 'a', expected_output: 'PASS' }], [{ case_id: 'a', verdict: 'PASS' }, { case_id: 'a', verdict: 'PASS' }]).results[0]; return r.trials === 2 && r.agreed === 2 && r.rule === 'all'; })()],
+    ['умолчание строгое: правило all, а не any', reduceCase([true, false]).rule === 'all' && reduceCase([true, false]).match === false],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }

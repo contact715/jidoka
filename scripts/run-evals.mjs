@@ -42,7 +42,91 @@ const MAX_CASES_PER_RUN = 200;
 
 // ── CLI argument parsing ─────────────────────────────────────────────────────
 
+// ── 2026-W35-B3: правило сведения обязано иметь ИМЯ ──────────────────────────
+// @closes-class: gate-verdict-reads-artifact-not-exit-code
+// @divergence: "НИЧЬЯ судьи это расхождение, а не проход" — измеряемая величина
+//              «не оба прогона провалились» говорила «чисто», а правило «судья согласен
+//              сам с собой» было нарушено: два прогона разошлись, и это записывалось в зачёт
+//
+// Два дефекта, найденные чтением кода 2026-08-24 и подтверждённые дословно:
+//
+//   run-evals.mjs:  const finalPass = judgement.verdict === 'pass' || judgement.verdict === 'tie';
+//   и рядом:        } else { /* Disagreement: position-bias TIE */ verdict = 'tie'; }
+//
+// То есть `tie` возникает РОВНО ТОГДА, когда два прогона судьи разошлись, и засчитывается
+// в проход. Схема «поменяй местами и сравни» существует специально ради обнаружения
+// позиционного сдвига, а найденное ею расхождение проглатывалось как успех. Это безымянный
+// редьюсер «не менее одного из двух», врущий в завышающую сторону.
+//
+// Лечение: у сведения появляется ИМЯ, и оно печатается рядом с числом. Ничья становится
+// отдельным исходом `inconclusive`: не проход и не провал. Считать её провалом было бы так
+// же произвольно, как считать проходом; честно — назвать её и не пускать в числитель.
+
+/** Имена правил сведения. Безымянного правила больше нет. */
+export const REDUCERS = ['all', 'majority', 'any', 'mean', 'median'];
+
+/**
+ * Свести несколько прогонов одного кейса в один исход ПО ИМЕНОВАННОМУ правилу.
+ * @param {boolean[]} results
+ * @param {'all'|'majority'|'any'} rule
+ * @returns {{pass:boolean, rule:string, n:number, passed:number}}
+ */
+export function reduceEpochs(results = [], rule = 'all') {
+  const n = results.length;
+  const passed = results.filter(Boolean).length;
+  let pass;
+  if (n === 0) pass = false;
+  else if (rule === 'any') pass = passed > 0;
+  else if (rule === 'majority') pass = passed * 2 > n;
+  else pass = passed === n; // 'all' — умолчание, самое строгое
+  return { pass, rule, n, passed };
+}
+
+/**
+ * Исход парного судейства. ТРИ значения, а не два: расхождение это своё состояние.
+ * @param {boolean} passA
+ * @param {boolean} passB
+ * @returns {'pass'|'fail'|'inconclusive'}
+ */
+export function judgeOutcome(passA, passB) {
+  if (passA && passB) return 'pass';
+  if (!passA && !passB) return 'fail';
+  return 'inconclusive';
+}
+
+/** Только `pass` идёт в зачёт. Ничья не проход и не провал: её считают отдельно. */
+export function countsAsPass(outcome) { return outcome === 'pass'; }
+
+function reducerSelfTest() {
+  const fails = [];
+  let ran = 0;
+  const ok = (n, c) => { ran++; if (!c) fails.push(n); console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };
+
+  ok('НИЧЬЯ судьи это расхождение, а не проход', countsAsPass(judgeOutcome(true, false)) === false);
+  ok('оба судьи за — проход', judgeOutcome(true, true) === 'pass');
+  ok('оба судьи против — провал', judgeOutcome(false, false) === 'fail');
+  ok('расхождение в любую сторону даёт inconclusive',
+    judgeOutcome(true, false) === 'inconclusive' && judgeOutcome(false, true) === 'inconclusive');
+  ok('правило сведения НАЗВАНО в результате', reduceEpochs([true, true], 'all').rule === 'all');
+  ok('all: одна неудача из трёх валит кейс', reduceEpochs([true, true, false], 'all').pass === false);
+  ok('majority: две из трёх дают проход', reduceEpochs([true, true, false], 'majority').pass === true);
+  ok('majority: одна из двух НЕ большинство', reduceEpochs([true, false], 'majority').pass === false);
+  ok('any: одна из трёх даёт проход', reduceEpochs([false, false, true], 'any').pass === true);
+  ok('пустой набор прогонов не проход', reduceEpochs([], 'all').pass === false);
+  ok('счётчики прогонов возвращаются для отчёта',
+    (() => { const r = reduceEpochs([true, false, true], 'majority'); return r.n === 3 && r.passed === 2; })());
+  ok('умолчание это самое строгое правило, а не самое мягкое', reduceEpochs([true, false]).pass === false);
+
+  if (fails.length) { console.log(`\n\x1b[31mrun-evals reducer self-test FAILED (${fails.length} из ${ran})\x1b[0m`); process.exit(1); }
+  console.log(`\n\x1b[32m✓ run-evals: ${ran} прошло, 0 упало\x1b[0m`);
+  process.exit(0);
+}
+
 const args = process.argv.slice(2);
+// Сторож это сравнение с argv[1], а НЕ проверка флага: родительская команда со своим
+// `--self-test` запустила бы чужую самопроверку прямо при импорте (правило от 2026-08-15,
+// класс work-runs-at-import-time). Гейт import-safety поймал ровно эту ошибку здесь.
+if (process.argv[1] === fileURLToPath(import.meta.url) && args.includes('--self-test')) reducerSelfTest();
 const isDryRun = args.includes('--dry-run') || args.includes('--dry');
 const isSeedBaseline = args.includes('--seed-baseline');
 const agentFlag = args.indexOf('--agent');
@@ -283,12 +367,16 @@ if (isMain) {
     // Layer 2: LLM swap-and-compare judge
     const judgement = await runSwapAndCompareJudge(evalCase);
 
-    const finalPass = judgement.verdict === 'pass' || judgement.verdict === 'tie';
+    // 2026-W35-B3 — раньше здесь стояло `verdict === 'pass' || verdict === 'tie'`, то есть
+    // расхождение двух прогонов судьи шло в зачёт. Теперь в числитель попадает только
+    // согласие, а ничья считается отдельно и НАЗЫВАЕТСЯ.
+    const finalPass = countsAsPass(judgement.verdict);
 
     return {
       case_id: evalCase.case_id,
       deterministic_pass: true,
       judge_verdict: judgement.verdict,
+      inconclusive: judgement.verdict === 'inconclusive',
       final_pass: finalPass,
     };
   }
@@ -343,19 +431,17 @@ if (isMain) {
     const passA = score_A >= PASS_THRESHOLD;
     const passB = score_B >= PASS_THRESHOLD;
 
-    let verdict;
-    if (passA && passB) {
-      verdict = 'pass';
-    } else if (!passA && !passB) {
-      verdict = 'fail';
-    } else {
-      // Disagreement: position-bias TIE (Zheng 2023)
-      verdict = 'tie';
-    }
+    // 2026-W35-B3 — исход теперь имеет ТРИ значения, и расхождение называется своим
+    // именем. Схема «поменяй местами и сравни» существует ради обнаружения позиционного
+    // сдвига (Zheng 2023); засчитывать найденное ею расхождение в проход значит выбрасывать
+    // ровно тот сигнал, ради которого схема и заведена.
+    const verdict = judgeOutcome(passA, passB);
 
     const reasoning = extractJudgeReasoning(resultA.stdout) || 'No reasoning extracted.';
 
-    return { case_id: evalCase.case_id, score_A, score_B, verdict, reasoning };
+    // Числа обоих прогонов уходят наружу, а не выбрасываются: без них нельзя ни
+    // пересчитать исход другим правилом, ни увидеть, насколько судья был близок к порогу.
+    return { case_id: evalCase.case_id, score_A, score_B, threshold: PASS_THRESHOLD, verdict, reasoning };
   }
 
   /**
