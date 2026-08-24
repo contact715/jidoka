@@ -80,6 +80,28 @@ if (isMain) {
 
   console.log('\n\x1b[1m  learning indicators\x1b[0m');
   console.log(`    gate coverage ......... ${pct(coverage)} (${gatedRecurring.length}/${recurring.length} recurring classes gated)   want ↑`);
+  // ВТОРОЕ число под тем же словом «покрытие» (2026-W35-A1). Первое считает знаменателем
+  // рецидивные ИМЕНА: сегодня их девять из семидесяти с лишним классов, то есть 13% поля,
+  // и сто процентов по нему успокаивают не по делу. Второе считает по РЕЖИМУ отказа, где
+  // и живёт настоящий рецидив: 89% имён встречались ровно один раз, а способ ошибаться
+  // повторяется. Одна цифра под двумя смыслами — тот самый дефект, ради которого правка.
+  {
+    const byMode = new Map();
+    for (const e of rows) {
+      if (!e || !e.mastMode || !e.class) continue;
+      if (!byMode.has(e.mastMode)) byMode.set(e.mastMode, new Set());
+      byMode.get(e.mastMode).add(e.class);
+    }
+    const parts = [...byMode.entries()]
+      .map(([mode, classes]) => {
+        const gated = [...classes].filter((c) => Object.prototype.hasOwnProperty.call(REMEDIES, c)).length;
+        return { mode, gated, n: classes.size };
+      })
+      .sort((a, b) => b.n - a.n)
+      .slice(0, 4)
+      .map((x) => `${x.mode} ${x.gated}/${x.n}`);
+    if (parts.length) console.log(`    покрытие по РЕЖИМУ .... ${parts.join(' · ')}   want ↑`);
+  }
   console.log(`    mean time-to-gate ..... ${meanTTG === null ? 'n/a' : meanTTG + 'd'} (first incident → gate live)            want ↓`);
   const evalBase = existsSync('docs/evals/_baseline.json') ? JSON.parse(readFileSync('docs/evals/_baseline.json', 'utf8')) : null;
   // Слово «eval» здесь не пишется: прибор меряет детерминированное соответствие механизмов

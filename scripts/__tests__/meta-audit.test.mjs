@@ -92,3 +92,86 @@ test('ungated: recurring class with no registered gate → exit 1', () => {
   ]);
   assert.equal(code, 1, 'a recurring class with no gate must demand one');
 });
+
+// ── 2026-W35-A1: рецидив по РЕЖИМУ ОТКАЗА, а не по имени класса ──────────────
+// Замер 2026-08-24 по живому реестру: детектор по имени класса нашёл в августе НОЛЬ
+// повторов, при том что режим FM-3.3 повторился 14 раз за 25 дней под 14 разными
+// именами. Причина арифметическая: 63 класса из 71 встречались ровно один раз, то есть
+// детектор, срабатывающий на втором появлении ИМЕНИ, по построению слеп к 89% поля.
+import { recurrenceByMode } from '../meta-audit.mjs';
+
+const row = (date, cls, mode) => ({ date, class: cls, mastMode: mode, claimed: 'x', real: 'y', caught_by: 'owner', kind: 'incident' });
+
+test('recurrenceByMode: три разных имени одного режима в окне — это семейный рецидив', () => {
+  const fams = recurrenceByMode([
+    row('2026-08-01', 'guard-a', 'FM-3.3'),
+    row('2026-08-05', 'guard-b', 'FM-3.3'),
+    row('2026-08-09', 'guard-c', 'FM-3.3'),
+  ], { windowDays: 30, minDistinctClasses: 3 });
+  assert.equal(fams.length, 1);
+  assert.equal(fams[0].mode, 'FM-3.3');
+  assert.equal(fams[0].peak, 3);
+});
+
+test('recurrenceByMode: детектор ПО ИМЕНИ этих же строк не видит ничего', () => {
+  const rows = [
+    row('2026-08-01', 'guard-a', 'FM-3.3'),
+    row('2026-08-05', 'guard-b', 'FM-3.3'),
+    row('2026-08-09', 'guard-c', 'FM-3.3'),
+  ];
+  const byName = {};
+  for (const r of rows) byName[r.class] = (byName[r.class] || 0) + 1;
+  assert.equal(Object.values(byName).filter(n => n >= 2).length, 0, 'по имени повторов нет');
+  assert.equal(recurrenceByMode(rows, { minDistinctClasses: 3 }).length, 1, 'по режиму семья есть');
+});
+
+test('recurrenceByMode: одно имя, повторённое трижды, семьёй НЕ считается', () => {
+  // это обычный рецидив, его ловит детектор по имени; вторая ось не должна его дублировать
+  const fams = recurrenceByMode([
+    row('2026-08-01', 'guard-a', 'FM-3.3'),
+    row('2026-08-05', 'guard-a', 'FM-3.3'),
+    row('2026-08-09', 'guard-a', 'FM-3.3'),
+  ], { minDistinctClasses: 3 });
+  assert.equal(fams.length, 0);
+});
+
+test('recurrenceByMode: окно скользящее — три имени за 90 дней это не семья', () => {
+  const fams = recurrenceByMode([
+    row('2026-05-01', 'guard-a', 'FM-3.3'),
+    row('2026-06-15', 'guard-b', 'FM-3.3'),
+    row('2026-08-01', 'guard-c', 'FM-3.3'),
+  ], { windowDays: 30, minDistinctClasses: 3 });
+  assert.equal(fams.length, 0);
+});
+
+test('recurrenceByMode: строки без режима не образуют семью', () => {
+  const fams = recurrenceByMode([
+    { date: '2026-08-01', class: 'a', mastMode: null, mastNote: 'не подошёл', kind: 'incident' },
+    { date: '2026-08-02', class: 'b', mastMode: null, mastNote: 'не подошёл', kind: 'incident' },
+    { date: '2026-08-03', class: 'c', mastMode: null, mastNote: 'не подошёл', kind: 'incident' },
+  ], { minDistinctClasses: 3 });
+  assert.equal(fams.length, 0);
+});
+
+test('recurrenceByMode: семья несёт окно пика и список имён', () => {
+  const f = recurrenceByMode([
+    row('2026-08-01', 'guard-a', 'FM-3.2'),
+    row('2026-08-05', 'guard-b', 'FM-3.2'),
+    row('2026-08-20', 'guard-c', 'FM-3.2'),
+  ], { minDistinctClasses: 3 })[0];
+  assert.equal(f.window.from, '2026-08-01');
+  assert.equal(f.window.to, '2026-08-20');
+  assert.deepEqual([...f.classes].sort(), ['guard-a', 'guard-b', 'guard-c']);
+});
+
+test('recurrenceByMode: на живом реестре августа FM-3.3 всплывает семьёй', () => {
+  // фиксированный слепок формы, а не весь файл: три реальных имени из окна 2026-07-29…08-22
+  const fams = recurrenceByMode([
+    row('2026-07-29', 'guard-bypassed-via-alternate-path', 'FM-3.3'),
+    row('2026-08-08', 'ascii-word-boundary-blind-in-cyrillic', 'FM-3.3'),
+    row('2026-08-17', 'guard-unit-mismatched-to-rule', 'FM-3.3'),
+    row('2026-08-22', 'guard-triggers-on-level-not-on-rate', 'FM-3.3'),
+  ], { windowDays: 30, minDistinctClasses: 3 });
+  assert.equal(fams.length, 1);
+  assert.ok(fams[0].peak >= 3, `пик ${fams[0].peak} должен быть не меньше 3`);
+});
