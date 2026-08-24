@@ -76,6 +76,7 @@
     "gate:import-safety": "node scripts/import-safety.mjs --self-test && node scripts/import-safety.mjs --all",
     "gate:ledger-schema": "node scripts/ledger-schema-gate.mjs",
     "gate:parity": "node scripts/install-into.mjs --check-parity",
+    "gate:hooks": "node scripts/hooks-reachability.mjs",
     "gate:waves": "node scripts/run-state.mjs --audit-closed",
     "red:team": "node scripts/red-team.mjs",
     "eval:trajectory": "node scripts/trajectory-eval.mjs",
