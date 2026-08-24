@@ -1,8 +1,8 @@
-# Kaizen Dashboard
+# Kaizen Dashboard — 2026-W35
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 79% · shipped 102/129, open 27, regressed 0, ~1.19w to ship, class-closure 100%**
+**adoption 81% · shipped 105/129, open 24, regressed 0, ~1.15w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -122,12 +122,12 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | open | 2026-W34-Q2 | БЫСТРАЯ ПОБЕДА: три контрольные руки в memory-eval (без памяти, весь контекст, только лексика) + отказ печатать выигрыш без них | scripts/memory-eval.mjs#controlArms | not yet present: scripts/memory-eval.mjs#controlArms |
 | open | 2026-W34-R12 | Приёмка обязана различать СОЗДАНИЕ символа и ИЗМЕНЕНИЕ существующего: сегодня рекомендация-правка читается как уже внедрённая (найдено собственными записями этой недели) | scripts/kaizen-audit.mjs#changeKind | not yet present: scripts/kaizen-audit.mjs#changeKind |
 | open | 2026-W34-R13 | Тупик гейта: ledger-sync-gate блокирует пуш, а его собственное лечение --sync ничего не абсорбирует, потому что внутрисессионный журнал пишет записи без обязательного поля kind | scripts/session-pattern-log.mjs#emitIncident | not yet present: scripts/session-pattern-log.mjs#emitIncident |
-| open | 2026-W35-A1 | Рецидив считается по режиму отказа, покрытие печатается двумя числами | scripts/meta-audit.mjs#recurrenceByMode | not yet present: scripts/meta-audit.mjs#recurrenceByMode |
+| shipped | 2026-W35-A1 | Рецидив считается по режиму отказа, покрытие печатается двумя числами | scripts/meta-audit.mjs#recurrenceByMode | present (symbol): scripts/meta-audit.mjs#recurrenceByMode |
 | open | 2026-W35-A2 | У каждого прибора есть кейс расхождения между измеряемой величиной и правилом | scripts/oracle-divergence.mjs#divergenceCase | not yet present: scripts/oracle-divergence.mjs#divergenceCase |
 | open | 2026-W35-A3 | Квитанция прогона гейта: отсутствие следа блокирует пуш | scripts/gate-receipt.mjs#requireReceipts | not yet present: scripts/gate-receipt.mjs#requireReceipts |
-| open | 2026-W35-A4 | Сторож разрешимости core.hooksPath из каждой рабочей копии | scripts/hooks-reachability.mjs#resolveFromWorktree | not yet present: scripts/hooks-reachability.mjs#resolveFromWorktree |
+| shipped | 2026-W35-A4 | Сторож разрешимости core.hooksPath из каждой рабочей копии | scripts/hooks-reachability.mjs#resolveFromWorktree | present (symbol): scripts/hooks-reachability.mjs#resolveFromWorktree |
 | shipped | 2026-W35-A5 | Быстрая победа: позвать уже готовый прибор паритета канон-копия | scripts/install-into.mjs#parityVerdict | present (symbol): scripts/install-into.mjs#parityVerdict |
-| open | 2026-W35-A10 | Приёмка доказывается прогоном, а не разрешимостью имени символа | scripts/kaizen-audit.mjs#executedEvidence | not yet present: scripts/kaizen-audit.mjs#executedEvidence |
+| shipped | 2026-W35-A10 | Приёмка доказывается прогоном, а не разрешимостью имени символа | scripts/kaizen-audit.mjs#executedEvidence | present (symbol): scripts/kaizen-audit.mjs#executedEvidence |
 | shipped | 2026-W35-B1 | Счётчик покрытия критериев разводится на проверенное и зачтённое по определению | scripts/ac-verify-map.mjs#wiredOf | present (symbol): scripts/ac-verify-map.mjs#wiredOf |
 | shipped | 2026-W35-B2 | Словарь внешних судей открывается: владелец перестаёт считаться своим | scripts/meta-honesty.mjs#judgeKind | present (symbol): scripts/meta-honesty.mjs#judgeKind |
 | open | 2026-W35-B3 | Именованное правило сведения эпох, ничья судьи перестаёт быть проходом | scripts/run-evals.mjs#namedReducer | not yet present: scripts/run-evals.mjs#namedReducer |

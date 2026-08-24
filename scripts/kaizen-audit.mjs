@@ -71,6 +71,59 @@ const isCommentLine = (line, shell) => {
  *   'absent'  — not there at all
  * Prose and data files (.md/.json/.jsonl/.yml) have no comment tier: their text IS the artifact.
  */
+/**
+ * 2026-W35-A10 — ПУСТОЙ символ это не доказательство.
+ *
+ * Возвращает true, если объявление есть, а работы в нём нет: пустое тело, значение
+ * null/undefined, или заглушка «not implemented». Разбор нарочно текстовый и грубый:
+ * задача не в том, чтобы понять код, а в том, чтобы отличить «написано» от «названо».
+ * Ошибаться этот разбор обязан в СТРОГУЮ сторону — сомнительное считаем настоящим,
+ * потому что ложное понижение объявляет построенное непостроенным, а это та же ложь
+ * наизнанку (урок 2026-08-11).
+ *
+ * @param {string} body исходник файла
+ * @param {string} name имя символа
+ * @returns {boolean}
+ */
+export function isStubDefinition(body, name) {
+  const n = escapeRe(name);
+  // const x = null | undefined
+  if (new RegExp(`(?:export\\s+)?(?:const|let|var)\\s+${n}\\s*=\\s*(?:null|undefined)\\s*[;\\n]`).test(body)) return true;
+  // function x(...) {}  — пустое тело, возможно с пробелами и переводами строк
+  if (new RegExp(`(?:export\\s+)?(?:default\\s+)?(?:async\\s+)?function\\s+${n}\\s*\\([^)]*\\)\\s*\\{\\s*\\}`).test(body)) return true;
+  // const x = (...) => {}  — пустая стрелка
+  if (new RegExp(`(?:export\\s+)?(?:const|let|var)\\s+${n}\\s*=\\s*(?:async\\s*)?\\([^)]*\\)\\s*=>\\s*\\{\\s*\\}`).test(body)) return true;
+  // тело состоит только из throw «не реализовано»
+  if (new RegExp(`(?:export\\s+)?(?:default\\s+)?(?:async\\s+)?function\\s+${n}\\s*\\([^)]*\\)\\s*\\{\\s*throw[^}]*\\}`).test(body)) {
+    const m = body.match(new RegExp(`function\\s+${n}\\s*\\([^)]*\\)\\s*\\{([\\s\\S]*?)\\}`));
+    if (m && /not\s*implemented|не\s*реализ|TODO/i.test(m[1])) return true;
+  }
+  return false;
+}
+
+/** Сила уровня доказательства. Прогон сильнее объявления, объявление сильнее заглушки. */
+export function tierRank(tier) {
+  return { executed: 5, symbol: 4, code: 3, stub: 2, comment: 1, absent: 0, 'check-failed': 0, 'no-check': 0 }[tier] ?? 0;
+}
+
+/**
+ * 2026-W35-A10 — единственный уровень, доказывающий ПОВЕДЕНИЕ, а не наличие имени.
+ *
+ * Запись реестра может нести поле `check` — команду, которая доказывает, что работа
+ * работает. Прогон намеренно НЕ делается на каждом аудите: исполнять строки из файла
+ * дорого и небезопасно, поэтому это отдельный режим `--verify-checks`. Отсутствие
+ * команды это честное `no-check`, а не молчаливое «сойдёт».
+ *
+ * @param {{check?:string}} entry
+ * @param {(cmd:string)=>{ok:boolean,out?:string}} runner
+ */
+export function executedEvidence(entry, runner) {
+  const cmd = entry && typeof entry.check === 'string' ? entry.check.trim() : '';
+  if (!cmd) return { tier: 'no-check', cmd: null, out: '' };
+  const r = runner(cmd) || { ok: false };
+  return { tier: r.ok ? 'executed' : 'check-failed', cmd, out: String(r.out || '').slice(0, 400) };
+}
+
 export function anchorEvidence(body, anchor, filePath = '') {
   if (typeof body !== 'string' || !anchor) return 'absent';
   const names = [...new Set([anchor, kebabToCamel(anchor)])];
@@ -78,7 +131,9 @@ export function anchorEvidence(body, anchor, filePath = '') {
   if (isCode) {
     for (const n of names) {
       const def = new RegExp(`(?:^|[^\\w$])(?:export\\s+)?(?:default\\s+)?(?:async\\s+)?(?:function|class|const|let|var)\\s+${escapeRe(n)}(?![\\w$])`);
-      if (def.test(body)) return 'symbol';
+      // Объявление найдено. Но объявление это ИМЯ, а не поведение: пустая функция,
+      // null и заглушка throw проходили как сильнейшее доказательство до 2026-W35-A10.
+      if (def.test(body)) return isStubDefinition(body, n) ? 'stub' : 'symbol';
     }
   }
   const shell = SHELL_FILE.test(filePath);
@@ -141,6 +196,16 @@ export function auditEntry(entry, probes = {}, week = '') {
   if (tier === 'symbol' || tier === 'code') {
     return { ...entry, status: 'shipped', shippedWeek: entry.shippedWeek || week || entry.week, evidence: `present (${tier}): ${entry.pointOfIntegration}` };
   }
+  if (tier === 'stub') {
+    // 2026-W35-A10 — символ есть, работы в нём нет. НЕ регресс (ничего не удаляли) и НЕ
+    // внедрение: тот же честный статус, что у комментария, потому что доказательная сила
+    // та же — названо, но не сделано.
+    return {
+      ...entry,
+      status: 'attested',
+      evidence: `символ объявлен, но пуст: ${entry.pointOfIntegration} — тело заглушка (пусто / null / not implemented); докажи прогоном через поле check`,
+    };
+  }
   if (tier === 'comment') {
     // The label exists, the proof does not point at behaviour. NOT a regression: nothing was
     // removed, the bar moved. shippedWeek is preserved so history is not rewritten.
@@ -187,7 +252,7 @@ function selfTest() {
 
   const exists = (p) => p === 'scripts/dag-schedule.mjs' || p === 'scripts/map-ac-coverage.mjs';
   const ciText = 'run: node scripts/dag-schedule.mjs --self-test\n- name: button-has-type gate';
-  const FILES = { 'scripts/dag-schedule.mjs': 'export function buildDag() {} // critical-path-edges' };
+  const FILES = { 'scripts/dag-schedule.mjs': 'export function buildDag(tasks) { return tasks.map(criticalPath); } // critical-path-edges' };
   const read = (p) => (p in FILES ? FILES[p] : null);
   const probes = { exists, read, ciText };
   const W = '2026-W28';
@@ -268,9 +333,9 @@ function selfTest() {
   const CODE = 'scripts/x.mjs';
   const evi = (body, anchor, file = CODE) => anchorEvidence(body, anchor, file);
   ok('a DEFINED symbol is the strongest evidence',
-    evi('export function reverseRemedyAudit(x) {}', 'reverseRemedyAudit') === 'symbol');
+    evi('export function reverseRemedyAudit(x) { return audit(x); }', 'reverseRemedyAudit') === 'symbol');
   ok('a kebab-case anchor matches its camelCase definition',
-    evi('export function reverseRemedyAudit(x) {}', 'reverse-remedy-audit') === 'symbol');
+    evi('export function reverseRemedyAudit(x) { return audit(x); }', 'reverse-remedy-audit') === 'symbol');
   ok('const and class definitions count as symbols',
     evi('const myThing = 1', 'my-thing') === 'symbol' && evi('class MyThing {}', 'MyThing') === 'symbol');
   ok('the anchor on a non-comment line is code-tier',
@@ -280,6 +345,40 @@ function selfTest() {
   ok('a block-comment line is also comment-tier', evi(' * anchor-here explained\ncode()', 'anchor-here') === 'comment');
   ok('a shell # comment is comment-tier', evi('# my-anchor\necho hi', 'my-anchor', 'scripts/x.sh') === 'comment');
   ok('absent anchor is absent', evi('nothing relevant', 'my-anchor') === 'absent');
+
+  // ── 2026-W35-A10: имя резолвится ≠ работа сделана ─────────────────────────
+  // Замер 2026-08-24: anchorEvidence отдавал сильнейший уровень `symbol` в четырёх
+  // случаях из четырёх, включая три пустышки — пустое тело, значение null и заглушку
+  // throw. Прибор доказывал существование ИМЕНИ, а не поведения. Это третий слой одной
+  // дыры: 2026-08-11 засчитывался комментарий, W34-R12 поймала засчитанный СУЩЕСТВУЮЩИЙ
+  // символ, здесь — засчитанный ПУСТОЙ. Каждая правка поднимала планку на ступень, и
+  // класс переживал её.
+  ok('ПУСТОЕ тело функции это заглушка, а не доказательство',
+    evi('export function fixThing() {}', 'fixThing') === 'stub');
+  ok('значение null это заглушка',
+    evi('export const fixThing = null;', 'fixThing') === 'stub');
+  ok('throw not implemented это заглушка',
+    evi('export function fixThing() { throw new Error("not implemented"); }', 'fixThing') === 'stub');
+  ok('тело с настоящей работой остаётся сильнейшим уровнем',
+    evi('export function fixThing(a) { return a * 2; }', 'fixThing') === 'symbol');
+  ok('однострочная стрелка с телом это символ',
+    evi('export const fixThing = (a) => a * 2;', 'fixThing') === 'symbol');
+  ok('заглушка НЕ считается внедрением, но и не регрессом: статус attested',
+    auditEntry(
+      { id: 's1', week: '2026-W35', title: 't', pointOfIntegration: 'scripts/x.mjs#fixThing', status: 'open', shippedWeek: null },
+      { exists: (p) => p === 'scripts/x.mjs', read: () => 'export function fixThing() {}', ciText: '' },
+      W,
+    ).status === 'attested');
+
+  // executedEvidence — единственный уровень, который доказывает ПОВЕДЕНИЕ
+  ok('запись без команды проверки не может быть доказана прогоном',
+    executedEvidence({ pointOfIntegration: 'scripts/x.mjs#a' }, () => ({ ok: true })).tier === 'no-check');
+  ok('прошедшая команда проверки даёт уровень executed',
+    executedEvidence({ check: 'node scripts/x.mjs --self-test' }, () => ({ ok: true })).tier === 'executed');
+  ok('упавшая команда проверки НЕ доказывает ничего',
+    executedEvidence({ check: 'node scripts/x.mjs --self-test' }, () => ({ ok: false, out: 'FAILED' })).tier === 'check-failed');
+  ok('executed сильнее symbol, а symbol сильнее stub',
+    tierRank('executed') > tierRank('symbol') && tierRank('symbol') > tierRank('stub') && tierRank('stub') > tierRank('comment'));
   ok('code beats comment when the anchor appears in BOTH',
     evi('// my-anchor is why\nrun("my-anchor")', 'my-anchor') === 'code');
   // in prose and data files there is no code/comment distinction — the text IS the artifact
@@ -292,7 +391,7 @@ function selfTest() {
   ok('comment-only anchor → status attested', attested.status === 'attested');
   ok('attested evidence explains WHY it is weak', /комментар/i.test(attested.evidence));
   const proven = auditEntry({ id: 'b', week: '2026-W33', title: 't', pointOfIntegration: `${CODE}#myCap`, status: 'proposed' },
-    probesFor('export function myCap() {}'), '2026-W33');
+    probesFor('export function myCap() { return cap(); }'), '2026-W33');
   ok('symbol anchor → status shipped', proven.status === 'shipped');
   // the BAR changed, the code did not: demoting an entry is a measurement change, not a regression
   const demoted = auditEntry({ id: 'c', week: '2026-W30', title: 't', pointOfIntegration: `${CODE}#my-cap`, status: 'shipped', shippedWeek: '2026-W30' },
@@ -314,7 +413,7 @@ function selfTest() {
 
   ok('an attested entry that later gains a symbol is promoted to shipped',
     auditEntry({ id: 'e', week: '2026-W33', title: 't', pointOfIntegration: `${CODE}#my-cap`, status: 'attested' },
-      probesFor('export function myCap() {}'), '2026-W33').status === 'shipped');
+      probesFor('export function myCap() { return cap(); }'), '2026-W33').status === 'shipped');
 
   if (fails) { console.log('\n\x1b[31mkaizen-audit self-test FAILED\x1b[0m'); process.exit(1); }
   console.log('\n\x1b[32m✓ kaizen-audit: deterministic shipped/open/regressed detection correct\x1b[0m');
@@ -338,7 +437,32 @@ if (isMain) {
   console.log(`[kaizen-audit] ${after.length} entrie(s) audited @ ${week} — ${changed} status change(s):`);
   for (const e of after) console.log(`  ${e.status.padEnd(9)} ${e.id}  ${e.pointOfIntegration || ''}`);
   const shipped = after.filter((e) => e.status === 'shipped').length;
-  console.log(`  adoption: ${shipped}/${after.length} shipped`);
+  const attested = after.filter((e) => e.status === 'attested').length;
+  console.log(`  adoption: ${shipped}/${after.length} shipped${attested ? `, ${attested} attested (символ есть, поведение не доказано)` : ''}`);
+
+  // ── 2026-W35-A10: доказательство ПРОГОНОМ, отдельным режимом ───────────────
+  // Статический аудит доказывает, что имя разрешается. Что работа РАБОТАЕТ, доказывает
+  // только запуск. Режим отдельный намеренно: исполнять команды из файла на каждом
+  // аудите дорого и небезопасно, а гейт, который дорого стоит на каждом шаге, учат
+  // обходить (класс gate-cost-not-proportional-to-change).
+  if (process.argv.includes('--verify-checks')) {
+    const { execSync } = await import('node:child_process');
+    const run = (cmd) => {
+      try { execSync(cmd, { cwd: ROOT, stdio: 'pipe', timeout: 120000 }); return { ok: true }; }
+      catch (e) { return { ok: false, out: String(e.stdout || e.stderr || e.message) }; }
+    };
+    const withCheck = after.filter((e) => e.check);
+    console.log(`\n[kaizen-audit --verify-checks] записей с командой проверки: ${withCheck.length} из ${after.length}`);
+    let passed = 0, failed = 0;
+    for (const e of withCheck) {
+      const r = executedEvidence(e, run);
+      if (r.tier === 'executed') { passed++; console.log(`  \x1b[32m✓ executed\x1b[0m ${e.id}  ${r.cmd}`); }
+      else { failed++; console.log(`  \x1b[31m✗ ${r.tier}\x1b[0m ${e.id}  ${r.cmd}\n      ${r.out.split('\n').slice(-3).join(' / ')}`); }
+    }
+    const noCheck = after.filter((e) => e.status === 'shipped' && !e.check).length;
+    console.log(`  доказано прогоном: ${passed} · упало: ${failed} · внедрено БЕЗ команды проверки: ${noCheck}`);
+    if (failed) process.exit(1);
+  }
   if (!process.argv.includes('--dry')) {
     writeLedger(after, file);
     console.log(`[kaizen-audit] ledger updated: ${path.relative(ROOT, file)}`);
