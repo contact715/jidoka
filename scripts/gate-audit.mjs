@@ -420,6 +420,35 @@ export function derivedScope(args = '') {
 }
 
 /**
+ * 2026-08-24 — ШЕСТОЙ ИНВАРИАНТ: дорогой шаг обязан пережить ПЕРЕИГРОВКУ git.
+ *
+ * Почему появился. Класс gate-cost-not-proportional-to-change протёк 2026-08-20, через ТРИ
+ * дня после того, как гейт встал. Паспорт стоимости моделирует, КАКИЕ файлы смотрит шаг, и
+ * ничего не знает про то, СКОЛЬКО РАЗ он запустится. У git есть операции, которые
+ * проигрывают десятки коммитов подряд: cherry-pick, revert, rebase. Post-commit срабатывает
+ * на каждом из них, pre-commit не срабатывает вовсе. Один жест человека превращается в N
+ * прогонов дорогого шага, и объявленная область при этом честная.
+ *
+ * Защита была написана в тот же день прямо в .githooks/post-commit. Но она осталась
+ * ЗАПЛАТКОЙ: гейт её не требовал, поэтому снятие защиты никто бы не заметил, и класс вернулся
+ * бы третий раз. Здесь она становится инвариантом.
+ *
+ * Признак защиты: шаг проверяет наличие служебных каталогов секвенсора git.
+ *
+ * @param {string} hookText исходник хука
+ * @returns {boolean}
+ */
+export function sequencerGuarded(hookText = '') {
+  const t = String(hookText);
+  const marks = [/CHERRY_PICK_HEAD/, /REVERT_HEAD/, /rebase-merge/, /rebase-apply/, /MERGE_HEAD/];
+  // Двух признаков мало по одному: cherry-pick и rebase это РАЗНЫЕ операции, и защита от
+  // одной не защищает от другой. Требуем оба семейства.
+  const hasPick = marks.slice(0, 2).some((r) => r.test(t));
+  const hasRebase = marks.slice(2, 4).some((r) => r.test(t));
+  return hasPick && hasRebase;
+}
+
+/**
  * The invariant. Judges ONLY mechanisms standing on the change path (a local git hook),
  * because those are the ones whose cost is paid on every commit. Pure.
  * Returns { judged, undeclared, mismatched, unjustified }.
@@ -611,6 +640,16 @@ function selfTest() {
     ['a mechanism the hook never calls is absent from invocations',
       hookInvocations('out=$(node "$ROOT/scripts/a.mjs" 2>&1)').has('scripts/b.mjs') === false],
     ['--staged derives scope staged', derivedScope(' --staged ') === 'staged'],
+    ['post-commit без защиты от секвенсора git не проходит',
+      sequencerGuarded('node scripts/heavy.mjs') === false],
+    ['защиты только от cherry-pick НЕ достаточно: rebase это другая операция',
+      sequencerGuarded('[ -f "$G/CHERRY_PICK_HEAD" ] && exit 0') === false],
+    ['защиты только от rebase тоже недостаточно',
+      sequencerGuarded('[ -d "$G/rebase-merge" ] && exit 0') === false],
+    ['РАСХОЖДЕНИЕ: область объявлена честно, а шаг всё равно запустится N раз подряд',
+      sequencerGuarded('[ -f "$G/CHERRY_PICK_HEAD" ] || [ -d "$G/rebase-merge" ] && exit 0') === true],
+    ['настоящая защита из post-commit признаётся',
+      sequencerGuarded('if [ -f "$G/CHERRY_PICK_HEAD" ] || [ -f "$G/REVERT_HEAD" ] || [ -d "$G/rebase-merge" ] || [ -d "$G/rebase-apply" ]; then exit 0; fi') === true],
     ['a passed file list derives scope staged', derivedScope(' $staged_mjs ') === 'staged'],
     // 2026-W35 — РАСХОЖДЕНИЕ: переменная в аргументах есть, а списка правок нет.
     ['переменная-корень репозитория это не список файлов: область all',
@@ -766,6 +805,28 @@ if (isMain) {
   const wide = sc.judged.filter((j) => j.actual === 'all');
   console.log(`  \x1b[32m✓ scope declared for all ${sc.judged.length} change-path gate(s); ${wide.length} run wide, each justified in writing.\x1b[0m`);
   for (const w of wide) console.log(`      ${w.path}${w.background ? ' (в фоне)' : ''} — ${w.justification}`);
+
+  // ── ШЕСТОЙ ИНВАРИАНТ: переживает ли дорогой шаг переигровку git (2026-08-24) ──
+  // Post-commit срабатывает на КАЖДОМ коммите, который проигрывает cherry-pick, revert или
+  // rebase, а pre-commit при этом не срабатывает вовсе. Один жест человека даёт N прогонов.
+  // Защита была написана 2026-08-20 заплаткой прямо в хуке; здесь она становится требуемой,
+  // иначе её снятие никто не заметит и класс вернётся третий раз.
+  {
+    const pcPath = join(process.cwd(), '.githooks', 'post-commit');
+    if (existsSync(pcPath)) {
+      const pcText = readFileSync(pcPath, 'utf8');
+      if (!sequencerGuarded(pcText)) {
+        console.error('\n\x1b[31m✗ post-commit не защищён от переигровки git (cherry-pick / revert / rebase).\x1b[0m');
+        console.error('    Эти операции проигрывают десятки коммитов подряд, и дорогой шаг запустится на каждом.');
+        console.error('    Объявленная область при этом честная — стоимость растёт не по файлам, а по числу прогонов.');
+        console.error('    Почини так: в начале хука выйти, если существует CHERRY_PICK_HEAD / REVERT_HEAD /');
+        console.error('    rebase-merge / rebase-apply, и сказать об этом вслух, а не пропустить молча.');
+        process.exit(1);
+      }
+      console.log('  \x1b[32m✓ дорогой шаг post-commit защищён от переигровки git (cherry-pick / revert / rebase).\x1b[0m');
+    }
+  }
+
   const tags = closesClassTags(mechFiles);
   const wired = wiredSetFrom(mechFiles, callerTexts(process.cwd(), settingsRaw));
   let REMEDIES = {};
