@@ -60,6 +60,40 @@ if [ $rc -ne 0 ]; then
 fi
 echo "✓ pre-push · spec-structural-gate: no new spec-tree breakage"
 
+# gate-receipt --verify (2026-W35-A3): КВИТАНЦИЯ вместо честного слова.
+#
+# Два самых дорогих гейта CI — eval-suite (24 с) и прогон тестов движка (14 с) — pre-push
+# НЕ запускает сам, и это правильно: минута на каждый пуш непропорциональна правке, а
+# непропорциональный гейт учат обходить (класс gate-cost-not-proportional-to-change, он у
+# нас как раз протёк). Но раз он их не запускает, единственным доказательством оставался
+# отчёт самой сессии — то есть доказательство, выписанное себе самому.
+#
+# Квитанция это доказательство, привязанное к ОТПЕЧАТКУ состояния: коммит плюс правки плюс
+# неотслеживаемые файлы плюс файл блокировки зависимостей. Изменилась буква — квитанция
+# просрочена. Молчание перестаёт означать «проверено» и начинает означать «следа нет».
+#
+# ПРОПОРЦИОНАЛЬНОСТЬ: требуем только когда правка трогает scripts/ или hooks/, то есть ровно
+# то, что эти два гейта и покрывают. Правка одних документов квитанций не требует.
+CHANGED_CODE=$(git diff --name-only @{push}..HEAD 2>/dev/null | grep -E '^(scripts|hooks)/' | head -1)
+if [ -z "$CHANGED_CODE" ]; then
+  CHANGED_CODE=$(git diff --name-only HEAD~1..HEAD 2>/dev/null | grep -E '^(scripts|hooks)/' | head -1)
+fi
+if [ -n "$CHANGED_CODE" ]; then
+  out=$(node "$ROOT/scripts/gate-receipt.mjs" --verify --require eval,tests 2>&1); rc=$?
+  if [ $rc -ne 0 ]; then
+    echo "$out"
+    echo "✗ pre-push BLOCKED by gate-receipt: правка трогает код движка, а следа прогона нет."
+    echo "  Эти два гейта pre-push не запускает (дорого), поэтому нужен след:"
+    echo "    node scripts/gate-receipt.mjs --gate tests --run \"npm test\""
+    echo "    node scripts/gate-receipt.mjs --gate eval  --run \"node scripts/eval-suite.mjs\""
+    echo "  Запускать ПОСЛЕ последней правки: квитанция привязана к отпечатку состояния."
+    exit 1
+  fi
+  echo "✓ pre-push · gate-receipt: прогон eval и тестов доказан квитанцией"
+else
+  echo "✓ pre-push · gate-receipt: код движка не менялся — квитанции не требуются"
+fi
+
 # hooks-reachability (2026-W35-A4): ИНФОРМАЦИОННО, не блокирует.
 # core.hooksPath общий для всех рабочих копий репозитория, поэтому настройка выглядит
 # сделанной из любой копии, а срабатывает не везде: копия на ветке без каталога хуков

@@ -78,6 +78,8 @@
     "gate:parity": "node scripts/install-into.mjs --check-parity",
     "gate:hooks": "node scripts/hooks-reachability.mjs",
     "gate:divergence": "node scripts/oracle-divergence.mjs",
+    "receipt:tests": "node scripts/gate-receipt.mjs --gate tests --run \"npm test\"",
+    "receipt:eval": "node scripts/gate-receipt.mjs --gate eval --run \"node scripts/eval-suite.mjs\"",
     "gate:waves": "node scripts/run-state.mjs --audit-closed",
     "red:team": "node scripts/red-team.mjs",
     "eval:trajectory": "node scripts/trajectory-eval.mjs",
