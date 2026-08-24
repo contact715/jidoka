@@ -68,8 +68,19 @@ echo ""
 #    классов. Класс считался закрытым механизмом, которого в рабочем месте нет.
 #    Рутина печатает вердикт, но НЕ падает: расхождение чинится синхронизацией, а не
 #    остановкой дня. Копии нет вовсе — честное «сравнивать не с чем» и тишина.
+#    Сравнение обязано идти ИЗ КАНОНА: рутину зовёт launchd из установленной копии, а
+#    сравнение копии с самой собой даёт бессмысленное «совпадают». Поэтому ищем клон
+#    канона: сначала переменная окружения (переносимо), потом привычное место. Не нашли —
+#    говорим об этом прямо, а не печатаем зелёное.
 echo "3. Канон против установленной копии"
-if [ -f scripts/install-into.mjs ]; then
+CANON=""
+for c in "${JIDOKA_CANON:-}" "$HOME/jidoka-framework" "$HOME/.jidoka-weekly"; do
+  if [ -n "$c" ] && [ -f "$c/scripts/install-into.mjs" ] && [ "$c" != "$ROOT" ]; then CANON="$c"; break; fi
+done
+if [ -n "$CANON" ]; then
+  echo "   канон: $CANON"
+  (cd "$CANON" && node scripts/install-into.mjs --check-parity 2>&1) || true
+elif [ -f scripts/install-into.mjs ]; then
   node scripts/install-into.mjs --check-parity 2>&1 || true
 else
   echo "   (scripts/install-into.mjs не найден, пропускаем)"

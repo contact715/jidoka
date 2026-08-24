@@ -129,7 +129,13 @@ export function parityReport(canonFiles = [], installFiles = []) {
  * @param {{installExists:boolean, missing:string[], extra:string[]}} o
  * @returns {'n/a'|'in-sync'|'drift'}
  */
-export function parityVerdict({ installExists, missing = [], extra = [] }) {
+export function parityVerdict({ installExists, sameDir = false, missing = [], extra = [] }) {
+  // Caught 2026-08-24 the first time this ran from its real home: the daily routine is
+  // invoked FROM ~/.claude/jidoka, so canon and copy resolved to the SAME directory and
+  // the check compared the install against itself. It printed a cheerful "они совпадают"
+  // next to "каталога agents нет целиком" — a green verdict with a red line under it.
+  // Comparing a thing with itself is not evidence of anything; say so instead.
+  if (sameDir) return 'n/a';
   if (!installExists) return 'n/a';
   return missing.length === 0 && extra.length === 0 ? 'in-sync' : 'drift';
 }
@@ -156,6 +162,8 @@ function profileSelfTest() {
   // routine and npm only helps if it stays quiet where there is nothing to compare.
   ok('no installed copy → n/a, NOT a red gate',
     parityVerdict({ installExists: false, missing: ['a.mjs', 'b.mjs'], extra: [] }) === 'n/a');
+  ok('canon and copy are the SAME directory → n/a, never a green "they match"',
+    parityVerdict({ installExists: true, sameDir: true, missing: [], extra: [] }) === 'n/a');
   ok('installed copy present and identical → in-sync',
     parityVerdict({ installExists: true, missing: [], extra: [] }) === 'in-sync');
   ok('a file missing from the install → drift',
@@ -234,11 +242,19 @@ if (isMain) {
     // каталогу печатал 300+ «не доехало» и красный вердикт, поэтому прибор нельзя было
     // позвать ни из CI, ни из рутины: на чистой машине он ложно краснел. Теперь это
     // честное «нечего сравнивать» и выход 0.
+    const { resolve: resolvePath } = await import('node:path');
     const installExists = existsSync(installRoot);
-    const verdict = parityVerdict({ installExists, missing: r.missing, extra: r.extra });
+    const sameDir = resolvePath(HERE) === resolvePath(installRoot);
+    const verdict = parityVerdict({ installExists, sameDir, missing: r.missing, extra: r.extra });
     if (verdict === 'n/a') {
-      console.log(`install-parity — установленной копии нет (${installRoot}), сравнивать не с чем.`);
-      console.log('  это не расхождение: на чистой машине или на раннере CI копии и не должно быть.');
+      if (sameDir) {
+        console.log(`install-parity — запущено ИЗ установленной копии (${installRoot}).`);
+        console.log('  канон и копия это один каталог, сравнивать нечего. Запусти из клона канона:');
+        console.log('    cd <клон jidoka> && npm run gate:parity');
+      } else {
+        console.log(`install-parity — установленной копии нет (${installRoot}), сравнивать не с чем.`);
+        console.log('  это не расхождение: на чистой машине или на раннере CI копии и не должно быть.');
+      }
       process.exit(0);
     }
     console.log(`install-parity — канон ${HERE}\n                 копия  ${installRoot}\n`);
