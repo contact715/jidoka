@@ -92,6 +92,34 @@ export function isStale(entry, now, pidAlive) {
   return false;                                        // свежая запись живёт
 }
 
+/**
+ * 2026-08-24 — АВТОМАТИЧЕСКАЯ заявка: сессия объявляет, что трогает файл, без того чтобы
+ * кто-то об этом помнил.
+ *
+ * Доска простояла с одной протухшей записью двое суток именно потому, что публикация была
+ * ручной командой. Механизм, который надо не забыть позвать, наполняется ровно столько
+ * раз, сколько раз о нём вспомнили; в нашем случае — один.
+ *
+ * Чистая: вернуть запись с добавленной заявкой. Каталог вместо файла нарочно — иначе
+ * заявок станут сотни и доска превратится в журнал правок вместо карты намерений.
+ *
+ * @param {object|null} entry прежняя запись (или null, если сессии на доске ещё нет)
+ * @param {string} file путь, который сессия трогает
+ * @param {number} now
+ * @param {number} maxClaims потолок, чтобы карта осталась читаемой
+ * @returns {object} новая запись
+ */
+export function mergeClaim(entry, file, now = Date.now(), maxClaims = 24) {
+  const dir = String(file || '').split('/').slice(0, -1).join('/');
+  const claim = dir ? `${dir}/**` : String(file || '');
+  const base = entry || { claims: [], startedAt: now, status: 'working' };
+  const claims = Array.isArray(base.claims) ? [...base.claims] : [];
+  if (claim && !claims.includes(claim)) claims.push(claim);
+  // Свежие заявки важнее старых: карта должна показывать, где сессия СЕЙЧАС.
+  const trimmed = claims.length > maxClaims ? claims.slice(claims.length - maxClaims) : claims;
+  return { ...base, claims: trimmed, updatedAt: now };
+}
+
 /** Простое сопоставление шаблона пути. Только звёздочки, без внешних зависимостей. */
 export function matchesGlob(pattern, filePath) {
   if (!pattern || !filePath) return false;
@@ -254,6 +282,19 @@ function selfTest() {
     conflicts([E({ session: 'a' }), E({ session: 'b', status: 'released' })]).length === 0);
   ok('пустая доска даёт пусто', conflicts([]).length === 0);
 
+  // ── автоматическая заявка (2026-08-24) ──────────────────────────────────
+  ok('заявка берётся КАТАЛОГОМ, а не отдельным файлом',
+    mergeClaim(null, 'lib/booking/x.ts', 1).claims[0] === 'lib/booking/**');
+  ok('повторная правка того же каталога не плодит заявок',
+    mergeClaim(mergeClaim(null, 'lib/a.ts', 1), 'lib/b.ts', 2).claims.length === 1);
+  ok('новый каталог добавляет заявку',
+    mergeClaim(mergeClaim(null, 'lib/a.ts', 1), 'app/b.ts', 2).claims.length === 2);
+  ok('время последней правки обновляется', mergeClaim(null, 'a/b.ts', 77).updatedAt === 77);
+  ok('начало сессии НЕ переписывается новой заявкой',
+    mergeClaim({ claims: [], startedAt: 5 }, 'a/b.ts', 99).startedAt === 5);
+  ok('файл в корне не даёт пустую заявку', mergeClaim(null, 'README.md', 1).claims[0] === 'README.md');
+  ok('потолок заявок держит карту читаемой',
+    (() => { let e = null; for (let i = 0; i < 40; i++) e = mergeClaim(e, `d${i}/x.ts`, i, 24); return e.claims.length === 24 && e.claims.at(-1) === 'd39/**'; })());
   ok('двойная звезда покрывает вложенное', matchesGlob('e2e/**', 'e2e/a/b.ts'));
   ok('одинарная звезда НЕ покрывает вложенное', !matchesGlob('app/*.ts', 'app/x/y.ts'));
   ok('точное совпадение путей', claimsOverlap(['a/b.ts'], ['a/b.ts']));

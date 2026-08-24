@@ -286,6 +286,25 @@ if (isMain) {
       }
     } catch { /* no queue */ }
 
+    // 5a-bis) ПИСЬМА ОТ СОСЕДНИХ СЕССИЙ (2026-08-24). Разговор между сессиями начинается
+    // не с отправки, а с ПРОЧТЕНИЯ: почта существовала с 22 августа и стояла пустой, а
+    // письмо, которое некому увидеть, разговором не является. Печатается ТОЛЬКО когда есть
+    // неотвеченное: строка «писем нет» в каждой сессии перестаёт читаться на третий день.
+    let mailLine = '';
+    try {
+      const mm = join(jidoka, 'scripts/session-mail.mjs');
+      if (existsSync(mm)) {
+        const { readMail, inboxFor, unanswered } = await import(mm);
+        const me = process.env.JIDOKA_SESSION || `${process.cwd().split('/').pop()}`;
+        const mine = inboxFor(readMail(), me);
+        const waitingReply = unanswered(mine);
+        if (waitingReply.length) {
+          const first = waitingReply[0];
+          mailLine = `письма от соседей: ${waitingReply.length} ждут ответа · «${String(first.subject || '').slice(0, 60)}» от ${first.from} — node scripts/session-mail.mjs`;
+        }
+      }
+    } catch { /* почта не обязательна */ }
+
     // 5b) СОСТОЯНИЕ МАШИНЫ (2026-08-22). Владелец перезагружал компьютер пять раз за сутки:
     // Claude уходил в 50 ГБ при 18 ГБ физической памяти. Ни один наш сторож этого не видел —
     // очередь тяжёлых задач привязана к КАТАЛОГУ (common-launcher ROOT, tsc-guard cwd), а
@@ -353,6 +372,7 @@ if (isMain) {
       `jidoka: ${health}`,
       machine,
       boardLine,
+      mailLine,
       ci,
       ages,
       queueLine,
