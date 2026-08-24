@@ -1,8 +1,8 @@
-# Kaizen Dashboard — 2026-W35
+# Kaizen Dashboard
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 77% · shipped 99/129, open 30, regressed 0, ~1.22w to ship**
+**adoption 79% · shipped 102/129, open 27, regressed 0, ~1.19w to ship, class-closure 100%**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -126,10 +126,10 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | open | 2026-W35-A2 | У каждого прибора есть кейс расхождения между измеряемой величиной и правилом | scripts/oracle-divergence.mjs#divergenceCase | not yet present: scripts/oracle-divergence.mjs#divergenceCase |
 | open | 2026-W35-A3 | Квитанция прогона гейта: отсутствие следа блокирует пуш | scripts/gate-receipt.mjs#requireReceipts | not yet present: scripts/gate-receipt.mjs#requireReceipts |
 | open | 2026-W35-A4 | Сторож разрешимости core.hooksPath из каждой рабочей копии | scripts/hooks-reachability.mjs#resolveFromWorktree | not yet present: scripts/hooks-reachability.mjs#resolveFromWorktree |
-| open | 2026-W35-A5 | Быстрая победа: позвать уже готовый прибор паритета канон-копия | scripts/routine-daily.sh#gate-parity | not yet present: scripts/routine-daily.sh#gate-parity |
+| shipped | 2026-W35-A5 | Быстрая победа: позвать уже готовый прибор паритета канон-копия | scripts/install-into.mjs#parityVerdict | present (symbol): scripts/install-into.mjs#parityVerdict |
 | open | 2026-W35-A10 | Приёмка доказывается прогоном, а не разрешимостью имени символа | scripts/kaizen-audit.mjs#executedEvidence | not yet present: scripts/kaizen-audit.mjs#executedEvidence |
-| open | 2026-W35-B1 | Счётчик покрытия критериев разводится на проверенное и зачтённое по определению | scripts/ac-verify-map.mjs#unrecognizedVerdict | not yet present: scripts/ac-verify-map.mjs#unrecognizedVerdict |
-| open | 2026-W35-B2 | Словарь внешних судей открывается: владелец перестаёт считаться своим | scripts/meta-honesty.mjs#isExternalJudge | not yet present: scripts/meta-honesty.mjs#isExternalJudge |
+| shipped | 2026-W35-B1 | Счётчик покрытия критериев разводится на проверенное и зачтённое по определению | scripts/ac-verify-map.mjs#wiredOf | present (symbol): scripts/ac-verify-map.mjs#wiredOf |
+| shipped | 2026-W35-B2 | Словарь внешних судей открывается: владелец перестаёт считаться своим | scripts/meta-honesty.mjs#judgeKind | present (symbol): scripts/meta-honesty.mjs#judgeKind |
 | open | 2026-W35-B3 | Именованное правило сведения эпох, ничья судьи перестаёт быть проходом | scripts/run-evals.mjs#namedReducer | not yet present: scripts/run-evals.mjs#namedReducer |
 | open | 2026-W35-B4 | Многотрайловый прогон золотых кейсов и надёжность pass^k, с условием смерти | scripts/judge-calibration.mjs#multiTrial | not yet present: scripts/judge-calibration.mjs#multiTrial |
 | open | 2026-W35-A6 | Сторож сирот перестаёт смотреть только на имя gate:* | scripts/gate-audit.mjs#findOrphanMechanisms | not yet present: scripts/gate-audit.mjs#findOrphanMechanisms |
