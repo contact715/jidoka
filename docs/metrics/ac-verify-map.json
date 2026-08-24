@@ -5,11 +5,13 @@
     "byKind": {
       "self": 11,
       "engine": 2,
-      "cli": 36,
-      "manual": 42
+      "cli": 38,
+      "manual": 40,
+      "unrecognized": 0
     },
     "wired": 91,
-    "executable": 13
+    "executable": 13,
+    "credited": 40
   },
   "rows": [
     {
@@ -52,9 +54,9 @@
       "spec": "docs/specs/modules/installer-federation/global-snapshot.md",
       "id": "AC-2",
       "title": "Every written file uses $HOME, no absolute home paths",
-      "command": "checked by pre-publish-guard home-path rule",
-      "kind": "manual",
-      "script": null,
+      "command": "node scripts/pre-publish-guard.mjs",
+      "kind": "cli",
+      "script": "scripts/pre-publish-guard.mjs",
       "wired": true
     },
     {
@@ -259,9 +261,9 @@
       "spec": "docs/specs/modules/meta-engine/meta-gate-registry.md",
       "id": "AC-2",
       "title": "Every entry mechanism points to a file on disk",
-      "command": "checked by meta-audit broken-gate rule",
-      "kind": "manual",
-      "script": null,
+      "command": "node scripts/meta-audit.mjs",
+      "kind": "cli",
+      "script": "scripts/meta-audit.mjs",
       "wired": true
     },
     {

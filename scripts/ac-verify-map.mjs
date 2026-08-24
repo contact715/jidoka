@@ -52,7 +52,22 @@ export function classifyVerify(command) {
   if (/--self-test\s*$/.test(c)) return 'self';
   if (/^node\s+--test\s+/.test(c)) return 'engine';
   if (/^node\s+scripts\//.test(c)) return 'cli';
-  return 'manual';
+  // 2026-W35-B1 — the fallback used to be `manual`, i.e. the ONE bucket that is credited
+  // as covered without any machine check. So a typo, a renamed flag or an unfamiliar
+  // wording silently improved the coverage number instead of lowering it. An oracle whose
+  // default answer is the flattering one measures its own vocabulary, not the work.
+  return 'unrecognized';
+}
+
+// ── pure: is this AC's verification actually reachable? ──────────────────────
+// Split out of buildRows so the rule is testable without touching the disk.
+//   self/engine/cli — wired when the script it names exists
+//   manual          — CREDITED by declaration: a human said "covered by X", no machine check
+//   unrecognized    — never wired: nothing understood the command at all
+export function wiredOf({ kind, script, scriptExists }) {
+  if (kind === 'unrecognized') return false;
+  if (script) return Boolean(scriptExists);
+  return kind === 'manual';
 }
 
 // ── pure: the script path a command references (for the WIRED check) ──────────
@@ -64,14 +79,18 @@ export function referencedScript(command) {
 // ── pure: roll the per-AC rows into a summary ────────────────────────────────
 export function summarize(rows) {
   const total = rows.length;
-  const byKind = { self: 0, engine: 0, cli: 0, manual: 0 };
-  let wired = 0, executable = 0;
+  const byKind = { self: 0, engine: 0, cli: 0, manual: 0, unrecognized: 0 };
+  let wired = 0, executable = 0, credited = 0;
   for (const r of rows) {
     byKind[r.kind] = (byKind[r.kind] || 0) + 1;
     if (r.wired) wired++;
     if (r.kind === 'self' || r.kind === 'engine') executable++;
+    // 2026-W35-B1 — counted APART from `wired`. "Covered by X" is a promise a human
+    // wrote, not evidence a machine produced; folding it into one number is how the
+    // headline came to read 91/91 while --run executed 13 checks.
+    if (r.kind === 'manual') credited++;
   }
-  return { total, byKind, wired, executable };
+  return { total, byKind, wired, executable, credited };
 }
 
 // ── impure: collect module specs ─────────────────────────────────────────────
@@ -95,7 +114,7 @@ function buildRows() {
     for (const ac of extractACVerifies(content)) {
       const kind = classifyVerify(ac.command);
       const script = referencedScript(ac.command);
-      const wired = script ? existsSync(join(ROOT, script)) : (kind === 'manual');
+      const wired = wiredOf({ kind, script, scriptExists: script ? existsSync(join(ROOT, script)) : false });
       rows.push({ spec: rel, id: ac.id, title: ac.title, command: ac.command, kind, script, wired });
     }
   }
@@ -132,6 +151,32 @@ function selfTest() {
     ['referencedScript pulls the engine test file', referencedScript(acs[2].command) === 'scripts/__tests__/meta-lib.test.mjs'],
     ['manual command has no referenced script', referencedScript(acs[1].command) === null],
     ['summary counts kinds', (() => { const s = summarize([{ kind: 'self', wired: true }, { kind: 'manual', wired: true }]); return s.total === 2 && s.byKind.self === 1 && s.executable === 1; })()],
+
+    // ── 2026-W35-B1: the fallback must NOT be the most favourable bucket ──────
+    // Measured 2026-08-24: the headline read "wired 91/91" while --run executed 13
+    // checks; 42 ACs sat in `manual` (credited by declaration, never proven) and 2 more
+    // had fallen into `manual` silently because nothing recognised their wording.
+    // An unrecognised command is a DEFECT IN THE SPEC and must be visible as one.
+    ['an unrecognised command is NOT silently called manual',
+      classifyVerify('checked by pre-publish-guard home-path rule') === 'unrecognized'],
+    ['a DECLARED manual command is still manual',
+      classifyVerify('covered by pre-publish-guard home-path rule') === 'manual'],
+    ['an unrecognised AC is never wired, even if a script name appears in it',
+      wiredOf({ kind: 'unrecognized', script: 'scripts/meta-lib.mjs', scriptExists: true }) === false],
+    ['a declared manual AC is credited without any file',
+      wiredOf({ kind: 'manual', script: null, scriptExists: false }) === true],
+    ['a cli AC is wired only when its script really exists',
+      wiredOf({ kind: 'cli', script: 'scripts/gone.mjs', scriptExists: false }) === false
+      && wiredOf({ kind: 'cli', script: 'scripts/meta-lib.mjs', scriptExists: true }) === true],
+    ['summary separates PROVEN from CREDITED-by-declaration',
+      (() => {
+        const s = summarize([
+          { kind: 'self', wired: true }, { kind: 'engine', wired: true },
+          { kind: 'cli', wired: true }, { kind: 'manual', wired: true },
+          { kind: 'unrecognized', wired: false },
+        ]);
+        return s.executable === 2 && s.credited === 1 && s.byKind.unrecognized === 1 && s.total === 5;
+      })()],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
@@ -174,8 +219,18 @@ if (isMain) {
     console.log(JSON.stringify({ summary, rows, runResults }, null, 2));
   } else {
     console.log(`ac-verify-map: ${summary.total} ACs across ${moduleSpecs().length} module specs`);
-    console.log(`  executable (self/engine): ${summary.executable}   cli: ${summary.byKind.cli}   manual: ${summary.byKind.manual}`);
-    console.log(`  wired (command → real file, or manual): ${summary.wired}/${summary.total}`);
+    // 2026-W35-B1 — THREE numbers, never one. The single "wired N/N" line folded proof,
+    // reachability and a human's promise into the same figure, so it printed 100% while
+    // only a seventh of the criteria were ever executed.
+    const proven = run ? runResults.filter(r => r.ok).length : 0;
+    console.log(`  доказано прогоном (self/engine): ${run ? proven : '—'} · исполнимых: ${summary.executable}`);
+    console.log(`  подключено к существующему файлу (cli): ${summary.byKind.cli}`);
+    console.log(`  зачтено по объявлению человека (manual, машина не проверяла): ${summary.credited}`);
+    if (summary.byKind.unrecognized) {
+      console.log(`  \x1b[31mне опознано (команду не понял никто): ${summary.byKind.unrecognized}\x1b[0m`);
+      for (const r of rows.filter(r => r.kind === 'unrecognized')) console.log(`      ${r.spec} ${r.id}: ${r.command.split('\n')[0]}`);
+    }
+    console.log(`  подключено всего (файл или объявление): ${summary.wired}/${summary.total}`);
     if (run) {
       const ok = runResults.filter(r => r.ok).length;
       console.log(`  --run: executed ${runResults.length} unique self/engine checks → ${ok} passed, ${runFails} failed`);
@@ -192,6 +247,17 @@ if (isMain) {
     if (broken.length) {
       console.error(`\x1b[31m✗ ${broken.length} AC(s) reference a script that does not exist:\x1b[0m`);
       for (const b of broken) console.error(`    ${b.spec} ${b.id}: ${b.command}`);
+      process.exit(1);
+    }
+    // 2026-W35-B1 — an unrecognised command used to raise the coverage number. Under
+    // --strict it now lowers it AND blocks, so the declared vocabulary stays the only
+    // way in and the flattering bucket can never fill by accident again.
+    const unknown = rows.filter(r => r.kind === 'unrecognized');
+    if (unknown.length) {
+      console.error(`\x1b[31m✗ ${unknown.length} AC(s) whose verification command nothing recognises:\x1b[0m`);
+      for (const u of unknown) console.error(`    ${u.spec} ${u.id}: ${u.command}`);
+      console.error('    Declare it explicitly (manual:/fixture:/observe:/audit:/behavior:/config:/grep/covered by)');
+      console.error('    or give it a runnable `node scripts/...` command.');
       process.exit(1);
     }
   }

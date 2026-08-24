@@ -40,7 +40,7 @@ node scripts/meta-remedies.mjs --self-test
 ### AC-2 — Every entry mechanism points to a file on disk
 
 ```
-checked by meta-audit broken-gate rule
+node scripts/meta-audit.mjs
 ```
 
 ## Linked waves

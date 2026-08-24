@@ -118,6 +118,22 @@ export function parityReport(canonFiles = [], installFiles = []) {
   return { missing, extra, inSync: missing.length === 0 && extra.length === 0, canonCount: canon.size, installCount: install.size };
 }
 
+/**
+ * 2026-W35-A5 — the verdict, separated from the comparison so it is testable.
+ *
+ * "No installed copy at all" is NOT drift. On a CI runner or a fresh clone the target
+ * directory simply does not exist, and treating that as "every file is missing" would
+ * paint a red gate over a machine that has nothing to be out of sync WITH. A gate that
+ * fails where it cannot possibly hold is the fastest way to teach people to ignore it.
+ *
+ * @param {{installExists:boolean, missing:string[], extra:string[]}} o
+ * @returns {'n/a'|'in-sync'|'drift'}
+ */
+export function parityVerdict({ installExists, missing = [], extra = [] }) {
+  if (!installExists) return 'n/a';
+  return missing.length === 0 && extra.length === 0 ? 'in-sync' : 'drift';
+}
+
 function profileSelfTest() {
   const fails = [];
   const ok = (n, c) => { if (!c) fails.push(n); console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };
@@ -134,6 +150,18 @@ function profileSelfTest() {
   })());
   ok('an empty install is fully missing, not silently in sync',
     parityReport(['a.mjs'], []).inSync === false && parityReport(['a.mjs'], []).missing.length === 1);
+
+  // ── 2026-W35-A5: the gate must be safe to CALL from anywhere ───────────────
+  // It was built in W33, it works, and nothing ever ran it. Wiring it into the daily
+  // routine and npm only helps if it stays quiet where there is nothing to compare.
+  ok('no installed copy → n/a, NOT a red gate',
+    parityVerdict({ installExists: false, missing: ['a.mjs', 'b.mjs'], extra: [] }) === 'n/a');
+  ok('installed copy present and identical → in-sync',
+    parityVerdict({ installExists: true, missing: [], extra: [] }) === 'in-sync');
+  ok('a file missing from the install → drift',
+    parityVerdict({ installExists: true, missing: ['gate-honesty-check.mjs'], extra: [] }) === 'drift');
+  ok('a file ONLY in the install → drift too (a fix that never reached the canon)',
+    parityVerdict({ installExists: true, missing: [], extra: ['local-only.mjs'] }) === 'drift');
   // docs-research-in-profile (2026-W30-Q2): the weekly reports and kaizen registries must travel
   ok('the global sync carries docs/research (weekly reports + kaizen registries)',
     GLOBAL_SYNC_DIRS.includes('docs/research'));
@@ -202,13 +230,24 @@ if (isMain) {
     const canonFiles = GLOBAL_SYNC_DIRS.flatMap((d) => listDir(HERE, d));
     const installFiles = GLOBAL_SYNC_DIRS.flatMap((d) => listDir(installRoot, d));
     const r = parityReport(canonFiles, installFiles);
+    // 2026-W35-A5 — «копии нет» это НЕ расхождение. Раньше прогон по несуществующему
+    // каталогу печатал 300+ «не доехало» и красный вердикт, поэтому прибор нельзя было
+    // позвать ни из CI, ни из рутины: на чистой машине он ложно краснел. Теперь это
+    // честное «нечего сравнивать» и выход 0.
+    const installExists = existsSync(installRoot);
+    const verdict = parityVerdict({ installExists, missing: r.missing, extra: r.extra });
+    if (verdict === 'n/a') {
+      console.log(`install-parity — установленной копии нет (${installRoot}), сравнивать не с чем.`);
+      console.log('  это не расхождение: на чистой машине или на раннере CI копии и не должно быть.');
+      process.exit(0);
+    }
     console.log(`install-parity — канон ${HERE}\n                 копия  ${installRoot}\n`);
     console.log(`  канон ${r.canonCount} файл(ов) · копия ${r.installCount}`);
     for (const d of GLOBAL_SYNC_DIRS) if (!existsSync(join(installRoot, d))) console.log(`  \x1b[31m⌀ в копии нет каталога ${d} целиком\x1b[0m`);
     if (r.missing.length) { console.log(`\n  \x1b[31mнет в копии (${r.missing.length}):\x1b[0m`); for (const f of r.missing.slice(0, 40)) console.log(`    ${f}`); if (r.missing.length > 40) console.log(`    …и ещё ${r.missing.length - 40}`); }
     if (r.extra.length) { console.log(`\n  \x1b[33mесть ТОЛЬКО в копии (${r.extra.length}) — почини в каноне, иначе следующая синхронизация это сотрёт:\x1b[0m`); for (const f of r.extra.slice(0, 40)) console.log(`    ${f}`); }
-    console.log(r.inSync ? '\n  \x1b[32m✓ канон и установленная копия совпадают\x1b[0m' : '\n  \x1b[31m✗ копия разошлась с каноном — метрики и гейты читают разный код\x1b[0m');
-    process.exit(r.inSync ? 0 : 1);
+    console.log(verdict === 'in-sync' ? '\n  \x1b[32m✓ канон и установленная копия совпадают\x1b[0m' : '\n  \x1b[31m✗ копия разошлась с каноном: метрики и гейты читают разный код\x1b[0m');
+    process.exit(verdict === 'in-sync' ? 0 : 1);
   }
 
   const target = process.argv.slice(2).find(a => !a.startsWith('--'));

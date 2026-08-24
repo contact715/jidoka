@@ -36,7 +36,44 @@ const VAGUE_REAL = new Set(['fixed', 'done', 'ok', 'okay', 'resolved', 'works', 
 // synonyms adds zero information — still a tautology even with 2+ novel WORDS. Lexical novelty is
 // not semantic novelty. If every novel word is a "done/pass/complete" synonym, it does not contradict.
 const DONE_SYNONYMS = new Set(['done', 'finished', 'completed', 'complete', 'accomplished', 'confirmed', 'verified', 'passing', 'passed', 'pass', 'successfully', 'success', 'working', 'works', 'fixed', 'resolved', 'ready', 'shipped', 'deployed', 'delivered', 'implemented', 'tested', 'validated', 'correct', 'correctly']);
-const EXTERNAL = new Set(['user', 'reviewer', 'review', 'test', 'tests', 'hook', 'ci', 'human', 'qa', 'gate', 'auditor', 'lint']);
+// ── who caught it: author, or somebody else? (2026-W35-B2) ───────────────────
+// This used to be ONE closed list of twelve English words, and `owner` was not among
+// them. Measured 2026-08-24 on the live ledger: 18 distinct `caught_by` values exist,
+// only two of them matched, and `owner` — the most external judge there is, third most
+// common catcher with 12 rows — was silently scored as "we caught ourselves". The
+// externalRatio the engine judges its own honesty by read 14% instead of 46%.
+//
+// The axis that matters is NOT "is this name on my list" but "was the judge someone
+// other than the author of the claim". So the vocabulary is now explicit in BOTH
+// directions, and anything it does not know is reported as unknown rather than quietly
+// counted as internal — the same closed-vocabulary blindness this file already learned
+// once on the Cyrillic axis (see the tokenizer note below) and repeated here.
+const EXTERNAL = new Set([
+  // humans outside the acting agent
+  'owner', 'user', 'human', 'reviewer', 'review', 'qa', 'auditor',
+  // independent mechanisms: they judge work they did not produce
+  'test', 'tests', 'hook', 'ci', 'gate', 'lint',
+  'red-team', 'reflexion-critic', 'meta-honesty', 'adversarial-review',
+  'measurement', 'browser', 'verification',
+]);
+// the acting agent noticing its own work — honest, but not independent evidence
+const INTERNAL = new Set([
+  'self', 'self-noticed', 'claude', 'agent', 'in-session-kaizen', 'dev-pipeline', 'orchestrator',
+]);
+
+/**
+ * Three-way, because "I do not know this judge" is a real answer and must not be
+ * disguised as either of the other two.
+ * @param {string} name
+ * @returns {'external'|'internal'|'unknown'}
+ */
+export function judgeKind(name) {
+  const n = String(name || '').trim().toLowerCase();
+  if (!n) return 'unknown';
+  if (EXTERNAL.has(n)) return 'external';
+  if (INTERNAL.has(n)) return 'internal';
+  return 'unknown';
+}
 const NEGATIVE_MARKERS = ['went wrong', 'missed', 'mistake', 'failed', 'failure', 'gap', 'should have', 'regression', 'bug', 'broke', 'wrong', 'didn\'t', 'did not', 'overlooked', 'forgot'];
 
 // UNICODE-AWARE, and that is load-bearing. The tokenizer used to strip everything outside
@@ -80,7 +117,9 @@ export function classifyRow(r) {
   return {
     selfConfirming: !contradicts(r.claimed, r.real),
     inflated: INFLATED.find(w => String(r.claimed).toLowerCase().includes(w)) || null,
-    selfReported: !by || !EXTERNAL.has(by),
+    // unknown is deliberately NOT external: a judge we cannot identify must never raise
+    // the honesty score. It shows up by name in auditRows so the gap is fixable.
+    selfReported: judgeKind(by) !== 'external',
   };
 }
 
@@ -90,15 +129,21 @@ export function classifyRow(r) {
 export function auditRows(rows) {
   const mistakeRows = rows.filter(isMistakeRow);
   let selfConfirming = 0, inflated = 0, selfReported = 0;
+  const unknown = new Set();
   for (const r of mistakeRows) {
     const c = classifyRow(r);
     if (c.selfConfirming) selfConfirming++;
     if (c.inflated) inflated++;
     if (c.selfReported) selfReported++;
+    // 2026-W35-B2 — name the judges the vocabulary does not know. Silence here is what
+    // let `owner` sit unrecognised for 85 days while the ratio it distorted was printed
+    // every day as a verdict on our own honesty.
+    if (judgeKind(r.caught_by) === 'unknown') unknown.add(String(r.caught_by || '(пусто)').toLowerCase());
   }
   const m = mistakeRows.length, n = m || 1;
   return {
     selfConfirming, inflated, selfReported,
+    unknownJudges: [...unknown].sort(),
     nonMistake: rows.length - m,
     mistakeCount: m,
     externalRatio: Math.round((100 * (m - selfReported)) / n),
@@ -153,6 +198,24 @@ function selfTest() {
   // classifyRow — per-entry flags
   ok('classifyRow: externally-caught, contradicting entry is clean', (() => { const c = classifyRow({ claimed: 'data cleaned ready', real: 'git history still leaked home paths and name', caught_by: 'user' }); return c.selfConfirming === false && c.selfReported === false; })());
   ok('classifyRow: self-caught tautology flags both', (() => { const c = classifyRow({ claimed: 'done', real: 'done', caught_by: 'self' }); return c.selfConfirming === true && c.selfReported === true; })());
+
+  // ── 2026-W35-B2: the owner is the most external judge we have ──────────────
+  // Measured 2026-08-24 on the live ledger: `owner` appears 12 times and is the third
+  // most common catcher, and the word did not exist anywhere in this file. Every
+  // incident the owner caught was therefore counted as "we caught ourselves", and the
+  // external-catch figure the engine judges itself by read 14% instead of 28%.
+  ok('owner-caught row is NOT self-reported',
+    classifyRow({ claimed: 'x done', real: 'the queue lock was per-directory so parallel builds stacked', caught_by: 'owner' }).selfReported === false);
+  ok('a judge that is not the author is external, whatever its name',
+    judgeKind('reflexion-critic') === 'external' && judgeKind('red-team') === 'external');
+  ok('the acting agent itself is internal',
+    judgeKind('self') === 'internal' && judgeKind('claude') === 'internal' && judgeKind('in-session-kaizen') === 'internal');
+  ok('an unknown judge is UNKNOWN, not silently internal',
+    judgeKind('some-new-thing') === 'unknown');
+  ok('unknown still counts as self-reported (never inflates the ratio)',
+    classifyRow({ claimed: 'x done', real: 'a real and specific contradicting reason here', caught_by: 'some-new-thing' }).selfReported === true);
+  ok('auditRows surfaces the unrecognised judge names instead of hiding them',
+    auditRows([{ claimed: 'x done', real: 'a real and specific contradicting reason here', caught_by: 'some-new-thing' }]).unknownJudges.includes('some-new-thing'));
   ok('classifyRow: booster word flags inflated', classifyRow({ claimed: 'comprehensive coverage added', real: 'only one path was covered actually', caught_by: 'user' }).inflated === 'comprehensive');
   // auditRows — aggregation
   ok('auditRows: ratios computed', (() => { const a = auditRows([{ claimed: 'x done', real: 'real reason it broke in prod clearly', caught_by: 'user' }]); return a.externalRatio === 100 && a.contraRatio === 100; })());
@@ -223,6 +286,13 @@ if (isMain) {
   console.log('\n\x1b[1m  signal indicators\x1b[0m');
   if (ind.nonMistake) console.log(`    non-mistake rows ....... ${ind.nonMistake} skipped (no claimed/real — telemetry misfiled into the ledger)`);
   console.log(`    external-catch ratio ... ${ind.externalRatio}% (${m - ind.selfReported}/${m} caught externally, not self)   want ↑`);
+  // 2026-W35-B2 — a judge the vocabulary does not know counts as self-reported (it never
+  // flatters the ratio), but it must be SAID. This line is the one that would have shown
+  // `owner` missing on day one instead of eighty-five days later.
+  if (ind.unknownJudges && ind.unknownJudges.length) {
+    console.log(`    \x1b[33mсудьи вне словаря ..... ${ind.unknownJudges.length}: ${ind.unknownJudges.join(', ')}\x1b[0m`);
+    console.log('                             считаются «поймал сам» — если это внешняя проверка, впиши её в EXTERNAL');
+  }
   console.log(`    contra-evidence ratio .. ${ind.contraRatio}% (${m - ind.selfConfirming}/${m} entries whose real contradicts the claim)   want ↑`);
   console.log(`    inflated-claim rate .... ${ind.inflatedRate}% (${ind.inflated}/${m} claims use unverifiable booster words)   want ↓`);
   if (retroTotal) console.log(`    retro honesty .......... ${retroTotal - retroFlags}/${retroTotal} retros carry an honest negative`);

@@ -40,7 +40,7 @@ node scripts/snapshot-global.mjs
 ### AC-2 — Every written file uses $HOME, no absolute home paths
 
 ```
-checked by pre-publish-guard home-path rule
+node scripts/pre-publish-guard.mjs
 ```
 
 ## Linked waves
