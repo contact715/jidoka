@@ -19,6 +19,20 @@ if [ $rc -ne 0 ]; then
 fi
 echo "✓ pre-commit · ledger-schema-gate: ledger schema OK"
 
+# oracle-divergence --ratchet (2026-W35-A2): ХРАПОВИК, не тотальная блокировка.
+# Прибор обязан нести КЕЙС РАСХОЖДЕНИЯ: вход, на котором измеряемая величина говорит
+# «чисто», а правило нарушено. Обычные примеры («вот нарушение», «вот норма») этого не
+# ловят: на них прокси и правило совпадают, тест зелёный, а прибор неверен. Режим FM-3.3
+# («оракул мерит не ту величину») повторился 15 раз за 30 дней под пятнадцатью именами.
+# Старый долг (22 прибора без кейса) виден и НЕ блокирует; новый прибор без кейса не проходит.
+out=$(node "$ROOT/scripts/oracle-divergence.mjs" --changed --ratchet 2>&1); rc=$?
+if [ $rc -ne 0 ]; then
+  echo "$out"
+  echo "✗ pre-commit BLOCKED by oracle-divergence (изменённый прибор без кейса расхождения — см. выше)."
+  exit 1
+fi
+echo "✓ pre-commit · oracle-divergence: у изменённых приборов есть кейс расхождения"
+
 out=$(node "$ROOT/scripts/meta-honesty.mjs" 2>&1); rc=$?
 if [ $rc -ne 0 ]; then
   echo "$out"

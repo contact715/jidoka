@@ -48,6 +48,9 @@ const DONE_SYNONYMS = new Set(['done', 'finished', 'completed', 'complete', 'acc
 // directions, and anything it does not know is reported as unknown rather than quietly
 // counted as internal — the same closed-vocabulary blindness this file already learned
 // once on the Cyrillic axis (see the tokenizer note below) and repeated here.
+// @divergence: "owner-caught row is NOT self-reported" — измеряемая величина «имя
+//              есть в списке» говорила «поймали сами», а правило «судья не равен автору»
+//              было выполнено: владелец внешний судья, но в списке его не было
 const EXTERNAL = new Set([
   // humans outside the acting agent
   'owner', 'user', 'human', 'reviewer', 'review', 'qa', 'auditor',
