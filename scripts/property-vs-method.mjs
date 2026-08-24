@@ -257,7 +257,7 @@ function walk(dir, acc = [], depth = 0) {
   return acc;
 }
 
-export function auditRepo(root) {
+export function auditTree(root) {
   const files = walk(root);
   const guards = [], wider = [], seeds = [];
   for (const f of files) {
@@ -348,7 +348,7 @@ if (isMain) {
   const argAfter = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
   const root = argAfter('--repo');
   if (!root || !existsSync(root)) { console.error('usage: --repo <путь>  (или --self-test)'); process.exit(2); }
-  const r = auditRepo(root);
+  const r = auditTree(root);
   console.log(`property-vs-method — просмотрено файлов: ${r.scanned}  (${root})`);
   console.log(`  сторож читает повествовательное поле: ${r.guards.length}`);
   for (const g of r.guards.slice(0, 15)) console.log(`      ${g.file}:${g.line}  поле "${g.field}", токен ${g.token}`);
