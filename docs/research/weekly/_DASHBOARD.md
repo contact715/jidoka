@@ -1,8 +1,8 @@
-# Kaizen Dashboard — 2026-W34
+# Kaizen Dashboard — 2026-W35
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 88% · shipped 99/112, open 13, regressed 0, ~1.22w to ship**
+**adoption 77% · shipped 99/129, open 30, regressed 0, ~1.22w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -122,3 +122,20 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | open | 2026-W34-Q2 | БЫСТРАЯ ПОБЕДА: три контрольные руки в memory-eval (без памяти, весь контекст, только лексика) + отказ печатать выигрыш без них | scripts/memory-eval.mjs#controlArms | not yet present: scripts/memory-eval.mjs#controlArms |
 | open | 2026-W34-R12 | Приёмка обязана различать СОЗДАНИЕ символа и ИЗМЕНЕНИЕ существующего: сегодня рекомендация-правка читается как уже внедрённая (найдено собственными записями этой недели) | scripts/kaizen-audit.mjs#changeKind | not yet present: scripts/kaizen-audit.mjs#changeKind |
 | open | 2026-W34-R13 | Тупик гейта: ledger-sync-gate блокирует пуш, а его собственное лечение --sync ничего не абсорбирует, потому что внутрисессионный журнал пишет записи без обязательного поля kind | scripts/session-pattern-log.mjs#emitIncident | not yet present: scripts/session-pattern-log.mjs#emitIncident |
+| open | 2026-W35-A1 | Рецидив считается по режиму отказа, покрытие печатается двумя числами | scripts/meta-audit.mjs#recurrenceByMode | not yet present: scripts/meta-audit.mjs#recurrenceByMode |
+| open | 2026-W35-A2 | У каждого прибора есть кейс расхождения между измеряемой величиной и правилом | scripts/oracle-divergence.mjs#divergenceCase | not yet present: scripts/oracle-divergence.mjs#divergenceCase |
+| open | 2026-W35-A3 | Квитанция прогона гейта: отсутствие следа блокирует пуш | scripts/gate-receipt.mjs#requireReceipts | not yet present: scripts/gate-receipt.mjs#requireReceipts |
+| open | 2026-W35-A4 | Сторож разрешимости core.hooksPath из каждой рабочей копии | scripts/hooks-reachability.mjs#resolveFromWorktree | not yet present: scripts/hooks-reachability.mjs#resolveFromWorktree |
+| open | 2026-W35-A5 | Быстрая победа: позвать уже готовый прибор паритета канон-копия | scripts/routine-daily.sh#gate-parity | not yet present: scripts/routine-daily.sh#gate-parity |
+| open | 2026-W35-A10 | Приёмка доказывается прогоном, а не разрешимостью имени символа | scripts/kaizen-audit.mjs#executedEvidence | not yet present: scripts/kaizen-audit.mjs#executedEvidence |
+| open | 2026-W35-B1 | Счётчик покрытия критериев разводится на проверенное и зачтённое по определению | scripts/ac-verify-map.mjs#unrecognizedVerdict | not yet present: scripts/ac-verify-map.mjs#unrecognizedVerdict |
+| open | 2026-W35-B2 | Словарь внешних судей открывается: владелец перестаёт считаться своим | scripts/meta-honesty.mjs#isExternalJudge | not yet present: scripts/meta-honesty.mjs#isExternalJudge |
+| open | 2026-W35-B3 | Именованное правило сведения эпох, ничья судьи перестаёт быть проходом | scripts/run-evals.mjs#namedReducer | not yet present: scripts/run-evals.mjs#namedReducer |
+| open | 2026-W35-B4 | Многотрайловый прогон золотых кейсов и надёжность pass^k, с условием смерти | scripts/judge-calibration.mjs#multiTrial | not yet present: scripts/judge-calibration.mjs#multiTrial |
+| open | 2026-W35-A6 | Сторож сирот перестаёт смотреть только на имя gate:* | scripts/gate-audit.mjs#findOrphanMechanisms | not yet present: scripts/gate-audit.mjs#findOrphanMechanisms |
+| open | 2026-W35-A7 | null в режиме отказа перестаёт быть кнопкой пропустить | scripts/meta-lib.mjs#validateMastNote | not yet present: scripts/meta-lib.mjs#validateMastNote |
+| open | 2026-W35-A8 | Очередь человеческих шагов доказывает необходимость перед показом | scripts/pending-human.mjs#stillNeeded | not yet present: scripts/pending-human.mjs#stillNeeded |
+| open | 2026-W35-A9 | Одно слово приёмка, один знаменатель, плюс доля свежей когорты | scripts/kaizen-scorecard.mjs#cohortAdoption | not yet present: scripts/kaizen-scorecard.mjs#cohortAdoption |
+| open | 2026-W35-B5 | Проставить отпечаток родителя на оставшихся 41 спеке (доведение W32-R6) | scripts/cascade-validate.mjs#stampAll | not yet present: scripts/cascade-validate.mjs#stampAll |
+| open | 2026-W35-B6 | Покрытие, которое истекает само: отпечаток тела критерия | scripts/map-ac-coverage.mjs#criterionFingerprint | not yet present: scripts/map-ac-coverage.mjs#criterionFingerprint |
+| open | 2026-W35-B7 | Пилот внешнего размеченного корпуса для парных судей, только замер | docs/evals/_pilot-judgebench.md#discrimination | not yet present: docs/evals/_pilot-judgebench.md#discrimination |
