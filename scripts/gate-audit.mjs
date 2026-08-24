@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 // @closes-class: gate-cost-not-proportional-to-change
+// @divergence: "переменная-корень репозитория это не список файлов: область all" —
+//              измеряемая величина «в аргументах есть переменная» говорила «передан список
+//              правок», а правило «вызов сужен до изменённого» нарушено: переменная была
+//              корнем дерева, и полный проход объявлялся как staged
 // gate-audit — the single map of every gate: which LAYER enforces it (CI / PreToolUse / runtime
 // dispatch / product pre-push / LLM-judge) and its MODE (hard-block / soft-warn / proxy / kernel /
 // measured / degrade-skip). Then it VERIFIES the claims: a gate marked CI must actually appear in a
@@ -405,7 +409,13 @@ export function derivedScope(args = '') {
   if (/--staged\b/.test(args)) return 'staged';
   if (/--changed\b/.test(args)) return 'changed';
   if (/--scope[= ]auto\b/.test(args)) return 'changed';
-  if (/\$\{?[A-Za-z_][A-Za-z0-9_]*/.test(args)) return 'staged';
+  // 2026-W35 — РАНЬШЕ здесь стояло «любая переменная в аргументах значит список файлов».
+  // Это проверка СПОСОБА, а не свойства: `--repo "$ROOT"` передаёт корень репозитория, а не
+  // перечень правок, и вызов по всему дереву объявлялся «staged». Поймано на живом гейте:
+  // property-vs-method объявлял all, вызов честно был all, а прибор настаивал на staged.
+  // Теперь переменная считается списком файлов, только если её ИМЯ об этом говорит.
+  const vars = [...args.matchAll(/\$\{?([A-Za-z_][A-Za-z0-9_]*)/g)].map((m) => m[1].toLowerCase());
+  if (vars.some((v) => /(staged|changed|files?|list|paths?|targets?)/.test(v))) return 'staged';
   return 'all';
 }
 
@@ -602,6 +612,11 @@ function selfTest() {
       hookInvocations('out=$(node "$ROOT/scripts/a.mjs" 2>&1)').has('scripts/b.mjs') === false],
     ['--staged derives scope staged', derivedScope(' --staged ') === 'staged'],
     ['a passed file list derives scope staged', derivedScope(' $staged_mjs ') === 'staged'],
+    // 2026-W35 — РАСХОЖДЕНИЕ: переменная в аргументах есть, а списка правок нет.
+    ['переменная-корень репозитория это не список файлов: область all',
+      derivedScope(' --repo "$ROOT" --ratchet ') === 'all'],
+    ['переменная с говорящим именем по-прежнему считается списком',
+      derivedScope(' $CHANGED_FILES ') === 'staged' && derivedScope(' $file_list ') === 'staged'],
     ['--scope auto derives changed', derivedScope(' --scope=auto ') === 'changed'],
     ['no file argument derives scope all', derivedScope(' ') === 'all'],
     ['an exit-code $? is not mistaken for a file list', derivedScope('; rc=$?') === 'all'],

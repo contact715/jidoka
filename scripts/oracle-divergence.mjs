@@ -56,9 +56,13 @@ export function declaresClass(text = '') {
  * @returns {{present:boolean, assertion:string|null, why:string}}
  */
 export function divergenceCase(text = '') {
-  const m = String(text).match(/@divergence:\s*"([^"]+)"\s*(?:—|-{1,2})?\s*([^\n]*)/);
+  // Экранированная кавычка ВНУТРИ имени не обрывает имя. Поймано на себе: маркер
+  // gate-audit содержал \\" и разбор возвращал огрызок, после чего гейт требовал
+  // проверку, которая на самом деле есть. Тот же дефект разбора кавычек, что и в
+  // именах тестов у property-vs-method.
+  const m = String(text).match(/@divergence:\s*"((?:\\.|[^"\\])+)"\s*(?:—|-{1,2})?\s*([^\n]*)/);
   if (!m) return { present: false, assertion: null, why: '' };
-  return { present: true, assertion: m[1].trim(), why: (m[2] || '').trim() };
+  return { present: true, assertion: m[1].replace(/\\(.)/g, '$1').trim(), why: (m[2] || '').trim() };
 }
 
 /**
@@ -140,6 +144,8 @@ function selfTest() {
     verifyDivergence('// @closes-class: c\n// @divergence: "мой кейс" — п\nok("мой кейс", true);').assertion === 'мой кейс');
   ok('дефис вместо тире тоже разбирается',
     divergenceCase('// @divergence: "имя" - пояснение').assertion === 'имя');
+  ok('РАСХОЖДЕНИЕ: экранированная кавычка внутри имени не обрывает имя',
+    divergenceCase('// @divergence: "флаг \\"--repo\\" это корень" — п').assertion === 'флаг "--repo" это корень');
   ok('аудит пропускает файлы, которые не приборы',
     auditFiles([]).length === 0);
 
