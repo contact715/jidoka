@@ -104,7 +104,7 @@ async function main() {
   if (!payload.transcript_path) process.exit(0);
 
   const turn = lastTurn(payload.transcript_path);
-  const v = verdict(turn);
+  const v = summaryVerdict(turn);
   if (!v.missing) process.exit(0);
 
   // Напоминать раз в сессию: повторное напоминание это не защита, а фон.
