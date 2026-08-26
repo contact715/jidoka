@@ -59,7 +59,7 @@ const MARKERS = [
  * @param {{toolCalls:number, text:string}} o
  * @returns {{needed:boolean, present:boolean, missing:boolean}}
  */
-export function verdict({ toolCalls = 0, text = '' }) {
+export function summaryVerdict({ toolCalls = 0, text = '' }) {
   const needed = toolCalls >= WORK_THRESHOLD;
   const present = MARKERS.some((r) => r.test(String(text)));
   return { needed, present, missing: needed && !present };
@@ -144,27 +144,27 @@ if (isMain) {
     const ok = (n, c) => { ran++; if (!c) fails.push(n); console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };
 
     ok('РАСХОЖДЕНИЕ: девять инструментов и фраза «готово» — итога нет',
-      verdict({ toolCalls: 9, text: 'Готово, всё работает.' }).missing === true);
+      summaryVerdict({ toolCalls: 9, text: 'Готово, всё работает.' }).missing === true);
     ok('шкала засчитывается как итог',
-      verdict({ toolCalls: 9, text: '▰▰▰▱▱▱▱▱▱▱ 30% · 34 из 722' }).missing === false);
+      summaryVerdict({ toolCalls: 9, text: '▰▰▰▱▱▱▱▱▱▱ 30% · 34 из 722' }).missing === false);
     ok('заголовок «Итог» засчитывается',
-      verdict({ toolCalls: 5, text: '## Итог\nСделано три вещи.' }).missing === false);
+      summaryVerdict({ toolCalls: 5, text: '## Итог\nСделано три вещи.' }).missing === false);
     ok('таблица состояний засчитывается',
-      verdict({ toolCalls: 5, text: '| закрыто | коммит 90520fd |' }).missing === false);
+      summaryVerdict({ toolCalls: 5, text: '| закрыто | коммит 90520fd |' }).missing === false);
     ok('остановка с причиной засчитывается',
-      verdict({ toolCalls: 4, text: 'Почему остановился: упёрся в ваше решение.' }).missing === false);
+      summaryVerdict({ toolCalls: 4, text: 'Почему остановился: упёрся в ваше решение.' }).missing === false);
     ok('разговорная реплика итога не требует',
-      verdict({ toolCalls: 0, text: 'Да, понял.' }).missing === false);
+      summaryVerdict({ toolCalls: 0, text: 'Да, понял.' }).missing === false);
     ok('порог: два вызова это ещё не работа',
-      verdict({ toolCalls: 2, text: 'Посмотрел, всё на месте.' }).missing === false);
+      summaryVerdict({ toolCalls: 2, text: 'Посмотрел, всё на месте.' }).missing === false);
     ok('порог: три вызова это уже работа',
-      verdict({ toolCalls: 3, text: 'Посмотрел, всё на месте.' }).missing === true);
+      summaryVerdict({ toolCalls: 3, text: 'Посмотрел, всё на месте.' }).missing === true);
     ok('needed и present считаются раздельно',
-      (() => { const v = verdict({ toolCalls: 1, text: '▰▰▰▱▱▱▱▱▱▱' }); return v.needed === false && v.present === true; })());
+      (() => { const v = summaryVerdict({ toolCalls: 1, text: '▰▰▰▱▱▱▱▱▱▱' }); return v.needed === false && v.present === true; })());
     ok('пустой ход не притворяется работой',
-      verdict({ toolCalls: 0, text: '' }).missing === false);
+      summaryVerdict({ toolCalls: 0, text: '' }).missing === false);
     ok('кириллические состояния распознаются (не \\b по ASCII)',
-      verdict({ toolCalls: 7, text: 'Пункт 3 — ждёт вас: нужна ваша строка в реестре.' }).missing === false);
+      summaryVerdict({ toolCalls: 7, text: 'Пункт 3 — ждёт вас: нужна ваша строка в реестре.' }).missing === false);
 
     if (fails.length) { console.log(`\n\x1b[31mclosing-summary-gate self-test FAILED (${fails.length} из ${ran})\x1b[0m`); process.exit(1); }
     console.log(`\n\x1b[32m✓ closing-summary-gate: ${ran} прошло, 0 упало\x1b[0m`);
