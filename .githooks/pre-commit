@@ -96,6 +96,22 @@ if [ $rc -ne 0 ]; then
 fi
 echo "✓ pre-commit · instantiation-audit: no ghosts"
 
+# cyrillic-boundary — ИНФОРМИРУЕТ, если в правке есть \b рядом с кириллицей. В JavaScript
+# \b определена через [A-Za-z0-9_], поэтому между пробелом и русской буквой границы нет и
+# правило молча ничего не находит. Класс встретился ЧЕТЫРЕ раза за три дня, каждый раз
+# ловился прогоном, ни разу чтением. Область — только staged-файлы, доли секунды.
+# Не блокирует: 12 живых случаев в дереве, часть из них надо разбирать глазами, а гейт,
+# который сразу краснеет на существующем коде, обходят в первый же день.
+if [ -n "$staged_mjs" ]; then
+  out=$(node "$ROOT/scripts/cyrillic-boundary.mjs" $staged_mjs 2>&1); rc=$?
+  if [ $rc -ne 0 ]; then
+    echo "$out"
+    echo "↑ cyrillic-boundary: \b рядом с кириллицей не сработает (informational, not blocking)."
+  else
+    echo "✓ pre-commit · cyrillic-boundary: границ слова по ASCII рядом с кириллицей нет"
+  fi
+fi
+
 # import-safety — BLOCKS if a staged .mjs does work at import time. Замер 2026-08-15:
 # 86 модулей печатали при импорте, один зависал, 19 файлов репозитория переписывались
 # сами. Проверяются ТОЛЬКО файлы этой правки: гейт соразмерен изменению.

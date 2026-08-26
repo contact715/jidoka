@@ -77,6 +77,7 @@
     "gate:ledger-schema": "node scripts/ledger-schema-gate.mjs",
     "gate:parity": "node scripts/install-into.mjs --check-parity",
     "gate:hooks": "node scripts/hooks-reachability.mjs",
+    "audit:cyrillic": "node scripts/cyrillic-boundary.mjs --all",
     "gate:divergence": "node scripts/oracle-divergence.mjs",
     "gate:property": "node scripts/property-vs-method.mjs --repo .",
     "receipt:tests": "node scripts/gate-receipt.mjs --gate tests --run \"npm test\"",
