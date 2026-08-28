@@ -57,3 +57,8 @@ test-results/
 # below are the accountability backbone and ARE committed with each weekly report — the
 # design doc (KAIZEN_ENGINE.md) and the weekly task require it, so they are NOT ignored.
 docs/research/weekly/_DASHBOARD.md
+
+# Граф знаний — производный артефакт (6+ МБ), строится в каждом дереве свой.
+# Коммитить нельзя: он устаревает в тот же день и становится вторым источником правды,
+# ровно тем, о котором предупреждает docs/KNOWLEDGE_GRAPH_FIRST.md.
+graphify-out/
