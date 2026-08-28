@@ -1,0 +1,13 @@
+{
+  "generated_at": "2026-08-24T16:30:39.546Z",
+  "total_specs_scanned": 0,
+  "legacy_format_specs_skipped": 0,
+  "legacy_spec_ids": [],
+  "parseable_specs": 0,
+  "total_acs": 0,
+  "covered": 0,
+  "uncovered": 0,
+  "coverage_pct": 0,
+  "note": "covered = real test with wave-qualified AC tag (// wave-NN AC-N:) AND real assertions (not it.todo). uncovered = everything else. Generated it.todo stubs in tests/spec-stubs/ are tracked work items, NOT coverage — the stub dir is excluded from the coverage scan to prevent self-inflation.",
+  "waves": []
+}
