@@ -1,8 +1,8 @@
-# Kaizen Dashboard — 2026-W35
+# Kaizen Dashboard
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 84% · shipped 109/129, open 20, regressed 0, ~1.11w to ship**
+**adoption 74% · shipped 109/147, open 38, regressed 0, ~1.11w to ship, class-closure 60%**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -139,3 +139,21 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | open | 2026-W35-B5 | Проставить отпечаток родителя на оставшихся 41 спеке (доведение W32-R6) | scripts/cascade-validate.mjs#stampAll | not yet present: scripts/cascade-validate.mjs#stampAll |
 | open | 2026-W35-B6 | Покрытие, которое истекает само: отпечаток тела критерия | scripts/map-ac-coverage.mjs#criterionFingerprint | not yet present: scripts/map-ac-coverage.mjs#criterionFingerprint |
 | open | 2026-W35-B7 | Пилот внешнего размеченного корпуса для парных судей, только замер | docs/evals/_pilot-judgebench.md#discrimination | not yet present: docs/evals/_pilot-judgebench.md#discrimination |
+| open | 2026-W36-A1 | Дата включения механизма берётся из git; регистрация класса становится решением через approval-queue | scripts/gate-audit.mjs#activationDateFromGit | not yet present: scripts/gate-audit.mjs#activationDateFromGit |
+| open | 2026-W36-A2 | Открытые рекомендации прошлых недель входят в ранжирование (carryover) | scripts/kaizen-rank.mjs#withCarryover | not yet present: scripts/kaizen-rank.mjs#withCarryover |
+| open | 2026-W36-A3 | Мягкий гейт без сигнала получает вердикт DORMANT после трёх горизонтов | scripts/gate-graduation.mjs#dormantVerdict | not yet present: scripts/gate-graduation.mjs#dormantVerdict |
+| open | 2026-W36-A4 | Режим только чтение JIDOKA_READONLY: прогон может доказать, что ничего не менял | scripts/lib/fs-write.mjs#assertWritable | not yet present: scripts/lib/fs-write.mjs#assertWritable |
+| open | 2026-W36-A5 | Устойчивое имя сессии вместо константы current во внутрисессионном журнале | scripts/session-pattern-log.mjs#resolveSessionId | not yet present: scripts/session-pattern-log.mjs#resolveSessionId |
+| open | 2026-W36-A6 | Открытая запись внутрисессионного кайдзена старше семи дней поднимается в сводку | scripts/session-pattern-log.mjs#staleOpen | not yet present: scripts/session-pattern-log.mjs#staleOpen |
+| open | 2026-W36-A7 | Прибор паритета перестаёт глушиться: убрать подавление кода возврата и поставить gate:parity в CI | scripts/routine-daily.sh#parityNotSilenced | not yet present: scripts/routine-daily.sh#parityNotSilenced |
+| open | 2026-W36-A8 | Глоб покрытия критериев видит .mjs, снять --dry с regenerate-coverage-report (доведение W34-Q1) | scripts/map-ac-coverage.mjs#walkDirMjs | not yet present: scripts/map-ac-coverage.mjs#walkDirMjs |
+| open | 2026-W36-A9 | Квитанция гейта перевыпускается при смене отпечатка: сейчас просрочены все 72 | scripts/gate-receipt.mjs#refreshOnFingerprintChange | not yet present: scripts/gate-receipt.mjs#refreshOnFingerprintChange |
+| open | 2026-W36-A10 | Решение по бегунку калибровки судей до 2026-09-07: условие смерти истекает | scripts/judge-calibration.mjs#deathConditionResolved | not yet present: scripts/judge-calibration.mjs#deathConditionResolved |
+| open | 2026-W36-K1 | КИЛЛЕР-ФИЧА: расписка за замер, гейт на высказанную величину, а не только на закоммиченный прибор | hooks/measurement-claim-gate.mjs#measurementClaims | not yet present: hooks/measurement-claim-gate.mjs#measurementClaims |
+| open | 2026-W36-K2 | КИЛЛЕР-ФИЧА: неизвестный флаг это отказ, а не умолчание (237 из 252 скриптов, 121 из них пишет) | scripts/lib/argv-strict.mjs#parseStrict | not yet present: scripts/lib/argv-strict.mjs#parseStrict |
+| open | 2026-W36-K3 | КИЛЛЕР-ФИЧА: после сжатия контекста своя история это файл, а не память | hooks/own-history-gate.mjs#ownHistoryClaim | not yet present: hooks/own-history-gate.mjs#ownHistoryClaim |
+| open | 2026-W36-B1 | Каталог операторов мутации от третьей стороны: сдвиг границы, арифметика, инкремент, строковый литерал | scripts/mutation-test.mjs#boundaryOps | not yet present: scripts/mutation-test.mjs#boundaryOps |
+| open | 2026-W36-B2 | Транскрипты сессий как топливо для трёх спящих приборов поведения, со счётчиком неразобранных | scripts/session-trajectory.mjs#toEvents | not yet present: scripts/session-trajectory.mjs#toEvents |
+| open | 2026-W36-B3 | Отрицательная ось элицитации: спросил там, где спрашивать было нечего | scripts/elicitation-gym.mjs#overAsked | not yet present: scripts/elicitation-gym.mjs#overAsked |
+| open | 2026-W36-B4 | Три оси AgentRewardBench как чеклист для кейса расхождения | scripts/oracle-divergence.mjs#divergenceChecklist | not yet present: scripts/oracle-divergence.mjs#divergenceChecklist |
+| open | 2026-W36-B5 | Документ честного состояния приводится в соответствие с прогоном (21/21 против 99/99) | docs/HONEST_SYSTEM_STATE.md#sixtySecondCheck | not yet present: docs/HONEST_SYSTEM_STATE.md#sixtySecondCheck |
