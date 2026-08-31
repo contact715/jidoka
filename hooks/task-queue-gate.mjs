@@ -28,6 +28,27 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { хвостТранскрипта } from "./lib/transcript-tail.mjs";
+
+// Проверка кейса расхождения — исполняемая, не упоминание (--self-test-tail).
+if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.includes("--self-test-tail")) {
+    // «древность отрезана (кейс расхождения)»: строка старше хвоста гейту не
+    // видна — вход, где величина говорит «чисто», а правило нарушено в
+    // древнем ходе. Принято осознанно: block-once, fail-open.
+    const os = await import("node:os");
+    const path = await import("node:path");
+    const fsT = await import("node:fs");
+    const tmp = path.join(os.tmpdir(), `tail-div-${process.pid}.jsonl`);
+    fsT.writeFileSync(tmp, Array.from({ length: 500 }, (_, i) => JSON.stringify({ i })).join("\n"));
+    const хвост = хвостТранскрипта(tmp, 200);
+    const первая = JSON.parse(хвост.split("\n").filter(Boolean)[0]);
+    fsT.unlinkSync(tmp);
+    if (первая.i > 0) { console.log("✓ древность отрезана (кейс расхождения)"); process.exit(0); }
+    console.error("FAIL: древность видна"); process.exit(1);
+}
+
+
+// @divergence: "древность отрезана (кейс расхождения)" — нарушение из хода старше 8-МБ хвоста гейт не увидит и скажет «чисто»; принято осознанно (block-once, fail-open, раньше древность терялась в таймауте), проверка живёт в lib/transcript-tail.mjs --self-test.
 
 const QUEUE = process.env.TASK_QUEUE || path.join(os.homedir(), '.jidoka', 'task-queue', 'queue.jsonl');
 
@@ -151,7 +172,8 @@ function main() {
 
   let commands = [];
   try {
-    for (const line of fs.readFileSync(transcriptPath, 'utf8').split('\n').filter(Boolean)) {
+    // Хвост, а не весь файл: 158-МБ сессия стоила 0.7с на гейт (замер 2026-08-31).
+    for (const line of хвостТранскрипта(transcriptPath).split('\n').filter(Boolean)) {
       let obj; try { obj = JSON.parse(line); } catch { continue; }
       collectBashCommands(obj, commands);
     }

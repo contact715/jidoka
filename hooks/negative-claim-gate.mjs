@@ -42,6 +42,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { хвостТранскрипта } from "./lib/transcript-tail.mjs";
 
 /** Утверждение об ОТСУТСТВИИ или о НЕДОСТИЖИМОСТИ. */
 // ГРАНИЦА СЛОВА НЕ \b. В JavaScript она определена по ASCII, поэтому перед кириллицей её
@@ -137,7 +138,8 @@ export function shouldBlock({ findings = [], alreadyBlocked = false }) {
 function collectLastTurn(transcriptPath) {
   let parsed = [];
   try {
-    parsed = fs.readFileSync(transcriptPath, 'utf8').split('\n').filter(Boolean)
+    // Хвост, а не весь файл: 158-МБ сессия стоила 0.7с на гейт (замер 2026-08-31).
+    parsed = хвостТранскрипта(transcriptPath).split('\n').filter(Boolean)
       .map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
   } catch { return ''; }
   let start = 0;
