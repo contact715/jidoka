@@ -34,6 +34,10 @@
  * при этом не бывает: непроверенное называется непроверенным.
  *
  * @closes-class: installed-copy-drifts-from-upstream
+ * @divergence: "без-источника/второй-корень-не-теряется" — скилл стоит ТОЛЬКО во втором
+ *              корне (~/.claude/skills), первый существует; старая версия обрывала поиск
+ *              на первом корне и такой скилл не появлялся вообще нигде в отчёте — не
+ *              «устарел», не «без источника», просто отсутствовал. Отчёт выглядел чистым.
  */
 
 import fs from 'node:fs';
@@ -241,6 +245,38 @@ export function upstreamMapForFolder(treeEntries, folder) {
 export function unsourcedSkills(localNames, lockEntries, officialNames) {
   const known = new Set([...lockEntries.map((e) => e.name), ...officialNames]);
   return localNames.filter((n) => !known.has(n)).sort();
+}
+
+/**
+ * Объединение имён скиллов по ВСЕМ корням, не только по первому существующему.
+ *
+ * РАСХОЖДЕНИЕ, которое это закрывает: скилл может стоять ТОЛЬКО во втором корне
+ * (у graphify свой установщик, он пишет прямо в ~/.claude/skills и никогда не
+ * создаёт запись в ~/.agents/skills). Версия, которая брала список из первого
+ * существующего корня и на этом останавливалась, не находила такой скилл НИГДЕ —
+ * не в «устарел», не в «без источника», а вообще нигде в отчёте. Отчёт при этом
+ * не падал и не жаловался: измеряемая величина («сколько скиллов без источника»)
+ * выглядела чистой цифрой, а правило («любая установленная копия чужого кода
+ * должна быть хотя бы НАЗВАНА») было нарушено молча. `listDir` принимает
+ * готовую реализацию (по умолчанию — чтение файловой системы), чтобы функцию
+ * можно было проверить на выдуманных корнях, не трогая диск.
+ */
+export function collectSkillNames(roots, listDir = defaultListDir) {
+  const all = new Set();
+  for (const root of roots) {
+    for (const name of listDir(root)) all.add(name);
+  }
+  return [...all];
+}
+
+function defaultListDir(root) {
+  try {
+    return fs.readdirSync(root, { withFileTypes: true })
+      .filter((d) => { try { return fs.statSync(path.join(root, d.name)).isDirectory(); } catch { return false; } })
+      .map((d) => d.name);
+  } catch {
+    return [];
+  }
 }
 
 /** Токен GitHub, если он есть: поднимает лимит с 60 до 5000 запросов в час. */
@@ -605,6 +641,19 @@ function selfTest() {
     ['моё'],
   );
 
+  // РАСХОЖДЕНИЕ: старая версия main() брала имена из ПЕРВОГО существующего корня и
+  // обрывала цикл — при двух непустых корнях ('root-one' существует всегда) скилл,
+  // стоящий только во втором ('graphify' — установлен ТОЛЬКО туда, где свой установщик
+  // пишет напрямую), не появлялся в результате вовсе. Проверяем, что итог — это
+  // ОБЪЕДИНЕНИЕ имён по всем корням, а не имена только первого.
+  const fakeRoots = ['/fake/root-one', '/fake/root-two'];
+  const fakeListDir = (root) => (root === '/fake/root-two' ? ['graphify', 'common'] : ['common', 'alpha']);
+  eq(
+    'без-источника/второй-корень-не-теряется',
+    collectSkillNames(fakeRoots, fakeListDir).sort(),
+    ['alpha', 'common', 'graphify'],
+  );
+
   const third = [{
     kind: 'third-party', checked: true,
     units: [
@@ -648,20 +697,15 @@ async function main() {
   const sources = third ? [...official, third] : official;
 
   // Скиллы, которых нет ни в официальном наборе, ни в реестре сторонних: сверять не с чем.
+  // collectSkillNames читает ОБА корня (см. её описание выше — там же кейс расхождения,
+  // который это чинит: замер 2026-09-02, 74 скилла из ~/.claude/skills были невидимы для
+  // этой проверки целиком).
   let unsourced = [];
   if (!officialOnly) {
     const officialNames = official.flatMap((s) => s.units.map((u) => u.name));
     let lock = [];
     try { lock = readSkillLock(fs.readFileSync(SKILL_LOCK, 'utf8')); } catch { /* нет реестра */ }
-    for (const root of SKILL_ROOTS) {
-      try {
-        const names = fs.readdirSync(root, { withFileTypes: true })
-          .filter((d) => { try { return fs.statSync(path.join(root, d.name)).isDirectory(); } catch { return false; } })
-          .map((d) => d.name);
-        unsourced = unsourcedSkills(names, lock, officialNames);
-        break;
-      } catch { /* следующий корень */ }
-    }
+    unsourced = unsourcedSkills(collectSkillNames(SKILL_ROOTS), lock, officialNames);
   }
 
   if (argv.includes('--json')) {

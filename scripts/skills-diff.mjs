@@ -118,7 +118,7 @@ async function fetchJson(url, timeoutMs = 20000) {
   } catch { return null; } finally { clearTimeout(t); }
 }
 
-async function treeOf(repo) {
+export async function treeOf(repo) {
   for (const br of ['main', 'master']) {
     const d = await fetchJson(`https://api.github.com/repos/${repo}/git/trees/${br}?recursive=1`);
     if (d && Array.isArray(d.tree) && !d.truncated) return d.tree;
@@ -127,7 +127,7 @@ async function treeOf(repo) {
 }
 
 /** Содержимое блоба по его SHA: работает и для приватных, и не зависит от имени ветки. */
-async function blob(repo, sha) {
+export async function blob(repo, sha) {
   const d = await fetchJson(`https://api.github.com/repos/${repo}/git/blobs/${sha}`);
   if (!d || typeof d.content !== 'string') return null;
   try { return Buffer.from(d.content, d.encoding === 'base64' ? 'base64' : 'utf8'); } catch { return null; }
