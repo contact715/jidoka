@@ -1,8 +1,8 @@
-# Kaizen Dashboard
+# Kaizen Dashboard — 2026-W37
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 74% · shipped 109/147, open 38, regressed 0, ~1.11w to ship, class-closure 60%**
+**adoption 74% · shipped 109/147, open 38, regressed 0, ~1.11w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
