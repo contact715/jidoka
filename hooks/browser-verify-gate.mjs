@@ -21,6 +21,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from 'node:url';
+import childProcess from "node:child_process";
 import { хвостТранскрипта } from "./lib/transcript-tail.mjs";
 
 // Проверка кейса расхождения — исполняемая, не упоминание (--self-test-tail).
@@ -66,6 +67,51 @@ function collectToolUses(node, out) {
   }
 }
 
+// Результаты инструментов, а не только вызовы. Гейт, который видит ТОЛЬКО вызовы,
+// умеет спросить «смотрел ли ты», но не «было ли на что смотреть».
+function collectToolResults(node, out) {
+  if (!node || typeof node !== "object") return;
+  if (Array.isArray(node)) { for (const item of node) collectToolResults(item, out); return; }
+  if (node.type === "tool_result") { try { out.push(JSON.stringify(node.content ?? "")); } catch { /* нечитаемый результат пропускаем */ } }
+  for (const key of Object.keys(node)) { if (key === "type") continue; collectToolResults(node[key], out); }
+}
+
+// Зонд пригодности: вызов, который спрашивает у страницы, видима ли она и есть ли
+// у неё высота. Ищем ВЫЗОВ ИНСТРУМЕНТА, а не слова в тексте: упоминание зонда в
+// рассуждении не является зондом (класс guard-fires-on-mention-not-action).
+const PROBE = /visibilityState/i;
+const PROBE_SIZE = /innerHeight|clientHeight/i;
+// Опровержение: страница прямо ответила, что она скрыта или нулевой высоты.
+const HIDDEN = /"?visibilityState"?\s*:\s*"?hidden/i;
+const ZERO_H = /"?(innerHeight|clientHeight)"?\s*:\s*0\b/i;
+
+/**
+ * Чистая: пригодно ли наблюдение, а не был ли вызван инструмент.
+ *
+ * Три исхода, и «не доказано» отличается от «опровергнуто» намеренно: первое лечится
+ * одним вызовом, второе означает, что уже сделанный вывод о продукте построен на
+ * чёрном экране и его надо отозвать.
+ *
+ * @returns {{verdict:'proved'|'refuted'|'unproved', why:string}}
+ */
+export function observationUsable(toolInputs = [], resultTexts = []) {
+  // Результат приходит сериализованным, поэтому кавычки внутри экранированы:
+  // "{\"visibilityState\":\"hidden\"}". Шаблон, написанный на неэкранированный
+  // вид, молча не совпадал, и опровержение проваливалось в ветку «не доказано» —
+  // гейт блокировал, но НЕ ТЕМ сообщением. Поймано вторым плечом собственной
+  // самопроверки, а не первым: первое проверяло только код возврата.
+  const clean = (x) => String(x).replace(/\\"/g, '"');
+  for (const raw of resultTexts) {
+    const t = clean(raw);
+    if (HIDDEN.test(t)) return { verdict: "refuted", why: "страница ответила visibilityState=hidden" };
+    if (ZERO_H.test(t)) return { verdict: "refuted", why: "страница ответила нулевой высотой окна" };
+  }
+  const probed = toolInputs.some((t) => PROBE.test(t) && PROBE_SIZE.test(t));
+  return probed
+    ? { verdict: "proved", why: "зонд пригодности вызван и не опровергнут" }
+    : { verdict: "unproved", why: "зонд пригодности не вызывался" };
+}
+
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 // Observable UI source. Tests / type decls / non-UI trees are not "look at it in a browser".
 const UI_FILE = /\.(tsx|jsx|css|scss|sass|less|vue|svelte)$/i;
@@ -105,6 +151,7 @@ function main() {
   }
 
   const tools = [];
+  const results = [];
   for (const line of lines) {
     let obj;
     try {
@@ -113,6 +160,7 @@ function main() {
       continue;
     }
     collectToolUses(obj, tools);
+    collectToolResults(obj, results);
   }
 
   let editedUi = false;
@@ -129,7 +177,18 @@ function main() {
     }
   }
 
-  if (!editedUi || usedBrowser) process.exit(0);
+  if (!editedUi) process.exit(0);
+
+  // Ось пригодности. Вызов браузерного инструмента доказывает, что браузер ОТКРЫВАЛИ,
+  // и ничего не говорит о том, было ли на что смотреть. За десять дней это дало три
+  // инцидента, два из них — заявление о несуществующем дефекте продукта по снимку из
+  // скрытой панели с нулевой высотой окна.
+  let usable = { verdict: "unproved", why: "" };
+  if (usedBrowser) {
+    const inputs = tools.map((t) => { try { return JSON.stringify(t.input || {}); } catch { return ""; } });
+    usable = observationUsable(inputs, results);
+    if (usable.verdict === "proved") process.exit(0);
+  }
 
   // Fire once.
   try {
@@ -141,6 +200,28 @@ function main() {
   }
 
   const files = editedFiles.join(", ");
+
+  if (usedBrowser && usable.verdict === "refuted") {
+    process.stderr.write(
+      "BROWSER-VERIFY-GATE: наблюдение НЕПРИГОДНО — " + usable.why + ".\n" +
+      "Панель браузера была скрыта или нулевой высоты, значит страница не могла нарисоваться ПО ПОСТРОЕНИЮ. " +
+      "Любой вывод о продукте, сделанный по этому наблюдению, надо отозвать: это измерение скрытости вкладки, а не продукта. " +
+      "Открой панель (mcp__Claude_Browser__tabs_select), убедись, что innerHeight больше нуля, и посмотри заново.\n");
+    process.exit(2);
+  }
+
+  if (usedBrowser && usable.verdict === "unproved") {
+    process.stderr.write(
+      "BROWSER-VERIFY-GATE: браузер открывали, но пригодность наблюдения не доказана.\n" +
+      "Вызов инструмента доказывает, что браузер ОТКРЫВАЛИ, и ничего не говорит о том, было ли на что смотреть: " +
+      "в скрытой панели innerHeight равен нулю, 100dvh равен нулю, и вся раскладка честно пустая. " +
+      "Три инцидента за десять дней пришли отсюда, два — с заявлением о несуществующем дефекте продукта.\n" +
+      "Прогони зонд ОДИН раз и посмотри ответ:\n" +
+      "  mcp__Claude_Browser__javascript_tool → ({visibilityState: document.visibilityState, innerHeight, innerWidth})\n" +
+      "Если ответ hidden или ноль — это не дефект продукта, это скрытая панель.\n");
+    process.exit(2);
+  }
+
   const reason =
     "BROWSER-VERIFY-GATE: this session edited observable UI (" +
     files +
@@ -154,7 +235,68 @@ function main() {
 }
 
 
+// @divergence: "скрытая панель опровергает наблюдение" — вызов браузерного инструмента
+// говорит «смотрел», а страница при этом была нулевой высоты; величина и правило
+// расходятся ровно здесь, и до 2026-09-07 гейт мерил только величину.
+function selfTest() {
+  let pass = 0, fail = 0;
+  const ok = (n, c) => { if (c) { pass++; console.log("  \u001b[32m\u2713\u001b[0m " + n); } else { fail++; console.log("  \u001b[31m\u2717\u001b[0m " + n); } };
+
+  // чистые плечи
+  ok("зонд не вызывался — не доказано",
+    observationUsable(['{"url":"http://x"}'], ["ok"]).verdict === "unproved");
+  ok("зонд вызван и не опровергнут — доказано",
+    observationUsable(['{"text":"({visibilityState: document.visibilityState, innerHeight})"}'], ['{"visibilityState":"visible","innerHeight":812}']).verdict === "proved");
+  ok("скрытая панель опровергает наблюдение",
+    observationUsable(['{"text":"visibilityState innerHeight"}'], ['{"visibilityState":"hidden","innerHeight":0}']).verdict === "refuted");
+  ok("нулевая высота опровергает даже при visible",
+    observationUsable(['{"text":"visibilityState innerHeight"}'], ['{"visibilityState":"visible","innerHeight":0}']).verdict === "refuted");
+  ok("опровержение сильнее зонда: вывод надо отозвать, а не повторить зонд",
+    observationUsable(['{"text":"visibilityState innerHeight"}'], ['{"innerHeight":0}']).why.length > 0);
+  ok("упоминание слова без второго признака зондом не считается",
+    observationUsable(['{"text":"надо бы глянуть visibilityState"}'], ["ok"]).verdict === "unproved");
+
+  // сквозное плечо: синтетический транскрипт через stdin, настоящий процесс
+  const os2 = os, fs2 = fs, path2 = path;
+  const dir = fs2.mkdtempSync(path2.join(os2.tmpdir(), "bvg-"));
+  const tp = path2.join(dir, "t.jsonl");
+  const rows = [
+    { type: "assistant", message: { content: [{ type: "tool_use", name: "Edit", input: { file_path: "/p/components/Card.tsx" } }] } },
+    { type: "assistant", message: { content: [{ type: "tool_use", name: "mcp__Claude_Browser__computer", input: { action: "screenshot" } }] } },
+    { type: "user", message: { content: [{ type: "tool_result", content: '{"visibilityState":"hidden","innerHeight":0}' }] } },
+  ];
+  fs2.writeFileSync(tp, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  const { spawnSync } = childProcess;
+  const run = (sid) => spawnSync(process.execPath, [fileURLToPath(import.meta.url)], {
+    input: JSON.stringify({ transcript_path: tp, session_id: sid }), encoding: "utf8",
+  });
+  const r1 = run("bvg-red-" + Date.now());
+  ok("СКВОЗНОЕ КРАСНОЕ: правка UI + браузер + скрытая панель = блок", r1.status === 2);
+  ok("и человеку сказано, что вывод надо отозвать", /отозвать/.test(r1.stderr || ""));
+
+  // зелёное плечо той же формы: пригодное наблюдение проходит
+  const tp2 = path2.join(dir, "t2.jsonl");
+  const rows2 = [
+    rows[0],
+    { type: "assistant", message: { content: [{ type: "tool_use", name: "mcp__Claude_Browser__javascript_tool", input: { text: "({visibilityState: document.visibilityState, innerHeight})" } }] } },
+    { type: "user", message: { content: [{ type: "tool_result", content: '{"visibilityState":"visible","innerHeight":812}' }] } },
+  ];
+  fs2.writeFileSync(tp2, rows2.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  const r2 = spawnSync(process.execPath, [fileURLToPath(import.meta.url)], {
+    input: JSON.stringify({ transcript_path: tp2, session_id: "bvg-green-" + Date.now() }), encoding: "utf8",
+  });
+  ok("СКВОЗНОЕ ЗЕЛЁНОЕ: пригодное наблюдение проходит", r2.status === 0);
+
+  fs2.rmSync(dir, { recursive: true, force: true });
+  console.log(`\nbrowser-verify-gate self-test: ${pass} passed, ${fail} failed`);
+  return fail === 0;
+}
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain && process.argv.includes("--self-test")) {
+  process.exit(selfTest() ? 0 : 1);
+}
 
 if (isMain) {
   try {
