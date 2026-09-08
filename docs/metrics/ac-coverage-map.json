@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-08T02:45:10.881Z",
+  "generated_at": "2026-09-08T04:56:46.228Z",
   "total_specs_scanned": 14,
   "legacy_format_specs_skipped": 7,
   "legacy_spec_ids": [
@@ -13,9 +13,9 @@
   ],
   "parseable_specs": 7,
   "total_acs": 86,
-  "covered": 0,
-  "uncovered": 86,
-  "coverage_pct": 0,
+  "covered": 11,
+  "uncovered": 75,
+  "coverage_pct": 12.8,
   "note": "covered = real test with wave-qualified AC tag (// wave-NN AC-N:) AND real assertions (not it.todo). uncovered = everything else. Generated it.todo stubs in tests/spec-stubs/ are tracked work items, NOT coverage — the stub dir is excluded from the coverage scan to prevent self-inflation.",
   "waves": [
     {
@@ -172,74 +172,74 @@
       "wave_id": "kaizen-dispatch-and-isolation",
       "spec_file": "docs/specs/kaizen-dispatch-and-isolation_MASTER_SPEC.md",
       "total_acs": 11,
-      "covered": 0,
-      "uncovered": 11,
+      "covered": 11,
+      "uncovered": 0,
       "acs": [
         {
           "ac_id": "AC-1.1",
-          "title": "- AC-1.1 Отгруженная или отклонённая рекомендация не ставится в очередь.",
-          "status": "uncovered",
-          "test_file": null
+          "title": "- AC-1.1 Отгруженная или отклонённая рекомендация не ставится в очередь.  Needs: selftest~scripts/kaizen-dispatch.mjs",
+          "status": "covered",
+          "test_file": "scripts/kaizen-dispatch.mjs"
         },
         {
           "ac_id": "AC-1.2",
-          "title": "- AC-1.2 Без явного отбора не ставится ничего: одобрение это вход, а не умолчание.",
-          "status": "uncovered",
-          "test_file": null
+          "title": "- AC-1.2 Без явного отбора не ставится ничего: одобрение это вход, а не умолчание.  Needs: selftest~scripts/kaizen-dispa",
+          "status": "covered",
+          "test_file": "scripts/kaizen-dispatch.mjs"
         },
         {
           "ac_id": "AC-1.3",
-          "title": "- AC-1.3 Пункты приоритета P0 ставятся первыми. → тот же самотест",
-          "status": "uncovered",
-          "test_file": null
+          "title": "- AC-1.3 Пункты приоритета P0 ставятся первыми. → тот же самотест  Needs: selftest~scripts/kaizen-dispatch.mjs",
+          "status": "covered",
+          "test_file": "scripts/kaizen-dispatch.mjs"
         },
         {
           "ac_id": "AC-1.4",
-          "title": "- AC-1.4 Задание самодостаточно: называет точку встройки, требует буквальный якорь,",
-          "status": "uncovered",
-          "test_file": null
+          "title": "- AC-1.4 Задание самодостаточно: называет точку встройки, требует буквальный якорь,  Needs: selftest~scripts/kaizen-disp",
+          "status": "covered",
+          "test_file": "scripts/kaizen-dispatch.mjs"
         },
         {
           "ac_id": "AC-1.5",
-          "title": "- AC-1.5 Пункт, у которого точка встройки задана голым путём, получает предупреждение,",
-          "status": "uncovered",
-          "test_file": null
+          "title": "- AC-1.5 Пункт, у которого точка встройки задана голым путём, получает предупреждение,  Needs: selftest~scripts/kaizen-d",
+          "status": "covered",
+          "test_file": "scripts/kaizen-dispatch.mjs"
         },
         {
           "ac_id": "AC-2.1",
-          "title": "- AC-2.1 Отсутствующий путь засева пропускается, а не роняет создание копии.",
-          "status": "uncovered",
-          "test_file": null
+          "title": "- AC-2.1 Отсутствующий путь засева пропускается, а не роняет создание копии.  Needs: selftest~scripts/worktree-session.m",
+          "status": "covered",
+          "test_file": "scripts/worktree-session.mjs"
         },
         {
           "ac_id": "AC-2.2",
-          "title": "- AC-2.2 Секретный файл копируется, большой каталог переносится ссылкой. → тот же самотест",
-          "status": "uncovered",
-          "test_file": null
+          "title": "- AC-2.2 Секретный файл копируется, большой каталог переносится ссылкой. → тот же самотест  Needs: selftest~scripts/work",
+          "status": "covered",
+          "test_file": "scripts/worktree-session.mjs"
         },
         {
           "ac_id": "AC-2.3",
-          "title": "- AC-2.3 Каталог, объявленный копией, понижается до ссылки, и понижение сообщается.",
-          "status": "uncovered",
-          "test_file": null
+          "title": "- AC-2.3 Каталог, объявленный копией, понижается до ссылки, и понижение сообщается.  Needs: selftest~scripts/worktree-se",
+          "status": "covered",
+          "test_file": "scripts/worktree-session.mjs"
         },
         {
           "ac_id": "AC-2.4",
-          "title": "- AC-2.4 Снос отказывается при незакоммиченных правках или неотправленных коммитах и",
-          "status": "uncovered",
-          "test_file": null
+          "title": "- AC-2.4 Снос отказывается при незакоммиченных правках или неотправленных коммитах и  Needs: selftest~scripts/worktree-s",
+          "status": "covered",
+          "test_file": "scripts/worktree-session.mjs"
         },
         {
           "ac_id": "AC-2.5",
-          "title": "- AC-2.5 Принудительный снос разрешён и вслух называет, что теряется. → тот же самотест",
-          "status": "uncovered",
-          "test_file": null
+          "title": "- AC-2.5 Принудительный снос разрешён и вслух называет, что теряется. → тот же самотест  Needs: selftest~scripts/worktre",
+          "status": "covered",
+          "test_file": "scripts/worktree-session.mjs"
         },
         {
           "ac_id": "AC-2.6",
-          "title": "- AC-2.6 Рабочая копия создаётся РЯДОМ с репозиторием, а не внутри него. → тот же самотест",
-          "status": "uncovered",
-          "test_file": null
+          "title": "- AC-2.6 Рабочая копия создаётся РЯДОМ с репозиторием, а не внутри него. → тот же самотест  Needs: selftest~scripts/work",
+          "status": "covered",
+          "test_file": "scripts/worktree-session.mjs"
         }
       ]
     },

@@ -109,6 +109,24 @@ cat >> "$REPORT" <<EOF
 
 ---
 
+## 4c. Доказательство критериев приёмки (ось Needs: selftest~)
+
+Критерий может объявить ВИД своего доказательства прямо на своей строке. Объявление
+проверяется фактом: модуль обязан существовать И нести ИСПОЛНЯЕМУЮ самопроверку, а не
+просто упоминать флаг. Строка «БЕЗ объявления вовсе» это долг, а не покрытие.
+
+EOF
+
+if [ -f scripts/map-ac-coverage.mjs ]; then
+  node scripts/map-ac-coverage.mjs 2>&1 | sed -n '/Summary/,$p' >> "$REPORT" || true
+else
+  echo "(scripts/map-ac-coverage.mjs not present; skipping)" >> "$REPORT"
+fi
+
+cat >> "$REPORT" <<EOF
+
+---
+
 ## 5. Dev-system Kaizen (the way we build, trending)
 
 EOF

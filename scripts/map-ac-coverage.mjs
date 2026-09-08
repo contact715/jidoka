@@ -61,6 +61,50 @@ function isLikelyLegacy(waveNumber) {
 }
 
 // ── Test-file AC tag grep ──────────────────────────────────────────────────────
+/**
+ * Чистая: разобрать объявление ВИДА доказательства прямо на строке критерия.
+ *
+ * Форма: `Needs: selftest~<путь модуля>`. Смысл в том, что критерий сам говорит, чем
+ * он доказывается, вместо единственной жёсткой цепочки из шести стадий, которую нельзя
+ * честно пройти ни хуку, ни правилу стиля, ни решению человека — поэтому её и не
+ * запускали. В движке 158 скриптов несут рабочий --self-test, и до сих пор прибор их
+ * не видел вовсе: он искал теги `// AC-N` в tests/, а доказательства живут в scripts/.
+ *
+ * @param {string} text строка критерия
+ * @returns {null|{kind:'selftest', target:string}}
+ */
+export function parseNeedsDeclaration(text = '') {
+  const m = String(text).match(/Needs:\s*selftest~([A-Za-z0-9_./-]+)/);
+  return m ? { kind: 'selftest', target: m[1] } : null;
+}
+
+/**
+ * Проверить объявление ФАКТОМ, а не на слово: модуль обязан существовать И нести
+ * исполняемую самопроверку. Объявление, которое ни на что не указывает, — это
+ * доказательство, выписанное себе самому.
+ *
+ * @param {{kind:string,target:string}|null} decl
+ * @param {(p:string)=>boolean} exists
+ * @param {(p:string)=>string} read
+ * @returns {{ok:boolean, why:string}}
+ */
+export function resolveNeeds(decl, exists, read) {
+  if (!decl) return { ok: false, why: 'объявления нет' };
+  if (decl.kind !== 'selftest') return { ok: false, why: `вид доказательства не поддержан: ${decl.kind}` };
+  if (!exists(decl.target)) return { ok: false, why: `модуль не найден: ${decl.target}` };
+  let src = '';
+  try { src = read(decl.target); } catch { return { ok: false, why: `модуль не читается: ${decl.target}` }; }
+  // Не УПОМИНАНИЕ строки, а исполняемая точка входа. Первая версия принимала
+  // package.json, потому что там слово --self-test встречается в скриптах npm:
+  // прибор срабатывал на упоминание, а не на действие. Поймано собственным
+  // дымовым прогоном, а не самопроверкой.
+  const runnable = /(^|\n)\s*(export\s+)?(async\s+)?function\s+selfTest\b/.test(src)
+    || /(^|\n)\s*(const|let)\s+selfTest\s*=/.test(src)
+    || /process\.argv\.includes\(\s*['"]--self-test/.test(src);
+  if (!runnable) return { ok: false, why: `у модуля нет исполняемой самопроверки: ${decl.target}` };
+  return { ok: true, why: `самопроверка ${decl.target}` };
+}
+
 // Collect all lines from tests/ that contain "// AC-N" or "// wave-NN AC-N" patterns.
 // Explicitly excludes "// Falsifiability documentation (AC-7)" section comments
 // (per D5 / REFLEXION-1: those are prose section headers, not linkage tags).
@@ -231,6 +275,8 @@ function main() {
   let totalCovered = 0;
   let totalUncovered = 0;
   let legacySkipped = 0;
+  let needsDeclared = 0, needsResolved = 0, needsAbsent = 0;
+  const needsBroken = [];
   const legacySpecNames = [];
   let parsedSpecCount = 0;
 
@@ -267,7 +313,22 @@ function main() {
 
     for (const ac of acs) {
       const acLabel = ac.label ?? 'AC-?';
-      const { status, test_file } = classifyAC(waveId, acLabel, tagMap);
+      let { status, test_file } = classifyAC(waveId, acLabel, tagMap);
+
+      // Вторая ось доказательства: критерий сам объявил, ЧЕМ он доказывается.
+      // Проверяется фактом (модуль есть и несёт исполняемую самопроверку), а не
+      // на слово. Объявление, которое не резолвится, НЕ засчитывается и попадает
+      // в отдельный счётчик — иначе метка была бы бесплатной.
+      const decl = parseNeedsDeclaration(ac.text || '');
+      if (decl) {
+        needsDeclared++;
+        const r = resolveNeeds(decl, (rel) => fs.existsSync(path.join(ROOT, rel)),
+          (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8'));
+        if (r.ok) { needsResolved++; status = 'covered'; test_file = decl.target; }
+        else { needsBroken.push(`${waveId} ${acLabel}: ${r.why}`); }
+      } else {
+        needsAbsent++;
+      }
 
       acRows.push({
         ac_id: acLabel,
@@ -311,6 +372,12 @@ function main() {
   console.log(`  Covered (real assertions):   ${totalCovered}`);
   console.log(`  Uncovered (no test linkage): ${totalUncovered}`);
   console.log(`  Coverage %:                  ${coveredPct}% (linked-test coverage, NOT line/branch coverage)`);
+  console.log(`  ── ось объявленного доказательства (Needs: selftest~) ──`);
+  console.log(`  Критериев с объявлением:     ${needsDeclared}`);
+  console.log(`  Из них резолвятся фактом:    ${needsResolved}`);
+  console.log(`  Объявлено, но не резолвится: ${needsDeclared - needsResolved}`);
+  console.log(`  БЕЗ объявления вовсе:        ${needsAbsent}   ← это долг, а не покрытие`);
+  for (const b of needsBroken.slice(0, 10)) console.log(`      ! ${b}`);
   console.log(`  NOTE: generated it.todo stubs in tests/spec-stubs/ are TRACKED TODOS, not coverage.`);
   console.log(`  NOTE: ~0% is the HONEST baseline on first run — this is correct per D5.`);
 
@@ -384,7 +451,46 @@ function main() {
 }
 
 
-const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+// @divergence: "объявление на файл, который лишь УПОМИНАЕТ --self-test, не резолвится"
+// — первая версия принимала package.json, потому что слово встречается в скриптах npm:
+// величина говорила «доказано», а доказательства не было.
+function selfTest() {
+  let pass = 0, fail = 0;
+  const ok = (n, c) => { if (c) { pass++; console.log('  \u001b[32m\u2713\u001b[0m ' + n); } else { fail++; console.log('  \u001b[31m\u2717\u001b[0m ' + n); } };
+  const has = (p) => fs.existsSync(path.join(ROOT, p));
+  const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
+
+  ok('объявление разбирается со строки критерия',
+    (parseNeedsDeclaration('- **AC-1.1** текст. Needs: selftest~scripts/x.mjs') || {}).target === 'scripts/x.mjs');
+  ok('критерий без объявления даёт null',
+    parseNeedsDeclaration('- **AC-2** просто текст') === null);
+  ok('точка и дефис в пути не обрывают цель',
+    (parseNeedsDeclaration('Needs: selftest~scripts/ac-coverage-check.mjs') || {}).target === 'scripts/ac-coverage-check.mjs');
+
+  ok('настоящий модуль с самопроверкой резолвится',
+    resolveNeeds({ kind: 'selftest', target: 'scripts/kaizen-dispatch.mjs' }, has, read).ok === true);
+
+  // КРАСНЫЕ ПЛЕЧИ: каждое из них — вход, на котором прибор ОБЯЗАН сказать нет.
+  ok('РАСХОЖДЕНИЕ: объявление на файл, который лишь УПОМИНАЕТ --self-test, не резолвится',
+    resolveNeeds({ kind: 'selftest', target: 'package.json' }, has, read).ok === false);
+  ok('несуществующий модуль не резолвится',
+    resolveNeeds({ kind: 'selftest', target: 'scripts/нет-такого-модуля.mjs' }, has, read).ok === false);
+  ok('модуль без исполняемой самопроверки не резолвится',
+    resolveNeeds({ kind: 'selftest', target: 'scripts/meta-lib.mjs' }, has, read).ok === false);
+  ok('пустое объявление не резолвится',
+    resolveNeeds(null, has, read).ok === false);
+  ok('неподдержанный вид доказательства называется вслух',
+    /не поддержан/.test(resolveNeeds({ kind: 'e2e', target: 'x' }, has, read).why));
+
+  console.log(`\nmap-ac-coverage self-test: ${pass} passed, ${fail} failed`);
+  return fail === 0;
+}
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url) || (() => { try { return fs.realpathSync(process.argv[1] || '') === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; } })();
+
+if (isMain && process.argv.includes('--self-test')) {
+  process.exit(selfTest() ? 0 : 1);
+}
 
 if (isMain) {
   main();
