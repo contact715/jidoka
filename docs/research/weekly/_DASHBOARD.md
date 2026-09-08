@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 72% · shipped 112/156, open 44, regressed 0, ~1.08w to ship**
+**adoption 73% · shipped 114/156, open 42, regressed 0, ~1.09w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -118,7 +118,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W34-K1 | КИЛЛЕР-ФИЧА: реестр незакрытых ЧЕЛОВЕЧЕСКИХ шагов с возрастом (7 регистраций стоят 7 дней; ложится и в jidoka, и в ~/.claude) | scripts/pending-human.mjs#pendingSteps | present (symbol): scripts/pending-human.mjs#pendingSteps |
 | shipped | 2026-W34-K2 | КИЛЛЕР-ФИЧА: гейт полноты сдачи по типу результата (закрывает completeness-claimed-without-self-audit) | scripts/synthesis-coverage-audit.mjs#auditByKind | present (symbol): scripts/synthesis-coverage-audit.mjs#auditByKind |
 | shipped | 2026-W34-K3 | КИЛЛЕР-ФИЧА: паспорт стоимости гейта — свойство проверяется у КАЖДОГО проекта на движке | scripts/gate-audit.mjs#scopeAudit | present (symbol): scripts/gate-audit.mjs#scopeAudit |
-| open | 2026-W34-Q1 | БЫСТРАЯ ПОБЕДА: снять --dry с regenerate-coverage-report в CI и починить глоб map-ac-coverage (0 спек из 14) | scripts/map-ac-coverage.mjs#extractAcLabels | not yet present: scripts/map-ac-coverage.mjs#extractAcLabels |
+| shipped | 2026-W34-Q1 | БЫСТРАЯ ПОБЕДА: снять --dry с regenerate-coverage-report в CI и починить глоб map-ac-coverage (0 спек из 14) | scripts/ac-coverage-check.mjs#extractAcLabels | present (symbol): scripts/ac-coverage-check.mjs#extractAcLabels |
 | open | 2026-W34-Q2 | БЫСТРАЯ ПОБЕДА: три контрольные руки в memory-eval (без памяти, весь контекст, только лексика) + отказ печатать выигрыш без них | scripts/memory-eval.mjs#controlArms | not yet present: scripts/memory-eval.mjs#controlArms |
 | open | 2026-W34-R12 | Приёмка обязана различать СОЗДАНИЕ символа и ИЗМЕНЕНИЕ существующего: сегодня рекомендация-правка читается как уже внедрённая (найдено собственными записями этой недели) | scripts/kaizen-audit.mjs#changeKind | not yet present: scripts/kaizen-audit.mjs#changeKind |
 | open | 2026-W34-R13 | Тупик гейта: ledger-sync-gate блокирует пуш, а его собственное лечение --sync ничего не абсорбирует, потому что внутрисессионный журнал пишет записи без обязательного поля kind | scripts/session-pattern-log.mjs#emitIncident | not yet present: scripts/session-pattern-log.mjs#emitIncident |
@@ -160,7 +160,7 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W37-A1 | КИЛЛЕР-ФИЧА: обязательное красное плечо. У механизма с @closes-class обязан быть кейс в корпусе, помеченный красным, и пометка проверяется машиной: красный кейс обязан ждать ненулевой код возврата. Храповик на изменённых механизмах | scripts/oracle-divergence.mjs#redArmFor | present (symbol): scripts/oracle-divergence.mjs#redArmFor |
 | shipped | 2026-W37-A2 | Третий исход для застрявшей записи: исполнитель или датированное отклонение; висит дальше перестаёт быть умолчанием | scripts/kaizen-dispatch.mjs#stallDisposition | present (symbol): scripts/kaizen-dispatch.mjs#stallDisposition |
 | open | 2026-W37-A3 | Критерий приёмки объявляет ВИД доказательства на своей строке (Needs: selftest~модуль); в той же правке чинится глоб .mjs (закрывает W36-A8) | scripts/map-ac-coverage.mjs#resolveNeeds | not yet present: scripts/map-ac-coverage.mjs#resolveNeeds |
-| open | 2026-W37-A4 | Запись о сжатии контекста становится надгробием: диапазон забытого (headUuid/anchorUuid/tailUuid из compactMetadata), отпечаток сводки и честная её длина (сегодня null в 124 записях из 124); зеркалить в ~/.claude/hooks | hooks/compaction-trace.mjs#preservedSegment | not yet present: hooks/compaction-trace.mjs#preservedSegment |
+| shipped | 2026-W37-A4 | Запись о сжатии становится надгробием: числа и якоря забытого куска читаются из транскрипта, а не из поля, которого не бывает | hooks/compaction-trace.mjs#parseCompactMetadata | present (symbol): hooks/compaction-trace.mjs#parseCompactMetadata |
 | open | 2026-W37-A5 | Вывод упавшей самопроверки перестаёт выбрасываться и становится корпусом задач на починку (--emit-corpus в mutation-test) | scripts/mutation-test.mjs#emitCorpus | not yet present: scripts/mutation-test.mjs#emitCorpus |
 | open | 2026-W37-A6 | Свидетель прогона: квитанция несёт отпечаток поведения (команда, код возврата, изменённые пути, отбитые ядром попытки записи наружу); даёт первого вызывающего sandbox-run | scripts/lib/run-witness.mjs#witnessRun | not yet present: scripts/lib/run-witness.mjs#witnessRun |
 | open | 2026-W37-K2 | КИЛЛЕР-ФИЧА: правило считается внедрённым, когда накрыло ВСЕ пути записи, а не один; молчаливый список отвергается (режим FM-2.2, ноль механизмов на восемь имён) | scripts/invariant-doors.mjs#allDoorsCovered | not yet present: scripts/invariant-doors.mjs#allDoorsCovered |
