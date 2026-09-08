@@ -27,8 +27,10 @@
 // This exists because a skill/checklist that relies on the agent remembering to
 // read it is not mechanical. This script makes the check unavoidable.
 
-import { execSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { execSync, spawnSync } from 'node:child_process';
+import { existsSync, readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { recordTrip } from './meta-lib.mjs';
 import { fileURLToPath } from 'node:url';
 
@@ -53,10 +55,38 @@ const RULES = [
   { name: 'connection string',   re: '[a-z]+://[^:@/ ]+:[^@/ ]{6,}@',    allow: /(example|user:pass|<|postgres:(postgres|password)@|:password@|@(localhost|127\.0\.0\.1|db|postgres|redis|mysql|mongo)([:/]|$))/, severity: 'block', scopes: ['tree', 'history'] },
 ];
 
+// НЕТ ОТВЕТА и НЕТ СЕКРЕТОВ это разные вещи, и до 2026-09-07 они были одной.
+// git grep выходит с 1, когда совпадений нет, и со 128, когда ответить не может
+// (не репозиторий, битый индекс). Прежний `catch { return '' }` читал оба случая
+// как пустой результат, а пустой результат печатался как «no real secrets».
+// На дереве без .git сторож был зелёным ВСЕГДА, включая установленную копию
+// ~/.claude/jidoka, которую правила велят звать каждой сессии.
+// Класс: green-check-that-checks-nothing.
+class Unscannable extends Error {}
+
+// Предусловие: сторож обязан сначала убедиться, что ему ЕСТЬ ЧТО читать.
+// Проверка стоит доли миллисекунды и снимает весь класс разом, а не по одному
+// вызывающему.
+function assertScannable() {
+  const r = spawnSync('git', ['rev-parse', '--is-inside-work-tree'], { encoding: 'utf8' });
+  if (r.status !== 0 || String(r.stdout).trim() !== 'true') {
+    throw new Unscannable(
+      'это не рабочее дерево git, поэтому проверить нечего:\n' +
+      '  ' + (String(r.stderr || '').trim().split('\n')[0] || 'git rev-parse не подтвердил рабочее дерево'));
+  }
+}
+
 function grepTree(re) {
-  try {
-    return execSync(`git grep -nIE ${JSON.stringify(re)} -- .`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  } catch { return ''; } // git grep exits 1 when no match
+  // -e ОБЯЗАТЕЛЕН: шаблон приватного ключа начинается с дефиса, и без -e git читает
+  // его как неизвестную опцию и выходит со 129. Старый перехват глотал этот код
+  // наравне с «совпадений нет», поэтому правило «private key block» не срабатывало
+  // НИ РАЗУ за всё время жизни сторожа. Нашлось первым же красным кейсом.
+  const r = spawnSync('git', ['grep', '-nIE', '-e', re, '--', '.'], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
+  if (r.status === 0) return r.stdout;
+  if (r.status === 1) return '';                    // честное «совпадений нет»
+  throw new Unscannable(
+    `git grep не смог ответить (код ${r.status}):\n  ` +
+    (String(r.stderr || '').trim().split('\n')[0] || 'причина не названа'));
 }
 function grepHistory(re) {
   try {
@@ -78,9 +108,102 @@ function classify(line, r, scope) {
 }
 
 
+
+// ─── самопроверка ───────────────────────────────────────────────────────────
+// У сторожа не было НИ ОДНОГО кейса до 2026-09-07, и именно поэтому он полгода
+// печатал «секретов нет» на дереве без .git. Первое плечо здесь КРАСНОЕ: вход,
+// на котором сторож ОБЯЗАН отказать. Кейс, который умеет только зеленеть,
+// ничего не доказывает.
+// @divergence: "дерево без .git не объявляется чистым" — до правки
+// grepTree тот же вход давал «no real secrets» и код 0; правило и величина
+// расходились ровно здесь.
+function selfTest() {
+  const wf = writeFileSync;
+  const GUARD = fileURLToPath(import.meta.url);
+  const AKIA = 'AKIA' + 'IOSFODNN7EXAMPLE';        // склеено, чтобы не сработать на себе
+  let pass = 0, fail = 0;
+  const ok = (name, cond) => { if (cond) { pass++; console.log('  ✓ ' + name); } else { fail++; console.log('  ✗ ' + name); } };
+
+  const run = (cwd) => spawnSync(process.execPath, [GUARD], {
+    cwd, encoding: 'utf8',
+    env: { ...process.env, META_TRIP_LOG: join(cwd, 'trips.jsonl') },
+  });
+
+  const mk = (withGit) => {
+    const d = mkdtempSync(join(tmpdir(), 'ppg-'));
+    if (withGit) {
+      spawnSync('git', ['init', '-q'], { cwd: d });
+      wf(join(d, 'placeholder.txt'), 'seed\n');
+      spawnSync('git', ['add', '-A'], { cwd: d });
+      spawnSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'seed'], { cwd: d });
+    }
+    return d;
+  };
+
+  // 1. КРАСНОЕ ПЛЕЧО: дерево без .git и с настоящим ключом обязано быть отказом,
+  //    а не зелёной галочкой. Это тот вход, на котором сторож молчал.
+  const noGit = mk(false);
+  wf(join(noGit, 'leak.js'), 'const aws = "' + AKIA + '";\n');
+  const r1 = run(noGit);
+  ok('дерево без .git не объявляется чистым', r1.status !== 0);
+  ok('отказ назван словами, а не молчанием', /не могу|cannot|не является|not a git/i.test((r1.stderr || '') + (r1.stdout || '')));
+  ok('на непроверяемом дереве НЕ печатается «секретов нет»', !/no real secrets/.test((r1.stderr || '') + (r1.stdout || '')));
+  rmSync(noGit, { recursive: true, force: true });
+
+  // 2. Тот же файл в настоящем репозитории обязан БЛОКИРОВАТЬ. Пара к кейсу 1:
+  //    без неё «отказывает всегда» тоже прошло бы.
+  const withGit = mk(true);
+  wf(join(withGit, 'leak.js'), 'const aws = "' + AKIA + '";\n');
+  spawnSync('git', ['add', '-A'], { cwd: withGit });
+  const r2 = run(withGit);
+  ok('тот же ключ в настоящем репозитории блокирует', r2.status === 1);
+  ok('в отчёте назван вид секрета', /AWS access key/.test((r2.stderr || '') + (r2.stdout || '')));
+  rmSync(withGit, { recursive: true, force: true });
+
+  // 3. Приватный ключ в репозитории обязан блокировать. Отдельное плечо, потому
+  //    что именно это правило было мёртвым: шаблон начинается с дефиса, git читал
+  //    его как опцию, падал со 129, и код возврата глотался.
+  const keyRepo = mk(true);
+  wf(join(keyRepo, 'id_rsa'), '-----BEGIN' + ' RSA PRIVATE KEY-----\nabc\n');
+  spawnSync('git', ['add', '-A'], { cwd: keyRepo });
+  const r4 = run(keyRepo);
+  ok('блок приватного ключа блокирует (правило было мёртвым)', r4.status === 1);
+  ok('и назван по имени', /private key block/.test((r4.stderr || '') + (r4.stdout || '')));
+  rmSync(keyRepo, { recursive: true, force: true });
+
+  // 4. Чистый репозиторий обязан пройти. Без этого плеча сторож мог бы просто
+  //    всегда краснеть и оба верхних кейса были бы зелёными.
+  const clean = mk(true);
+  const r3 = run(clean);
+  ok('чистый репозиторий проходит', r3.status === 0);
+  ok('и говорит об этом прямо', /no real secrets/.test((r3.stderr || '') + (r3.stdout || '')));
+  rmSync(clean, { recursive: true, force: true });
+
+  console.log(`\npre-publish-guard self-test: ${pass} passed, ${fail} failed`);
+  return fail === 0;
+}
+
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
+if (isMain && process.argv.includes('--self-test')) {
+  process.exit(selfTest() ? 0 : 1);
+}
+
 if (isMain) {
+  try {
+    assertScannable();
+  } catch (e) {
+    if (!(e instanceof Unscannable)) throw e;
+    console.error('\n\x1b[31m✗ pre-publish-guard ОТКАЗАЛ: не могу проверить это дерево\x1b[0m\n');
+    console.error('  ' + e.message.split('\n').join('\n  '));
+    console.error('\n  Отсутствие ответа это НЕ отсутствие секретов. Раньше здесь печаталась');
+    console.error('  зелёная строка и код 0, то есть непроверенное выдавалось за чистое.');
+    console.error('  Что делать: запускать сторож из рабочего дерева git. Установленная копия');
+    console.error('  ~/.claude/jidoka репозиторием не является, и проверка там смысла не имеет.\n');
+    process.exit(3);
+  }
+
   for (const r of RULES) {
     for (const scope of r.scopes) {
       for (const line of SCAN[scope](r.re).split('\n')) classify(line, r, scope);
