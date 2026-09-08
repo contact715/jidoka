@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 73% · shipped 114/156, open 42, regressed 0, ~1.09w to ship**
+**adoption 74% · shipped 116/156, open 40, regressed 0, ~1.07w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -159,10 +159,10 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | open | 2026-W36-B5 | Документ честного состояния приводится в соответствие с прогоном (21/21 против 99/99) | docs/HONEST_SYSTEM_STATE.md#sixtySecondCheck | not yet present: docs/HONEST_SYSTEM_STATE.md#sixtySecondCheck |
 | shipped | 2026-W37-A1 | КИЛЛЕР-ФИЧА: обязательное красное плечо. У механизма с @closes-class обязан быть кейс в корпусе, помеченный красным, и пометка проверяется машиной: красный кейс обязан ждать ненулевой код возврата. Храповик на изменённых механизмах | scripts/oracle-divergence.mjs#redArmFor | present (symbol): scripts/oracle-divergence.mjs#redArmFor |
 | shipped | 2026-W37-A2 | Третий исход для застрявшей записи: исполнитель или датированное отклонение; висит дальше перестаёт быть умолчанием | scripts/kaizen-dispatch.mjs#stallDisposition | present (symbol): scripts/kaizen-dispatch.mjs#stallDisposition |
-| open | 2026-W37-A3 | Критерий приёмки объявляет ВИД доказательства на своей строке (Needs: selftest~модуль); в той же правке чинится глоб .mjs (закрывает W36-A8) | scripts/map-ac-coverage.mjs#resolveNeeds | not yet present: scripts/map-ac-coverage.mjs#resolveNeeds |
+| shipped | 2026-W37-A3 | Критерий приёмки объявляет ВИД своего доказательства на своей строке (Needs: selftest~), объявление проверяется фактом а не на слово | scripts/map-ac-coverage.mjs#resolveNeeds | present (symbol): scripts/map-ac-coverage.mjs#resolveNeeds |
 | shipped | 2026-W37-A4 | Запись о сжатии становится надгробием: числа и якоря забытого куска читаются из транскрипта, а не из поля, которого не бывает | hooks/compaction-trace.mjs#parseCompactMetadata | present (symbol): hooks/compaction-trace.mjs#parseCompactMetadata |
 | open | 2026-W37-A5 | Вывод упавшей самопроверки перестаёт выбрасываться и становится корпусом задач на починку (--emit-corpus в mutation-test) | scripts/mutation-test.mjs#emitCorpus | not yet present: scripts/mutation-test.mjs#emitCorpus |
 | open | 2026-W37-A6 | Свидетель прогона: квитанция несёт отпечаток поведения (команда, код возврата, изменённые пути, отбитые ядром попытки записи наружу); даёт первого вызывающего sandbox-run | scripts/lib/run-witness.mjs#witnessRun | not yet present: scripts/lib/run-witness.mjs#witnessRun |
 | open | 2026-W37-K2 | КИЛЛЕР-ФИЧА: правило считается внедрённым, когда накрыло ВСЕ пути записи, а не один; молчаливый список отвергается (режим FM-2.2, ноль механизмов на восемь имён) | scripts/invariant-doors.mjs#allDoorsCovered | not yet present: scripts/invariant-doors.mjs#allDoorsCovered |
 | shipped | 2026-W37-K3 | КИЛЛЕР-ФИЧА: браузерное наблюдение засчитывается по ПРИГОДНОСТИ (панель видима, высота больше нуля), а не по факту вызова инструмента | hooks/browser-verify-gate.mjs#observationUsable | present (symbol): hooks/browser-verify-gate.mjs#observationUsable |
-| open | 2026-W37-Q1 | БЫСТРАЯ ПОБЕДА: контрфактическая пара в проверке замещения памяти — урок X, затем отменяющий его X-штрих, два условия проверяются раздельно | scripts/memory-supersede-check.mjs#counterfactualPair | not yet present: scripts/memory-supersede-check.mjs#counterfactualPair |
+| shipped | 2026-W37-Q1 | БЫСТРАЯ ПОБЕДА: контрфактическая пара в проверке замещения памяти — применение предложенной пометки обязано заглушить урок, и два условия проверяются раздельно | scripts/memory-supersede-check.mjs#detectContradictions | present (symbol): scripts/memory-supersede-check.mjs#detectContradictions |
