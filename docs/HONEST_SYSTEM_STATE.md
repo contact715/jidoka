@@ -14,6 +14,14 @@
 
 ---
 
+
+> **Почему эти числа разъезжались.** До 2026-09-08 документ обещал 75 тестов и 97/97 в одном
+> месте и 21/21 в другом, при реальных 92 и 106/106. Числа вписаны руками и стареют молча:
+> документ, который врёт на первой же команде, учит не проверять. Сверять при каждом
+> изменении корпуса; команды рядом с числами приведены именно для того, чтобы сверка стоила
+> одну минуту.
+
+
 ## 1. Что реально работает — проверяется вживую
 
 Каждая строка запускается на чистом клоне **без `npm install`** (движок на голых
@@ -22,14 +30,14 @@ node-builtins).
 | Возможность | Команда проверки | Что увидите |
 |---|---|---|
 | Meta-Mistake Engine (closed-loop) | `node scripts/meta-audit.mjs` | классифицирует промахи: holding / regression / ungated; ловит рецидив *сквозь* gate |
-| Тесты ядра движка (zero-dep) | `npm run test:engine` | 75 pass — чистые функции + интеграция closed-loop |
+| Тесты ядра движка (zero-dep) | `npm run test:engine` | 92 pass — чистые функции + интеграция closed-loop |
 | Самопроверка целостности | `node scripts/instantiation-audit.mjs` | 0 ghosts: каждый заявленный механизм указывает на реальный объект |
 | Честность входного сигнала | `node scripts/meta-honesty.mjs` | аудит ledger на self-confirming/booster-язык |
 | Механический secret-гейт | `node scripts/pre-publish-guard.mjs` | сканирует дерево + **всю git-историю**, блокирует push на секреты/PII |
 | CI на чистом клоне | см. `.github/workflows/ci.yml` | 42 шага-гейта, exit 0 без `npm install` |
 | Декомпозиция (ratchet) | `npm run check:structural` | LOC/hook-лимиты, baseline не может ухудшиться |
 | Тренд обучения | `node scripts/meta-trend.mjs` | покрытие gate / time-to-gate / regression-rate |
-| Agent eval suite (детерминир.) | `node scripts/eval-suite.mjs` | 97/97 кейсов: каждый движковый механизм ведёт себя по спеке, регрессия валит CI |
+| Agent eval suite (детерминир.) | `node scripts/eval-suite.mjs` | 106/106 кейсов: каждый движковый механизм ведёт себя по спеке, регрессия валит CI |
 | Измеримость LLM-судей | `node scripts/agent-eval-dashboard.mjs` | измерены 10 из 11 агентов с golden-кейсами; слабый назван вслух (debate-defender 1/2) |
 | Калибровка судей (запись, а не факт прогона) | `node scripts/judge-calibration-state.mjs --dry` | 6 из 7 судей с записью калибровки, из них надёжных 5; запись устаревает при смене эталонов |
 | Контракт конвейера (E2E) | `node scripts/pipeline-contract.mjs` | граф оркестратора well-formed: 37 узлов резолвятся в реальных агентов/скрипты, у каждой фазы артефакт |
@@ -102,8 +110,8 @@ TLA+-спека andon (`docs/formal/AndonHalt.tla`), и таблица «мех�
 
 ```bash
 node scripts/instantiation-audit.mjs   # 0 ghosts — заявления = реальность
-node scripts/eval-suite.mjs            # 21/21 — каждый механизм по спеке
-node scripts/agent-eval-dashboard.mjs  # какие LLM-судьи измерены (3/3 с golden)
+node scripts/eval-suite.mjs            # 106/106 — каждый механизм по спеке
+node scripts/agent-eval-dashboard.mjs  # какие LLM-судьи измерены
 node scripts/pipeline-contract.mjs     # граф конвейера well-formed
 npm run test:engine                    # 14 pass — ядро под тестами
 node scripts/meta-audit.mjs            # closed-loop движок самообучения

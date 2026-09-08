@@ -192,7 +192,8 @@
     "mail:open": "node scripts/session-mail.mjs --open",
     "receipt": "node scripts/gate-receipt.mjs --list",
     "receipt:verify": "node scripts/gate-receipt.mjs --verify",
-    "kaizen:stalled": "node scripts/kaizen-dispatch.mjs stalled"
+    "kaizen:stalled": "node scripts/kaizen-dispatch.mjs stalled",
+    "memory:eval": "node scripts/memory-eval.mjs"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
