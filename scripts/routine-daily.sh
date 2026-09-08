@@ -77,13 +77,28 @@ CANON=""
 for c in "${JIDOKA_CANON:-}" "$HOME/jidoka-framework" "$HOME/.jidoka-weekly"; do
   if [ -n "$c" ] && [ -f "$c/scripts/install-into.mjs" ] && [ "$c" != "$ROOT" ]; then CANON="$c"; break; fi
 done
+# Код возврата больше НЕ глотается. Раньше здесь стояло `|| true`, и прибор мог
+# краснеть сколько угодно: рутина этого не замечала, а печатная строка в длинном
+# логе становится обоями. Хард-фейл рутины тоже не годится: расхождение копится
+# неделями, и ежедневный отказ научил бы обходить рутину целиком. Поэтому третий
+# исход: расхождение получает ВОЗРАСТ в очереди человеческих шагов, где его видно
+# в каждой стартовой сводке и где просрочка считается числом.
+PARITY_RC=0
 if [ -n "$CANON" ]; then
   echo "   канон: $CANON"
-  (cd "$CANON" && node scripts/install-into.mjs --check-parity 2>&1) || true
+  (cd "$CANON" && node scripts/install-into.mjs --check-parity 2>&1); PARITY_RC=$?
 elif [ -f scripts/install-into.mjs ]; then
-  node scripts/install-into.mjs --check-parity 2>&1 || true
+  node scripts/install-into.mjs --check-parity 2>&1; PARITY_RC=$?
 else
   echo "   (scripts/install-into.mjs не найден, пропускаем)"
+  PARITY_RC=-1
+fi
+
+if [ "$PARITY_RC" -gt 0 ] 2>/dev/null; then
+  echo "   ⚠ паритет РАЗОШЁЛСЯ (код $PARITY_RC): установленная копия и канон читают разный код"
+  node scripts/pending-human.mjs --emit '[{"id":"parity:canon-vs-installed","what":"свести установленную копию ~/.claude/jidoka с каноном (node scripts/install-into.mjs)","why":"метрики и гейты читают РАЗНЫЙ код: прибор паритета краснеет, и до 2026-09-07 его код возврата глотался через || true","source":"routine-daily.sh#parity"}]' >/dev/null 2>&1 || true
+elif [ "$PARITY_RC" = "0" ]; then
+  node scripts/pending-human.mjs --close parity:canon-vs-installed --by routine-daily >/dev/null 2>&1 || true
 fi
 
 # 4. Достижимость git-хуков из КАЖДОЙ рабочей копии (2026-W35-A4).

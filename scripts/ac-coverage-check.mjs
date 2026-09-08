@@ -155,7 +155,7 @@ function run() {
 
 // ── self-test ────────────────────────────────────────────────────────────────
 function selfTest() {
-  let pass = 0; const total = 6;
+  let pass = 0; const total = 8;
   // extraction
   const spec = '## ACs\n**A1** [micro] the panel renders the count badge always\n**AC-login** [macro] login flow round-trips the token correctly\nbody [EARS-3] WHEN x, the system SHALL y\n';
   const labels = extractAcLabels(spec);
@@ -166,6 +166,32 @@ function selfTest() {
   if (testReferencesLabel('it("badge renders", () => {}) // AC-A1', 'A1')) { pass++; console.log('  ok  matches AC-A1 tag'); } else console.log('  FAIL AC-A1 tag');
   if (testReferencesLabel('describe("[EARS-3] sla", ...)', 'EARS-3')) { pass++; console.log('  ok  matches [EARS-3]'); } else console.log('  FAIL [EARS-3]');
   if (!testReferencesLabel('nothing relevant here', 'A1')) { pass++; console.log('  ok  no false match'); } else console.log('  FAIL false match');
+  // ── сторож против повторного расхождения двух копий одного правила ──────────
+  // Правило разбора критериев живёт в ДВУХ файлах, и это уже разъезжалось: узкая
+  // копия в sync-specs-to-memory требовала скобочную метку, из-за чего map-ac-coverage
+  // печатал «Total ACs extracted: 0» при 81 критерии на диске. Пока копии две, их
+  // совпадение проверяет машина, а не обещание в комментарии.
+  const REAL = '- **AC-1.1** `docs/evals/x.jsonl` seeded for three key agents and wired\n'
+             + '- **AC-2.10** deterministic scoring layer with machine-checkable assertions\n';
+  const mine = extractAcLabels(REAL);
+  // Вторая копия читается С ДИСКА, а не импортируется: импорт разорвал бы замкнутость
+  // профиля установки (поймано его же самопроверкой), и проверял бы то, что удалось
+  // подгрузить, вместо того, что реально лежит в файле.
+  let theirs = null;
+  try {
+    const src = readFileSync(new URL('./sync-specs-to-memory.mjs', import.meta.url), 'utf8');
+    const lit = src.match(/export const AC_RE = \/(.+)\/([gimsuy]*);/);
+    if (lit) {
+      const re = new RegExp(lit[1], lit[2].includes('g') ? lit[2] : lit[2] + 'g');
+      theirs = [...REAL.matchAll(re)].map((m) => (m[0].match(/\*\*(AC-[\w.]+|[A-Z]\d+)\*\*/) || [])[1]).filter(Boolean);
+    }
+  } catch { theirs = null; }
+  if (mine.includes('AC-1.1') && mine.includes('AC-2.10')) { pass++; console.log('  ok  точка в номере критерия разбирается'); }
+  else console.log('  FAIL точка в номере: ' + JSON.stringify(mine));
+  if (theirs === null) console.log('  FAIL вторую копию правила не удалось прочитать — расхождение НЕ проверено');
+  else if (theirs.length === mine.length && theirs.every((l) => mine.includes(l))) { pass++; console.log('  ok  вторая копия правила даёт ТО ЖЕ'); }
+  else console.log(`  FAIL копии разошлись: здесь ${JSON.stringify(mine)}, там ${JSON.stringify(theirs)}`);
+
   console.log(`[ac-coverage] self-test: ${pass}/${total}`);
   return pass === total ? 0 : 1;
 }

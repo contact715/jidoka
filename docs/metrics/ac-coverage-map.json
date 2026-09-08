@@ -1,13 +1,601 @@
 {
-  "generated_at": "2026-08-24T16:30:39.546Z",
-  "total_specs_scanned": 0,
-  "legacy_format_specs_skipped": 0,
-  "legacy_spec_ids": [],
-  "parseable_specs": 0,
-  "total_acs": 0,
+  "generated_at": "2026-09-08T02:45:10.881Z",
+  "total_specs_scanned": 14,
+  "legacy_format_specs_skipped": 7,
+  "legacy_spec_ids": [
+    "wave-claim-wave-id",
+    "wave-cost-ledger",
+    "wave-judge-debias",
+    "wave-memory-validity",
+    "wave-tui-control",
+    "wave-tui-interactive",
+    "wave-tui-top"
+  ],
+  "parseable_specs": 7,
+  "total_acs": 86,
   "covered": 0,
-  "uncovered": 0,
+  "uncovered": 86,
   "coverage_pct": 0,
   "note": "covered = real test with wave-qualified AC tag (// wave-NN AC-N:) AND real assertions (not it.todo). uncovered = everything else. Generated it.todo stubs in tests/spec-stubs/ are tracked work items, NOT coverage — the stub dir is excluded from the coverage scan to prevent self-inflation.",
-  "waves": []
+  "waves": [
+    {
+      "wave_id": "agent-resilience",
+      "spec_file": "docs/specs/agent-resilience_MASTER_SPEC.md",
+      "total_acs": 12,
+      "covered": 0,
+      "uncovered": 12,
+      "acs": [
+        {
+          "ac_id": "AC-1.1",
+          "title": "- AC-1.1 Временные коды (529, 502, 503, 504, обрывы соединения) классифицируются как",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.2",
+          "title": "- AC-1.2 Смертельные коды (400, 401, 403, 404, 413, 500, нет сессии, нет бинарника)",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.3",
+          "title": "- AC-1.3 Порядок таблицы соблюдён: 500 читается как смертельный, а не как временный.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.4",
+          "title": "- AC-1.4 Упор в лимит без разрешения ждать останавливается чисто и объясняет, как разрешить.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.5",
+          "title": "- AC-1.5 Неопознанный сбой не повторяется и помечается неопознанным. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.6",
+          "title": "- AC-1.6 Пауза растёт и имеет потолок 60 секунд. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.1",
+          "title": "- AC-2.1 Второй застой того же признака подряд без прогресса останавливает забег.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.2",
+          "title": "- AC-2.2 Тот же признак ПОСЛЕ прогресса перепланирует, а не останавливает. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.3",
+          "title": "- AC-2.3 Два разных признака не складываются в остановку. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.4",
+          "title": "- AC-2.4 После остановки счётчик перезапускается: одна петля сообщается один раз.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-3.1",
+          "title": "- AC-3.1 Проигрыватель воспроизводит оба правила и считает долю преждевременных остановок.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-3.2",
+          "title": "- AC-3.2 Правка файла считается прогрессом, чтение — нет. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        }
+      ]
+    },
+    {
+      "wave_id": "governance-of-change",
+      "spec_file": "docs/specs/governance-of-change_MASTER_SPEC.md",
+      "total_acs": 10,
+      "covered": 0,
+      "uncovered": 10,
+      "acs": [
+        {
+          "ac_id": "AC-1.1",
+          "title": "- AC-1.1 Разрешение внутри области и срока разрешает действие, а вне области отказывает.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.2",
+          "title": "- AC-1.2 Истёкшее разрешение отвечает «это уже разрешали однажды, и оно истекло», а не",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.3",
+          "title": "- AC-1.3 Бессрочных разрешений не бывает: запись без срока никогда не считается живой.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.4",
+          "title": "- AC-1.4 Сторож отличает ДЕЙСТВИЕ от УПОМИНАНИЯ: флаг, названный внутри текста сообщения",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.1",
+          "title": "- AC-2.1 Перевёрнутая норма при неизменной версии блокирует, и причина называет суть.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.2",
+          "title": "- AC-2.2 То же изменение с поднятой версией проходит как поправка и не блокирует.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.3",
+          "title": "- AC-2.3 Переформатирование и правка только во frontmatter не считаются правкой нормы.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.4",
+          "title": "- AC-2.4 Незарегистрированный документ сообщается, но не блокирует: принятие механизма это",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-3.1",
+          "title": "- AC-3.1 Запись о сжатии помнит сессию и повод; автоматический повод отличается от ручного.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-3.2",
+          "title": "- AC-3.2 После сжатия видна длина уцелевшей сводки. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        }
+      ]
+    },
+    {
+      "wave_id": "kaizen-dispatch-and-isolation",
+      "spec_file": "docs/specs/kaizen-dispatch-and-isolation_MASTER_SPEC.md",
+      "total_acs": 11,
+      "covered": 0,
+      "uncovered": 11,
+      "acs": [
+        {
+          "ac_id": "AC-1.1",
+          "title": "- AC-1.1 Отгруженная или отклонённая рекомендация не ставится в очередь.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.2",
+          "title": "- AC-1.2 Без явного отбора не ставится ничего: одобрение это вход, а не умолчание.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.3",
+          "title": "- AC-1.3 Пункты приоритета P0 ставятся первыми. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.4",
+          "title": "- AC-1.4 Задание самодостаточно: называет точку встройки, требует буквальный якорь,",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.5",
+          "title": "- AC-1.5 Пункт, у которого точка встройки задана голым путём, получает предупреждение,",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.1",
+          "title": "- AC-2.1 Отсутствующий путь засева пропускается, а не роняет создание копии.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.2",
+          "title": "- AC-2.2 Секретный файл копируется, большой каталог переносится ссылкой. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.3",
+          "title": "- AC-2.3 Каталог, объявленный копией, понижается до ссылки, и понижение сообщается.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.4",
+          "title": "- AC-2.4 Снос отказывается при незакоммиченных правках или неотправленных коммитах и",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.5",
+          "title": "- AC-2.5 Принудительный снос разрешён и вслух называет, что теряется. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.6",
+          "title": "- AC-2.6 Рабочая копия создаётся РЯДОМ с репозиторием, а не внутри него. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        }
+      ]
+    },
+    {
+      "wave_id": "spec-reach-and-memory-evidence",
+      "spec_file": "docs/specs/spec-reach-and-memory-evidence_MASTER_SPEC.md",
+      "total_acs": 11,
+      "covered": 0,
+      "uncovered": 11,
+      "acs": [
+        {
+          "ac_id": "AC-1.1",
+          "title": "- AC-1.1 Путь к скрипту, хуку и githook-файлу распознаётся в тексте спеки.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.2",
+          "title": "- AC-1.2 Спека с бОльшим числом упоминаний считается регулирующей; одиночное упоминание",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.3",
+          "title": "- AC-1.3 Обратная ось не считает непрошеным файл, у которого спека есть. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.4",
+          "title": "- AC-1.4 Свежий файл без спеки помечается отдельно от старого: окно настраивается.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.1",
+          "title": "- AC-2.1 Файл под спекой даёт строку вставки с её именем.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.2",
+          "title": "- AC-2.2 Файл вне известных корней и файл вне индекса не дают ничего. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.3",
+          "title": "- AC-2.3 Каталог, совпадающий по префиксу, но другой, не считается своим. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-3.1",
+          "title": "- AC-3.1 Верное первое попадание засчитывается, неверное нет, и в отчёте видно ожидание.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-3.2",
+          "title": "- AC-3.2 Ответ на вопрос, которого нет в корпусе, считается ПРОВАЛОМ воздержания.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-3.3",
+          "title": "- AC-3.3 Промахи разложены по способностям, а не сведены в одно число. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-3.4",
+          "title": "- AC-3.4 Случай без проверяемого ожидания не может пройти молча. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        }
+      ]
+    },
+    {
+      "wave_id": "system-truth-and-rework",
+      "spec_file": "docs/specs/system-truth-and-rework_MASTER_SPEC.md",
+      "total_acs": 10,
+      "covered": 0,
+      "uncovered": 10,
+      "acs": [
+        {
+          "ac_id": "AC-1.1",
+          "title": "- AC-1.1 Красный прогон CI назван красным, и виден его возраст.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.2",
+          "title": "- AC-1.2 Неизвестный вердикт называется неизвестным, а идущий прогон не выдаётся за успех.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.3",
+          "title": "- AC-1.3 Пустой реестр ошибок читается как неизвестный, а не как ноль дней. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.4",
+          "title": "- AC-1.4 Возраст округляется ВНИЗ: документ, тронутый утром, имеет возраст 0 дней, а не 1.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.5",
+          "title": "- AC-1.5 Протухший кеш не признаётся свежим, отсутствующий тоже. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.1",
+          "title": "- AC-2.1 Прямая цепочка без перемоток даёт ноль брошенного.",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.2",
+          "title": "- AC-2.2 Перемотка оставляет брошенную ветку, и она посчитана. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.3",
+          "title": "- AC-2.3 Выжившей считается ветка последней строки файла. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.4",
+          "title": "- AC-2.4 Самоссылающийся узел не зацикливает обход. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.5",
+          "title": "- AC-2.5 Пустой вход не делит на ноль. → тот же самотест",
+          "status": "uncovered",
+          "test_file": null
+        }
+      ]
+    },
+    {
+      "wave_id": "wave-federation",
+      "spec_file": "docs/specs/wave-federation_MASTER_SPEC.md",
+      "total_acs": 5,
+      "covered": 0,
+      "uncovered": 5,
+      "acs": [
+        {
+          "ac_id": "F1",
+          "title": "- F1 `project-steward.md` role + `PROJECT_CHARTER_TEMPLATE.md` + `charter-check.mjs` (+ self-test, eval).",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "F2",
+          "title": "- F2 Handshake wired into `dev-pipeline` (step 0.5: in a project → steward + charter before work)",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "F3",
+          "title": "- F3 `install-into` ships project-steward + charter template + charter-check into new projects;",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "F4",
+          "title": "- F4 Fill `PROJECT_CHARTER.md` for Mosco + Castells from their North Star + real structure; prove",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "F5",
+          "title": "- F5 Snapshot global, refresh counts, commit + push.",
+          "status": "uncovered",
+          "test_file": null
+        }
+      ]
+    },
+    {
+      "wave_id": "wave-frontier",
+      "spec_file": "docs/specs/wave-frontier_MASTER_SPEC.md",
+      "total_acs": 27,
+      "covered": 0,
+      "uncovered": 27,
+      "acs": [
+        {
+          "ac_id": "AC-1.1",
+          "title": "- AC-1.1 `docs/evals/<agent>/golden-cases.jsonl` seeded for ≥3 key agents (constitutional-reviewer,",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.2",
+          "title": "- AC-1.2 Deterministic scoring layer: each case carries machine-checkable assertions (regex/",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.3",
+          "title": "- AC-1.3 Baseline registry `docs/evals/_baseline.json` — per-agent pass-rate; a run compares",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.4",
+          "title": "- AC-1.4 LLM-judge layer optional (run-evals already has it) — DORMANT until run with a model. `[DORMANT, honest]`",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.5",
+          "title": "- AC-1.5 `npm run eval` runs the deterministic suite, exits 1 on regression. Wired into CI. `[FULL]`",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-1.6",
+          "title": "- AC-1.6 Fitness hook: eval pass-rate feeds meta-trend as the \"are we getting better\" metric. `[FULL]`",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.1",
+          "title": "- AC-2.1 `scripts/judge-panel.mjs` — runs N judges (default 3) with DISTINCT rubrics (correctness /",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.2",
+          "title": "- AC-2.2 Rubric rotation: rubrics are pulled from a registry so two runs don't use identical framing",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.3",
+          "title": "- AC-2.3 Disagreement surfaced: if judges split, output is `CONTESTED` (escalate to human), not a",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-2.4",
+          "title": "- AC-2.4 Deterministic self-test proving majority/contested/consensus logic without LLM. `[FULL]`",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-3.1",
+          "title": "- AC-3.1 `scripts/budget-gate.mjs` — reads a per-wave budget (tool calls / est. tokens), tracks",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-3.2",
+          "title": "- AC-3.2 `docs/quality/budget-policy.json` — declarative limits per tier (trivial/normal/critical). `[FULL]`",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-3.3",
+          "title": "- AC-3.3 Runaway guard: a single agent exceeding its solo cap halts before the global cap. `[FULL]`",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-3.4",
+          "title": "- AC-3.4 Deterministic self-test (under / at / over budget). `[FULL]`",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-4.1",
+          "title": "- AC-4.1 `scripts/policy-sandbox.mjs` — given an agent slug + a changed-file list, verifies every",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-4.2",
+          "title": "- AC-4.2 Tool-grant check: an agent's declared_tools is the allowlist; using an undeclared tool is",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-4.3",
+          "title": "- AC-4.3 Honest boundary doc: this is POLICY isolation, not OS isolation — names the limitation and",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-4.4",
+          "title": "- AC-4.4 Deterministic self-test (in-scope pass, out-of-scope block). `[FULL]`",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-5.1",
+          "title": "- AC-5.1 `scripts/orchestration-planner.mjs` — given a task descriptor (type, risk, surfaces,",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-5.2",
+          "title": "- AC-5.2 Rules registry `docs/quality/orchestration-rules.json` — declarative: trivial → skip",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-5.3",
+          "title": "- AC-5.3 dev-pipeline skill references the planner: orchestrator calls it to compose the graph",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-5.4",
+          "title": "- AC-5.4 Honest boundary: this composes from a FIXED agent set by rules; it does not yet generate",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-5.5",
+          "title": "- AC-5.5 Deterministic self-test (trivial task → minimal graph; critical backend → full graph). `[FULL]`",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-6.1",
+          "title": "- AC-6.1 `scripts/memory-consolidate.mjs` — reads the cross-project ledger + retros, clusters by",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-6.2",
+          "title": "- AC-6.2 Recency+frequency weighting: a lesson seen often and recently ranks above a one-off. `[FULL]`",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-6.3",
+          "title": "- AC-6.3 Decay: lessons untouched for a long window are demoted (ties into meta-decay). `[FULL]`",
+          "status": "uncovered",
+          "test_file": null
+        },
+        {
+          "ac_id": "AC-6.4",
+          "title": "- AC-6.4 Deterministic self-test on a synthetic ledger. `[FULL]`",
+          "status": "uncovered",
+          "test_file": null
+        }
+      ]
+    }
+  ]
 }

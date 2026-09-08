@@ -100,7 +100,7 @@ function collectTestTags() {
           full === STUBS_DIR
         ) continue;
         walkDir(full);
-      } else if (entry.isFile() && /\.(ts|tsx|js|jsx)$/.test(entry.name)) {
+      } else if (entry.isFile() && /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(entry.name)) {
         let content;
         try {
           content = fs.readFileSync(full, 'utf8');
@@ -210,7 +210,12 @@ function main() {
   try {
     specFiles = fs
       .readdirSync(SPECS_DIR)
-      .filter((f) => /^wave-[\d]/.test(f) && f.endsWith('_MASTER_SPEC.md'))
+      // Раньше требовалось имя вида wave-<цифра>. Волны давно называются словами
+      // (wave-claim-wave-id, agent-resilience), поэтому фильтр не совпадал НИ С ОДНОЙ
+      // из 14 спек на диске и прибор honestly печатал «Specs scanned: 0» три недели.
+      // Отчёт W37 указывал на другую строку (глоб обхода кода); проверка на диске
+      // показала, что причина здесь.
+      .filter((f) => f.endsWith('_MASTER_SPEC.md'))
       .sort();
   } catch (err) {
     console.error(`[map-ac-coverage] ERROR: could not read ${SPECS_DIR}: ${err.message}`);

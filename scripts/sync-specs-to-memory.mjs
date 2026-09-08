@@ -108,8 +108,15 @@ function extractDependsOn(content) {
 
 // ── AC line extraction ─────────────────────────────────────────────────
 // Matches lines like: **A1** [...] text, or: 1. [micro] text, or: - AC-A1: text
-export const AC_RE = /\*\*(AC-[\w]+|[A-Z]\d+)\*\*\s+\[(?:micro|macro|carto|synthesis)\][^\n]*|^\d+\.\s+\[(?:micro|macro|carto|synthesis)\][^\n]*/gm;
-export const AC_LABEL_RE = /\*\*(AC-[\w]+|[A-Z]\d+)\*\*/;
+// ОДНА правда на два файла. Здесь жила УЗКАЯ копия: она требовала скобочную метку
+// [micro|macro|carto|synthesis] и не пускала точку в номер критерия. В спеках на диске
+// 81 критерий вида `- **AC-1.1** ...`, со скобочной меткой из них НОЛЬ, поэтому копия
+// не совпадала ни разу, а map-ac-coverage импортировал именно её и честно печатал
+// «Total ACs extracted: 0». Широкий и проверенный вариант с 2026-08 живёт в
+// scripts/ac-coverage-check.mjs:63; здесь он теперь дословно тот же, а совпадение
+// двух копий проверяется машиной (ac-coverage-check --self-test).
+export const AC_RE = /\*\*(AC-[\w.]+|[A-Z]\d+)\*\*\s+\[(?:micro|macro|carto|synthesis)\][^\n]*|^\s*[-*]?\s*\*\*(AC-[\w.]+|[A-Z]\d+)\*\*[^\n]*|^\d+\.\s+\[(?:micro|macro|carto|synthesis)\][^\n]*/gm;
+export const AC_LABEL_RE = /\*\*(AC-[\w.]+|[A-Z]\d+)\*\*/;
 
 export function extractACs(content) {
   const acs = [];
