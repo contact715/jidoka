@@ -279,6 +279,21 @@ function selfTest() {
   const entityNames = (cand || []).map((c) => c.entity);
   const theOne = (cand || []).find((c) => c.entity === 'config-x');
 
+  // ── круг замещения, прогоняемый ЦЕЛИКОМ (2026-W37-Q1) ──────────────────────
+  // Отдельная сущность, чтобы не задеть существующие плечи. Прогоняем то, что прибор
+  // САМ предложил: берём его suggestedMarker, подставляем вместо старого наблюдения и
+  // спрашиваем заново. Если предложение не заглушает находку, круг разомкнут, и до
+  // сегодня этого не проверял никто.
+  const cfBase = [{ name: 'cf-entity', type: 'AntiPattern',
+    observations: ['Status: experimental', 'Status: production'] }];
+  const counterfactualBefore = detectContradictions(cfBase, { today });
+  const cfMarker = counterfactualBefore[0] && counterfactualBefore[0].suggestedMarker;
+  const counterfactualEntityAfter = {
+    name: 'cf-entity', type: 'AntiPattern',
+    observations: cfBase[0].observations.map((o) => (o === 'Status: experimental' && cfMarker ? cfMarker : o)),
+  };
+  const counterfactualAfter = detectContradictions([counterfactualEntityAfter], { today });
+
   const cleanReport = report([], { strict: true });
   const dirtyReport = report(cand || [], { strict: true });
   const advisoryReport = report(cand || [], { strict: false });
@@ -320,6 +335,21 @@ function selfTest() {
     ['(f) suggestedMarker = <old> [superseded <today> by: <successor>] and matches the regex',
       !!theOne && markerRe.test(theOne.suggestedMarker) &&
       theOne.suggestedMarker.startsWith(theOne.oldObservation + ' [superseded ' + today + ' by: ')],
+    // ── КОНТРФАКТИЧЕСКАЯ ПАРА (2026-W37-Q1) ──────────────────────────────────
+    // Форму пометки проверяли, а КРУГ не замыкали ни разу: никто не показал, что
+    // применение предложенной пометки реально заглушает урок. Прибор мог предлагать
+    // пометку, которая ничего не меняет, и все плечи оставались бы зелёными.
+    // Здесь два условия проверяются РАЗДЕЛЬНО: старое перестало выдаваться И новое
+    // осталось на месте. Слитая проверка пропустила бы пометку, стирающую оба факта.
+    ['(cf1) до применения пометки урок выдаётся ровно один раз',
+      counterfactualBefore.length === 1 && counterfactualBefore[0].entity === 'cf-entity'],
+    ['(cf2) ПОСЛЕ применения предложенной пометки урок больше НЕ выдаётся',
+      counterfactualAfter.length === 0],
+    ['(cf3) при этом новый факт остался на месте, а не стёрся вместе со старым',
+      counterfactualEntityAfter.observations.some((o) => o === 'Status: production')],
+    ['(cf4) старый факт не исчез, а помечен: он читается и виден как отменённый',
+      counterfactualEntityAfter.observations.some((o) => isSuperseded(o) && o.includes('Status: experimental'))],
+
     // AC-7 — strict exit code
     ['(g) --strict: clean → exit 0', cleanReport.exitCode === 0],
     ['(g) --strict: ≥1 candidate → exit 1', dirtyReport.exitCode === 1],
