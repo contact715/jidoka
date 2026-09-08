@@ -191,7 +191,8 @@
     "mail": "node scripts/session-mail.mjs --inbox",
     "mail:open": "node scripts/session-mail.mjs --open",
     "receipt": "node scripts/gate-receipt.mjs --list",
-    "receipt:verify": "node scripts/gate-receipt.mjs --verify"
+    "receipt:verify": "node scripts/gate-receipt.mjs --verify",
+    "kaizen:stalled": "node scripts/kaizen-dispatch.mjs stalled"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

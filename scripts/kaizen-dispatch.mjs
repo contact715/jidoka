@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// @closes-class: mechanism-built-human-step-never-taken
+// @scope: all
+// @scope-ok: вход это весь реестр рекомендаций (160 строк) и очередь задач, доли секунды; застревание видно только на всей истории
+// @divergence: "запись без исполнителя и без отклонения считается застрявшей" — реестр говорит «всё под контролем», потому что у записи есть статус open, а третьего исхода у неё нет вовсе
 // kaizen-dispatch — the missing step between "the owner said yes" and "the work happened".
 //
 // approved-to-work-bridge (2026-W32-K2)
@@ -37,11 +41,64 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const LEDGER = path.join(ROOT, 'docs/research/weekly/_KAIZEN_LEDGER.jsonl');
+// Переопределение реестра, как у соседних приборов (META_LEDGER, TASK_QUEUE).
+// Без него у механизма нет входа, на котором он ОБЯЗАН отказать: единственный реестр
+// это боевой, и красное плечо пришлось бы ставить на настоящих данных.
+const LEDGER = process.env.KAIZEN_LEDGER || path.join(ROOT, 'docs/research/weekly/_KAIZEN_LEDGER.jsonl');
 
 // ── pure core ────────────────────────────────────────────────────────────────
 
 export const isDispatchable = (e) => !!e && e.status !== 'shipped' && e.status !== 'rejected';
+
+/**
+ * Чистая: ТРЕТИЙ ИСХОД для застрявшей записи.
+ *
+ * Сегодня у открытой записи два состояния: «внедрена» и «висит». Второе бесплатно,
+ * поэтому оно и побеждает: за 20 дней очередь человеческих шагов дала ноль закрытий,
+ * то есть громкость как лекарство уже доказанно провалилась на соседнем пациенте.
+ *
+ * Правило: запись старше порога обязана иметь ДИСПОЗИЦИЮ — либо исполнителя (её номер
+ * упомянут в задаче очереди), либо датированное отклонение с причиной. Отклонение
+ * остаётся полностью законным исходом: цель не заставить всё внедрить, а запретить
+ * молчание. Возраст выводится из недели и статуса, нового поля в схеме НЕ заводится
+ * (иначе это был бы второй источник одной правды).
+ *
+ * @param {Array} entries записи реестра
+ * @param {{currentWeek:string, thresholdWeeks?:number, queueTexts?:string[], rejectedIds?:string[]}} ctx
+ * @returns {{stalled:Array, disposed:Array, threshold:number}}
+ */
+export function stallDisposition(entries = [], ctx = {}) {
+  const { currentWeek = '', thresholdWeeks = 2, queueTexts = [], rejectedIds = [] } = ctx;
+  const weekNum = (w) => { const m = /^(\d{4})-W(\d{1,2})$/.exec(String(w || '')); return m ? Number(m[1]) * 53 + Number(m[2]) : null; };
+  const now = weekNum(currentWeek);
+  const rejected = new Set(rejectedIds.map(String));
+  const queue = queueTexts.map(String).join('\n');
+  const stalled = [], disposed = [];
+  for (const e of entries) {
+    if (!isDispatchable(e)) continue;
+    const w = weekNum(e.week);
+    if (now === null || w === null) continue;
+    const age = now - w;
+    if (age < thresholdWeeks) continue;
+    const id = String(e.id || '');
+    const hasExecutor = id.length > 0 && queue.includes(id);
+    const hasRejection = rejected.has(id);
+    (hasExecutor || hasRejection ? disposed : stalled).push({ id, week: e.week, ageWeeks: age, title: e.title || '' });
+  }
+  stalled.sort((a, b) => b.ageWeeks - a.ageWeeks);
+  return { stalled, disposed, threshold: thresholdWeeks };
+}
+
+
+/** Чистая: ISO-неделя как 'YYYY-Www'. Свой, потому что тянуть зависимость ради даты нельзя. */
+export function isoWeekOf(d) {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const yStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((t - yStart) / 86400000 + 1) / 7);
+  return `${t.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
 
 /** Match an id loosely: "W32-K1" finds "2026-W32-K1". Pure. */
 export const idMatches = (entry, wanted) => {
@@ -140,6 +197,36 @@ function selfTest() {
   ok('a bare-path entry is told to convert to path#anchor', /переведи её в форму путь#якорь/.test(t2.prompt));
   ok('bare-path prompt warns about premature shipped', /зачтёт пункт отгруженным до написания кода/.test(t2.prompt));
 
+
+  // ── третий исход для застрявшей записи ────────────────────────────────────
+  const SD = [
+    { id: '2026-W34-R1', week: '2026-W34', status: 'open', title: 'старая без исхода' },
+    { id: '2026-W36-A1', week: '2026-W36', status: 'open', title: 'свежая, порог не вышел' },
+    { id: '2026-W34-R2', week: '2026-W34', status: 'open', title: 'есть исполнитель' },
+    { id: '2026-W34-R3', week: '2026-W34', status: 'open', title: 'датированно отклонена' },
+    { id: '2026-W34-R4', week: '2026-W34', status: 'shipped', title: 'внедрена' },
+  ];
+  const sd = stallDisposition(SD, { currentWeek: '2026-W37', thresholdWeeks: 2,
+    queueTexts: ['{"title":"работа по 2026-W34-R2"}'], rejectedIds: ['2026-W34-R3'] });
+
+  ok('запись без исполнителя и без отклонения считается застрявшей',
+    sd.stalled.length === 1 && sd.stalled[0].id === '2026-W34-R1');
+  ok('свежая запись не трогается: порог возраста соблюдается',
+    !sd.stalled.some((e) => e.id === '2026-W36-A1'));
+  ok('исполнитель в очереди это законная диспозиция',
+    sd.disposed.some((e) => e.id === '2026-W34-R2'));
+  ok('датированное отклонение это ТОЖЕ законная диспозиция, а не поражение',
+    sd.disposed.some((e) => e.id === '2026-W34-R3'));
+  ok('внедрённая запись вообще не рассматривается',
+    !sd.stalled.concat(sd.disposed).some((e) => e.id === '2026-W34-R4'));
+  ok('старшие идут первыми',
+    stallDisposition([{ id: 'a', week: '2026-W30', status: 'open', title: 'x' }, { id: 'b', week: '2026-W34', status: 'open', title: 'y' }],
+      { currentWeek: '2026-W37', thresholdWeeks: 2 }).stalled[0].id === 'a');
+  ok('запись без разбираемой недели не превращается в застрявшую молча',
+    stallDisposition([{ id: 'z', week: 'непонятно', status: 'open', title: 'x' }], { currentWeek: '2026-W37' }).stalled.length === 0);
+  ok('ISO-неделя считается верно',
+    isoWeekOf(new Date('2026-09-07T12:00:00Z')) === '2026-W37');
+
   if (fails) { console.log(`\n\x1b[31mkaizen-dispatch self-test FAILED (${fails})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ kaizen-dispatch: approved recommendations become standalone serial tasks\x1b[0m');
   process.exit(0);
@@ -156,6 +243,37 @@ if (isMain) {
   const week = arg('--week');
   const ids = arg('--ids') ? arg('--ids').split(',').map(s => s.trim()).filter(Boolean) : null;
   const all = argv.includes('--all');
+
+  if (cmd === 'stalled') {
+    const thresholdWeeks = Number(arg('--weeks', 2));
+    let queueTexts = [];
+    try {
+      const qp = process.env.TASK_QUEUE || path.join(process.env.HOME || '', '.jidoka', 'task-queue', 'queue.jsonl');
+      if (existsSync(qp)) queueTexts = readFileSync(qp, 'utf8').split('\n').filter(Boolean);
+    } catch { /* очередь недоступна — считаем, что исполнителей нет, и говорим это вслух ниже */ }
+    let rejectedIds = [];
+    try {
+      const rp = 'docs/research/weekly/_REJECTED.jsonl';
+      if (existsSync(rp)) rejectedIds = readFileSync(rp, 'utf8').split('\n').filter(Boolean)
+        .map((l) => { try { return JSON.parse(l).recId || JSON.parse(l).id; } catch { return null; } }).filter(Boolean);
+    } catch { /* память отказов недоступна */ }
+
+    const cw = arg('--current-week') || isoWeekOf(new Date());
+    const r = stallDisposition(entries, { currentWeek: cw, thresholdWeeks, queueTexts, rejectedIds });
+    console.log(`застрявшие записи (старше ${r.threshold} недель, без исполнителя и без датированного отклонения): ${r.stalled.length}`);
+    for (const e of r.stalled.slice(0, 30)) console.log(`  ${String(e.ageWeeks).padStart(2)}н  ${e.id}  ${e.title.slice(0, 66)}`);
+    if (r.stalled.length > 30) console.log(`  …и ещё ${r.stalled.length - 30}`);
+    console.log(`  с диспозицией: ${r.disposed.length}`);
+    if (process.argv.includes('--gate') && r.stalled.length) {
+      console.error('\n✗ у застрявших записей нет ТРЕТЬЕГО ИСХОДА: ни исполнителя, ни датированного отклонения.');
+      console.error('  «Висит дальше» перестало быть умолчанием. Выбери по каждой:');
+      console.error('    исполнитель  → node scripts/kaizen-dispatch.mjs dispatch --ids <id,id>');
+      console.error('    отклонение   → строка в docs/research/weekly/_REJECTED.jsonl с recId, датой и причиной');
+      console.error('  Отклонить это ЗАКОННЫЙ исход. Незаконно только молчание.');
+      process.exit(1);
+    }
+    process.exit(0);
+  }
 
   if (cmd === 'status') {
     const byWeek = {};
