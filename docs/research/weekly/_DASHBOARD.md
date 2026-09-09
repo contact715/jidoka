@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 75% · shipped 117/156, open 39, regressed 0, ~1.06w to ship**
+**adoption 76% · shipped 118/156, open 38, regressed 0, ~1.05w to ship**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -163,6 +163,6 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W37-A4 | Запись о сжатии становится надгробием: числа и якоря забытого куска читаются из транскрипта, а не из поля, которого не бывает | hooks/compaction-trace.mjs#parseCompactMetadata | present (symbol): hooks/compaction-trace.mjs#parseCompactMetadata |
 | open | 2026-W37-A5 | Вывод упавшей самопроверки перестаёт выбрасываться и становится корпусом задач на починку (--emit-corpus в mutation-test) | scripts/mutation-test.mjs#emitCorpus | not yet present: scripts/mutation-test.mjs#emitCorpus |
 | shipped | 2026-W37-A6 | Свидетель прогона: прогон может ДОКАЗАТЬ, что он тронул вне рабочей папки. Наблюдение, а не запрет — запрет сломал бы инструменты, которые по замыслу держат состояние одно на машину | scripts/lib/run-witness.mjs#witnessVerdict | present (symbol): scripts/lib/run-witness.mjs#witnessVerdict |
-| open | 2026-W37-K2 | КИЛЛЕР-ФИЧА: правило считается внедрённым, когда накрыло ВСЕ пути записи, а не один; молчаливый список отвергается (режим FM-2.2, ноль механизмов на восемь имён) | scripts/invariant-doors.mjs#allDoorsCovered | not yet present: scripts/invariant-doors.mjs#allDoorsCovered |
+| shipped | 2026-W37-K2 | КИЛЛЕР-ФИЧА: правило, применённое к ОДНОМУ месту из нескольких похожих, ловится структурно, без разметки. Предупреждение, а не запрет | scripts/sibling-parity.mjs#oddOneOut | present (symbol): scripts/sibling-parity.mjs#oddOneOut |
 | shipped | 2026-W37-K3 | КИЛЛЕР-ФИЧА: браузерное наблюдение засчитывается по ПРИГОДНОСТИ (панель видима, высота больше нуля), а не по факту вызова инструмента | hooks/browser-verify-gate.mjs#observationUsable | present (symbol): hooks/browser-verify-gate.mjs#observationUsable |
 | shipped | 2026-W37-Q1 | БЫСТРАЯ ПОБЕДА: контрфактическая пара в проверке замещения памяти — применение предложенной пометки обязано заглушить урок, и два условия проверяются раздельно | scripts/memory-supersede-check.mjs#detectContradictions | present (symbol): scripts/memory-supersede-check.mjs#detectContradictions |
