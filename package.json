@@ -75,7 +75,7 @@
     "gate:selftest": "node scripts/selftest-reality.mjs",
     "gate:import-safety": "node scripts/import-safety.mjs --self-test && node scripts/import-safety.mjs --all",
     "gate:ledger-schema": "node scripts/ledger-schema-gate.mjs",
-    "gate:parity": "node scripts/install-into.mjs --check-parity",
+    "gate:parity": "node scripts/sibling-parity.mjs --staged",
     "gate:hooks": "node scripts/hooks-reachability.mjs",
     "audit:cyrillic": "node scripts/cyrillic-boundary.mjs --all",
     "gate:divergence": "node scripts/oracle-divergence.mjs",
