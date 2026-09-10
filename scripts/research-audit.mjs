@@ -37,6 +37,22 @@ export const STATUSES_NEEDING_EVIDENCE = ['есть', 'частично'];
  */
 export const PLACEHOLDER_TOKENS = ['TODO', 'TBD', 'XXX', 'FIXME', 'допишу', 'lorem ipsum'];
 
+/**
+ * @divergence: "обещание доделать без токена" — прокси у этой проверки это СПИСОК СЛОВ,
+ * а правило шире: «в сданном документе нет незаконченных мест». Вход, где они расходятся:
+ * строка «этот раздел будет дополнен позже» — ни одного токена из списка нет, прибор
+ * говорит «чисто», а правило нарушено. Граница известна и зафиксирована проверкой ниже,
+ * а не закрыта расширением списка: слова «будет», «позже», «дополнить» живут в законной
+ * прозе, и добавление их в список вернуло бы срабатывание на упоминание вместо действия
+ * (класс guard-fires-on-mention-not-action, из-за которого отсюда уже убрали «дописать»).
+ * Эту дыру закрывает человек на вычитке, прибор её НЕ ловит и не притворяется, что ловит.
+ */
+
+/** Экранирует токен для подстановки в RegExp. */
+export function escapeForRegExp(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 const URL_RE = /https?:\/\/[^\s<>()\[\]"'`]+/g;
 /** путь/до/файла.ext:НОМЕР — адрес с точностью до строки. */
 const PATH_WITH_LINE_RE = /[\w./@-]+\.(?:tsx?|jsx?|mjs|cjs|py|go|rs|java|rb|php|css|scss|json|ya?ml|md|sql|sh)\s*:\s*\d+/i;
@@ -146,7 +162,11 @@ export function auditText(text, tier) {
   // --- Заглушки ---
   lines.forEach((line, i) => {
     for (const tok of PLACEHOLDER_TOKENS) {
-      if (line.toLowerCase().includes(tok.toLowerCase())) {
+      // Границы слова обязательны: без них «TBD» срабатывал внутри «JTBD»,
+      // а «XXX» — внутри любого маскированного числа. Класс: guard-fires-on-mention-not-action.
+      // \b не годится: он работает только для латиницы, а среди токенов есть «допишу».
+      const re = new RegExp(`(?<![\\p{L}\\p{N}])${escapeForRegExp(tok)}(?![\\p{L}\\p{N}])`, 'iu');
+      if (re.test(line)) {
         violations.push({ code: 'PLACEHOLDER', line: i + 1, detail: `заглушка «${tok}» в сданном документе` });
         break;
       }
@@ -279,6 +299,19 @@ function selfTest() {
     'заголовок столбца это не заглушка');
   check('одна строка с двумя заглушками даёт одно нарушение',
     auditText(`${CLEAN}\n\nTODO TBD`, 'light').violations.filter((v) => v.code === 'PLACEHOLDER').length === 1);
+  check('«TBD» внутри «JTBD» НЕ ловится',
+    !codes(`${CLEAN}\n\nJTBD: работа, на которую нанимают продукт`).includes('PLACEHOLDER'),
+    'подстрока в законном термине это упоминание, а не заглушка');
+  check('«XXX» внутри «XXXL» НЕ ловится',
+    !codes(`${CLEAN}\n\nразмер XXXL в каталоге`).includes('PLACEHOLDER'));
+  check('«TBD» отдельным словом по-прежнему ловится',
+    codes(`${CLEAN}\n\nцена TBD`).includes('PLACEHOLDER'));
+  check('«TBD» в скобках ловится',
+    codes(`${CLEAN}\n\nцена (TBD)`).includes('PLACEHOLDER'));
+  // @divergence: "обещание доделать без токена"
+  check('РАСХОЖДЕНИЕ: обещание доделать без токена прибор НЕ ловит',
+    !codes(`${CLEAN}\n\nэтот раздел будет дополнен позже`).includes('PLACEHOLDER'),
+    'известная и намеренная граница: список слов уже правила, ловит человек на вычитке');
 
   // Тяжёлый уровень
   const DEEP_OK = `${CLEAN}\n\n## Приговоры\n| Пункт | Вердикт | Первый шаг | Стоимость |\n|---|---|---|---|\n| Теги | берём | правка в Tags.tsx | день, только фронт |`;
