@@ -1,8 +1,8 @@
-# Kaizen Dashboard — 2026-W37
+# Kaizen Dashboard
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 76% · shipped 118/156, open 38, regressed 0, ~1.05w to ship**
+**adoption 69% · shipped 118/172, open 54, regressed 0, ~1.05w to ship, class-closure 50%**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -166,3 +166,19 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | shipped | 2026-W37-K2 | КИЛЛЕР-ФИЧА: правило, применённое к ОДНОМУ месту из нескольких похожих, ловится структурно, без разметки. Предупреждение, а не запрет | scripts/sibling-parity.mjs#oddOneOut | present (symbol): scripts/sibling-parity.mjs#oddOneOut |
 | shipped | 2026-W37-K3 | КИЛЛЕР-ФИЧА: браузерное наблюдение засчитывается по ПРИГОДНОСТИ (панель видима, высота больше нуля), а не по факту вызова инструмента | hooks/browser-verify-gate.mjs#observationUsable | present (symbol): hooks/browser-verify-gate.mjs#observationUsable |
 | shipped | 2026-W37-Q1 | БЫСТРАЯ ПОБЕДА: контрфактическая пара в проверке замещения памяти — применение предложенной пометки обязано заглушить урок, и два условия проверяются раздельно | scripts/memory-supersede-check.mjs#detectContradictions | present (symbol): scripts/memory-supersede-check.mjs#detectContradictions |
+| open | 2026-W38-K1 | Регистрация класса становится решением в одну команду через approval-queue, без ручной вставки | scripts/gate-audit.mjs#emitRegistrationForApproval | not yet present: scripts/gate-audit.mjs#emitRegistrationForApproval |
+| open | 2026-W38-K3 | Тест не может зависеть от машины, на которой его писали: кейс не ссылается за пределы репозитория | scripts/eval-suite.mjs#caseIsPortable | not yet present: scripts/eval-suite.mjs#caseIsPortable |
+| open | 2026-W38-R3 | Отклонение уходит из знаменателя приёмки: kaizen-audit читает _REJECTED.jsonl | scripts/kaizen-audit.mjs#absorbRejections | not yet present: scripts/kaizen-audit.mjs#absorbRejections |
+| open | 2026-W38-R4 | Разобранный регресс получает датированное признание, счётчик перестаёт быть вечным | scripts/meta-audit.mjs#acknowledgedRegression | not yet present: scripts/meta-audit.mjs#acknowledgedRegression |
+| open | 2026-W38-A1 | Правило накрыло ВСЕ двери: структурный запрос по форме кода вместо текста, правила как данные | scripts/all-doors-audit.mjs#everyDoorReached | not yet present: scripts/all-doors-audit.mjs#everyDoorReached |
+| open | 2026-W38-A3 | Вердикт тренда считается доверительной последовательностью, а не порогом по уровню | scripts/meta-trend.mjs#confidenceSequence | not yet present: scripts/meta-trend.mjs#confidenceSequence |
+| open | 2026-W38-A4 | Дисперсия судьи меряется четырьмя прогонами без единой человеческой метки | scripts/judge-calibration.mjs#biasVarianceSplit | not yet present: scripts/judge-calibration.mjs#biasVarianceSplit |
+| open | 2026-W38-A7 | Корпус Who&When как РАЗЛИЧАЮЩИЙ вход для пилота парных судей | docs/evals/_pilot-judgebench.md#discrimination | not yet present: docs/evals/_pilot-judgebench.md#discrimination |
+| open | 2026-W38-A10 | Фаза прогона задаёт доступные инструменты: ограничение живёт в состоянии, а не в тексте задания | scripts/orchestration-planner.mjs#phaseScopedTools | not yet present: scripts/orchestration-planner.mjs#phaseScopedTools |
+| open | 2026-W38-A11 | Правила детектора инъекций живут в данных, а не в коде детектора | scripts/detect-injection.mjs#rulesFromData | not yet present: scripts/detect-injection.mjs#rulesFromData |
+| open | 2026-W38-K0 | Гейт, который наблюдает гейты: полевая частота срабатывания и блокировок из собственных транскриптов | scripts/gate-field-efficacy.mjs#fieldVerdict | not yet present: scripts/gate-field-efficacy.mjs#fieldVerdict |
+| open | 2026-W38-K2 | Пустое наблюдение никогда не зелёное: зонд пригодности опускается со страницы на элемент | hooks/browser-verify-gate.mjs#elementObservable | not yet present: hooks/browser-verify-gate.mjs#elementObservable |
+| open | 2026-W38-A5 | Расписка о ВЫЖИВАНИИ правила после сжатия вместо расписки о самом сжатии | hooks/compaction-trace.mjs#constraintSurvival | not yet present: hooks/compaction-trace.mjs#constraintSurvival |
+| open | 2026-W38-A6 | Бюджет контекста скиллов как ЧИСЛО из внешнего канона: 100 на витрину, 5000 на тело | scripts/skill-budget.mjs#startupTax | not yet present: scripts/skill-budget.mjs#startupTax |
+| open | 2026-W38-A8 | Отпечаток поверхности агента: имя плюс описание инструмента, перевыпуск при изменении | scripts/agent-surface-pin.mjs#surfaceFingerprint | not yet present: scripts/agent-surface-pin.mjs#surfaceFingerprint |
+| open | 2026-W38-R5 | Решение это не телеметрия: журналы решений и вердиктов начинают коммититься | scripts/cron-audit.mjs#persistRunJournal | not yet present: scripts/cron-audit.mjs#persistRunJournal |
