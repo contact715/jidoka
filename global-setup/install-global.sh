@@ -93,12 +93,16 @@ s.hooks=s.hooks||{};
 // dedup at the COMMAND level, not the block level: an extended live block (e.g. UserPromptSubmit
 // gaining session-state/session-lock) no longer matched the 2-hook fragment block, so the fragment
 // got re-appended as a duplicate on every install. Compare by command string instead.
+// 2026-09-17: the key is MATCHER + command. By command alone, one hook wired on two tool sets
+// (permission-gate on Bash and on Monitor|mcp__terminal__run_in_terminal) lost its second wiring
+// on every fresh install, silently.
+const key=(m,c)=>(m||"")+" :: "+c;
 for(const [evt,arr] of Object.entries(frag.hooks||{})){
   s.hooks[evt]=s.hooks[evt]||[];
-  const seen=new Set(s.hooks[evt].flatMap(b=>(b.hooks||[]).map(h=>h.command)));
+  const seen=new Set(s.hooks[evt].flatMap(b=>(b.hooks||[]).map(h=>key(b.matcher,h.command))));
   for(const block of arr){
-    const fresh=(block.hooks||[]).filter(h=>!seen.has(h.command));
-    if(fresh.length){ s.hooks[evt].push(Object.assign({},block,{hooks:fresh})); fresh.forEach(h=>seen.add(h.command)); }
+    const fresh=(block.hooks||[]).filter(h=>!seen.has(key(block.matcher,h.command)));
+    if(fresh.length){ s.hooks[evt].push(Object.assign({},block,{hooks:fresh})); fresh.forEach(h=>seen.add(key(block.matcher,h.command))); }
   }
 }
 fs.writeFileSync(p,JSON.stringify(s,null,2)+"\n");

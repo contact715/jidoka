@@ -21,6 +21,15 @@
         ]
       },
       {
+        "matcher": "Monitor|mcp__terminal__run_in_terminal",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node $HOME/.claude/hooks/permission-gate.mjs"
+          }
+        ]
+      },
+      {
         "matcher": "Write|Edit|MultiEdit|NotebookEdit|mcp__.*",
         "hooks": [
           {

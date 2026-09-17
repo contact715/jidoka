@@ -13,7 +13,7 @@ children: []
 breaking_change_in_v: null
 created: 2026-07-02
 last_validated_against_parents: 2026-07-02
-last_updated: 2026-07-02
+last_updated: 2026-09-17
 ---
 
 # Parallel Sessions Protocol — one folder, one session; commits by turns; work serial
@@ -69,6 +69,75 @@ Because steps 3-4 are inside the lock, the window a race needs is closed. Proven
 A rebase conflict is not auto-resolved. safe-commit aborts the rebase cleanly, keeps your
 commit safe locally, releases the lock, and hands back to you to resolve.
 
+## Layer 2b — The stash stack is shared (stops taking another session's work)
+
+Set 2026-09-17, class `agent-uses-shared-git-stash`. A worktree has its own directory and
+branch, but NOT its own stash: `refs/stash` lives in the common git dir, so the main checkout
+and every worktree push onto and pop from ONE stack. With several sessions running, `git stash
+pop` takes whatever is on top, and the top may be another session's work. Twice in one wave
+(projectx-app, wave 368) an executor ran `git stash` / `git stash pop` to compare against a
+baseline although its brief forbade it. Nothing was lost, by luck. A rule that lives only in a
+brief is not a guard.
+
+Enforced by `hooks/permission-gate.mjs` (PreToolUse on Bash, Monitor and
+`mcp__terminal__run_in_terminal` — every tool that runs a shell command), rule in
+`hooks/lib/git-stash-rule.mjs`. Allowed forms, because none of them can take someone else's
+entry:
+
+- `git stash list` / `git stash show` — read only
+- `git stash push -m "<tag>"` (usually with `-u`) — a tagged entry you can find again
+- `git stash apply <sha>` — by a fingerprint that does not shift. An all-digit value is NOT a
+  fingerprint: git reads `apply 0000000` as `stash@{0}` (checked on a throwaway repo)
+- `git stash drop <ref>` — an explicit ref, re-found by tag right before the drop
+
+Everything else is blocked with exit 2: bare `git stash`, `save`, `pop`, `push` without `-m`,
+`apply` without a sha, `drop` without a ref, `clear`, `branch`, `create`, `store`. There is no
+permission for these: a safe replacement always exists, and a live `--no-verify` permission
+does not switch this check off (it covers only its own action).
+
+- set work aside → a temporary commit: `git add -A && git commit -m "WIP <tag>"`, undo with
+  `git reset --soft HEAD~1`
+- compare with a baseline → a separate folder: `git worktree add --detach <path> <base>`,
+  remove with `git worktree remove <path>`
+- if stash is unavoidable, the recipes the block message prints (they pass the guard):
+
+```
+git stash push -u -m "<tag>"
+SHA=$(git stash list --format='%H %gs' | awk '/<tag>/{print $1; exit}'); git stash apply "$SHA"
+REF=$(git stash list --format='%gd %gs' | awk '/<tag>/{print $1; exit}'); git stash drop "$REF"
+```
+
+Quote the variable. `"$SHA"` is accepted: an empty quoted value makes git fail and touch
+nothing. `$SHA` without quotes is refused: an empty value vanishes and the command becomes a
+bare `apply` / `drop` on the top entry.
+
+The guard judges the ACTION, not a mention. `hooks/lib/shell-parse.mjs` reads the command into
+real shell words (quotes make one word, a heredoc body is data, `$'…'` escapes are decoded, and
+every word remembers whether it holds an unquoted expansion). `hooks/lib/shell-commands.mjs`
+then works out what will run: `&&` / `;` / `|` chains, `git -C <dir>` and other global options,
+env prefixes and wrappers (`env`, `env -S`, `timeout`, `nice`, `sudo`, `xargs`, `caffeinate`,
+`stdbuf`), `find -exec`, `$(…)`, backticks, `bash -c '…'`, `eval`, a heredoc or herestring fed
+to a shell, `bash -` / `bash /dev/stdin`, and `echo …|bash`, `printf …|sh`, `cat <<EOF …|bash`.
+The git name itself is seen through too: `$G stash`, `GIT stash` (macOS ignores case),
+`…/git-stash`, and `git -c alias.x='stash pop' x`. A commit message that says "git stash pop"
+passes. `bash -c 'git stash pop'` does not.
+
+A command nested deeper than the parser handles (256 levels of substitution, 6 levels of text
+handed to a shell, 256 wrappers) is not waved through: it is blocked as "команда глубже
+разбора". Legitimate commands never get there.
+
+Red-teamed 2026-09-17 (84 blocked and 52 allowed shapes in
+`scripts/__tests__/git-stash-guard.test.mjs`). Honest limits — not expanded, because their text
+is not in the command: shell functions defined earlier, `source <file>`, a script run by path,
+`curl … | bash`, code run by an interpreter (`node -e`, `python -c`), GNU parallel, brace
+expansion (`{git,} stash`). `drop stash@{n}` is allowed by design — the ref is explicit, and the
+recipe re-finds n by tag immediately before the drop.
+
+The installer merges hooks by MATCHER + command (`global-setup/install-global.sh`, step 6).
+Before 2026-09-17 it compared the command alone, so the second wiring of permission-gate
+(Monitor|terminal) would have been dropped on every fresh install
+(`scripts/__tests__/install-hooks-merge.test.mjs`).
+
 ## Layer 3 — Serial task queue (one task at a time)
 
 `task-queue.mjs` holds the backlog and enforces one invariant: at most ONE task is
@@ -107,4 +176,5 @@ node scripts/commit-lock.mjs  --self-test
 node scripts/safe-commit.mjs  --self-test
 node scripts/task-queue.mjs   --self-test
 node scripts/session-lock.mjs --self-test
+node hooks/permission-gate.mjs --self-test   # --no-verify + shared git stash
 ```
