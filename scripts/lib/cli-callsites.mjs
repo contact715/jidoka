@@ -196,8 +196,10 @@ export function extractFile(text, source) {
 }
 
 const TEXT_FILE = /\.(?:mjs|cjs|js|ts|sh|zsh|bash|json|jsonl|md|ya?ml|txt|toml)$|^(?:pre-commit|pre-push|commit-msg|post-commit|pre-merge-commit|post-merge|prepare-commit-msg|Makefile)$/;
-// __tests__ — данные тестов (вызовы вымышленных скриптов), а не места вызова
-const SKIP = /(?:^|\/)(?:node_modules|\.git|\.next|graphify-out|dist|build|coverage|\.worktrees|worktrees|__tests__)(?:\/|$)/;
+// __tests__ — данные тестов (вызовы вымышленных скриптов), а не места вызова.
+// local-hooks — архив хуков ПРОДУКТА в установке (~/.claude/jidoka/local-hooks/<продукт>): их
+// `node scripts/x.mjs` зовёт скрипт продукта, и спецификация движка к нему не относится.
+const SKIP = /(?:^|\/)(?:node_modules|\.git|\.next|graphify-out|dist|build|coverage|\.worktrees|worktrees|__tests__|local-hooks)(?:\/|$)/;
 
 /** Собрать вызовы из дерева. kind помечает происхождение для отчёта. */
 export function collect(root, { kind = 'repo', maxBytes = 2_000_000, skip = null } = {}) {

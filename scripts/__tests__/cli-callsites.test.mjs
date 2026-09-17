@@ -4,10 +4,12 @@
 // `node scripts/cli-strictness.mjs --callsites --home` на машине владельца.
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, realpathSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { commandWords, normalizeWord, extract, isLive, collect, PLACEHOLDER, RUNTIME } from '../lib/cli-callsites.mjs';
-import { judge, replay, replayInSandbox } from '../lib/cli-replay.mjs';
+import { judge, replay, replayInSandbox, resolveScript } from '../lib/cli-replay.mjs';
 
 const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const args = (text) => extract(text, 'x.sh')[0].args;
@@ -181,5 +183,44 @@ describe('живые места вызова в репозитории', () => {
   it('ни одно живое место вызова не сломано строгим разбором', () => {
     const live = r.failures.filter((f) => isLive(f.source));
     assert.deepEqual(live.map((f) => `${f.source}:${f.line} ${f.script}: ${f.error}`), []);
+  });
+});
+
+describe('сверка из установки (~/.claude/jidoka)', () => {
+  const layout = () => {
+    const base = realpathSync(mkdtempSync(join(tmpdir(), 'callsites-')));
+    const root = join(base, '.claude', 'jidoka');
+    mkdirSync(join(root, 'scripts'), { recursive: true });
+    mkdirSync(join(base, '.claude', 'hooks'), { recursive: true });
+    writeFileSync(join(base, '.claude', 'statusline-jidoka.mjs'), 'export const CLI = {};\n');
+    writeFileSync(join(base, '.claude', 'hooks', 'policy-enforce-hook.mjs'), 'export const CLI = {};\n');
+    return { base, root };
+  };
+  it('файл global-setup находится там, куда его ставит установка', () => {
+    const { base, root } = layout();
+    try {
+      assert.equal(resolveScript(root, 'global-setup/statusline-jidoka.mjs'), join('..', 'statusline-jidoka.mjs'));
+      assert.equal(resolveScript(root, 'global-setup/hooks/policy-enforce-hook.mjs'), join('..', 'hooks', 'policy-enforce-hook.mjs'));
+      assert.equal(resolveScript(root, 'global-setup/nope.mjs'), null);
+    } finally { rmSync(base, { recursive: true, force: true }); }
+  });
+  it('вне установки подъём на уровень вверх не делается', () => {
+    const { base } = layout();
+    const other = join(base, 'repo', 'jidoka');
+    mkdirSync(other, { recursive: true });
+    writeFileSync(join(base, 'repo', 'statusline-jidoka.mjs'), 'export const CLI = {};\n');
+    try {
+      assert.equal(resolveScript(other, 'global-setup/statusline-jidoka.mjs'), null);
+    } finally { rmSync(base, { recursive: true, force: true }); }
+  });
+  it('архив хуков продукта (local-hooks) — не места вызова движка', () => {
+    const { base, root } = layout();
+    mkdirSync(join(root, 'local-hooks', 'product', 'hooks'), { recursive: true });
+    writeFileSync(join(root, 'local-hooks', 'product', 'hooks', 'pre-push'), 'node scripts/common-launcher.mjs --wait=25 scripts/x.mjs\n');
+    writeFileSync(join(root, 'scripts', 'run.sh'), 'node scripts/common-launcher.mjs --wait=25 scripts/x.mjs\n');
+    try {
+      const found = collect(root).map((c) => c.source);
+      assert.deepEqual(found, ['scripts/run.sh']);
+    } finally { rmSync(base, { recursive: true, force: true }); }
   });
 });

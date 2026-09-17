@@ -9,7 +9,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { parseCli } from './cli.mjs';
 import { PLACEHOLDER, RUNTIME } from './cli-callsites.mjs';
@@ -81,11 +81,21 @@ export function enginePrefix(prefix = '') {
   return prefix === '' || /(?:^|\/)(?:\.jidoka|\.claude\/jidoka|jidoka-framework)\/$|\$\{?ROOT\}?\/$|\.claude\/(?:hooks\/)?$/.test(prefix);
 }
 
-/** Где в каноне лежит файл вызова: хуки из global-setup ставятся в тот же ~/.claude/hooks. */
+/**
+ * Где лежит файл вызова. В каноне хуки из global-setup ставятся в тот же ~/.claude/hooks.
+ * В установке (корень — ~/.claude/jidoka) папки global-setup нет: её файлы разложены по
+ * ~/.claude, поэтому global-setup/x ищется как ../x. Без этого сверка, запущенная из установки
+ * (так её и советуют звать), называла строку состояния «скриптом, которого нет в движке».
+ */
 export function resolveScript(root, script) {
   if (existsSync(join(root, script))) return script;
   const alt = script.replace(/^hooks\//, 'global-setup/hooks/');
   if (alt !== script && existsSync(join(root, alt))) return alt;
+  const installed = basename(root) === 'jidoka' && basename(dirname(root)) === '.claude';
+  if (installed && alt.startsWith('global-setup/')) {
+    const up = join('..', alt.slice('global-setup/'.length));
+    if (existsSync(join(root, up))) return up;
+  }
   return null;
 }
 
