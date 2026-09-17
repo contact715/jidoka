@@ -72,7 +72,7 @@ commit safe locally, releases the lock, and hands back to you to resolve.
 ## Layer 2b — The stash stack is shared (stops taking another session's work)
 
 Set 2026-09-17, class `agent-uses-shared-git-stash`. A worktree has its own directory and
-branch, but NOT its own stash: `refs/stash` lives in the common git dir, so the main checkout
+branch, but NOT its own stash: the stash ref lives in the common git dir, so the main checkout
 and every worktree push onto and pop from ONE stack. With several sessions running, `git stash
 pop` takes whatever is on top, and the top may be another session's work. Twice in one wave
 (projectx-app, wave 368) an executor ran `git stash` / `git stash pop` to compare against a
@@ -118,8 +118,8 @@ then works out what will run: `&&` / `;` / `|` chains, `git -C <dir>` and other 
 env prefixes and wrappers (`env`, `env -S`, `timeout`, `nice`, `sudo`, `xargs`, `caffeinate`,
 `stdbuf`), `find -exec`, `$(…)`, backticks, `bash -c '…'`, `eval`, a heredoc or herestring fed
 to a shell, `bash -` / `bash /dev/stdin`, and `echo …|bash`, `printf …|sh`, `cat <<EOF …|bash`.
-The git name itself is seen through too: `$G stash`, `GIT stash` (macOS ignores case),
-`…/git-stash`, and `git -c alias.x='stash pop' x`. A commit message that says "git stash pop"
+The git name itself is seen through too: `$G stash`, `GIT stash` (macOS ignores case), the
+separate git-stash binary called by its full path, and `git -c alias.x='stash pop' x`. A commit message that says "git stash pop"
 passes. `bash -c 'git stash pop'` does not.
 
 A command nested deeper than the parser handles (256 levels of substitution, 6 levels of text
