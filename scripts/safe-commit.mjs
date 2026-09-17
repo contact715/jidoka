@@ -22,16 +22,19 @@
 // real IO, guarded and reported; a rebase CONFLICT is NOT auto-resolved — it aborts cleanly,
 // releases the lock, and hands back to the model/human (agents propose, they don't force).
 //
-// FULL & self-tested. Usage:
+// FULL & self-tested. Usage (full text: --help, the USAGE constant below):
 //   node scripts/safe-commit.mjs --self-test
+//   node scripts/safe-commit.mjs --help
 //   node scripts/safe-commit.mjs --message "feat: x" [--repo <path>] [--session <id>]
 //                                [--target main] [--no-push] [--dry-run] [--wait 120]
+// An unknown flag exits 2 before any git call (2026-09-16: `--help` used to run the flow).
 
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import { readFileSync, existsSync, writeFileSync, unlinkSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 import { acquire, release } from './commit-lock.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -288,26 +291,130 @@ function selfTest() {
     ok('empty status → no risk', sweepRisk('', () => 0).risky === false);
   }
 
+  // ── CLI parsing (2026-09-16): `--help` was silently ignored and the full flow ran.
+  // On a dirty tree it stopped only for lack of --message; on a clean tree with unpushed
+  // commits it went on to `git push origin HEAD:main`. Unknown input must stop BEFORE any work.
+  {
+    const p = (argv) => parseCli(argv);
+    ok('--help is recognised (long and short)', p(['--help']).help === true && p(['-h']).help === true);
+    ok('unknown flag is an error', Boolean(p(['--bogus']).error));
+    ok('unknown flag next to a valid --message is an error', Boolean(p(['--message', 'x', '--bogus']).error));
+    ok('--message without a value is an error', Boolean(p(['--message']).error));
+    ok('--message followed by a flag is an error', Boolean(p(['--message', '--dry-run']).error));
+    ok('a positional argument is an error', Boolean(p(['feat: x']).error));
+    ok('--wait must be a positive number', Boolean(p(['--wait', 'abc']).error) && Boolean(p(['--wait', '0']).error));
+    ok('a message that starts with "- " is taken verbatim, like git -m', p(['--message', '- пункт']).opts?.message === '- пункт'
+      && p(['-m', '-fix: typo in docs']).opts?.message === '-fix: typo in docs');
+    ok('a flag-shaped message value is still an error (forgotten message must not become a commit)',
+      Boolean(p(['-m', '--no-push']).error) && Boolean(p(['--message', '-x']).error));
+    const full = p(['-m', 'feat: x', '--repo', '/r', '--session', 's', '--target', 'dev', '--no-push',
+      '--dry-run', '--wait', '30', '--only-staged', '--force-sweep']);
+    ok('every documented flag parses', !full.error && full.opts.message === 'feat: x' && full.opts.repo === '/r'
+      && full.opts.session === 's' && full.opts.target === 'dev' && full.opts.noPush && full.opts.dryRun
+      && full.opts.wait === 30 && full.opts.onlyStaged && full.opts.forceSweep);
+    ok('no flags is valid (clean-tree push), wait defaults to 120', !p([]).error && p([]).opts.wait === 120);
+
+    // end to end, from a directory that is NOT a git repo: any work at all would fail on git
+    const cli = (...a) => spawnSync(process.execPath, [fileURLToPath(import.meta.url), ...a], { encoding: 'utf8', cwd: tmpdir() });
+    const help = cli('--help');
+    ok('--help from the shell: exit 0, usage printed, no git touched',
+      help.status === 0 && help.stdout.includes('--message') && !/fatal|repo:/.test(help.stdout + help.stderr));
+    const bogus = cli('--bogus');
+    ok('unknown flag from the shell: exit 2 before any work',
+      bogus.status === 2 && bogus.stderr.includes('--bogus') && !/fatal|repo:/.test(bogus.stdout + bogus.stderr));
+  }
+
   if (fails) { console.log('\n\x1b[31msafe-commit self-test FAILED\x1b[0m'); process.exit(1); }
   console.log('\n\x1b[32m✓ safe-commit: policy + push-decision correct\x1b[0m');
   process.exit(0);
 }
 
 // ---- CLI ----
-const arg = (k) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : undefined; };
-const has = (k) => process.argv.includes(k);
+export const USAGE = `Usage:
+  node scripts/safe-commit.mjs --message "feat: x" [--repo <path>] [--session <id>]
+                               [--target main] [--no-push] [--dry-run] [--wait 120]
+                               [--only-staged | --force-sweep]
+  node scripts/safe-commit.mjs --self-test
+  node scripts/safe-commit.mjs --help
 
+  -m, --message <text>  commit message (required when the tree has changes)
+      --repo <path>     repository to work in (default: current directory)
+      --session <id>    commit-lock holder id (default: sc-<pid>)
+      --target <branch> branch to rebase onto and push to (default: main)
+      --no-push         commit locally, never push
+      --dry-run         describe the plan, write nothing
+      --wait <seconds>  how long to wait for the commit-lock (default: 120)
+      --only-staged     commit exactly what is staged, never \`git add -A\`
+      --force-sweep     allow \`git add -A\` even when the tree looks shared
+
+A message starting with "-" is taken as is ("- item"); a flag-shaped one needs --message=-x.
+Exit codes: 0 done, 1 refused or failed, 2 bad invocation (nothing was run).`;
+
+// Strict on purpose: an unknown flag, a stray word or a flag without its value stops the
+// script BEFORE any git call. The old parser ignored what it did not know, so `--help`
+// ran the whole commit-and-push flow.
+// A message value is taken verbatim, like `git commit -m`, so "- item" or "-fix: typo" pass.
+// A value shaped like a flag ("--no-push", "-x") stays an error: a forgotten message must
+// not quietly become a commit named after the next flag.
+const FLAG_SHAPED = /^--?[A-Za-z][\w-]*(=.*)?$/;
+function foldMessageValue(argv) {
+  const out = [];
+  for (let i = 0; i < argv.length; i += 1) {
+    const a = argv[i], next = argv[i + 1];
+    if ((a === '--message' || a === '-m') && typeof next === 'string' && next.startsWith('-') && !FLAG_SHAPED.test(next)) {
+      out.push(`--message=${next}`);
+      i += 1;
+    } else out.push(a);
+  }
+  return out;
+}
+
+export function parseCli(argv) {
+  let values;
+  try {
+    ({ values } = parseArgs({
+      args: foldMessageValue(argv),
+      strict: true,
+      allowPositionals: false,
+      options: {
+        message: { type: 'string', short: 'm' },
+        repo: { type: 'string' },
+        session: { type: 'string' },
+        target: { type: 'string' },
+        wait: { type: 'string' },
+        'no-push': { type: 'boolean' },
+        'dry-run': { type: 'boolean' },
+        'only-staged': { type: 'boolean' },
+        'force-sweep': { type: 'boolean' },
+        'self-test': { type: 'boolean' },
+        help: { type: 'boolean', short: 'h' },
+      },
+    }));
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
+  const wait = values.wait === undefined ? 120 : Number(values.wait);
+  if (!Number.isFinite(wait) || wait <= 0) return { error: `--wait takes a positive number of seconds, got: ${values.wait}` };
+  return {
+    help: values.help === true,
+    selfTest: values['self-test'] === true,
+    opts: {
+      repo: values.repo, message: values.message, session: values.session, target: values.target,
+      noPush: values['no-push'] === true, dryRun: values['dry-run'] === true, wait,
+      onlyStaged: values['only-staged'] === true, forceSweep: values['force-sweep'] === true,
+    },
+  };
+}
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (has('--self-test')) selfTest();
+  const cli = parseCli(process.argv.slice(2));
+  if (cli.error) { console.error(`safe-commit: bad invocation — ${cli.error}\nNothing was run.\n\n${USAGE}`); process.exit(2); }
+  if (cli.help) { console.log(USAGE); process.exit(0); }
+  if (cli.selfTest) selfTest();
   else {
-    const r = await run({
-      repo: arg('--repo'), message: arg('--message') || arg('-m'), session: arg('--session'),
-      target: arg('--target'), noPush: has('--no-push'), dryRun: has('--dry-run'), wait: Number(arg('--wait')) || 120,
-      onlyStaged: has('--only-staged'), forceSweep: has('--force-sweep'),
-    });
+    const r = await run(cli.opts);
     process.exit(r.ok ? 0 : 1);
   }
 }
