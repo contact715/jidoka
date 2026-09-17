@@ -14,9 +14,11 @@
 // docs/IMPORT_SAFETY.md), а не по ощущению от регэкспа.
 //
 // @closes-class: work-runs-at-import-time
+// @divergence: "process.argv.includes('--self-test') — дефект" — мера «работа стоит под if со словом process.argv» говорит «сторож есть», а импорт с таким флагом у родителя всё равно запустит работу
 
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
@@ -575,13 +577,44 @@ function selfTest() {
   process.exit(failed.length ? 1 : 0);
 }
 
-if (isMain) {
-  const args = process.argv.slice(2);
-  if (args.includes('--self-test')) selfTest();
+// Разбор строгий (2026-09-16): гейт стоит в pre-commit и CI. Незнакомый флаг раньше молча
+// отбрасывался, а слово с одним дефисом считалось путём. Теперь — код 2 до чтения файлов.
+// Без аргументов по-прежнему печатается подсказка и код 0: pre-commit зовёт гейт только
+// при непустом списке, а пустой вызов руками — вопрос «как пользоваться», не отказ.
+export const CLI = {
+  name: 'import-safety',
+  usage: `import-safety — модуль обязан импортироваться без последствий (статическая проверка, файл не импортируется).
 
-  const fix = args.includes('--fix');
-  let paths = args.filter((a) => !a.startsWith('--'));
-  if (args.includes('--all')) paths = allModules('.');
+Использование:
+  node scripts/import-safety.mjs <файлы…>          отчёт по файлам; код 1, если найден дефект
+  node scripts/import-safety.mjs --all             вся область движка
+  node scripts/import-safety.mjs <файл…> --fix     обернуть работу верхнего уровня в сторож isMain
+  node scripts/import-safety.mjs --self-test       самопроверка
+
+Флаги:
+      --all         проверить все модули движка (список файлов тогда не нужен и заменяется)
+      --fix         не отчёт, а правка: обернуть хвост в сторож
+      --self-test   самопроверка
+  -h, --help        эта справка
+
+Без аргументов печатает подсказку и выходит с кодом 0.
+
+Коды выхода: 0 — чисто (или подсказка), 1 — найден дефект, 2 — неверный вызов (ничего не выполнено).`,
+  selfTest: true,
+  options: {
+    all: { type: 'boolean', desc: 'вся область движка' },
+    fix: { type: 'boolean', desc: 'обернуть хвост в сторож' },
+  },
+  positionals: { min: 0, max: Infinity, name: 'файл' },
+};
+
+if (isMain) {
+  const { values, positionals, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+
+  const fix = values.fix === true;
+  let paths = positionals;
+  if (values.all) paths = allModules('.');
   if (!paths.length) {
     console.log('использование: import-safety.mjs <файлы…> [--fix] [--self-test]');
     console.log('  без --fix — только отчёт; выход 1, если найден дефект');

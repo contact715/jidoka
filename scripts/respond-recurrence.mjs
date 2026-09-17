@@ -8,15 +8,12 @@
  * Append-not-mutate: prior records are never modified.
  *
  * Usage:
- *   node scripts/respond-recurrence.mjs \
- *     --fingerprint <anti_pattern_slug::agent> \
- *     --outcome suppressed|investigated|resolved \
- *     --wave wave-NNN \
- *     --notes "<free text>"
+ *   node scripts/respond-recurrence.mjs --fingerprint <anti_pattern_slug::agent> --outcome <suppressed|investigated|resolved> --wave <wave-NNN> [--notes "<free text>"]
  *
  * Exit codes:
  *   0  — outcome appended successfully
- *   1  — usage error or file not found
+ *   1  — records file not found, or the write failed
+ *   2  — bad call: unknown flag, missing --fingerprint/--outcome/--wave, outcome outside the list (nothing written)
  */
 
 import fs from 'node:fs';
@@ -24,6 +21,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { readJsonlStream, sanitizeField } from './emit-telemetry.mjs';
+import { runCli, formatUsage, EXIT_USAGE } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -32,28 +30,31 @@ const RECURRENCE_PATH = path.join(ROOT, 'docs', 'audits', 'recurrence-events.jso
 const VALID_OUTCOMES = new Set(['suppressed', 'investigated', 'resolved']);
 
 // ── CLI argument parser ───────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): раньше свой цикл брал любое `--слово` как ключ и молча
+// пропускал незнакомые, а флаг последним словом без значения терялся. Теперь незнакомый
+// флаг, флаг без значения, исход не из списка — код 2 до записи.
+
+export const CLI = {
+  name: 'respond-recurrence',
+  summary: 'Записать исход по повтору анти-паттерна в docs/audits/recurrence-events.jsonl (только дописывание).',
+  options: {
+    fingerprint: { type: 'string', value: 'slug::agent', desc: 'отпечаток повтора (обязателен)' },
+    outcome: { type: 'string', choices: [...VALID_OUTCOMES], desc: 'исход (обязателен)' },
+    wave: { type: 'string', value: 'wave-NNN', desc: 'волна, в которой решено (обязателен)' },
+    notes: { type: 'string', value: 'текст', desc: 'пояснение' },
+  },
+};
 
 /**
  * @returns {{ fingerprint: string, outcome: string, wave: string, notes: string }}
  */
 function parseArgs() {
-  const args = process.argv.slice(2);
-  /** @type {Record<string, string>} */
-  const parsed = {};
-
-  for (let i = 0; i < args.length; i++) {
-    if (args[i].startsWith('--') && i + 1 < args.length) {
-      const key = args[i].slice(2);
-      parsed[key] = args[i + 1];
-      i++;
-    }
-  }
-
+  const { values } = runCli(CLI);
   return {
-    fingerprint: parsed['fingerprint'] ?? '',
-    outcome: parsed['outcome'] ?? '',
-    wave: parsed['wave'] ?? '',
-    notes: parsed['notes'] ?? '',
+    fingerprint: values.fingerprint ?? '',
+    outcome: values.outcome ?? '',
+    wave: values.wave ?? '',
+    notes: values.notes ?? '',
   };
 }
 
@@ -66,24 +67,13 @@ const sanitize = (/** @type {string} */ val) => /** @type {string} */ (sanitizeF
 function main() {
   const args = parseArgs();
 
-  // Usage validation
+  // Usage validation (the outcome list itself is checked by the parser)
   if (!args.fingerprint || !args.outcome || !args.wave) {
     process.stderr.write(
-      'Usage: node scripts/respond-recurrence.mjs \\\n' +
-      '  --fingerprint <slug::agent> \\\n' +
-      '  --outcome suppressed|investigated|resolved \\\n' +
-      '  --wave wave-NNN \\\n' +
-      '  --notes "<text>"\n'
+      'respond-recurrence: неверный вызов — нужны --fingerprint, --outcome и --wave\n' +
+      `Ничего не выполнено.\n\n${formatUsage(CLI, CLI.name)}\n`
     );
-    process.exit(1);
-  }
-
-  if (!VALID_OUTCOMES.has(args.outcome)) {
-    process.stderr.write(
-      `[respond-recurrence] ERROR — invalid outcome "${args.outcome}". ` +
-      `Must be one of: ${[...VALID_OUTCOMES].join(', ')}\n`
-    );
-    process.exit(1);
+    process.exit(EXIT_USAGE);
   }
 
   // Check file exists

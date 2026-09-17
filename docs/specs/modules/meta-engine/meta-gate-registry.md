@@ -31,11 +31,15 @@ Source of truth mapping each mistake class to its gate: since-date, mechanism fi
 
 Each AC names the executable check that proves it. ACs are the contract; the command is how the line verifies it.
 
-### AC-1 — Self-test passes
+### AC-1 — The registry loads and drives the recurrence audit
 
 ```
-node scripts/meta-remedies.mjs --self-test
+node --test scripts/__tests__/meta-audit.test.mjs
 ```
+
+<!-- 2026-09-16: до этого здесь стоял запуск meta-remedies.mjs с флагом --self-test. Самопроверки у
+модуля нет, аргументы он не читает, и команда выходила с 0, ничего не проверив. Поймала сверка
+мест вызова (scripts/lib/cli-replay.mjs: аргументы модулю без точки входа — сломанное место). -->
 
 ### AC-2 — Every entry mechanism points to a file on disk
 

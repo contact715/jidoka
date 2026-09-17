@@ -35,6 +35,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 export const DEFAULT_SETTINGS = () => join(homedir(), '.claude', 'settings.json');
 
@@ -145,11 +146,22 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): опечатка во флаге раньше молча проверяла ~/.claude/settings.json
+// вместо указанного файла. Теперь — код 2 до чтения.
+export const CLI = {
+  name: 'settings-integrity',
+  summary: 'Проверить, что каждый хук в settings.json существует на диске, без дублей и пустых событий.',
+  selfTest: true,
+  options: {
+    file: { type: 'string', value: 'путь', desc: 'какой settings.json проверять (по умолчанию ~/.claude/settings.json)' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const i = process.argv.indexOf('--file');
-  const file = i !== -1 ? process.argv[i + 1] : DEFAULT_SETTINGS();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const file = values.file !== undefined ? values.file : DEFAULT_SETTINGS();
 
   if (!existsSync(file)) {
     console.log(`\x1b[2m○ settings-integrity: n/a — no settings file at ${file}\x1b[0m`);

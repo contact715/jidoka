@@ -8,17 +8,18 @@
  * Usage:
  *   node scripts/regenerate-adr-index.mjs        # write docs/decisions/_INDEX.md
  *   node scripts/regenerate-adr-index.mjs --dry  # print table, do not write
+ *   (full help: --help; an unknown flag or a stray word exits 2 before anything is written)
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const DECISIONS_DIR = path.join(ROOT, 'docs/decisions');
 const OUT = path.join(DECISIONS_DIR, '_INDEX.md');
-const isDry = process.argv.includes('--dry');
 
 // Files to exclude from the index (non-ADR files in the same directory)
 const EXCLUDE = new Set(['_TEMPLATE.md', 'README.md', '_INDEX.md', '_RFC_INDEX.md']);
@@ -60,7 +61,7 @@ export function extractAdrNumber(filename) {
 
 
 // ── Main ───────────────────────────────────────────────────────────────
-function main() {
+function main({ dry: isDry = false } = {}) {
   if (!fs.existsSync(DECISIONS_DIR)) {
     process.stderr.write('[warn] docs/decisions/ not found — nothing to index\n');
     process.exit(1);
@@ -142,7 +143,18 @@ ${table}
   process.stdout.write(`[adr-index] wrote ${rows.length} rows → docs/decisions/_INDEX.md\n`);
 }
 
+// Strict parsing (2026-09-16): an unknown flag or a stray word exits 2 before anything is
+// written. Before, a typo like `--dyr` silently rewrote docs/decisions/_INDEX.md.
+export const CLI = {
+  name: 'regenerate-adr-index',
+  summary: 'Rebuild docs/decisions/_INDEX.md from docs/decisions/ADR-*.md.',
+  options: {
+    dry: { type: 'boolean', desc: 'print the index, do not write it' },
+  },
+};
+
 // Only run main when invoked directly (not when imported as a module by regenerate-rfc-index.mjs)
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main();
+  const { values } = runCli(CLI);
+  main({ dry: values.dry === true });
 }

@@ -52,6 +52,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const PAGE = 16384;
 
@@ -318,8 +319,7 @@ export function isStarving(m) {
 
 function pause(ms) { execFileSync('perl', ['-e', `select(undef,undef,undef,${ms / 1000})`]); }
 
-function main(argv) {
-  const fix = argv.includes('--fix');
+function main({ fix = false } = {}) {
   const all = ps();
   const mePid = process.pid;
 
@@ -522,7 +522,19 @@ function selfTest() {
   return bad === 0 ? 0 : 1;
 }
 
+// Разбор строгий (2026-09-16): прибор умеет посылать сигналы процессам, поэтому незнакомый
+// флаг или опечатка (`--fx`) — код 2 до первого вызова ps, а не тихий прогон.
+export const CLI = {
+  name: 'dev-server-audit',
+  summary: 'Лишние серверы разработки: найти дубли в одной рабочей папке, назвать, убрать (--fix).',
+  selfTest: true,
+  options: {
+    fix: { type: 'boolean', desc: 'остановить лишние (TERM, пауза, KILL выжившим); без флага ничего не трогает' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  process.exit(process.argv.includes('--self-test') ? selfTest() : main(process.argv.slice(2)));
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  process.exit(wantsSelfTest ? selfTest() : main({ fix: values.fix === true }));
 }

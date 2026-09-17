@@ -34,11 +34,13 @@
 //   node scripts/kaizen-dispatch.mjs dispatch --ids W32-K1,W32-R6    # queue those, by owner's yes
 //   node scripts/kaizen-dispatch.mjs dispatch --week 2026-W32 --all  # queue every open item of a week
 //   node scripts/kaizen-dispatch.mjs status                          # queued vs open, per week
+//   node scripts/kaizen-dispatch.mjs stalled [--weeks 2] [--current-week 2026-W37] [--gate]
 
 import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Переопределение реестра, как у соседних приборов (META_LEDGER, TASK_QUEUE).
@@ -128,7 +130,7 @@ export function taskFromEntry(entry, { repo = ROOT } = {}) {
     '- негативный случай: показать, что механизм ЛОВИТ то, ради чего сделан, а не только пропускает;',
     '- гейты проходятся честно, обход запрещён;',
     '- если это меняет то, КАК мы работаем, запись идёт в оба места: движок и ~/.claude;',
-    '- после внедрения прогнать: node scripts/kaizen-audit.mjs --repo . и убедиться, что пункт стал shipped.',
+    '- после внедрения прогнать: node scripts/kaizen-audit.mjs и убедиться, что пункт стал shipped.',
     '',
     `Приоритет: ${entry.priority || 'не задан'}. Оценка усилий: ${entry.effort || 'не задана'}.`,
   ].join('\n');
@@ -233,19 +235,45 @@ function selfTest() {
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): опечатка в команде раньше молча печатала справку с кодом 0,
+// а `dispatch --id X` отказывал только потому, что --ids не нашёлся. Теперь незнакомая
+// команда, флаг чужой команды или лишнее слово — код 2 до чтения реестра и постановки задач.
+const SELECT = {
+  week: { type: 'string', value: 'неделя', desc: 'когорта, например 2026-W32' },
+  ids: { type: 'string', value: 'id,id', desc: 'id рекомендаций через запятую' },
+  all: { type: 'boolean', desc: 'все открытые записи выбранной недели' },
+};
+export const CLI = {
+  name: 'kaizen-dispatch',
+  summary: 'Одобренные рекомендации кайдзен → задачи в последовательной очереди (task-queue).',
+  selfTest: true,
+  defaultCommand: 'status',
+  commands: {
+    status: { desc: 'открытые рекомендации по неделям (по умолчанию)' },
+    plan: { desc: 'что БУДЕТ поставлено в очередь', options: SELECT },
+    dispatch: { desc: 'поставить в очередь (нужен --ids или --week … --all)', options: SELECT },
+    stalled: {
+      desc: 'записи без исполнителя и без датированного отклонения',
+      options: {
+        weeks: { type: 'number', default: 2, desc: 'порог возраста в неделях' },
+        'current-week': { type: 'string', value: 'неделя', desc: 'текущая неделя (по умолчанию по календарю)' },
+        gate: { type: 'boolean', desc: 'код 1, если застрявшие есть' },
+      },
+    },
+  },
+};
+
 const isMain = process.argv[1] && process.argv[1].endsWith('kaizen-dispatch.mjs');
 if (isMain) {
-  const argv = process.argv.slice(2);
-  if (argv.includes('--self-test')) selfTest();
-  const arg = (f, d = null) => { const i = argv.indexOf(f); return i !== -1 ? argv[i + 1] : d; };
-  const cmd = argv[0] || 'status';
+  const { command: cmd, values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const entries = readLedger();
-  const week = arg('--week');
-  const ids = arg('--ids') ? arg('--ids').split(',').map(s => s.trim()).filter(Boolean) : null;
-  const all = argv.includes('--all');
+  const week = values.week || null;
+  const ids = values.ids ? values.ids.split(',').map(s => s.trim()).filter(Boolean) : null;
+  const all = values.all === true;
 
   if (cmd === 'stalled') {
-    const thresholdWeeks = Number(arg('--weeks', 2));
+    const thresholdWeeks = values.weeks;
     let queueTexts = [];
     try {
       const qp = process.env.TASK_QUEUE || path.join(process.env.HOME || '', '.jidoka', 'task-queue', 'queue.jsonl');
@@ -258,13 +286,13 @@ if (isMain) {
         .map((l) => { try { return JSON.parse(l).recId || JSON.parse(l).id; } catch { return null; } }).filter(Boolean);
     } catch { /* память отказов недоступна */ }
 
-    const cw = arg('--current-week') || isoWeekOf(new Date());
+    const cw = values['current-week'] || isoWeekOf(new Date());
     const r = stallDisposition(entries, { currentWeek: cw, thresholdWeeks, queueTexts, rejectedIds });
     console.log(`застрявшие записи (старше ${r.threshold} недель, без исполнителя и без датированного отклонения): ${r.stalled.length}`);
     for (const e of r.stalled.slice(0, 30)) console.log(`  ${String(e.ageWeeks).padStart(2)}н  ${e.id}  ${e.title.slice(0, 66)}`);
     if (r.stalled.length > 30) console.log(`  …и ещё ${r.stalled.length - 30}`);
     console.log(`  с диспозицией: ${r.disposed.length}`);
-    if (process.argv.includes('--gate') && r.stalled.length) {
+    if (values.gate && r.stalled.length) {
       console.error('\n✗ у застрявших записей нет ТРЕТЬЕГО ИСХОДА: ни исполнителя, ни датированного отклонения.');
       console.error('  «Висит дальше» перестало быть умолчанием. Выбери по каждой:');
       console.error('    исполнитель  → node scripts/kaizen-dispatch.mjs dispatch --ids <id,id>');
@@ -305,6 +333,4 @@ if (isMain) {
     console.log(`\nпоставлено задач: ${n}. Веди их по одной: task-queue.mjs next → сделал → safe-commit → done <id>.`);
     process.exit(0);
   }
-
-  console.log('usage: kaizen-dispatch.mjs status | plan | dispatch [--ids a,b | --week W --all]  |  --self-test');
 }

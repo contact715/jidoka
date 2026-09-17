@@ -9,14 +9,15 @@
  * item is unmet.
  *
  * Usage:
- *   node scripts/run-checklist.mjs --phase <dor|dod|spec-review|task-decomp|closure> \
- *     --wave wave-NNN [--tier <L0|L1|L2|L3|L4>] [--dry-run] [--staged]
+ *   node scripts/run-checklist.mjs --phase <dor|dod|spec-review|task-decomp|closure> --wave wave-NNN [--tier <L0|L1|L2|L3|L4>] [--dry-run] [--staged]
  *   node scripts/run-checklist.mjs --help
  *
  * Exit codes:
  *   0   PASS or WARN (soft mode, pfca.hardBlockEnabled: false)
  *   0   SKIP (pfca.enabled: false)
- *   1   Usage error (no --phase provided)
+ *   0   --help (справка в stdout; до 2026-09-16 было stderr и код 1)
+ *   1   Usage error (no arguments, no/invalid --phase)
+ *   2   Bad call: unknown flag, flag without value, --tier not in L0..L4 (nothing evaluated or logged)
  *   42  BLOCK (pfca.hardBlockEnabled: true, any killer item returns no)
  */
 
@@ -24,6 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { runCli, formatUsage } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -38,28 +40,15 @@ const VALID_PHASES = ['dor', 'dod', 'spec-review', 'task-decomp', 'closure', 'im
 const VALID_TIERS = ['L0', 'L1', 'L2', 'L3', 'L4'];
 
 // ── CLI args ───────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-
-function getArg(flag) {
-  const idx = args.indexOf(flag);
-  return idx !== -1 ? args[idx + 1] : null;
-}
-
-function hasFlag(flag) {
-  return args.includes(flag);
-}
-
-// ── Usage ──────────────────────────────────────────────────────────────────
-
-const isMain = process.argv[1] === fileURLToPath(import.meta.url);
-
-if (isMain) {
-  if (hasFlag('--help') || args.length === 0) {
-    process.stderr.write(`
+// Разбор строгий (2026-09-16): скрипт дописывает результат в docs/audits/checklist-runs.jsonl,
+// поэтому опечатка (`--dryrun`) раньше молча писала в журнал. Теперь — код 2 до оценки.
+export const CLI = {
+  name: 'run-checklist',
+  usage: `
 [pfca] Pre-Flight Checklist Agent — Wave-159
 
 Usage:
-  node scripts/run-checklist.mjs --phase <phase> --wave <wave-NNN> [options]
+  node scripts/run-checklist.mjs --phase <phase> --wave <wave-NNN> [--tier <tier>] [--dry-run] [--staged]
 
 Required:
   --phase <phase>    One of: ${VALID_PHASES.join(', ')}
@@ -72,25 +61,43 @@ Options:
   --help             Show this help message
 
 Exit codes:
-  0   PASS or WARN (soft mode) or SKIP (disabled)
-  1   Usage error
+  0   PASS or WARN (soft mode) or SKIP (disabled); --help
+  1   Usage error (no arguments, no/invalid --phase)
+  2   Bad call: unknown flag, flag without value, --tier not in the list (nothing evaluated or logged)
   42  BLOCK (hard mode, killer item failed)
 
 Config (.sdd-config.json):
   pfca.enabled: false        -> skip all evaluation (SKIP)
   pfca.hardBlockEnabled: false -> WARN on failure, exit 0 (default)
   pfca.hardBlockEnabled: true  -> BLOCK on failure, exit 42
+`,
+  options: {
+    phase: { type: 'string', value: 'phase' },
+    wave: { type: 'string', value: 'wave-NNN' },
+    tier: { type: 'string', choices: VALID_TIERS },
+    'dry-run': { type: 'boolean' },
+    staged: { type: 'boolean' },
+  },
+};
 
-`);
+// ── Usage ──────────────────────────────────────────────────────────────────
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  const { values } = runCli(CLI);
+  // без аргументов — как раньше: справка в stderr и код 1 (ошибка использования)
+  if (process.argv.length <= 2) {
+    process.stderr.write(`${formatUsage(CLI, CLI.name)}\n`);
     process.exit(1);
   }
 
   // ── Staged mode: auto-derive phase from staged file pattern ────────────────
-  let phase = getArg('--phase');
-  let wave = getArg('--wave');
-  const isDryRun = hasFlag('--dry-run');
-  const isStaged = hasFlag('--staged');
-  const tier = getArg('--tier');
+  let phase = values.phase ?? null;
+  let wave = values.wave ?? null;
+  const isDryRun = values['dry-run'] === true;
+  const isStaged = values.staged === true;
+  const tier = values.tier ?? null;
 
   if (isStaged && !phase) {
     // Hook calls: MASTER_SPEC staged -> dor, TASKS staged -> task-decomp

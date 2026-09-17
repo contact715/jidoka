@@ -26,6 +26,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MODULES_DIR = join(ROOT, 'docs/specs/modules');
@@ -187,15 +188,29 @@ function selfTest() {
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до сборки карты и до записи
+// docs/metrics/ac-verify-map.json.
+export const CLI = {
+  name: 'ac-verify-map',
+  summary: 'Карта «критерий приёмки L3 → команда проверки»; пишет docs/metrics/ac-verify-map.json.',
+  selfTest: true,
+  options: {
+    run: { type: 'boolean', desc: 'выполнить каждую self/engine-проверку; код 1 при любом провале' },
+    strict: { type: 'boolean', desc: 'код 1, если команда ссылается на несуществующий скрипт или не опознана' },
+    json: { type: 'boolean', desc: 'вывод в JSON' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
   const rows = buildRows();
   const summary = summarize(rows);
-  const run = process.argv.includes('--run');
-  const strict = process.argv.includes('--strict');
+  const run = values.run === true;
+  const strict = values.strict === true;
 
   // --run: execute every self/engine AC and record pass/fail (real executable proof).
   let runResults = [];
@@ -215,7 +230,7 @@ if (isMain) {
     }
   }
 
-  if (process.argv.includes('--json')) {
+  if (values.json) {
     console.log(JSON.stringify({ summary, rows, runResults }, null, 2));
   } else {
     console.log(`ac-verify-map: ${summary.total} ACs across ${moduleSpecs().length} module specs`);

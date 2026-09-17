@@ -34,21 +34,34 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const REGISTRY_PATH = path.join(ROOT, 'scripts', 'outcomes-registry.json');
 
 // ── args ─────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-const nameArg = args.find((a) => a.startsWith('--name='))?.slice(7) ?? null;
-const isJson = args.includes('--json');
-
-// ── load registry ────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): незнакомый флаг раньше молча пропускался и запускались ВСЕ
+// проверки реестра; `--name X` (через пробел) молча проверял всё вместо X. Теперь `--name X`
+// и `--name=X` равны, а неверный вызов — код 2 до первой проверки. Код 2 здесь и раньше
+// означал «ошибка реестра / неизвестный исход».
+export const CLI = {
+  name: 'outcome-check',
+  summary: 'Проверить исходы из scripts/outcomes-registry.json: 0 — все достигнуты, 1 — нет, 2 — ошибка реестра или неверный вызов.',
+  options: {
+    name: { type: 'string', value: 'исход', desc: 'проверить только этот исход' },
+    json: { type: 'boolean', desc: 'вывод в JSON' },
+  },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values } = runCli(CLI);
+  const nameArg = values.name || null;
+  const isJson = values.json === true;
+
+  // ── load registry ────────────────────────────────────────────────────
   if (!fs.existsSync(REGISTRY_PATH)) {
     console.error(`✗ Registry not found: ${REGISTRY_PATH}`);
     process.exit(2);

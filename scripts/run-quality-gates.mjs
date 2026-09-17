@@ -16,20 +16,17 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
-// ── CLI args ─────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-
-
-const isMain = process.argv[1] === fileURLToPath(import.meta.url);
-
-if (isMain) {
-  if (args.includes('--help')) {
-    console.log(`
-run-quality-gates.mjs — L0.96 quality gate suite
+// ── CLI ──────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): незнакомый флаг раньше молча пропускался, и шёл полный
+// прогон гейтов. Теперь — код 2 до первого гейта.
+export const CLI = {
+  name: 'run-quality-gates',
+  usage: `run-quality-gates.mjs — L0.96 quality gate suite
 
 Usage:
   node scripts/run-quality-gates.mjs [--wave <wave-id>] [--skip-e2e] [--help]
@@ -37,18 +34,25 @@ Usage:
 Flags:
   --wave <id>   Wave identifier for logging (e.g. wave-102)
   --skip-e2e    Skip Playwright E2E tests (unit-only pass)
-  --help        Show this message
+  -h, --help    Show this message
 
 Exit codes:
   0  All gates passed (or gracefully skipped)
   1  One or more gates emitted BLOCK
-`);
-    process.exit(0);
-  }
+  2  Invalid call: unknown flag, stray word or missing value (nothing executed)`,
+  options: {
+    wave: { type: 'string', value: 'id', desc: 'идентификатор волны для журнала' },
+    'skip-e2e': { type: 'boolean', desc: 'пропустить Playwright' },
+  },
+};
 
-  const skipE2e = args.includes('--skip-e2e');
-  const waveIdx = args.indexOf('--wave');
-  const waveId = waveIdx !== -1 ? args[waveIdx + 1] : 'unknown';
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  const { values } = runCli(CLI);
+
+  const skipE2e = values['skip-e2e'] === true;
+  const waveId = values.wave ?? 'unknown';
 
   // ── Helpers ────────────────────────────────────────────────────────────
   function elapsed(start) {

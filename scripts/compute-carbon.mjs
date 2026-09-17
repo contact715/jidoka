@@ -16,8 +16,8 @@
  * Usage:
  *   npm run compute:carbon
  *   node scripts/compute-carbon.mjs
- *   node scripts/compute-carbon.mjs --dry    (print output; no JSONL write, no dashboard append)
- *   node scripts/compute-carbon.mjs --debug  (verbose per-wave breakdown)
+ *   node scripts/compute-carbon.mjs --dry    # print output; no JSONL write, no dashboard append
+ *   node scripts/compute-carbon.mjs --debug  # verbose per-wave breakdown
  *
  * Decisions honored:
  *   D1: compute-carbon mirrors compute-cost function-for-function (orthogonal gCO2e output)
@@ -43,6 +43,7 @@ import { fileURLToPath } from 'node:url';
 
 import { emitTelemetry } from './emit-telemetry.mjs';
 import { writeHaltState } from './andon-halt-helpers.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -52,8 +53,16 @@ const CARBON_FACTORS_PATH = path.join(ROOT, 'docs', 'quality', 'carbon-factors.j
 const DASHBOARD_PATH = path.join(ROOT, 'docs', 'metrics', '_DASHBOARD.md');
 const CARBON_EVENTS_PATH = path.join(ROOT, 'docs', 'audits', 'carbon-events.jsonl');
 
-const isDry = process.argv.includes('--dry');
-const isDebug = process.argv.includes('--debug');
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до записи в журнал и витрину.
+// Раньше опечатка `--dyr` молча давала полный прогон с записью.
+export const CLI = {
+  name: 'compute-carbon',
+  summary: 'Оценка углеродного следа по токенам из docs/metrics/_DASHBOARD.md (диапазон low/central/high, gCO2e est.).',
+  options: {
+    dry: { type: 'boolean', desc: 'только вывод: без записи в журнал событий и витрину' },
+    debug: { type: 'boolean', desc: 'подробная разбивка по волнам' },
+  },
+};
 
 // ── Config readers ────────────────────────────────────────────────────────────
 
@@ -347,7 +356,7 @@ function readFinopsCostFromDashboard(dashboardContent) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-async function main() {
+async function main({ isDry = false, isDebug = false } = {}) {
   const cfg = readConfig();
 
   // D8: soft-default — exit 0 with note when disabled
@@ -616,7 +625,8 @@ function appendDashboardSummary(summary) {
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  main().catch(err => {
+  const { values } = runCli(CLI);
+  main({ isDry: values.dry === true, isDebug: values.debug === true }).catch(err => {
     process.stderr.write(`[carbon] FATAL: ${err}\n`);
     process.exit(1);
   });

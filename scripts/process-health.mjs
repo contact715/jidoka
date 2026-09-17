@@ -77,6 +77,7 @@
 
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const ПОРОГ_МИНУТ_ПО_УМОЛЧАНИЮ = 30;
 const ПОРОГ_ПРОЦЕССОРА = 1.0; // %
@@ -523,21 +524,35 @@ function самопроверка() {
     process.exit(плохо.length ? 1 : 0);
 }
 
-function main() {
-    const args = process.argv.slice(2);
-    if (args.includes("--self-test")) return самопроверка();
+// Разбор строгий (2026-09-16): с --fix прибор убивает процессы, поэтому опечатка во флаге
+// (`--rot <проект>`) раньше молча расширяла «наше» до текущей папки. Теперь — код 2 ДО сбора
+// процессов. `--root` без значения раньше давал корень "undefined".
+export const CLI = {
+    name: "process-health",
+    summary: "Найти зависшие процессы по мёртвому родителю (сирота, ноль процессора, возраст) и, с --fix, убрать их.",
+    selfTest: true,
+    options: {
+        root: { type: "string", value: "путь", desc: "что считать «нашим» (по умолчанию текущая папка)" },
+        fix: { type: "boolean", desc: "убрать сирот: сначала TERM, через 2 с KILL" },
+        all: { type: "boolean", desc: "брошенное в чужих проектах тоже можно трогать" },
+        minutes: { type: "number", default: ПОРОГ_МИНУТ_ПО_УМОЛЧАНИЮ, desc: "порог возраста, минут" },
+        json: { type: "boolean", desc: "вывод в JSON" },
+    },
+};
 
-    const чинить = args.includes("--fix");
-    const какJson = args.includes("--json");
-    const iКорень = args.indexOf("--root");
-    const корень = iКорень >= 0 ? args[iКорень + 1] : process.cwd();
-    const iМин = args.indexOf("--minutes");
-    const порогМинут = iМин >= 0 ? Number(args[iМин + 1]) : ПОРОГ_МИНУТ_ПО_УМОЛЧАНИЮ;
+function main() {
+    const { values, selfTest: хочетСамопроверку } = runCli(CLI);
+    if (хочетСамопроверку) return самопроверка();
+
+    const чинить = values.fix === true;
+    const какJson = values.json === true;
+    const корень = values.root ?? process.cwd();
+    const порогМинут = values.minutes;
 
     const процессы = собратьПроцессы();
     const свои = процессы.filter((п) => п.команда.includes(корень) && п.pid !== process.pid);
 
-    const всяМашина = args.includes("--all");
+    const всяМашина = values.all === true;
     const зависшие = [];
     const подозрительные = [];
     const жгут = [];

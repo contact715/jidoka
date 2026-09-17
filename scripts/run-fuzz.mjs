@@ -50,6 +50,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -448,10 +449,17 @@ async function main() {
   }
 }
 
+// Флагов и слов нет. Разбор строгий (2026-09-16): незнакомый флаг — код 2 ДО подмены файлов
+// и сорока запусков валидаторов, а не молча проглоченный хвост.
+export const CLI = {
+  name: 'run-fuzz',
+  summary: 'Фаззинг валидаторов: 8 классов испорченного входа × 5 целей; находки — в docs/security/findings-register.json.',
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
   main().catch((err) => {
     process.stderr.write(`[fuzz] Unexpected harness error: ${err.message}\n${err.stack}\n`);
     process.exit(1);

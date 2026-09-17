@@ -13,6 +13,7 @@
  * Usage:
  *   node scripts/export-memory-anti-patterns.mjs           # write snapshot
  *   node scripts/export-memory-anti-patterns.mjs --dry     # print only, no file write
+ *   (полная справка: --help; незнакомый флаг или лишнее слово — код 2 до любой записи)
  *
  * Exit codes:
  *   0 — success (file written or dry run printed)
@@ -22,14 +23,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const OUT_PATH = path.join(ROOT, 'docs/memory-anti-patterns.md');
 const CATALOG_PATH = path.join(ROOT, 'docs/ANTI_PATTERNS_CATALOG.md');
-
-const args = new Set(process.argv.slice(2));
-const isDry = args.has('--dry');
 
 /**
  * Known anti-pattern entities — used as fallback when MCP is unavailable.
@@ -202,9 +201,11 @@ ${e.observations.map((o) => `- ${o}`).join('\n')}
 `;
 }
 
-function main() {
+/** @param {{ dry?: boolean, 'legacy-bypass'?: boolean }} values */
+function main(values) {
+  const isDry = values.dry === true;
   // Deprecation guard (wave-151) — superseded by scripts/export-memory-snapshot.mjs
-  if (!process.argv.includes('--legacy-bypass')) {
+  if (values['legacy-bypass'] !== true) {
     process.stderr.write('[DEPRECATED] scripts/export-memory-anti-patterns.mjs has been superseded by scripts/export-memory-snapshot.mjs (wave-151).\n');
     process.stderr.write('Run: npm run memory:snapshot\n');
     process.stderr.write('To force-run the legacy single-file exporter: --legacy-bypass\n');
@@ -242,8 +243,19 @@ function main() {
 }
 
 
+// Разбор строгий (2026-09-16): незнакомый флаг или лишнее слово — код 2 до любой записи.
+export const CLI = {
+  name: 'export-memory-anti-patterns',
+  summary: 'Устаревший экспорт антипаттернов в docs/memory-anti-patterns.md (заменён export-memory-snapshot.mjs).',
+  options: {
+    dry: { type: 'boolean', desc: 'только напечатать, файл не писать' },
+    'legacy-bypass': { type: 'boolean', desc: 'всё равно запустить устаревший экспорт' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  main();
+  const { values } = runCli(CLI);
+  main(values);
 }

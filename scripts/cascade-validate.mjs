@@ -25,17 +25,26 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
 // ── CLI args ───────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-const rootArg = args.find((_, i) => args[i - 1] === '--root') ?? null;
-const levelFilter = args.find((_, i) => args[i - 1] === '--level') ?? null;
-// --dry is a no-op for cascade-validate (always read-only), kept for parity
-// with other cascade scripts.
-const isDry = args.includes('--dry');
+// Разбор строгий (2026-09-16): опечатка `--levle L1` раньше молча снимала фильтр уровня,
+// а `--stmap` — превращала запись отпечатков в обычный отчёт. Теперь — код 2 до чтения спек.
+export const CLI = {
+  name: 'cascade-validate',
+  summary: 'Проверить, совместимы ли дочерние спеки с родителем (--root): версия и отпечаток содержимого.',
+  selfTest: true,
+  options: {
+    root: { type: 'string', value: 'путь', desc: 'родительская спека (без него — предупреждение и выход 0)' },
+    level: { type: 'string', value: 'уровень', desc: 'проверять только детей этого уровня (например L1)' },
+    stamp: { type: 'boolean', desc: 'записать текущий отпечаток родителя в ссылки детей (пишет файлы)' },
+    // --dry ничего не меняет: проверка и так только читает; оставлен для единообразия со скриптами каскада
+    dry: { type: 'boolean', desc: 'ничего не меняет (проверка и так только читает)' },
+  },
+};
 
 // ── YAML + bold-field two-pass parser (shared contract from T.1) ───────
 // Wave-171: exported so validate-runbooks.mjs can import without rewriting (D4 / AC-15).
@@ -199,10 +208,8 @@ function fingerprintSelfTest() {
   console.log('\n\x1b[32m✓ cascade-validate: parent-content fingerprint catches an edit the version number hides\x1b[0m');
   process.exit(0);
 }
-// самопроверка — только при прямом запуске: импортирующий CLI со своим
-// --self-test не должен запускать чужую
-const isMainCascade = process.argv[1] === fileURLToPath(import.meta.url);
-if (isMainCascade && process.argv.includes('--self-test')) fingerprintSelfTest();
+// самопроверка — только при прямом запуске (см. сторож в конце файла): импортирующий CLI
+// со своим --self-test не должен запускать чужую
 
 // ── Semver comparison ──────────────────────────────────────────────────
 // Returns { major, minor, patch } from "MAJOR.MINOR.PATCH" string.
@@ -362,7 +369,7 @@ function keywordSignatureCheck(rootHeadings, childSpec) {
 }
 
 // ── Main ───────────────────────────────────────────────────────────────
-function main() {
+function main({ root: rootArg = null, level: levelFilter = null, stamp = false } = {}) {
   if (!rootArg) {
     process.stderr.write('[cascade-validate] error: --root <spec-path> is required\n');
     process.exit(0);
@@ -447,7 +454,7 @@ function main() {
   // --stamp: record the parent's current fingerprint on every child link that points at it.
   // This is the deliberate adoption step. It says "I have read these children against this
   // parent as it stands now", which is exactly what doorstop's `reviewed:` stamp means.
-  if (process.argv.includes('--stamp')) {
+  if (stamp) {
     const fp = contentFingerprint(rootContent);
     let stamped = 0;
     for (const { childRelPath, childSpec } of closure) {
@@ -514,5 +521,7 @@ function main() {
 // Wave-171: guard so main() only runs when this file is the entry point,
 // not when it is imported by validate-runbooks.mjs for its exported parsers.
 if (fileURLToPath(import.meta.url) === process.argv[1]) {
-  main();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) fingerprintSelfTest();
+  main(values);
 }

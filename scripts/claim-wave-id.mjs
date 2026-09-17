@@ -21,6 +21,7 @@
 //
 // Usage: node scripts/claim-wave-id.mjs [--session id] [--remote origin] [--branch dev]
 //        [--registry docs/specs/_CLAIMED_WAVES.jsonl] [--max-attempts 5] [--json] [--self-test]
+//        (полная справка: --help; незнакомый флаг — код 2 до любого обращения к git)
 // stdout: "wave-N" (или JSON с --json); пояснения — на stderr. Без remote — локальный fallback.
 
 import {
@@ -28,6 +29,7 @@ import {
   readdirSync, mkdtempSync, rmSync, unlinkSync,
 } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 import { join, resolve, dirname } from 'node:path';
 import { tmpdir, hostname } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -323,20 +325,32 @@ function selfTest() {
 }
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
-function cli() {
-  const arg = (k, d = null) => {
-    const i = process.argv.indexOf(k);
-    return i > -1 ? process.argv[i + 1] : d;
-  };
+// Разбор строгий (2026-09-16): опечатка во флаге (`--brnach dev`) раньше молча отправляла
+// резерв номера в ветку по умолчанию. Теперь — код 2 до любого обращения к git.
+export const CLI = {
+  name: 'claim-wave-id',
+  summary: 'Зарезервировать следующий свободный номер волны (атомарно, через пуш в remote).',
+  selfTest: true,
+  options: {
+    session: { type: 'string', value: 'id', desc: 'кто резервирует' },
+    remote: { type: 'string', value: 'имя', desc: 'remote (по умолчанию — из upstream ветки, иначе первый из git remote)' },
+    branch: { type: 'string', value: 'ветка', desc: 'ветка реестра (обязательна при отцепленной голове)' },
+    registry: { type: 'string', value: 'путь', desc: 'реестр (по умолчанию docs/specs/_CLAIMED_WAVES.jsonl)' },
+    'max-attempts': { type: 'number', default: 5, desc: 'сколько раз пробовать следующий номер' },
+    json: { type: 'boolean', desc: 'ответ в JSON' },
+  },
+};
+
+function cli(values) {
   try {
     const res = claimWave({
-      session: arg('--session') || undefined,
-      remote: arg('--remote') || undefined,
-      branch: arg('--branch') || undefined,
-      registryRel: arg('--registry') || undefined,
-      maxAttempts: Number(arg('--max-attempts', 5)),
+      session: values.session || undefined,
+      remote: values.remote || undefined,
+      branch: values.branch || undefined,
+      registryRel: values.registry || undefined,
+      maxAttempts: values['max-attempts'],
     });
-    process.stdout.write(process.argv.includes('--json') ? JSON.stringify(res) + '\n' : res.wave + '\n');
+    process.stdout.write(values.json ? JSON.stringify(res) + '\n' : res.wave + '\n');
   } catch (e) {
     process.stderr.write(`claim-wave-id: ${e.message}\n`);
     process.exit(1);
@@ -345,6 +359,7 @@ function cli() {
 
 const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  else cli();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  else cli(values);
 }

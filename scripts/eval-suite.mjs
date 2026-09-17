@@ -23,16 +23,32 @@ import { execSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli, formatUsage, EXIT_USAGE } from './lib/cli.mjs';
 
 const CASES = 'docs/evals/_cases.jsonl';
 const BASELINE = 'docs/evals/_baseline.json';
 const REGRESSION_DROP = 0.05; // >5% pass-rate drop = regression
-const update = process.argv.includes('--update-baseline');
 
+// Разбор строгий (2026-09-16): опечатка `--update-baselin` раньше молча превращала запись
+// базовой линии в обычный прогон. Код 2 у скрипта уже занят (нет файла кейсов) — оставлен.
+export const CLI = {
+  name: 'eval-suite',
+  summary: 'Детерминированные кейсы механизмов движка: прогон и сверка с базовой линией (падение >5% — регрессия).',
+  options: {
+    'update-baseline': { type: 'boolean', desc: 'записать базовую линию (только если все кейсы зелёные)' },
+    force: { type: 'boolean', desc: 'только с --update-baseline: записать и при красных кейсах' },
+  },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values } = runCli(CLI);
+  const update = values['update-baseline'] === true;
+  if (values.force && !update) {
+    process.stderr.write(`eval-suite: неверный вызов — флаг --force работает только с --update-baseline\nНичего не выполнено.\n\n${formatUsage(CLI, 'eval-suite')}\n`);
+    process.exit(EXIT_USAGE);
+  }
   if (!existsSync(CASES)) { console.error(`eval-suite: ${CASES} missing`); process.exit(2); }
 
   const cases = readFileSync(CASES, 'utf8').split('\n').filter(Boolean).map((l, i) => {
@@ -77,7 +93,7 @@ if (isMain) {
   if (update) {
     // Guard against the recurring mistake of baselining a FAILING suite (which silently locks
     // in a regression). Refuse unless every case passes, or --force is explicit.
-    if (passed < cases.length && !process.argv.includes('--force')) {
+    if (passed < cases.length && !values.force) {
       console.log(`\n\x1b[31m✗ refusing to baseline a failing suite (${(rate * 100).toFixed(1)}%) — fix the case first, or pass --force if intended:\x1b[0m`);
       for (const r of results) if (!r.pass) console.log(`    ✗ ${r.id}: ${r.fails.join(', ')}`);
       process.exit(1);

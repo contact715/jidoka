@@ -18,19 +18,15 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
 // ── CLI args ─────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-
-
-const isMain = process.argv[1] === fileURLToPath(import.meta.url);
-
-if (isMain) {
-  if (args.includes('--help')) {
-    console.log(`
+// Разбор строгий (2026-09-16): раньше `--dryrun` молча не распознавался, и прогон шёл
+// по-настоящему. Теперь незнакомый флаг — код 2 до запуска специалистов.
+const USAGE = `
 run-tier-2-checks.mjs — Tier 2 specialist check orchestrator
 
 Runs 4 specialist checks with smart routing on REVISE verdicts.
@@ -40,7 +36,7 @@ Usage:
   node scripts/run-tier-2-checks.mjs --wave <wave-id> [--skip-visual] [--dry-run] [--help]
 
 Flags:
-  --wave <id>      Wave identifier (e.g. wave-103)
+  --wave <id>      Wave identifier (e.g. wave-103; default "unknown")
   --skip-visual    Skip visual-qa check (no screenshot baseline required)
   --dry-run        Print routing decisions without executing agents
   --help           Show this message
@@ -48,14 +44,27 @@ Flags:
 Exit codes:
   0  All specialists return PASS or SKIP
   1  Any specialist returns BLOCK after iteration cap is reached
-`);
-    process.exit(0);
-  }
+  2  Invalid call (unknown flag, stray word, flag without value) — nothing executed
+`;
 
-  const waveIdx = args.indexOf('--wave');
-  const waveId = waveIdx !== -1 ? args[waveIdx + 1] : 'unknown';
-  const skipVisual = args.includes('--skip-visual');
-  const dryRun = args.includes('--dry-run');
+export const CLI = {
+  name: 'run-tier-2-checks',
+  usage: USAGE,
+  options: {
+    wave: { type: 'string', value: 'id', default: 'unknown', desc: 'wave identifier' },
+    'skip-visual': { type: 'boolean', desc: 'skip visual-qa' },
+    'dry-run': { type: 'boolean', desc: 'print routing decisions without executing agents' },
+  },
+};
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  const { values } = runCli(CLI);
+
+  const waveId = values.wave;
+  const skipVisual = values['skip-visual'] === true;
+  const dryRun = values['dry-run'] === true;
 
   /** Max outer routing cycles before escalating. */
   const ITERATION_CAP = 5;

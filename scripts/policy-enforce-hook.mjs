@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // @closes-class: gate-bypass
+// @divergence: "a brand-new unknown tool is treated as writing" — мера «инструмента нет в списке пишущих» пропустила бы запись, а правило «незнакомое считается пишущим» нарушено
 // policy-enforce-hook — a PreToolUse hook that BLOCKS writes to protected L0/security paths in
 // real time (not after the fact). This is the honest enforcement step beyond policy-sandbox (which
 // only reports): here a Write/Edit to a constitution, mission, the agent-access registry, an eval
@@ -16,6 +17,10 @@
 //   (as a hook) echo '{"tool_name":"Write","tool_input":{"file_path":"..."}}' | node scripts/policy-enforce-hook.mjs
 
 import { readFileSync, appendFileSync } from 'node:fs';
+// Строгий разбор аргументов. Копия лежит в scripts/, поэтому помощник берётся статически рядом
+// (install-into везёт lib/cli.mjs с любым профилем). Код отказа у хука — 1, не 2: для
+// PreToolUse код 2 значит «заблокировать вызов инструмента».
+import { runCli, HOOK_BAD_CALL_EXIT } from './lib/cli.mjs';
 
 // case-INSENSITIVE: a red-team probe found that on a case-insensitive filesystem (macOS/Windows)
 // "docs/constitution.md" is the SAME file as "docs/CONSTITUTION.md" but a case-sensitive regex let
@@ -214,9 +219,19 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор — первое, что делает хук: незнакомый флаг или лишнее слово — отказ до чтения stdin.
+// Слово события хук не читает, поэтому слов не принимает.
+export const CLI = {
+  name: 'policy-enforce-hook',
+  summary: 'Хук PreToolUse: блокирует запись в защищённые пути (секреты, .git, реестры, L0-документы). Данные события — в stdin.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   let raw = '';
   try { raw = readFileSync(0, 'utf8'); } catch { /* no stdin */ }
   let data = {};

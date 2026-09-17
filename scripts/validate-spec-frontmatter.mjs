@@ -41,6 +41,7 @@ import { readFileSync, existsSync, readdirSync, statSync, mkdtempSync, writeFile
 import { resolve, join, relative, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 // ── defaults (overridable via .sdd-config.json → specFrontmatter) ────────────────
 const DEFAULTS = {
@@ -182,20 +183,19 @@ function* walkMd(dir, excludeDirs) {
   }
 }
 
-function run() {
-  const args = process.argv.slice(2);
-  const rootArg = args.find((_, i) => args[i - 1] === '--root');
-  const filesArg = args.find((_, i) => args[i - 1] === '--files');
+function run(values = {}) {
+  const rootArg = values.root;
+  const filesArg = values.files;
   const root = resolve(rootArg ?? process.cwd());
   const cfg = loadConfig(root);
   if (cfg.enabled === false) { console.log('[spec-frontmatter] disabled via .sdd-config.json'); return 0; }
-  const hard = args.includes('--hard') || cfg.hardBlockEnabled === true;
-  const quiet = args.includes('--quiet');
+  const hard = values.hard === true || cfg.hardBlockEnabled === true;
+  const quiet = values.quiet === true;
 
   let files = [];
   if (filesArg) {
     files = filesArg.split(',').map((f) => resolve(root, f.trim())).filter(existsSync);
-  } else if (args.includes('--staged')) {
+  } else if (values.staged === true) {
     try {
       files = execSync('git diff --cached --name-only', { cwd: root, encoding: 'utf8' })
         .split('\n').filter((f) => f.endsWith('.md'))
@@ -278,6 +278,22 @@ function selfTest() {
   return pass === cases.length ? 0 : 1;
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг, флаг без значения — код 2 до проверки.
+// Раньше опечатка `--hrad` молча давала мягкий режим, и гейт пропускал ошибки кодом 0.
+export const CLI = {
+  name: 'validate-spec-frontmatter',
+  summary: 'Гейт схемы: у спеки корректная шапка YAML (уровень, версия x.y.z, статус, пути родителей).',
+  selfTest: true,
+  options: {
+    root: { type: 'string', value: 'папка', desc: 'корень репозитория (по умолчанию текущая папка)' },
+    files: { type: 'string', value: 'a.md,b.md', desc: 'проверить только эти файлы (через запятую)' },
+    staged: { type: 'boolean', desc: 'проверить спеки из индекса git' },
+    hard: { type: 'boolean', desc: 'жёсткий режим: ошибка — код 1' },
+    quiet: { type: 'boolean', desc: 'без построчных находок, только итог' },
+  },
+};
+
 if (process.argv[1] && process.argv[1].endsWith('validate-spec-frontmatter.mjs')) {
-  process.exit(process.argv.includes('--self-test') ? selfTest() : run());
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  process.exit(wantsSelfTest ? selfTest() : run(values));
 }

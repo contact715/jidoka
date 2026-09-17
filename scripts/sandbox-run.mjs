@@ -19,6 +19,7 @@ import { existsSync, realpathSync, writeFileSync, mkdtempSync } from 'node:fs';
 import { execSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { runCli } from './lib/cli.mjs';
 
 // pure: build a macOS Seatbelt (SBPL) profile — read anything, write only in writePaths, net off by default
 export function buildProfile(writePaths, { network = false } = {}) {
@@ -73,20 +74,36 @@ function verify() {
   process.exit(ok ? 0 : 1);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово или флаг без значения — код 2 до
+// запуска команды. Код 2 здесь исторически значит и «нет песочницы в ОС» — он оставлен как был.
+// --cmd — свободный текст для /bin/sh -c; текст, похожий на флаг, пишется как --cmd=<текст>.
+export const CLI = {
+  name: 'sandbox-run',
+  summary: 'Запуск команды в песочнице ядра (macOS sandbox-exec): писать можно только в --scope, сеть закрыта.\nКод 2 также значит: в ОС нет поддерживаемой песочницы (команда не запущена).',
+  selfTest: true,
+  options: {
+    scope: { type: 'string', value: 'папка', desc: 'единственная папка, куда команде можно писать' },
+    cmd: { type: 'string', value: 'команда', desc: 'команда для /bin/sh -c (в кавычках)' },
+    network: { type: 'boolean', desc: 'разрешить сеть (по умолчанию закрыта)' },
+    verify: { type: 'boolean', desc: 'доказать изоляцию ядром: запись в папку проходит, вне — блокируется' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  if (process.argv.includes('--verify')) verify();
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const scope = arg('--scope'), cmd = arg('--cmd');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  if (values.verify) verify();
+  const scope = values.scope || null, cmd = values.cmd || null;
   if (!scope || !cmd) { console.error('usage: --scope <writable-dir> --cmd "<command>" [--network] | --verify | --self-test'); process.exit(2); }
   const mech = detectSandbox();
   if (mech === 'none') { console.error(`sandbox-run: no OS sandbox on ${process.platform} (no sandbox-exec/firejail/bwrap) — refusing to claim isolation. Install one or run unsandboxed deliberately.`); process.exit(2); }
   if (mech !== 'sandbox-exec') { console.error(`sandbox-run: ${mech} detected but only sandbox-exec wiring is implemented — honest stop rather than a fake sandbox.`); process.exit(2); }
   const resolved = realpathSync(scope);
   const prof = join(mkdtempSync(join(tmpdir(), 'sbx-')), 'p.sb');
-  writeFileSync(prof, buildProfile([resolved], { network: process.argv.includes('--network') }));
-  console.log(`sandbox-run: ${cmd}\n  isolation: sandbox-exec (kernel) · write-scope: ${resolved} · network: ${process.argv.includes('--network') ? 'on' : 'DENIED'}\n`);
+  const network = values.network === true;
+  writeFileSync(prof, buildProfile([resolved], { network }));
+  console.log(`sandbox-run: ${cmd}\n  isolation: sandbox-exec (kernel) · write-scope: ${resolved} · network: ${network ? 'on' : 'DENIED'}\n`);
   const r = spawnSync('/usr/bin/sandbox-exec', ['-f', prof, '/bin/sh', '-c', cmd], { stdio: 'inherit' });
   process.exit(r.status ?? 1);
 }

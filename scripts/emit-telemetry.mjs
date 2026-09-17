@@ -39,7 +39,8 @@
  *   any other event_type                      → docs/audits/agent-events.jsonl
  *
  * Wave-148 additions:
- *   CLI: node scripts/emit-telemetry.mjs hash-chain  (backfill prev_hash on all 5 streams)
+ *   CLI, backfill prev_hash on every stream:
+ *     node scripts/emit-telemetry.mjs hash-chain
  *   export getCurrentTraceId()           reads APP_TRACE_ID env or generates UUID
  *   export withTraceContext(id, fn)      sets APP_TRACE_ID for duration of fn()
  *   export readJsonlChainIntegrity(fp)   verifies prev_hash chain integrity
@@ -52,6 +53,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { fork } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 // Wave-165: PII redaction — import from shared module (TS/MJS boundary: .mjs only)
 import { redactPiiString, detectPiiTokens } from '../lib/redaction/redact-pii.mjs';
 
@@ -552,10 +554,21 @@ export function emitTelemetry(eventType, fields) {
 // Legacy records (prev_hash: null) are untouched. Atomic write via .tmp file.
 
 
+// Разбор строгий (2026-09-16): модуль — прежде всего библиотека; из командной строки
+// у него одно слово `hash-chain`. Без слова, как и раньше, ничего не делает (код 0);
+// любое другое слово или флаг — код 2 до чтения потоков.
+export const CLI = {
+  name: 'emit-telemetry',
+  summary: 'Библиотека телеметрии; из командной строки — `hash-chain`: пересчитать prev_hash во всех потоках docs/audits/*.jsonl. Без слова ничего не делает.',
+  options: {},
+  positionals: { min: 0, max: 1, name: 'hash-chain', choices: ['hash-chain'] },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (process.argv[2] === 'hash-chain') {
+  const { positionals } = runCli(CLI);
+  if (positionals[0] === 'hash-chain') {
     runHashChain();
   }
 

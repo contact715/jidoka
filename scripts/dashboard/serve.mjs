@@ -2,7 +2,10 @@
 // serve.mjs — jidoka dashboard server (docs/DASHBOARD_SPEC.md AC4/AC5).
 // http + /api/* + SSE live watch. Entry: npm run jidoka:dashboard.
 //
-// Usage: node scripts/dashboard/serve.mjs            (port 7717, or JIDOKA_DASHBOARD_PORT)
+// Port: 7717, or PORT / JIDOKA_DASHBOARD_PORT. `--emit-html [project]` prints the HTML snapshot
+// to stdout without starting the server. Usage:
+//   node scripts/dashboard/serve.mjs
+//   node scripts/dashboard/serve.mjs --emit-html
 
 import { createServer } from 'node:http';
 import { exec } from 'node:child_process';
@@ -13,6 +16,7 @@ import { homedir, networkInterfaces } from 'node:os';
 import { timingSafeEqual } from 'node:crypto';
 import { discoverProjects, collectProject } from './collectors.mjs';
 import { snapshotMarkdown, snapshotHtml } from './gdoc-export.mjs';
+import { runCli, formatUsage, EXIT_USAGE } from '../lib/cli.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FRAMEWORK = dirname(dirname(HERE)); // scripts/dashboard → framework root
@@ -37,7 +41,9 @@ const json = (res, obj) => { res.writeHead(200, { 'content-type': 'application/j
 
 const sseClients = new Set();
 
-const server = createServer((req, res) => {
+// Запрос к панели. Сервер создаётся только при запуске (createDashboardServer), не при импорте:
+// импорт модуля ради разбора аргументов или сверки мест вызова не должен поднимать HTTP.
+function handle(req, res) {
   if (!authOk(req)) {
     res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="jidoka dashboard"' });
     return res.end('auth required');
@@ -77,7 +83,11 @@ const server = createServer((req, res) => {
   }
 
   res.writeHead(404); res.end('not found');
-});
+}
+
+export function createDashboardServer() {
+  return createServer(handle);
+}
 
 // Live watch: artifact changes push an SSE 'update' to clients on that project.
 function watchProjects() {
@@ -101,14 +111,39 @@ function watchProjects() {
 
 // CLI: `--emit-html [project]` prints the GDoc-ready HTML snapshot to stdout (for the Claude/cron
 // MCP push into a real Google Doc), then exits without starting the server. Default: the framework.
+// Разбор строгий (2026-09-16): незнакомый флаг или лишнее слово — код 2 до запуска сервера.
+export const CLI = {
+  name: 'serve',
+  path: 'scripts/dashboard/serve.mjs',
+  usage: `Панель jidoka.
+
+Поднять HTTP-сервер (порт 7717, PORT или JIDOKA_DASHBOARD_PORT):
+  node scripts/dashboard/serve.mjs
+
+Напечатать HTML-снимок проекта в stdout, сервер не поднимается (без имени проекта — фреймворк):
+  node scripts/dashboard/serve.mjs --emit-html [проект]
+
+Флаги:
+      --emit-html   напечатать HTML-снимок и выйти
+  -h, --help        эта справка`,
+  options: {
+    'emit-html': { type: 'boolean', desc: 'напечатать HTML-снимок проекта в stdout и выйти, сервер не поднимать' },
+  },
+  positionals: { min: 0, max: 1, name: 'проект' },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (process.argv.includes('--emit-html')) {
-    const arg = process.argv[process.argv.indexOf('--emit-html') + 1];
+  const { values, positionals } = runCli(CLI);
+  if (positionals.length && !values['emit-html']) {
+    process.stderr.write(`serve: неверный вызов — имя проекта принимается только вместе с --emit-html\nНичего не выполнено.\n\n${formatUsage(CLI, 'serve')}\n`);
+    process.exit(EXIT_USAGE);
+  }
+  if (values['emit-html']) {
+    const arg = positionals[0];
     const list = projects();
-    const p = (arg && !arg.startsWith('--')) ? byName(arg) : (list.find((x) => x.kind === 'framework') || list[0]);
+    const p = arg ? byName(arg) : (list.find((x) => x.kind === 'framework') || list[0]);
     if (!p) { console.error('emit-html: no project found'); process.exit(1); }
     const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
     process.stdout.write(snapshotHtml(p, collectProject(p.path), stamp));
@@ -117,6 +152,7 @@ if (isMain) {
 
   // Auto-fallback: if the default port is taken (a stray server, another app), step to the next free
   // one instead of crashing on EADDRINUSE — so `npm run dashboard` always comes up.
+  const server = createDashboardServer();
   let boundPort = PORT;
   server.on('error', (e) => {
     if (e.code === 'EADDRINUSE' && !EXPLICIT_PORT && boundPort < PORT + 12) {

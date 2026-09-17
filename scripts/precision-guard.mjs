@@ -12,6 +12,8 @@
 //   node scripts/precision-guard.mjs --self-test
 //   node scripts/precision-guard.mjs --code <file>
 
+import { runCli } from './lib/cli.mjs';
+
 // identifiers that almost certainly carry monetary values
 const MONEY_IDS = /\b(price|cost|amount|total|fee|tax|discount|balance|charge|rate|revenue|payment|salary|wage|fare|subtotal|grandTotal|invoiceTotal)\b/i;
 // identifiers that carry quantities where precision matters
@@ -79,12 +81,22 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Строгий разбор (2026-09-16): незнакомый флаг или слово — код 2 (как и отсутствие --code).
+export const CLI = {
+  name: 'precision-guard',
+  summary: 'Найти вещественную арифметику над деньгами и количествами до выкладки.',
+  selfTest: true,
+  options: {
+    code: { type: 'string', value: 'файл', desc: 'файл для проверки (обязателен)' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const { readFileSync } = await import('node:fs');
-  const file = arg('--code');
+  const file = values.code;
   if (!file) { console.error('usage: --code <file> | --self-test'); process.exit(2); }
   const r = scan(readFileSync(file, 'utf8'));
   if (!r.ok) {

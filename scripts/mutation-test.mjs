@@ -19,10 +19,11 @@
 //   node scripts/mutation-test.mjs --file scripts/coverage-gate.mjs [--threshold 0.5] [--max 60]
 //   node scripts/mutation-test.mjs --file scripts/x.mjs --test 'node {file} --self-test'
 
-import { readFileSync, writeFileSync, mkdtempSync, rmSync, realpathSync, copyFileSync, existsSync } from 'node:fs';
-import { join, basename, dirname } from 'node:path';
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync, realpathSync, copyFileSync, existsSync } from 'node:fs';
+import { join, dirname, resolve, relative, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 const OPS = [
   { from: '===', to: '!==' }, { from: '!==', to: '===' },
@@ -90,36 +91,73 @@ export function mutate(src, max = Infinity) {
 
 export const scoreOf = ({ killed, survived }) => (killed + survived ? killed / (killed + survived) : null);
 
+// pure: the relative .mjs specifiers a module imports statically (`from './x.mjs'`, `from '../lib/y.mjs'`).
+export const relativeImports = (src) => [...src.matchAll(/\bfrom\s+['"](\.\.?\/[^'"]+\.mjs)['"]/g)].map((m) => m[1]);
+
+// every file the target reaches through relative imports, as absolute paths (the target itself excluded).
+function importClosure(target) {
+  const deps = new Set();
+  const queue = [target];
+  while (queue.length) {
+    const cur = queue.shift();
+    for (const spec of relativeImports(readFileSync(cur, 'utf8'))) {
+      const abs = resolve(dirname(cur), spec);
+      if (abs === target || deps.has(abs) || !existsSync(abs)) continue;
+      deps.add(abs);
+      queue.push(abs);
+    }
+  }
+  return [...deps];
+}
+
+// pure: the deepest folder that contains every given file.
+export function commonDir(files) {
+  const parts = files.map((f) => dirname(f).split(sep));
+  const out = [];
+  for (let i = 0; i < parts[0].length; i++) {
+    if (!parts.every((p) => p[i] === parts[0][i])) break;
+    out.push(parts[0][i]);
+  }
+  return out.join(sep) || sep;
+}
+
+/** Чистая: где кончается библиотечная часть файла (дальше самопроверка и вход CLI). */
+export function libraryRegionEnd(src) {
+  const guard = src.search(/\n(function selfTest\b|const isMain|if \([^\n]*import\.meta\.url|if \(process\.argv\[1\])/);
+  return guard === -1 ? src.length : guard;
+}
+
 export function runMutants(file, { max = 60, testCmd } = {}) {
   const src = readFileSync(file, 'utf8');
   // Only mutate the LIBRARY region (above `function selfTest(` and the `const isMain` / import.meta CLI
   // guard). The selfTest body is the TEST itself (mutating its own assertions yields un-killable mutants)
   // and the CLI block is glue --self-test never executes; counting either unfairly depresses the score.
   // Stated boundary: the score reflects the exported LOGIC's test gaps, not the test harness or I/O wrapper.
-  const guard = src.search(/\n(function selfTest\b|const isMain|if \(import\.meta|if \(process\.argv\[1\])/);
-  const regionEnd = guard === -1 ? src.length : guard;
+  // Сторож входа бывает и в форме `if (fileURLToPath(import.meta.url) === process.argv[1])`: без неё
+  // область мутаций у cascade-validate разрослась до main() после перевода на строгий разбор (2026-09-16).
+  const regionEnd = libraryRegionEnd(src);
   const mutants = mutate(src).filter(m => m.index < regionEnd).slice(0, max);
   const tmp = mkdtempSync(join(tmpdir(), 'jidoka-mut-'));
   // copy the target's relative-.mjs imports TRANSITIVELY (BFS) so the mutated copy resolves them — a
   // one-level copy breaks on deps-of-deps (e.g. run-state → planner → debate-trigger) and every mutant
-  // would then falsely count as "killed" on the import error.
-  const srcDir = dirname(file);
-  const copied = new Set();
-  const queue = [file];
-  while (queue.length) {
-    const curSrc = readFileSync(queue.shift(), 'utf8');
-    for (const m of curSrc.matchAll(/from '\.\/([\w-]+\.mjs)'/g)) {
-      if (copied.has(m[1]) || !existsSync(join(srcDir, m[1]))) continue;
-      copyFileSync(join(srcDir, m[1]), join(tmp, m[1]));
-      copied.add(m[1]);
-      queue.push(join(srcDir, m[1]));
-    }
+  // would then falsely count as "killed" on the import error. Imports in subfolders and above
+  // (`./lib/cli.mjs`, `../lib/cli.mjs`) are copied too, with the folder layout kept: the flat
+  // `./name.mjs` match missed them, and after the strict-CLI migration (2026-09-16) every engine
+  // script imports ./lib/cli.mjs — each mutant died on the import error and the score read 100%.
+  const target = resolve(file);
+  const deps = importClosure(target);
+  const root = commonDir([target, ...deps]);
+  for (const dep of deps) {
+    const to = join(tmp, relative(root, dep));
+    mkdirSync(dirname(to), { recursive: true });
+    copyFileSync(dep, to);
   }
   // realpath the temp dir: macOS tmpdir() is symlinked (/var → /private/var); without this,
   // `process.argv[1] === fileURLToPath(import.meta.url)` (the isMain guard) is FALSE in the copy, so
   // the file's --self-test never runs and EVERY mutant falsely "survives". This bug silently faked
   // scores until a manual check caught it — the realpath makes argv[1] match the resolved module URL.
-  const tmpFile = join(realpathSync(tmp), basename(file));
+  const tmpFile = join(realpathSync(tmp), relative(root, target));
+  mkdirSync(dirname(tmpFile), { recursive: true });
   let killed = 0, survived = 0, invalid = 0;
   const survivors = [];
   try {
@@ -145,6 +183,13 @@ function selfTest() {
   ok('mutate flips && to ||', ms.some(m => m.from === '&&' && m.to === '||'));
   ok('mutate flips true to false', ms.some(m => m.from === 'true' && m.to === 'false'));
   ok('mutate respects max', mutate('a === b === c === d', 2).length === 2);
+  {
+    const lib = 'export function f(a) { return a > 0; }\n';
+    ok('область мутаций кончается на сторож вида if (fileURLToPath(import.meta.url) === process.argv[1])',
+      libraryRegionEnd(`${lib}\nfunction main() { return 1; }\nif (fileURLToPath(import.meta.url) === process.argv[1]) { main(); }\n`) < lib.length + 40);
+    ok('область мутаций кончается на const isMain', libraryRegionEnd(`${lib}const isMain = 1;\n`) === lib.length - 1);
+    ok('без сторожа мутируется весь файл', libraryRegionEnd(lib) === lib.length);
+  }
   const strMut = mutate("const s = 'true === false'; const c = a && b;");
   ok('skips operators/booleans inside string literals (equivalent-mutant noise)', strMut.length === 1 && strMut[0].from === '&&');
   const cmtMut = mutate("// don't mutate: a && b\nlet z = c === d;");
@@ -169,6 +214,18 @@ function selfTest() {
     ok('strong self-test KILLS mutants (score > 0)', sr.killed > 0 && sr.score > 0);
     ok('no-op self-test lets mutants SURVIVE (gap surfaced)', wr.survived > 0);
     ok('strong scores higher than no-op (discriminates)', sr.score > (wr.score ?? 0));
+    // imports from a subfolder and from above are copied with the layout kept: a missing import would
+    // kill every mutant on the load error, and a no-op self-test would read as a perfect score
+    mkdirSync(join(tmp, 'pkg', 'lib'), { recursive: true });
+    mkdirSync(join(tmp, 'pkg', 'sub'), { recursive: true });
+    writeFileSync(join(tmp, 'pkg', 'lib', 'h.mjs'), 'export const one = () => 1;\n');
+    const down = join(tmp, 'pkg', 'down.mjs');
+    writeFileSync(down, 'import { one } from "./lib/h.mjs";\nexport function f(a){ return a >= one(); }\nif (process.argv.includes("--self-test")) { process.exit(0); }\n');
+    const up = join(tmp, 'pkg', 'sub', 'up.mjs');
+    writeFileSync(up, 'import { one } from \'../lib/h.mjs\';\nexport function f(a){ return a >= one(); }\nif (process.argv.includes("--self-test")) { process.exit(0); }\n');
+    ok('subfolder import (./lib/x.mjs) resolves in the copy: no-op self-test is not a fake kill', runMutants(down, { max: 2 }).survived > 0);
+    ok('parent-folder import (../lib/x.mjs) resolves in the copy: no-op self-test is not a fake kill', runMutants(up, { max: 2 }).survived > 0);
+    ok('relativeImports finds ./ and ../ specifiers, skips packages', relativeImports(`import a from './a.mjs';\nimport { b } from "../lib/b.mjs";\nimport c from 'node:fs';`).join() === './a.mjs,../lib/b.mjs');
   } finally { rmSync(tmp, { recursive: true, force: true }); }
 
   if (fails.length) { console.log(`\n\x1b[31mmutation-test self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
@@ -176,16 +233,28 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k, d) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : d; };
+// Strict parsing (2026-09-16): an unknown flag or a stray word exits 2 before any mutant is written.
+export const CLI = {
+  name: 'mutation-test',
+  summary: 'Мутационная проверка: по одному перевороту оператора в файле, ловит ли его собственный --self-test.',
+  selfTest: true,
+  options: {
+    file: { type: 'string', value: 'путь', desc: 'файл для мутаций (обязателен)' },
+    test: { type: 'string', value: 'команда', desc: 'команда проверки, {file} — мутант (по умолчанию node {file} --self-test)' },
+    threshold: { type: 'number', default: 0.5, desc: 'порог счёта, 0..1' },
+    max: { type: 'number', default: 60, desc: 'сколько мутантов максимум' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const file = arg('--file');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const file = values.file;
   if (!file) { console.error('usage: mutation-test.mjs --file <path> [--test "node {file} --self-test"] [--threshold 0.5] [--max 60]'); process.exit(2); }
-  const threshold = parseFloat(arg('--threshold', '0.5'));
-  const max = parseInt(arg('--max', '60'), 10);
-  const testCmd = arg('--test');
+  const threshold = values.threshold;
+  const max = Math.trunc(values.max);
+  const testCmd = values.test;
   console.log(`mutation-test: ${file}  (max ${max} mutants, threshold ${threshold})\n`);
   const r = runMutants(file, { max, testCmd });
   if (r.valid === 0) { console.log('  no valid mutants generated (no mutable operators found) — skipping'); process.exit(0); }

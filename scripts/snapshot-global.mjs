@@ -10,14 +10,23 @@ import { copyFileSync, mkdirSync, readFileSync, writeFileSync, existsSync } from
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const HOME = homedir();
 const SRC = join(HOME, '.claude');
 const DEST = 'global-setup';
 
+// Разбор строгий (2026-09-16): флагов нет. Раньше `--help` или любое слово молча
+// переписывали снимок global-setup/ из живого ~/.claude.
+export const CLI = {
+  name: 'snapshot-global',
+  summary: 'Снять живую глобальную настройку ~/.claude в global-setup/ (пути машины заменяются на $HOME).',
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
   mkdirSync(join(DEST, 'hooks'), { recursive: true });
   mkdirSync(join(DEST, 'skills', 'dev-pipeline'), { recursive: true });
   mkdirSync(join(DEST, 'commands'), { recursive: true });

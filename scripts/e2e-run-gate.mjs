@@ -10,6 +10,8 @@
 //   node scripts/e2e-run-gate.mjs --self-test
 //   node scripts/e2e-run-gate.mjs --results '[{"flow":"checkout","passed":true}]'
 
+import { runCli } from './lib/cli.mjs';
+
 export function assess(results = [], { maxFailedFlows = 0 } = {}) {
   const failed = results.filter((r) => !r.passed);
   const passed = results.length - failed.length;
@@ -37,12 +39,22 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+export const CLI = {
+  name: 'e2e-run-gate',
+  summary: 'Оценить результаты сквозных тестов и отказать на упавших сценариях (код 1).',
+  selfTest: true,
+  options: {
+    results: { type: 'string', value: 'json', desc: 'результаты: [{"flow":"…","passed":true}]' },
+    'max-failed': { type: 'number', default: 0, desc: 'сколько упавших сценариев допустимо' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const results = JSON.parse(arg('--results') || '[]');
-  const max = parseInt(arg('--max-failed') || '0', 10);
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const results = JSON.parse(values.results || '[]');
+  const max = parseInt(String(values['max-failed']), 10);
   const r = assess(results, { maxFailedFlows: max });
   console.log(`e2e-run-gate: ${r.passed}/${r.total} flows passed (${r.passPct}%)`);
   if (!r.ok) {

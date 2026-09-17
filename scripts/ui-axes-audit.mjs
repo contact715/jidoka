@@ -13,28 +13,35 @@
  *     а не «решение правильное».
  *
  * Запуск:
- *   node ui-axes-audit.mjs --repo /путь/к/проекту [--json отчёт.json]
+ *   node ui-axes-audit.mjs --repo /путь/к/проекту [--exclude components/site] [--json отчёт.json]
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
-const args = process.argv.slice(2);
-const argOf = (имя, поум = null) => {
-  const i = args.indexOf(имя);
-  return i >= 0 && args[i + 1] ? args[i + 1] : поум;
+export const CLI = {
+  name: 'ui-axes-audit',
+  summary: 'Десять осей интерфейса: у каких есть канон в коде, а какие разъезжаются.',
+  options: {
+    repo: { type: 'string', value: 'путь', desc: 'фронтенд-репозиторий (по умолчанию текущая папка)' },
+    exclude: { type: 'string', value: 'пути', desc: 'части со своим дизайн-языком, через запятую (например components/site)' },
+    json: { type: 'string', value: 'файл', desc: 'записать отчёт в JSON' },
+  },
 };
-const REPO = path.resolve(argOf('--repo', process.cwd()));
-const JSON_OUT = argOf('--json');
-// Части репозитория со своим дизайн-языком (маркетинговый сайт, лендинги)
-// считать вместе с продуктом нельзя — у них другая система по построению.
-const ИСКЛ_ПУТИ = (argOf('--exclude', '') || '').split(',').filter(Boolean);
-
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values } = runCli(CLI);
+  // пустое значение (--repo "") по-прежнему значит «по умолчанию»
+  const REPO = path.resolve(values.repo || process.cwd());
+  const JSON_OUT = values.json || null;
+  // Части репозитория со своим дизайн-языком (маркетинговый сайт, лендинги)
+  // считать вместе с продуктом нельзя — у них другая система по построению.
+  const ИСКЛ_ПУТИ = (values.exclude || '').split(',').filter(Boolean);
+
   if (!fs.existsSync(REPO)) {
     console.error(`[ui-axes] нет каталога: ${REPO}`);
     process.exit(1);

@@ -33,6 +33,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from '
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE = join(ROOT, 'docs/metrics/spec-structural-baseline.json');
@@ -178,15 +179,26 @@ function selfTest() {
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 
+export const CLI = {
+  name: 'spec-structural-gate',
+  summary: 'Храповик структурного здоровья дерева спек: рост любой метрики выше базовой линии — код 1, снижение затягивает линию.',
+  selfTest: true,
+  options: {
+    update: { type: 'boolean', desc: 'переписать базовую линию текущими значениями' },
+    json: { type: 'boolean', desc: 'дополнительно напечатать результат в JSON' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
   const current = measure();
   const baseline = readBaseline();
 
-  if (process.argv.includes('--update')) {
+  if (values.update) {
     writeBaseline(current, 'Spec-tree structural ceiling. Lower is better; the gate blocks any increase. Auto-tightens when a metric drops.');
     console.log(`[spec-structural] baseline updated → ${JSON.stringify(current)}`);
     process.exit(0);
@@ -194,7 +206,7 @@ if (isMain) {
 
   const { regressions, improvements, verdict } = ratchet(baseline, current);
 
-  if (process.argv.includes('--json')) {
+  if (values.json) {
     console.log(JSON.stringify({ baseline, current, regressions, improvements, verdict }, null, 2));
   }
 

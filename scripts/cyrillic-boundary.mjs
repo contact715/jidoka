@@ -32,6 +32,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const CYR = 'а-яёА-ЯЁ';
 
@@ -112,12 +113,24 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): раньше любое слово с `--` молча отбрасывалось, и `--al` давал
+// «файлов не передано — нечего проверять» с кодом 0.
+export const CLI = {
+  name: 'cyrillic-boundary',
+  summary: 'Найти \\b вплотную к кириллице: такое правило молча ничего не находит.',
+  selfTest: true,
+  options: {
+    all: { type: 'boolean', desc: 'проверить всё дерево от текущего каталога (файлы-аргументы тогда не читаются)' },
+  },
+  positionals: { min: 0, max: Infinity, name: 'файл' },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, positionals, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const root = process.cwd();
-  const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
-  const files = process.argv.includes('--all') ? walk(root) : args;
+  const files = values.all ? walk(root) : positionals;
   if (!files.length) { console.log('cyrillic-boundary: файлов не передано — нечего проверять.'); process.exit(0); }
 
   let total = 0;

@@ -8,6 +8,7 @@
 // Usage:
 //   node cc-stats.mjs               # last 14 days
 //   node cc-stats.mjs --days 30
+//   node cc-stats.mjs --rework      # доля работы, отменённой перемоткой
 //   node cc-stats.mjs --self-test
 //
 // FULL & self-tested (pure helpers covered; streaming layer is I/O-thin).
@@ -16,6 +17,7 @@ import { createReadStream, readdirSync, statSync, readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { runCli } from './lib/cli.mjs';
 
 const C = {
   mint:  s => `\x1b[38;5;49m${s}\x1b[0m`,
@@ -256,13 +258,26 @@ function selfTest() {
 
 // ---------- main ----------
 
+// Разбор строгий (2026-09-16): `cc-stats.mjs 30` или `--dyas 30` раньше молча показывали
+// 14 дней. Теперь незнакомый флаг, лишнее слово или не число в --days — код 2.
+export const CLI = {
+  name: 'cc-stats',
+  summary: 'Дашборд токенов Claude Code по дням, проектам и моделям (из ~/.claude/projects).',
+  selfTest: true,
+  options: {
+    days: { type: 'number', default: 14, desc: 'за сколько дней (меньше 1 — берётся 1, 0 — 14)' },
+    rework: { type: 'boolean', desc: 'вместо токенов — сколько работы отменено перемоткой' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   // parentuuid-chain: --rework reads the causal chain instead of the token totals and reports
   // how much of each session was rewound away. Tokens rise whether work shipped or was thrown
   // out; this separates the two.
-  if (process.argv.includes('--rework')) {
+  if (values.rework) {
     const root = join(homedir(), '.claude', 'projects');
     const rows = [];
     let dirs = [];
@@ -296,8 +311,7 @@ if (isMain) {
     console.log('  брошенное это работа, отменённая перемоткой: токены за неё потрачены, результата нет.');
     process.exit(0);
   }
-  const di = process.argv.indexOf('--days');
-  const days = di > -1 ? Math.max(1, parseInt(process.argv[di + 1], 10) || 14) : 14;
+  const days = Math.max(1, Math.trunc(values.days) || 14);
   const sinceMs = Date.now() - days * 86400000;
   const root = join(homedir(), '.claude', 'projects');
   const t0 = Date.now();

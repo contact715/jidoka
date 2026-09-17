@@ -14,8 +14,10 @@
  *                                  auto-strengthen-approve label (human decision)
  *
  * Usage:
- *   node scripts/auto-strengthen.mjs --dry-run   (default, safe — no config mutation)
- *   node scripts/auto-strengthen.mjs --apply     (mutations allowed; gates still apply)
+ *   node scripts/auto-strengthen.mjs --dry-run
+ *     default, safe — no config mutation
+ *   node scripts/auto-strengthen.mjs --apply
+ *     mutations allowed; gates still apply
  *
  * Config: .sdd-config.json autoStrengthen stanza
  * Output stream: docs/audits/strengthen-events.jsonl (7th stream, append-only)
@@ -33,6 +35,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runCli, formatUsage, EXIT_USAGE } from './lib/cli.mjs';
 import {
   readJsonlStream,
   STRENGTHEN_EVENTS_PATH,
@@ -679,14 +682,27 @@ function runApply() {
 
 // ── CLI entry ─────────────────────────────────────────────────────────────────
 
-const args = process.argv.slice(2);
-const applyMode = args.includes('--apply');
-const dryRunMode = args.includes('--dry-run') || !applyMode;
-
+// Строгий разбор (2026-09-16): режим --apply меняет конфиг и открывает issue на GitHub, поэтому
+// незнакомый флаг или лишнее слово — отказ до любой работы, а не молчаливый пробный прогон.
+export const CLI = {
+  name: 'auto-strengthen',
+  summary: 'Перевод гейтов с мягкого режима на жёсткий по счётчикам за 7 дней. По умолчанию — пробный прогон без правки конфига.',
+  options: {
+    'dry-run': { type: 'boolean', desc: 'пробный прогон: только предложения, конфиг не меняется (по умолчанию)' },
+    apply: { type: 'boolean', desc: 'применить уровень 1; для уровня 2 открыть issue на GitHub' },
+  },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values } = runCli(CLI);
+  // Оба режима сразу — противоречие: раньше молча побеждал --apply, то есть опасный.
+  if (values.apply && values['dry-run']) {
+    process.stderr.write(`auto-strengthen: неверный вызов — флаги --apply и --dry-run взаимоисключающие\nНичего не выполнено.\n\n${formatUsage(CLI)}\n`);
+    process.exit(EXIT_USAGE);
+  }
+  const applyMode = values.apply === true;
   if (applyMode) {
     runApply();
   } else {

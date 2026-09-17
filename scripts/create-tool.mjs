@@ -25,8 +25,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const VALID_CATEGORIES = [
   'lead-capture', 'communication', 'scheduling', 'reputation',
@@ -47,24 +47,27 @@ const CATEGORY_ARRAY_NAME = {
   'builders':      'BUILDERS_TOOLS',
 };
 
-const { values } = parseArgs({
+// Разбор строгий (2026-09-16): раньше util.parseArgs стоял на верхнем уровне модуля (читал argv
+// при импорте) и на --help отвечал кодом 1, а спецификации для сверки мест вызова не было.
+export const CLI = {
+  name: 'create-tool',
+  summary: 'Заготовка нового инструмента: страница, компонент и запись в каталог категории.',
   options: {
-    id: { type: 'string' },
-    name: { type: 'string' },
-    description: { type: 'string', default: '...' },
-    category: { type: 'string' },
-    status: { type: 'string', default: 'coming-soon' },
-    icon: { type: 'string', default: 'Sparkles' },
-    'agent-id': { type: 'string', default: '' },
-    'dry-run': { type: 'boolean', default: false },
+    id: { type: 'string', desc: 'kebab-case идентификатор (обязателен)' },
+    name: { type: 'string', desc: 'отображаемое имя (обязательно)' },
+    description: { type: 'string', default: '...', desc: 'короткое описание' },
+    category: { type: 'string', desc: `категория (обязательна): ${VALID_CATEGORIES.join(' | ')}` },
+    status: { type: 'string', default: 'coming-soon', desc: `статус: ${VALID_STATUSES.join(' | ')}` },
+    icon: { type: 'string', default: 'Sparkles', desc: 'имя иконки lucide-react в PascalCase' },
+    'agent-id': { type: 'string', default: '', desc: 'связанный агент' },
+    'dry-run': { type: 'boolean', default: false, desc: 'показать, что будет создано, ничего не писать' },
   },
-});
-
-// Validate
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values } = runCli(CLI);
   if (!values.id || !/^[a-z][a-z0-9-]+$/.test(values.id)) {
     console.error('Error: --id is required and must be kebab-case (e.g. foo-bar)');
     process.exit(1);

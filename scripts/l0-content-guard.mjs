@@ -42,6 +42,7 @@
 import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REGISTRY = path.join(ROOT, 'docs/audits/l0-fingerprints.json');
@@ -154,19 +155,31 @@ function selfTest() {
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово, --reason или --docs без
+// значения — код 2 до чтения документов и до записи реестра отпечатков.
+export const CLI = {
+  name: 'l0-content-guard',
+  summary: 'Нормативные документы L0 сверяются по СОДЕРЖАНИЮ: правка без поднятой версии блокируется.',
+  selfTest: true,
+  options: {
+    stamp: { type: 'boolean', desc: 'записать текущие отпечатки (нужен --reason)' },
+    reason: { type: 'string', value: 'текст', desc: 'что и почему меняется (обязателен с --stamp)' },
+    docs: { type: 'string', value: 'a.md,b.md', desc: 'список документов через запятую вместо L0 по умолчанию' },
+  },
+};
+
 const isMain = process.argv[1] && process.argv[1].endsWith('l0-content-guard.mjs');
 if (isMain) {
-  const argv = process.argv.slice(2);
-  if (argv.includes('--self-test')) selfTest();
-  const arg = (k) => { const i = argv.indexOf(k); return i !== -1 ? argv[i + 1] : null; };
-  const docsArg = arg('--docs');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const docsArg = values.docs || null;
   const docs = docsArg ? docsArg.split(',').map((s) => s.trim()).filter(Boolean) : L0_NORMATIVE_DOCS;
   const readDoc = (rel) => { try { return readFileSync(path.join(ROOT, rel), 'utf8'); } catch { return null; } };
   let registry = {};
   try { registry = JSON.parse(readFileSync(REGISTRY, 'utf8')); } catch { /* first run */ }
 
-  if (argv.includes('--stamp')) {
-    const reason = arg('--reason');
+  if (values.stamp) {
+    const reason = values.reason || null;
     if (!reason) { console.error('отказ: --stamp требует --reason. Перештамповка без причины это то же самое, что её отсутствие.'); process.exit(2); }
     const next = { ...registry };
     const changed = [];

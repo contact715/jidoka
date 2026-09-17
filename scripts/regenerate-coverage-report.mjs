@@ -18,12 +18,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const SPECS_DIR = path.join(ROOT, 'docs/specs');
 const OUT = path.join(SPECS_DIR, '_COVERAGE.md');
-const isDry = process.argv.includes('--dry');
+export const CLI = {
+  name: 'regenerate-coverage-report',
+  summary: 'Пересобрать карту покрытия спек docs/specs/_COVERAGE.md по реестру модулей.',
+  options: {
+    dry: { type: 'boolean', desc: 'только сводка, файл не пишется' },
+  },
+};
 
 // ── Canonical feature list ─────────────────────────────────────────────
 // Re-grounded 2026-06-05 (spec-tree overhaul): the framework's coverage is
@@ -52,6 +59,7 @@ function loadCanonicalFeatures() {
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const isDry = runCli(CLI).values.dry === true;
   const CANONICAL_FEATURES = loadCanonicalFeatures();
 
   // Category labels = the L2 domain ids (dynamic).

@@ -30,6 +30,7 @@ import { readFileSync, writeFileSync, existsSync, statSync, mkdirSync } from 'no
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CACHE = path.join(homedir(), '.jidoka', 'ci-status.json');
@@ -169,14 +170,27 @@ function selfTest() {
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): незнакомый флаг раньше молча давал сетевой зонд и строку,
+// теперь — код 2. --ages зовёт стартовая сводка (hooks/session-start-digest.mjs).
+export const CLI = {
+  name: 'system-truth',
+  summary: 'Настоящее состояние движка: вердикт CI, возраст реестра ошибок, возраст дока «честное состояние».',
+  selfTest: true,
+  options: {
+    ages: { type: 'boolean', desc: 'только возрасты, без обращения к сети (для стартовой сводки)' },
+    json: { type: 'boolean', desc: 'полное состояние в JSON' },
+  },
+};
+
 const isMain = process.argv[1] && process.argv[1].endsWith('system-truth.mjs');
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const now = Date.now();
   // --ages skips the network probe entirely. The session-start digest already has its own CI
   // line (it prints nothing when green, deliberately), and probing twice at session start would
   // pay the network cost twice to say the same thing.
-  const agesOnly = process.argv.includes('--ages');
+  const agesOnly = values.ages === true;
   const state = { ci: agesOnly ? null : probeCi(now), ledgerAgeDays: ledgerAge(now), docAgeDays: docAge(now), baseline: baselinePct() };
   if (agesOnly) {
     const parts = [];
@@ -185,7 +199,7 @@ if (isMain) {
     console.log(parts.join(' · '));
     process.exit(0);
   }
-  if (process.argv.includes('--json')) { console.log(JSON.stringify({ ...state, line: renderLine(state), alarming: isAlarming(state) }, null, 2)); process.exit(0); }
+  if (values.json === true) { console.log(JSON.stringify({ ...state, line: renderLine(state), alarming: isAlarming(state) }, null, 2)); process.exit(0); }
   console.log(renderLine(state));
   process.exit(0);
 }

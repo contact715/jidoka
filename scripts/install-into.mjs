@@ -24,6 +24,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { detectNativeFramework, nativeSignals, auditInstall } from './footprint-audit.mjs';
+import { runCli, formatUsage, EXIT_USAGE } from './lib/cli.mjs';
 
 const HERE = dirname(dirname(fileURLToPath(import.meta.url))); // framework root
 
@@ -91,6 +92,9 @@ const HEAVY = [ // full adds the deeper adversarial / analysis tools
 ];
 export const CORE = [...KERNEL, ...COMMON, ...HEAVY];
 export const PROFILES = { core: KERNEL, standard: [...KERNEL, ...COMMON], full: CORE };
+// Общие модули scripts/lib/, которые едут с ЛЮБЫМ профилем: скрипт, импортирующий
+// ./lib/cli.mjs (строгий разбор аргументов, 2026-09-16), без них падает при запуске.
+export const LIBS = ['lib/cli.mjs'];
 export function resolveProfile(name = 'standard') {
   if (!PROFILES[name]) throw new Error(`unknown profile: ${name} (use core|standard|full)`);
   return [...new Set(PROFILES[name])];
@@ -184,15 +188,18 @@ function profileSelfTest() {
   // import-closure: a profile must contain the relative deps of every script it ships, or the install
   // breaks on a missing import. (This is the check that the run-state→planner gap in wave-1 lacked.)
   const closure = (prof) => {
-    const set = new Set(resolveProfile(prof));
+    const set = new Set([...resolveProfile(prof), ...LIBS]);
     for (const f of set) {
       // Anchored to the START of a line on purpose. The old pattern matched `from './x.mjs'`
       // ANYWHERE, including inside a test fixture string — on 2026-08-15 dag-schedule added
       // self-test data like "import x from './b.mjs';" and the closure check declared a dependency
       // on a file that does not exist. What a file SAYS is data; what it IMPORTS is syntax, and
       // only a real import statement starts its own line.
-      for (const m of readFileSync(join(HERE, 'scripts', f), 'utf8').matchAll(/^\s*(?:import|export)[^'"\n]*from '\.\/([\w-]+\.mjs)'/gm)) {
-        if (!set.has(m[1])) return { ok: false, f, missing: m[1] };
+      // Подпапки тоже: до 2026-09-16 выражение видело только './x.mjs', и импорт
+      // './lib/cli.mjs' проходил мимо — проверка была зелёной над сломанной установкой.
+      for (const m of readFileSync(join(HERE, 'scripts', f), 'utf8').matchAll(/^\s*(?:import|export)[^'"\n]*from ['"]\.\/([\w./-]+\.mjs)['"]/gm)) {
+        const dep = join(dirname(f), m[1]).replace(/\\/g, '/');
+        if (!set.has(dep)) return { ok: false, f, missing: dep };
       }
     }
     return { ok: true };
@@ -200,6 +207,12 @@ function profileSelfTest() {
   ok('core profile is import-closed', closure('core').ok);
   ok('standard profile is import-closed', closure('standard').ok);
   ok('full profile is import-closed', closure('full').ok);
+  ok('closure sees an import from a subfolder (./lib/x.mjs), not only ./x.mjs', (() => {
+    const src = "import { runCli } from './lib/cli.mjs';\nimport { x } from \"./lib/y.mjs\";\n";
+    const found = [...src.matchAll(/^\s*(?:import|export)[^'"\n]*from ['"]\.\/([\w./-]+\.mjs)['"]/gm)].map((m) => m[1]);
+    return found.length === 2 && found[0] === 'lib/cli.mjs' && found[1] === 'lib/y.mjs';
+  })());
+  ok('every shared lib exists on disk', LIBS.every((l) => existsSync(join(HERE, 'scripts', l))));
   ok('unknown profile throws', (() => { try { resolveProfile('nope'); return false; } catch { return true; } })());
   if (fails.length) { console.log(`\n\x1b[31minstall-into profile self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ install-into: profile resolution correct (kernel always shipped, full == CORE)\x1b[0m');
@@ -207,19 +220,59 @@ function profileSelfTest() {
 }
 
 
+// ── CLI ───────────────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16). Прежний разбор брал ПЕРВОЕ слово без `--` как цель и молча
+// пропускал незнакомые флаги: `--parity --target ~/.claude/jidoka` (опечатка вместо
+// --check-parity) выполнил полную установку в установленную копию (отчёт W36, находка 6).
+// Теперь незнакомый флаг, лишнее слово или неверный профиль — код 2 до любой записи.
+const USAGE = `install-into — поставить переносимое ядро jidoka в другой проект или сверить канон с установленной копией.
+
+Использование:
+  node scripts/install-into.mjs <целевой-проект> [--frontend] [--profile=core|standard|full]
+  node scripts/install-into.mjs --check-parity [<абсолютный-путь-копии>]   # по умолчанию ~/.claude/jidoka
+  node scripts/install-into.mjs --self-test
+  node scripts/install-into.mjs --help
+
+Флаги:
+  --frontend            отметить структурный гейт React/TS (шаг базовой линии печатается)
+  --profile <профиль>   core — только ядро; standard — ядро и повседневные гейты (по умолчанию); full — всё
+  --check-parity        только чтение: сравнить этот репозиторий с установленной копией
+
+Коды выхода: 0 — готово (или копии нет — сравнивать не с чем); 1 — копия разошлась с каноном или
+установка упала; 2 — неверный вызов или целевого каталога нет (ничего не выполнено).`;
+
+export const CLI = {
+  name: 'install-into',
+  usage: USAGE,
+  selfTest: true,
+  options: {
+    frontend: { type: 'boolean', desc: 'отметить структурный гейт React/TS' },
+    profile: { type: 'string', choices: ['core', 'standard', 'full'], desc: 'объём установки (по умолчанию standard)' },
+    'check-parity': { type: 'boolean', desc: 'сверить канон с установленной копией (только чтение)' },
+  },
+  positionals: { min: 0, max: 1, name: 'каталог', label: '<целевой-проект | путь-копии>' },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (process.argv.includes('--self-test')) profileSelfTest();
+  const { values, positionals, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) profileSelfTest();
+  const refuse = (why) => {
+    process.stderr.write(`install-into: неверный вызов — ${why}\nНичего не выполнено.\n\n${formatUsage(CLI, 'install-into')}\n`);
+    process.exit(EXIT_USAGE);
+  };
 
   // canon-install-parity-gate: compare this repo against the live copy and report BOTH directions.
   // Read-only on purpose — it names the drift and exits non-zero; it never silently overwrites a
   // live environment, because a "fix" that only exists in the install would be destroyed by a sync.
-  if (process.argv.includes('--check-parity')) {
+  if (values['check-parity']) {
+    if (values.frontend || values.profile !== undefined) refuse('--frontend и --profile относятся к установке, а не к --check-parity');
+    // раньше относительный путь молча заменялся на ~/.claude/jidoka — сверялось не то, что просили
+    if (positionals[0] !== undefined && !positionals[0].startsWith('/')) refuse(`путь к установленной копии должен быть абсолютным, дано «${positionals[0]}»`);
     const { readdirSync, statSync } = await import('node:fs');
     const { homedir } = await import('node:os');
-    const argAfter = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-    const installRoot = (argAfter('--check-parity') || '').startsWith('/') ? argAfter('--check-parity') : join(homedir(), '.claude', 'jidoka');
+    const installRoot = positionals[0] ?? join(homedir(), '.claude', 'jidoka');
     // RECURSIVE on purpose. The first version listed only the top level of each directory, so
     // docs/research/weekly/* — the kaizen registries, the whole reason W30-Q2 exists — was never
     // compared at all and the gate reported "in sync" over a directory it had not looked into.
@@ -266,14 +319,12 @@ if (isMain) {
     process.exit(verdict === 'in-sync' ? 0 : 1);
   }
 
-  const target = process.argv.slice(2).find(a => !a.startsWith('--'));
-  const isFrontend = process.argv.includes('--frontend');
-  const profile = (process.argv.find(a => a.startsWith('--profile=')) || '--profile=standard').split('=')[1];
+  const target = positionals[0];
+  const isFrontend = values.frontend === true;
+  const profile = values.profile ?? 'standard';
 
-  if (!target || !existsSync(target)) {
-    console.error('usage: node scripts/install-into.mjs <existing-target-dir> [--frontend] [--profile=core|standard|full]  (or --self-test)');
-    process.exit(2);
-  }
+  if (!target) refuse('нужен каталог целевого проекта');
+  if (!existsSync(target)) refuse(`целевого каталога нет: ${target}`);
   const T = s => join(target, s);
   const log = m => console.log(m);
   const isGit = (() => { try { execSync('git rev-parse --is-inside-work-tree', { cwd: target, stdio: 'ignore' }); return true; } catch { return false; } })();
@@ -298,7 +349,8 @@ if (isMain) {
   const scripts = resolveProfile(profile);
   mkdirSync(T('.jidoka/scripts'), { recursive: true });
   mkdirSync(T('.jidoka/lib/redaction'), { recursive: true });
-  for (const f of scripts) copyFileSync(join(HERE, 'scripts', f), T(`.jidoka/scripts/${f}`));
+  mkdirSync(T('.jidoka/scripts/lib'), { recursive: true });
+  for (const f of [...scripts, ...LIBS]) copyFileSync(join(HERE, 'scripts', f), T(`.jidoka/scripts/${f}`));
   copyFileSync(join(HERE, 'lib/redaction/redact-pii.mjs'), T('.jidoka/lib/redaction/redact-pii.mjs'));
   log(`  ✓ profile '${profile}': copied ${scripts.length} engine scripts + redact-pii → .jidoka/  (kernel always included)`);
 

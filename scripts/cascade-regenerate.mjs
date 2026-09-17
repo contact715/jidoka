@@ -21,15 +21,23 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const CASCADE_LOG = path.join(ROOT, 'docs', 'cascade-log.md');
 
-// ── CLI args ───────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-const rootArg = args.find((_, i) => args[i - 1] === '--root') ?? null;
-const isDry = args.includes('--dry');
+// ── CLI ────────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): опечатка `--dyr` раньше молча давала запись в дочерние
+// спеки и в docs/cascade-log.md. Теперь — код 2 до любой записи.
+export const CLI = {
+  name: 'cascade-regenerate',
+  summary: 'Непрерывающее распространение версии родительской спеки в прямых детей (глубина 1).',
+  options: {
+    root: { type: 'string', value: 'путь к спеке', desc: 'родительская спека, чья версия изменилась (обязателен)' },
+    dry: { type: 'boolean', desc: 'показать, что изменится, ничего не записывать' },
+  },
+};
 
 // ── YAML + bold-field two-pass parser (shared contract from T.1) ───────
 function extractYamlBlock(content) {
@@ -187,7 +195,7 @@ function appendCascadeLog(rootPath, childPath, version) {
 }
 
 // ── Main ───────────────────────────────────────────────────────────────
-function main() {
+function main({ root: rootArg = null, dry: isDry = false } = {}) {
   if (!rootArg) {
     process.stderr.write('[cascade-regenerate] error: --root <spec-path> is required\n');
     process.exit(0);
@@ -283,5 +291,6 @@ function main() {
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  main();
+  const { values } = runCli(CLI);
+  main({ root: values.root ?? null, dry: values.dry === true });
 }

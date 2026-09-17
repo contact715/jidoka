@@ -18,6 +18,7 @@
 
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const has = (v) => v != null && v !== '';
 // exported so kaizen-rank reuses the exact same "is this a gate-strengthening rec" notion.
@@ -105,14 +106,26 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово, --plan или --verdict без
+// значения — код 2 до чтения плана. Код 2 на отсутствующий план был и раньше.
+export const CLI = {
+  name: 'kaizen-critique',
+  summary: 'Гейт полноты недельного плана Kaizen: пустые домены, рекомендации без источника, пропущенные разделы.',
+  selfTest: true,
+  options: {
+    plan: { type: 'string', value: 'plan.json', desc: 'план недели (обязателен)' },
+    verdict: { type: 'string', value: 'вердикт', desc: 'вердикт meta-trend, например REGRESSING' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const planPath = arg('--plan');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const planPath = values.plan || null;
   if (!planPath || !fs.existsSync(planPath)) { console.error('usage: --plan <plan.json> [--verdict REGRESSING]  (or --self-test)'); process.exit(2); }
   const plan = JSON.parse(fs.readFileSync(planPath, 'utf8'));
-  const res = critique(plan, { metaTrendVerdict: arg('--verdict') || '' });
+  const res = critique(plan, { metaTrendVerdict: values.verdict || '' });
   if (res.ok) { console.log('[kaizen-critique] ✓ plan is complete — no gaps'); process.exit(0); }
   console.log(`[kaizen-critique] ${res.gaps.length} gap(s):`);
   for (const g of res.gaps) console.log(`  [${g.severity}] ${g.gap}`);

@@ -11,7 +11,7 @@
  * Usage:
  *   npm run compute:dora
  *   node scripts/compute-dora.mjs
- *   node scripts/compute-dora.mjs --dry   (print metrics; no JSONL write)
+ *   node scripts/compute-dora.mjs --dry   # print metrics; no JSONL write
  *
  * Decisions honored:
  *   D1: NEW sibling of compute-slos.mjs — different computation class (time-delta vs occurrence-count)
@@ -35,6 +35,7 @@ import { fileURLToPath } from 'node:url';
 
 import { readJsonlStream, emitTelemetry } from './emit-telemetry.mjs';
 import { writeHaltState } from './andon-halt-helpers.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -45,7 +46,8 @@ const HALT_EVENTS_PATH = path.join(ROOT, 'docs', 'audits', 'halt-events.jsonl');
 const RECURRENCE_EVENTS_PATH = path.join(ROOT, 'docs', 'audits', 'recurrence-events.jsonl');
 const DORA_EVENTS_PATH = path.join(ROOT, 'docs', 'audits', 'dora-events.jsonl');
 
-const isDry = process.argv.includes('--dry');
+// Задаётся разбором аргументов в точке входа (runCli); при импорте — обычный режим.
+let isDry = false;
 
 /** @returns {{ enabled: boolean, hardBlockEnabled: boolean }} */
 function readConfig() {
@@ -534,9 +536,20 @@ async function main() {
 }
 
 
+// Разбор строгий (2026-09-16): опечатка `--dyr` раньше молча писала в dora-events.jsonl
+// вместо пробного прогона. Теперь незнакомый флаг — код 2 до всякой работы.
+export const CLI = {
+  name: 'compute-dora',
+  summary: 'Посчитать четыре метрики DORA и записать их в docs/audits/dora-events.jsonl.',
+  options: {
+    dry: { type: 'boolean', desc: 'только напечатать метрики, в JSONL не писать' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  isDry = runCli(CLI).values.dry === true;
   main().catch(err => {
     process.stderr.write(`[dora] FATAL: ${err}\n`);
     process.exit(1);

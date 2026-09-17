@@ -15,6 +15,8 @@
 //   node scripts/model-tier.mjs --role chief-architect --tier budget
 //   (library) import { modelForAgent, planModels } from './model-tier.mjs'
 
+import { runCli } from './lib/cli.mjs';
+
 // high-reasoning roles: architecture, product strategy, judgement, adversarial review — never haiku
 const HIGH = new Set([
   'chief-architect', 'micro-architect', 'macro-architect', 'surface-cartographer', 'design-system-architect',
@@ -75,13 +77,23 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Разбор строгий (2026-09-16): опечатка в уровне (`--tier budgte`) раньше молча становилась balanced.
+export const CLI = {
+  name: 'model-tier',
+  summary: 'Подобрать модель для агента по уровню задачи (архитекторов и судей не удешевляем).',
+  selfTest: true,
+  options: {
+    role: { type: 'string', value: 'агент', desc: 'роль агента (обязательна)' },
+    tier: { type: 'string', choices: ['quality', 'balanced', 'budget'], desc: 'уровень (по умолчанию balanced)' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const role = arg('--role');
-  const tier = arg('--tier') || 'balanced';
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const role = values.role;
+  const tier = values.tier || 'balanced';
   if (!role) { console.error("usage: model-tier.mjs --role <agent> --tier <quality|balanced|budget>  (or --self-test)"); process.exit(2); }
   console.log(`${role} @ ${tier} → ${modelForAgent(role, tier)} (class: ${classOf(role)})`);
   process.exit(0);

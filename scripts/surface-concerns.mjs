@@ -17,7 +17,8 @@
  *
  * Exit codes:
  *   0 — success (including zero concerns found)
- *   1 — invalid arguments or write failure
+ *   1 — --respond without title/type, unknown response type, or write failure
+ *   2 — bad call: unknown flag, stray word, --dry together with --respond (nothing done)
  *
  * MCP fallback: docs/memory-anti-patterns.md is the git-tracked snapshot.
  * If the MCP is unavailable, the script reads the snapshot and continues.
@@ -28,6 +29,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli, formatUsage, EXIT_USAGE } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -606,16 +608,16 @@ async function createMcpEntity(concerns, triggeredBy) {
 // Main
 // ---------------------------------------------------------------------------
 
-async function main() {
-  const args = process.argv.slice(2);
-  const isDry = args.includes('--dry');
-  const respondIdx = args.indexOf('--respond');
-
+/**
+ * @param {{ isDry: boolean, respond: boolean, words: string[] }} opts
+ *   words — after --respond: title, type, reason…; otherwise at most one wave-NNN label
+ */
+async function main({ isDry, respond, words }) {
   const currentWave = extractCurrentWave();
 
   // Handle --respond first (mutually exclusive with normal run)
-  if (respondIdx !== -1) {
-    handleRespond(args.slice(respondIdx + 1), currentWave);
+  if (respond) {
+    handleRespond(words, currentWave);
     return;
   }
 
@@ -675,7 +677,7 @@ async function main() {
       // Dynamic import to avoid circular dependency at module load time
       const { writeHaltState } = await import('./andon-halt-helpers.mjs');
       const firstBlocking = blockingConcerns[0];
-      const currentWaveArg = process.argv.find((a) => a.startsWith('wave-')) ?? 'unknown';
+      const currentWaveArg = words[0] ?? 'unknown';
       writeHaltState(
         currentWaveArg,
         'proactive-surfacing-agent',
@@ -694,11 +696,55 @@ async function main() {
   await createMcpEntity(concerns, triggeredBy);
 }
 
+// Разбор строгий (2026-09-16): раньше незнакомый флаг и любое лишнее слово молча
+// пропускались, и шёл полный прогон с записью очереди. Теперь — код 2 до работы.
+// Слова после --respond — заголовок, тип и причина; без --respond допустимо одно
+// слово wave-NNN (метка волны для остановки конвейера).
+export const CLI = {
+  name: 'surface-concerns',
+  usage: `Очередь тревог: собрать из ретро, каталога анти-паттернов и снимка памяти в docs/surfacing-concerns-current.md.
+
+Использование:
+  node scripts/surface-concerns.mjs [wave-NNN]                          полный прогон, запись файла
+  node scripts/surface-concerns.mjs --dry                               только stdout, без записи
+  node scripts/surface-concerns.mjs --respond "<title>" <type> [reason]  записать ответ в журнал
+
+  type       addressed | deferred | declined | disputed
+  wave-NNN   метка волны для остановки конвейера при BLOCKING-тревоге (andonCord)
+
+Флаги:
+  --dry         только stdout, файлы не пишутся
+  --respond     записать ответ на тревогу (слова после — заголовок, тип, причина)
+  -h, --help    эта справка
+
+Коды выхода: 0 — готово (в том числе ноль тревог); 1 — у --respond нет заголовка или типа,
+неизвестный тип, ошибка записи; 2 — неверный вызов (незнакомый флаг, лишнее слово,
+--dry вместе с --respond): ничего не выполнено; 42 — конвейер остановлен (andonCord).`,
+  options: {
+    dry: { type: 'boolean' },
+    respond: { type: 'boolean' },
+  },
+  positionals: { min: 0, max: Infinity },
+};
+
+/** Чистая: причина отказа для слов, которые разбор пропустил, или null. */
+export function wordsProblem({ dry, respond }, words) {
+  if (respond) return dry ? '--dry нельзя вместе с --respond: ответ всегда записывается' : null;
+  if (words.length > 1) return `лишнее слово «${words[1]}»: без --respond принимается одно слово wave-NNN`;
+  if (words.length === 1 && !words[0].startsWith('wave-')) return `лишнее слово «${words[0]}»: без --respond принимается только wave-NNN`;
+  return null;
+}
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  main().catch((err) => {
+  const { values, positionals } = runCli(CLI);
+  const problem = wordsProblem({ dry: values.dry === true, respond: values.respond === true }, positionals);
+  if (problem) {
+    process.stderr.write(`surface-concerns: неверный вызов — ${problem}\nНичего не выполнено.\n\n${formatUsage(CLI, CLI.name)}\n`);
+    process.exit(EXIT_USAGE);
+  }
+  main({ isDry: values.dry === true, respond: values.respond === true, words: positionals }).catch((err) => {
     process.stderr.write(`[surface-concerns] FATAL: ${err.message}\n`);
     process.exit(1);
   });

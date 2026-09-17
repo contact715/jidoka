@@ -18,6 +18,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { runCli } from './lib/cli.mjs';
 
 const LEDGER = 'docs/trends/_candidates.jsonl';
 
@@ -57,19 +58,30 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово, --top не число — код 2 до записи
+// в реестр кандидатов.
+export const CLI = {
+  name: 'trend-scan',
+  summary: 'Внешние сигналы для самоулучшения: записать кандидата (--add) или показать лучших (--top).',
+  selfTest: true,
+  options: {
+    add: { type: 'string', value: 'json', desc: 'записать кандидата: {"key","kind","date","stars?","note"}' },
+    top: { type: 'number', default: 10, desc: 'сколько кандидатов показать' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  if (arg('--add')) {
-    const entry = JSON.parse(arg('--add'));
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  if (values.add) {
+    const entry = JSON.parse(values.add);
     if (!existsSync(dirname(LEDGER))) mkdirSync(dirname(LEDGER), { recursive: true });
     writeFileSync(LEDGER, (existsSync(LEDGER) ? readFileSync(LEDGER, 'utf8') : '') + JSON.stringify(entry) + '\n');
     console.log(`trend-scan: recorded candidate ${entry.key}`);
     process.exit(0);
   }
-  const n = parseInt(arg('--top') || '10', 10);
+  const n = Math.trunc(values.top);
   const ranked = rankCandidates(readLedger());
   if (!ranked.length) { console.log('trend-scan: no candidates yet. The orchestrator scans trending repos/news weekly and records them via --add; this ranks them for architect review.'); process.exit(0); }
   console.log(`trend-scan — top ${Math.min(n, ranked.length)} candidates to evaluate for borrowing:\n`);

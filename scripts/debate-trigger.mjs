@@ -22,6 +22,8 @@
 //   node scripts/debate-trigger.mjs --self-test
 //   node scripts/debate-trigger.mjs --task '{"prompt":"compare A vs B, which is better?"}'
 
+import { runCli } from './lib/cli.mjs';
+
 const COMPARE = [/\bcompare\b/, /\bvs\.?\b/, /which (is |one is )?(better|best|stronger)/, /pros and cons/, /trade-?offs?/, /сравн/, /что лучше/, /за и против/, /компромисс/, /лучше или/];
 const DECISION = [/should (we|i)\b/, /worth (it|doing|building)/, /\bdecide\b/, /\bchoose\b/, /стоит ли/, /выбра(ть|ть\b)|выбери/, /какой (подход|вариант)/, /go or no/];
 const ANALYSIS = [/\banaly[sz]e\b/, /\banaly[sz]is\b/, /\bevaluate\b/, /\bassess\b/, /\bcritique\b/, /проанализ/, /\bоцен(и|ить|ка)\b/, /аналитик/, /\bразбор\b/, /дебат/, /ai war|аи вар/];
@@ -76,12 +78,21 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Разбор строгий (2026-09-16): опечатка во флаге раньше молча давала пустую задачу и «debate: no».
+export const CLI = {
+  name: 'debate-trigger',
+  summary: 'Решить, нужен ли задаче состязательный разбор (дебаты), и в каком режиме.',
+  selfTest: true,
+  options: {
+    task: { type: 'string', value: 'json', desc: 'задача, например {"prompt":"compare A vs B"} (по умолчанию {})' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const task = JSON.parse(arg('--task') || '{}');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const task = JSON.parse(values.task || '{}');
   const r = shouldDebate(task);
   if (r.debate) {
     console.log(`\x1b[1m⚔️  debate: YES (${r.mode})\x1b[0m — ${r.reason}`);

@@ -20,6 +20,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { plan } from './orchestration-planner.mjs';
+import { runCli } from './lib/cli.mjs';
 
 // ── pure core: the agentevals semantics ───────────────────────────
 // Compare an ACTUAL step list against an EXPECTED one. Steps are plain strings (agent or tool names).
@@ -82,22 +83,36 @@ function selfTest() {
 }
 
 // ── CLI ────────────────────────────────────────────────────────────
-function arg(k) { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; }
+// Разбор строгий (2026-09-16): опечатка в режиме (`--mode strcit`) раньше молча считалась как
+// contains, а `--wave` без значения давал справку с кодом 1. Теперь незнакомый флаг или режим,
+// лишнее слово, флаг без значения — код 2 до чтения журнала волны.
+const MODES = ['strict', 'unordered', 'superset', 'contains', 'partial'];
+export const CLI = {
+  name: 'trajectory-eval',
+  summary: 'Сравнить путь волны (какие агенты реально работали) с планом orchestration-planner.',
+  selfTest: true,
+  options: {
+    wave: { type: 'string', value: 'волна', desc: 'волна: docs/runs/<wave>/state.json против agent-traces.jsonl' },
+    task: { type: 'string', value: 'json', desc: 'только показать ожидаемых агентов для задачи' },
+    mode: { type: 'string', choices: MODES, default: 'contains', desc: 'как сравнивать' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const ROOT = process.cwd();
-  const mode = arg('--mode') || 'contains';
+  const mode = values.mode || 'contains';
 
-  if (arg('--task')) {
-    const task = JSON.parse(arg('--task'));
+  if (values.task) {
+    const task = JSON.parse(values.task);
     console.log(`expected agents for ${JSON.stringify(task)}:`);
     console.log('  ' + expectedAgents(task).join(', '));
     process.exit(0);
   }
 
-  const wave = arg('--wave');
+  const wave = values.wave;
   if (!wave) { console.error('usage: trajectory-eval.mjs --wave <wave> [--mode contains|strict|...] | --task <json> | --self-test'); process.exit(1); }
 
   const stateFile = join(ROOT, 'docs', 'runs', wave, 'state.json');

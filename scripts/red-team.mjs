@@ -14,6 +14,7 @@
 //   node scripts/red-team.mjs            # attack the real gates, report, log vulnerabilities
 
 import { execSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 // each attack: a command that SHOULD be blocked (expectBlocked) or SHOULD pass (control)
 const ATTACKS = [
@@ -36,10 +37,17 @@ export function verdict(blocked, expectBlocked) {
   return expectBlocked ? 'VULNERABLE' : 'FALSE-POSITIVE';
 }
 
+// Чистая: заблокировала ли цель. Хук Claude Code блокирует кодом 2; код 1 у него — неверный вызов
+// или падение (2026-09-16: строгий разбор отвечает хукам кодом 1), и считать его «защитились» нельзя —
+// Claude Code при таком коде действие пропускает. Обычный гейт блокирует любым ненулевым кодом.
+export function isBlocked(code, cmd) {
+  return /hooks?\/[\w-]+\.mjs|policy-enforce-hook\.mjs/.test(cmd) ? code === 2 : code !== 0;
+}
+
 function runAttack(a) {
   let code = 0;
   try { execSync(a.cmd, { stdio: 'ignore' }); } catch (e) { code = e.status ?? 1; }
-  const blocked = code !== 0;
+  const blocked = isBlocked(code, a.cmd);
   return { ...a, blocked, verdict: verdict(blocked, a.expectBlocked) };
 }
 
@@ -49,6 +57,9 @@ function selfTest() {
     ['missed attack that should be blocked → VULNERABLE', verdict(false, true) === 'VULNERABLE'],
     ['blocked legitimate action → FALSE-POSITIVE', verdict(true, false) === 'FALSE-POSITIVE'],
     ['passed legitimate action → defended', verdict(false, false) === 'defended'],
+    ['хук, упавший с кодом 1, НЕ заблокировал (Claude Code пропустит действие)', isBlocked(1, 'node scripts/policy-enforce-hook.mjs') === false],
+    ['хук с кодом 2 заблокировал', isBlocked(2, 'echo x | node scripts/policy-enforce-hook.mjs') === true],
+    ['обычный гейт блокирует любым ненулевым кодом', isBlocked(1, 'node scripts/meta-honesty.mjs') === true],
     ['catalog has attacks + a control', ATTACKS.some(a => a.cls !== 'control') && ATTACKS.some(a => a.cls === 'control')],
   ];
   let fails = 0;
@@ -58,9 +69,18 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): флагов у прогона нет, поэтому любое лишнее слово — код 2
+// до запуска атак, а не молчаливый прогон всего каталога.
+export const CLI = {
+  name: 'red-team',
+  summary: 'Самоатака: прогнать каталог известных атак против собственных гейтов и доложить.',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const results = ATTACKS.map(runAttack);
   console.log(`red-team: ran ${results.length} attacks against the framework's own gates\n`);
   for (const r of results) {

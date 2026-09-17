@@ -54,6 +54,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -373,8 +374,15 @@ function main() {
 }
 
 
+// Разбор строгий (2026-09-16): флагов нет — любое слово даёт код 2 до проверки.
+export const CLI = {
+  name: 'validate-glossary',
+  summary: 'Проверить реестр глоссария (якоря, синонимы ролей) и устаревшие синонимы в целевых документах.',
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
   main();
 }

@@ -12,12 +12,13 @@
 //
 // FULL & self-tested. Usage:
 //   node scripts/skill-coverage.mjs --self-test
-//   node scripts/skill-coverage.mjs            (audit ~/.claude/skills)
+//   node scripts/skill-coverage.mjs            # audit ~/.claude/skills
 //   node scripts/skill-coverage.mjs --dir <skills-dir>
 
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { runCli } from './lib/cli.mjs';
 
 // the canonical superpowers process skills
 export const CANONICAL = [
@@ -67,12 +68,22 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Разбор строгий (2026-09-16): опечатка `--dri x` раньше молча проверяла ~/.claude/skills.
+// Теперь незнакомый флаг, лишнее слово или --dir без пути — код 2.
+export const CLI = {
+  name: 'skill-coverage',
+  summary: 'Проверить, что процессные скиллы superpowers установлены (по именам папок).',
+  selfTest: true,
+  options: {
+    dir: { type: 'string', value: 'папка', desc: 'папка скиллов (по умолчанию ~/.claude/skills)' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const dir = arg('--dir') || join(homedir(), '.claude', 'skills');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const dir = values.dir || join(homedir(), '.claude', 'skills');
   const r = coverage(installedSkills(dir));
   console.log(`skill-coverage — superpowers in ${dir}\n  ${r.present}/${r.total} canonical skills present (${r.pct}%)`);
   if (r.missing.length) console.log(`  missing: ${r.missing.join(', ')}`);

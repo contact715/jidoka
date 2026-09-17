@@ -29,6 +29,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -106,20 +107,25 @@ export function readBank() {
 }
 
 // CLI: `node scripts/reasoning-bank.mjs --list` prints a compact backlog for humans.
+// Разбор строгий (2026-09-16): незнакомое слово — код 2 (раньше — 1 со своей строкой).
+export const CLI = {
+  name: 'reasoning-bank',
+  summary: 'Банк проигравших попыток и отклонённых разборов: показать, что сохранено (библиотека пишет сама).',
+  options: {
+    list: { type: 'boolean', desc: 'показать сохранённое (действие по умолчанию)' },
+  },
+};
+
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const args = process.argv.slice(2);
-  if (args.includes('--list') || args.length === 0) {
-    const items = readBank();
-    if (items.length === 0) {
-      console.log('[reasoning-bank] empty — no captured contrast artifacts yet.');
-    } else {
-      console.log(`[reasoning-bank] ${items.length} captured artifact(s):`);
-      for (const it of items) {
-        console.log(`  ${it.ts}  ${it.source}/${it.kind}  key=${it.key}${it.verdict ? `  verdict=${it.verdict}` : ''}  (${it.content.length} chars)`);
-      }
+  runCli(CLI);
+  const items = readBank();
+  if (items.length === 0) {
+    console.log('[reasoning-bank] empty — no captured contrast artifacts yet.');
+  } else {
+    console.log(`[reasoning-bank] ${items.length} captured artifact(s):`);
+    for (const it of items) {
+      console.log(`  ${it.ts}  ${it.source}/${it.kind}  key=${it.key}${it.verdict ? `  verdict=${it.verdict}` : ''}  (${it.content.length} chars)`);
     }
-    process.exit(0);
   }
-  console.error('[reasoning-bank] unknown args. Use --list.');
-  process.exit(1);
+  process.exit(0);
 }

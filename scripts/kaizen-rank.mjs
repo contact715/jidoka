@@ -16,6 +16,7 @@
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { isGateStrengthening } from './kaizen-critique.mjs';
+import { runCli } from './lib/cli.mjs';
 
 export const EFFORT_WEIGHT = { low: 1, medium: 2, high: 3 };
 const round2 = (n) => Math.round(n * 100) / 100;
@@ -91,15 +92,25 @@ function selfTest() {
   process.exit(0);
 }
 
+export const CLI = {
+  name: 'kaizen-rank',
+  summary: 'Упорядочить рекомендации недельного кайдзена по отдаче (влияние / усилие); при REGRESSING укрепление гейтов идёт первым.',
+  selfTest: true,
+  options: {
+    plan: { type: 'string', value: 'plan.json', desc: 'план с полем recommendations (обязателен)' },
+    verdict: { type: 'string', value: 'вердикт', desc: 'вердикт meta-trend, например REGRESSING' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const planPath = arg('--plan');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const planPath = values.plan;
   if (!planPath || !fs.existsSync(planPath)) { console.error('usage: --plan <plan.json> [--verdict REGRESSING]  (or --self-test)'); process.exit(2); }
   const plan = JSON.parse(fs.readFileSync(planPath, 'utf8'));
-  const ranked = rank(plan.recommendations || [], { metaTrendVerdict: arg('--verdict') || '' });
-  console.log(`[kaizen-rank] ${ranked.length} recommendation(s) by leverage${/REGRESS/i.test(arg('--verdict') || '') ? ' (REGRESSING → gates first)' : ''}:`);
+  const ranked = rank(plan.recommendations || [], { metaTrendVerdict: values.verdict || '' });
+  console.log(`[kaizen-rank] ${ranked.length} recommendation(s) by leverage${/REGRESS/i.test(values.verdict || '') ? ' (REGRESSING → gates first)' : ''}:`);
   for (const r of ranked) console.log(`  ${String(r.rank).padStart(2)}. [lev ${r.leverage}]${r.prioritised ? ' ⬆gate' : ''} ${r.title}`);
   process.exit(0);
 }

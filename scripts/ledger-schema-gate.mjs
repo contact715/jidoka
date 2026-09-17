@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // @closes-class: ledger-pollution
+// @divergence: "null БЕЗ объяснения отклоняется (иначе null это бесплатная кнопка «пропустить»)" — мера «поле mastMode есть» говорит «чисто», а правило «режим рассмотрен» не выполнено
 // @scope: all
 // @scope-ok: весь вход это ОДИН файл реестра, 0,09 с — «весь» здесь не дерево
 // ledger-schema-gate — mechanical schema gate for the meta-mistake ledger (2026-W28-G3).
@@ -24,6 +25,7 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { LEDGER, validateLedgerEntry, recordTrip } from './meta-lib.mjs';
+import { runCli } from './lib/cli.mjs';
 
 // pure: audit raw jsonl text → { total, bad: [{line, class, problems}] }.
 // Raw lines, NOT loadLedger — the loader silently skips malformed JSON, and a line that
@@ -80,11 +82,22 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): гейт стоит в pre-commit и CI; незнакомый флаг раньше молча
+// пропускался и гейт проверял реестр по умолчанию. Теперь — код 2 до проверки.
+export const CLI = {
+  name: 'ledger-schema-gate',
+  summary: 'Гейт реестра ошибок: каждая строка обязана нести полную схему ошибки.',
+  selfTest: true,
+  options: {},
+  positionals: { min: 0, max: 1, name: 'path.jsonl' },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { positionals, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
-  const path = process.argv.slice(2).find(a => !a.startsWith('--')) || LEDGER;
+  const path = positionals[0] || LEDGER;
   if (!existsSync(path)) { console.log(`ledger-schema-gate: ${path} does not exist — nothing to pollute; OK`); process.exit(0); }
 
   const { total, bad } = auditLedgerText(readFileSync(path, 'utf8'));

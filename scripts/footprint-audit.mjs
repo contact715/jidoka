@@ -20,12 +20,15 @@
 //
 // FULL & self-tested. Usage:
 //   node scripts/footprint-audit.mjs --self-test
-//   node scripts/footprint-audit.mjs --target /path/to/product            (audit an install)
-//   node scripts/footprint-audit.mjs --target /path/to/product --strict   (exit 1 if redundant)
+//   node scripts/footprint-audit.mjs --target /path/to/product
+//     audit an install
+//   node scripts/footprint-audit.mjs --target /path/to/product --strict
+//     exit 1 if redundant
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 // ── pure logic (testable without IO) ─────────────────────────────────────────
 // Every installed basename that does NOT appear in the target's live-caller text is dead-on-arrival.
@@ -127,11 +130,21 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+export const CLI = {
+  name: 'footprint-audit',
+  summary: 'Проверить установку движка в продукт: у каждого установленного скрипта есть живой вызывающий, своего фреймворка у цели нет.',
+  selfTest: true,
+  options: {
+    target: { type: 'string', value: 'папка', desc: 'продукт, куда ставили движок (обязателен)' },
+    strict: { type: 'boolean', desc: 'код 1, если вердикт не OK' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const target = arg('--target');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const target = values.target;
   if (!target) { console.error('usage: --target <product-dir> [--strict] | --self-test'); process.exit(2); }
   const r = auditInstall(target);
   console.log(`footprint-audit — ${target}\n`);
@@ -141,6 +154,6 @@ if (isMain) {
   console.log(`  native framework already in target: ${r.native.hasOwn ? '\x1b[33mYES\x1b[0m → ' + r.native.signals.join(', ') : 'no'}`);
   const color = r.verdict.level === 'OK' ? '\x1b[32m' : '\x1b[33m';
   console.log(`\n  ${color}▌ ${r.verdict.level}\x1b[0m — ${r.verdict.msg}`);
-  if (process.argv.includes('--strict') && r.verdict.level !== 'OK') process.exit(1);
+  if (values.strict && r.verdict.level !== 'OK') process.exit(1);
   process.exit(0);
 }

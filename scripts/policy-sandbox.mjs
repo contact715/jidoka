@@ -15,6 +15,7 @@
 //   node scripts/policy-sandbox.mjs --agent reflexion-critic --tools "Read,Write,Bash"
 
 import { readFileSync, existsSync } from 'node:fs';
+import { runCli, formatUsage, EXIT_USAGE } from './lib/cli.mjs';
 const REGISTRY = 'docs/governance/agent-access-registry.json';
 
 // glob match: "x/**" = prefix x/, "**/*.test.ts" via split-on-**, exact otherwise. No deps.
@@ -49,9 +50,23 @@ export function checkTools(agent, tools, registry) {
   return { ok: violations.length === 0, granted: [...granted], violations };
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг, флаг без значения — код 2 до проверки.
+// Раньше опечатка `--file` вместо `--files` молча пропускала проверку записи, и выход был 0.
+export const CLI = {
+  name: 'policy-sandbox',
+  summary: 'Предел ущерба на уровне политики: агент пишет только в свою write_scope и берёт только заявленные инструменты.',
+  selfTest: true,
+  options: {
+    agent: { type: 'string', value: 'slug', desc: 'агент из docs/governance/agent-access-registry.json (обязателен)' },
+    files: { type: 'string', value: 'a,b', desc: 'файлы, которые агент пишет (через запятую)' },
+    tools: { type: 'string', value: 'X,Y', desc: 'инструменты, которые агент берёт (через запятую)' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-if (process.argv.includes('--self-test')) {
+const { values, selfTest: wantsSelfTest } = runCli(CLI);
+if (wantsSelfTest) {
   const reg = { agents: [
     { slug: 'skill-extractor', write_scope: '.claude/skills/**, docs/retros/_FINDINGS.md', declared_tools: ['Read', 'Grep', 'Write'] },
     { slug: 'test-engineer', write_scope: '**/*.test.ts, **/*.spec.ts', declared_tools: ['Read', 'Write', 'Edit'] },
@@ -74,19 +89,18 @@ if (process.argv.includes('--self-test')) {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-const agent = arg('--agent');
-if (!agent) { console.error('usage: --agent <slug> [--files a,b] [--tools X,Y] | --self-test'); process.exit(2); }
+const agent = values.agent || null;
+if (!agent) { console.error(`policy-sandbox: неверный вызов — нужен --agent\nНичего не выполнено.\n\n${formatUsage(CLI, CLI.name)}`); process.exit(EXIT_USAGE); }
 const registry = existsSync(REGISTRY) ? JSON.parse(readFileSync(REGISTRY, 'utf8')) : { agents: [] };
 let bad = false;
-if (arg('--files')) {
-  const r = checkWrites(agent, arg('--files').split(','), registry);
+if (values.files) {
+  const r = checkWrites(agent, values.files.split(','), registry);
   if (r.unscoped) console.log(`○ ${agent}: no write_scope declared (unscoped — registry I2 warn)`);
   else if (r.ok) console.log(`\x1b[32m✓ ${agent}: all writes within scope\x1b[0m (${r.scope})`);
   else { bad = true; console.error(`\x1b[31m✗ ${agent}: out-of-scope writes:\x1b[0m ${r.violations.join(', ')}  (allowed: ${r.scope})`); }
 }
-if (arg('--tools')) {
-  const r = checkTools(agent, arg('--tools').split(','), registry);
+if (values.tools) {
+  const r = checkTools(agent, values.tools.split(','), registry);
   if (r.ok) console.log(`\x1b[32m✓ ${agent}: all tools granted\x1b[0m`);
   else { bad = true; console.error(`\x1b[31m✗ ${agent}: ungranted tools:\x1b[0m ${r.violations.join(', ')}  (granted: ${r.granted.join(', ')})`); }
 }

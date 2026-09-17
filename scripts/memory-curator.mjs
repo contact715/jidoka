@@ -33,6 +33,7 @@ import { pathToFileURL } from 'node:url';
 import { loadLedger, groupByClass, recurrencesAfter, todayISO, LEDGER } from './meta-lib.mjs';
 import { scoreCluster, ACTIVE, WATCH } from './memory-consolidate.mjs';
 import { REMEDIES } from './meta-remedies.mjs';
+import { runCli } from './lib/cli.mjs';
 
 // Sidecar lives next to the ledger (global ~/.claude/jidoka in install, docs/audits in repo)
 // so curator (writer) and memory-retrieve (reader) always resolve the same file.
@@ -93,20 +94,30 @@ function save(model, manual) {
   mkdirSync(dirname(SIDECAR), { recursive: true });
   writeFileSync(SIDECAR, JSON.stringify({ ...model, manual }, null, 2) + '\n');
 }
-function arg(args, name) { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; }
+export const CLI = {
+  name: 'memory-curator',
+  summary: 'Полезность уроков по фактам (реестр ошибок + реестр гейтов) → docs/audits/lesson-utility.json. Без флагов — как --build.',
+  selfTest: true,
+  options: {
+    build: { type: 'boolean', desc: 'пересчитать и записать файл полезности' },
+    status: { type: 'boolean', desc: 'показать классы по приоритету, ничего не записывая' },
+    helpful: { type: 'string', value: 'класс', desc: 'ручной +1 «помог» (записывает файл)' },
+    harmful: { type: 'string', value: 'класс', desc: 'ручной +1 «вредил» (записывает файл)' },
+  },
+};
 
 function main() {
-  const args = process.argv.slice(2);
-  if (args.includes('--self-test')) return selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) return selfTest();
 
   const manual = loadManual();
   const bump = (cls, key) => { (manual[cls] ??= { helpful: 0, harmful: 0 })[key]++; };
-  const h = arg(args, '--helpful'); if (h) bump(h, 'helpful');
-  const harm = arg(args, '--harmful'); if (harm) bump(harm, 'harmful');
+  const h = values.helpful; if (h) bump(h, 'helpful');
+  const harm = values.harmful; if (harm) bump(harm, 'harmful');
 
   const model = computeUtility(loadLedger(), REMEDIES, manual, todayISO());
 
-  if (args.includes('--status') && !args.includes('--build') && !h && !harm) {
+  if (values.status && !values.build && !h && !harm) {
     const rows = Object.entries(model.classes).sort((a, b) => b[1].surfacePrior - a[1].surfacePrior);
     console.log(`memory-curator: ${rows.length} classes (by surfacePrior)`);
     for (const [cls, u] of rows.slice(0, 12)) {

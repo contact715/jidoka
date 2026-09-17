@@ -31,6 +31,7 @@ import fs from 'node:fs';
 import { goldenFingerprint } from './agent-eval-dashboard.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -145,9 +146,21 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг или слово — код 2 ДО записи маркера. Раньше
+// опечатка `--dyr` молча переписывала docs/metrics/judge-calibration-state.json.
+export const CLI = {
+  name: 'judge-calibration-state',
+  summary: 'Маркер калибровки судей (docs/metrics/judge-calibration-state.json) по доказательствам на диске.',
+  selfTest: true,
+  options: {
+    dry: { type: 'boolean', desc: 'только напечатать, ничего не записывать' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
   // the reader is passed so freshness is really checked, not assumed
   const readRel = (rel) => { try { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch { return null; } };
@@ -166,7 +179,7 @@ if (isMain) {
     ? `  → надёжных судей ${state.reliableJudges} (>=2): reasoning-distill может раздавать выжимки стратегий.`
     : `  → надёжных судей ${state.reliableJudges} (<2): reasoning-distill держит стратегии закрытыми — честно и безопасно.`);
 
-  if (process.argv.includes('--dry')) { console.log('[judge-calibration-state] --dry: nothing written'); process.exit(0); }
+  if (values.dry) { console.log('[judge-calibration-state] --dry: nothing written'); process.exit(0); }
   const outDir = path.join(ROOT, 'docs', 'metrics');
   fs.mkdirSync(outDir, { recursive: true });
   const out = path.join(outDir, 'judge-calibration-state.json');

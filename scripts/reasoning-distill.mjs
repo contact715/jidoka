@@ -29,6 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readBank } from './reasoning-bank.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -144,9 +145,21 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): опечатка `--dyr` раньше молча писала staging-файл вместо
+// пробного прогона. Теперь незнакомый флаг или лишнее слово — код 2 до всякой работы.
+export const CLI = {
+  name: 'reasoning-distill',
+  summary: 'Дистиллировать контрастные артефакты reasoning-bank в записи-стратегии (.claude/memory-staging/).',
+  selfTest: true,
+  options: {
+    dry: { type: 'boolean', desc: 'только показать кандидатов, ничего не писать' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
   const calibrated = measuredJudges() >= MIN_MEASURED_JUDGES;
   const artifacts = readBank();
@@ -155,7 +168,7 @@ if (isMain) {
   console.log(`[reasoning-distill] ${artifacts.length} captured artifact(s) → ${records.length} strategy candidate(s) · judges measured: ${measuredJudges()} (${calibrated ? 'CALIBRATED → shared' : 'not calibrated → private, injection gated'})`);
   for (const r of records) console.log(`  ${r.title}  [${r.verdict}]  attempts=${r.material.attempts} reviews=${r.material.reviews}`);
 
-  if (process.argv.includes('--dry')) { console.log('[reasoning-distill] --dry: no staging written'); process.exit(0); }
+  if (values.dry) { console.log('[reasoning-distill] --dry: no staging written'); process.exit(0); }
   const out = writeStaging(records);
   console.log(out ? `[reasoning-distill] wrote ${path.relative(ROOT, out)}` : '[reasoning-distill] nothing to write');
   process.exit(0);

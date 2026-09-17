@@ -40,6 +40,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { runCli, formatUsage, EXIT_USAGE } from './lib/cli.mjs';
 
 // 9-category taxonomy. impact = base business weight; the Mom-Test note steers
 // the human asker toward concrete-past phrasing for the behavioural categories.
@@ -150,20 +151,57 @@ function trace(rec) {
   appendFileSync(TRACE, JSON.stringify(rec) + '\n');
 }
 
-function arg(args, name) { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; }
+export const CLI = {
+  name: 'clarify-engine',
+  usage: [
+    'Уточняющие вопросы до спеки: 9 категорий, покрытие, следующий вопрос по влиянию × неопределённости.',
+    '',
+    'Использование:',
+    '  node scripts/clarify-engine.mjs --feature <имя> [--status]   # покрытие (по умолчанию)',
+    '  node scripts/clarify-engine.mjs --feature <имя> --plan       # следующие вопросы по порядку',
+    '  node scripts/clarify-engine.mjs --feature <имя> --answer <категория> "текст"',
+    '  node scripts/clarify-engine.mjs --feature <имя> --defer <категория> "причина"',
+    '  node scripts/clarify-engine.mjs --feature <имя> --json       # покрытие в JSON',
+    '  node scripts/clarify-engine.mjs --self-test',
+    '',
+    'Флаги:',
+    '      --feature <имя>          фича или волна (обязательна)',
+    '      --status                 покрытие по категориям',
+    '      --plan                   следующие вопросы',
+    '      --answer <категория>     записать ответ; текст — слово после категории',
+    '      --defer <категория>      отложить категорию; причина — слово после категории',
+    '      --json                   покрытие в JSON',
+    '  -h, --help                   эта справка',
+  ].join('\n'),
+  selfTest: true,
+  options: {
+    feature: { type: 'string', value: 'имя' },
+    status: { type: 'boolean' },
+    plan: { type: 'boolean' },
+    answer: { type: 'string', value: 'категория' },
+    defer: { type: 'string', value: 'категория' },
+    json: { type: 'boolean' },
+  },
+  positionals: { min: 0, max: 1, name: 'текст' },
+};
 
 function main() {
-  const args = process.argv.slice(2);
-  if (args.includes('--self-test')) return selfTest();
+  const { values, positionals, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) return selfTest();
+  // текст ответа — единственное слово, и только после --answer/--defer; иначе его молча проглотили бы
+  if (positionals.length && values.answer === undefined && values.defer === undefined) {
+    process.stderr.write(`clarify-engine: неверный вызов — лишнее слово «${positionals[0]}» (текст пишется после --answer <категория> или --defer <категория>)\nНичего не выполнено.\n\n${formatUsage(CLI)}\n`);
+    process.exit(EXIT_USAGE);
+  }
 
-  const feature = arg(args, '--feature');
+  const feature = values.feature;
   if (!feature) { console.error('clarify-engine: --feature <name> required'); process.exit(2); }
   const nowIso = new Date().toISOString();
   const cov = loadCoverage(feature);
 
-  if (args.includes('--json')) { process.stdout.write(JSON.stringify({ ...cov, summary: summary(cov) }, null, 2) + '\n'); return; }
+  if (values.json) { process.stdout.write(JSON.stringify({ ...cov, summary: summary(cov) }, null, 2) + '\n'); return; }
 
-  if (args.includes('--plan')) {
+  if (values.plan) {
     const plan = questionPlan(cov);
     const s = summary(cov);
     console.log(`clarify "${feature}": ${s.clear}✓ ${s.partial}~ ${s.missing}✗ ${s.deferred}⏸ — ${s.complete ? 'COMPLETE' : 'incomplete'}`);
@@ -173,11 +211,11 @@ function main() {
     return;
   }
 
-  const ansCat = arg(args, '--answer');
-  const defCat = arg(args, '--defer');
+  const ansCat = values.answer;
+  const defCat = values.defer;
   if (ansCat || defCat) {
     const cat = ansCat || defCat;
-    const text = args[args.indexOf(ansCat ? '--answer' : '--defer') + 2] || '';
+    const text = positionals[0] || '';
     applyAnswer(cov, cat, text, { defer: !!defCat });
     saveCoverage(cov, nowIso);
     const s = summary(cov);
@@ -190,7 +228,7 @@ function main() {
   const s = summary(cov);
   console.log(`clarify "${feature}": ${s.clear}✓ clear, ${s.partial}~ partial, ${s.missing}✗ missing, ${s.deferred}⏸ deferred — ${s.complete ? 'COMPLETE' : 'INCOMPLETE'}`);
   console.log(`  coverage: ${COVERAGE_PATH(feature)}  ·  md: ${MD_PATH(feature)}`);
-  if (!s.complete) console.log('  → node scripts/clarify-engine.mjs --feature ' + feature + ' --plan');
+  if (!s.complete) console.log(`  → node scripts/clarify-engine.mjs --feature ${feature} --plan`);
 }
 
 function selfTest() {

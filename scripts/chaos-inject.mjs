@@ -25,6 +25,7 @@ import assert from 'node:assert';
 import { fileURLToPath } from 'node:url';
 
 import { readAndonConfig } from './andon-halt-helpers.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -607,8 +608,17 @@ function main() {
 }
 
 
+// Разбор строгий (2026-09-16): флагов у харнесса нет, любое слово или флаг — код 2 до
+// первого сценария (раньше `--help` молча запускал все пять инъекций).
+export const CLI = {
+  name: 'chaos-inject',
+  summary: 'Хаос-харнесс: пять сценариев инъекции (I-1…I-5), пишет только в docs/audits/chaos-test-stream.jsonl.',
+  options: {},
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
   main();
 }

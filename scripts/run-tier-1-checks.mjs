@@ -20,19 +20,16 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
 // ── CLI args ─────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-
-
-const isMain = process.argv[1] === fileURLToPath(import.meta.url);
-
-if (isMain) {
-  if (args.includes('--help')) {
-    console.log(`
+// Строгий разбор (2026-09-16): незнакомый флаг раньше молча запускал все семь проверок.
+export const CLI = {
+  name: 'run-tier-1-checks',
+  usage: `
 run-tier-1-checks.mjs — Tier 1 automated gate orchestrator
 
 Wraps run-quality-gates.mjs and adds Tier 1 formal isolation with structured
@@ -49,13 +46,21 @@ Flags:
 Exit codes:
   0  All checks PASS or SKIP
   1  One or more checks emitted BLOCK
-`);
-    process.exit(0);
-  }
+  2  Bad call (unknown flag, stray word, --wave without a value) — nothing ran
+`,
+  options: {
+    wave: { type: 'string', value: 'wave-id' },
+    'dry-run': { type: 'boolean' },
+  },
+};
 
-  const waveIdx = args.indexOf('--wave');
-  const waveId = waveIdx !== -1 ? args[waveIdx + 1] : 'unknown';
-  const dryRun = args.includes('--dry-run');
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  const { values } = runCli(CLI);
+
+  const waveId = values.wave !== undefined ? values.wave : 'unknown';
+  const dryRun = values['dry-run'] === true;
 
   // ── Helpers ─────────────────────────────────────────────────────────────
 

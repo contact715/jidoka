@@ -31,6 +31,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -145,12 +146,20 @@ function самопроверка() {
 const запущенНапрямую =
   process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
+// Разбор строгий (2026-09-16): флагов, кроме --self-test, нет. Незнакомый флаг — код 2:
+// раньше `--self-tset` (опечатка) молча запускал полную проверку вместо самопроверки.
+export const CLI = {
+  name: 'gate-honesty-check',
+  summary: 'Гейт, который объявляет блокировку, обязан блокировать: вызовы в .husky/* пробрасывают код, скрипты со словами отказа имеют ненулевой выход.',
+  selfTest: true,
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
   if (запущенНапрямую) {
-    if (process.argv.includes('--self-test')) process.exit(самопроверка() ? 0 : 1);
+    const { selfTest: хочетСамопроверку } = runCli(CLI);
+    if (хочетСамопроверку) process.exit(самопроверка() ? 0 : 1);
 
     const претензии = проверить();
     if (претензии.length === 0) {

@@ -19,6 +19,8 @@
  *   node scripts/clarify-gate.mjs --staged --block      # exit 1 instead of WARN
  *   node scripts/clarify-gate.mjs --staged --since 48h  # freshness window (default 24h)
  *   node scripts/clarify-gate.mjs --self-test
+ *   (full help: --help; an unknown flag, a stray word or --since without a value exits 2
+ *   before the staged tree is read)
  *
  * Honest limit: like spec-first-gate, this verifies the coverage STATE is
  * complete and fresh, not that the answers are good. Forcing function, not proof.
@@ -28,6 +30,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { screenQuestions } from './clarify-question-quality.mjs';
+import { runCli } from './lib/cli.mjs';
 
 /** Pull question lines (containing '?') from a spec's ## Clarifications section. */
 export function questionLines(md = '') {
@@ -129,12 +132,12 @@ function stagedFiles() {
 }
 
 function main() {
-  const args = process.argv.slice(2);
-  if (args.includes('--self-test')) return selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) return selfTest();
 
-  const staged = args.includes('--staged');
-  const block = args.includes('--block');
-  const since = args.find((_, i) => args[i - 1] === '--since') ?? '24h';
+  const staged = values.staged === true;
+  const block = values.block === true;
+  const since = values.since ?? '24h';
   if (!staged) { console.log('clarify-gate: pass --staged to gate a commit. (dry mode, no-op)'); process.exit(0); }
 
   const specs = stagedFiles().filter(isMasterSpec);
@@ -216,6 +219,19 @@ function selfTest() {
   console.log(fail === 0 ? '\nclarify-gate: all self-tests passed' : `\nclarify-gate: ${fail} self-test(s) FAILED`);
   process.exit(fail === 0 ? 0 : 1);
 }
+
+// Strict parsing (2026-09-16): an unknown flag or a stray word exits 2. Before, a typo like
+// `--blcok` silently downgraded the gate to WARN and the commit went through.
+export const CLI = {
+  name: 'clarify-gate',
+  summary: 'Commit gate: a staged *_MASTER_SPEC.md needs complete, fresh business-question coverage.',
+  selfTest: true,
+  options: {
+    staged: { type: 'boolean', desc: 'gate the staged changes (without it the gate is a no-op)' },
+    block: { type: 'boolean', desc: 'exit 1 on a failure instead of a WARN' },
+    since: { type: 'string', value: 'window', desc: 'freshness window, e.g. 48h (default 24h)' },
+  },
+};
 
 // Run only when invoked directly — importing for tests must not trigger main()/exit.
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) main();

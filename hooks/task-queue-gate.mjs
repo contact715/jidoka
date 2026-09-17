@@ -29,9 +29,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { хвостТранскрипта } from "./lib/transcript-tail.mjs";
+import { loadCli } from './lib/load-cli.mjs';
+
+// Строгий разбор аргументов (2026-09-16). Код отказа 1, а не 2: для Claude Code код 2 у
+// Stop значит «заблокировать завершение», и опечатка в settings.json заперла бы сессию.
+const HOOK_BAD_CALL_EXIT = 1;
 
 // Проверка кейса расхождения — исполняемая, не упоминание (--self-test-tail).
-if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.includes("--self-test-tail")) {
+async function selfTestTail() {
     // «древность отрезана (кейс расхождения)»: строка старше хвоста гейту не
     // видна — вход, где величина говорит «чисто», а правило нарушено в
     // древнем ходе. Принято осознанно: block-once, fail-open.
@@ -192,9 +197,24 @@ function main() {
 }
 
 
+// Разбор — первое, что делает хук: незнакомый флаг или лишнее слово — отказ до чтения
+// очереди и транскрипта. Слово события хук не читает, поэтому слов не принимает.
+export const CLI = {
+  name: 'task-queue-gate',
+  path: 'hooks/task-queue-gate.mjs',
+  summary: 'Хук Stop: сессия, которая вела очередь задач, не останавливается при непустой очереди (один раз). Данные события — в stdin.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+  options: {
+    'self-test-tail': { type: 'boolean', desc: 'кейс расхождения: строка старше хвоста транскрипта гейту не видна' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = (await loadCli(import.meta.url)).runCli(CLI);
+  if (values['self-test-tail']) await selfTestTail();
+  if (wantsSelfTest) selfTest();
   main();
 }

@@ -47,6 +47,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -55,10 +56,16 @@ const ROOT = path.resolve(__dirname, '..');
 const CATALOG_PATH = path.join(ROOT, 'docs', 'security', 'dr-scenario-catalog.json');
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
 // --dry flag: validate only, no file writes (this validator never writes anyway,
 // but the flag makes CI intent explicit and mirrors validate-raci.mjs).
-const isDry = args.includes('--dry');
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до проверки каталога.
+export const CLI = {
+  name: 'validate-dr-catalog',
+  summary: 'Проверить каталог сценариев восстановления docs/security/dr-scenario-catalog.json (DR-V1…V4).',
+  options: {
+    dry: { type: 'boolean', desc: 'только проверка (валидатор и так ничего не пишет)' },
+  },
+};
 
 // ── Output helpers ─────────────────────────────────────────────────────────────
 /** @param {string} msg */
@@ -70,6 +77,8 @@ function log(msg) { process.stdout.write(msg + '\n'); }
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values } = runCli(CLI);
+  const isDry = values.dry === true;
   if (!fs.existsSync(CATALOG_PATH)) {
     log(`⊘ DORMANT — ${CATALOG_PATH} not seeded yet; DR-catalog gate inactive, not failed. Seed the catalog to activate.`);
     process.exit(0);

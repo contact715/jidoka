@@ -12,6 +12,7 @@
 
 import { readFileSync } from 'node:fs';
 import { summarize } from './kaizen-scorecard.mjs';
+import { runCli } from './lib/cli.mjs';
 
 /**
  * Render the panel from a scorecard plus the audited entries. Pure — no I/O, no clock.
@@ -57,8 +58,17 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): модуль библиотечный, у запуска есть только --self-test и --help;
+// любое другое слово — код 2.
+export const CLI = {
+  name: 'kaizen-dashboard',
+  summary: 'Рендер панели Kaizen из реестра исходов; модуль импортируют kaizen-engine и kaizen-audit.',
+  selfTest: true,
+};
+
 if (process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url)) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   console.log('usage: imported by kaizen-engine / kaizen-audit; run with --self-test to verify');
   process.exit(0);
 }

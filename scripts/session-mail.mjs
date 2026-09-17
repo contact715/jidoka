@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // @closes-class: agreement-lives-only-in-chat
+// @divergence: "неотвеченный вопрос виден" — мера «в цепочке есть сообщения» говорит «разобрано», а правило «на вопрос ответили» не выполнено
 // @scope: all
 // @scope-ok: почта сессий по определению собирает переписку ВСЕХ сессий машины
 /**
@@ -21,8 +22,7 @@
  * (разбудит сейчас).
  *
  * Использование:
- *   node scripts/session-mail.mjs --send --to projectx-app-18 --type claim-query \
- *        --subject "e2e/**" --body "твои визуальные тесты или ничьи?"
+ *   node scripts/session-mail.mjs --send --to projectx-app-18 --type claim-query --subject "e2e/**" --body "твои тесты или ничьи?"
  *   node scripts/session-mail.mjs --inbox
  *   node scripts/session-mail.mjs --answer <id> --body "мои, не трогай"
  *   node scripts/session-mail.mjs --open          # вопросы без ответа, по всем сессиям
@@ -33,6 +33,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 export const MAIL_DIR = path.join(os.homedir(), '.jidoka', 'board', '_mail');
 
@@ -51,13 +52,30 @@ export const TYPES = {
 /** Типы, которые остаются открытыми, пока на них не ответили. */
 export const NEEDS_ANSWER = new Set(['claim-query']);
 
-const arg = (name, dflt = undefined) => {
-  const i = process.argv.indexOf(name);
-  return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : dflt;
+// Разбор строгий (2026-09-16): режим выбирается флагом, и опечатка в нём (`--sned`) раньше
+// молча показывала входящие вместо отправки. Теперь — код 2 до чтения и записи почты.
+// Код 2 здесь же значит «сообщение не прошло проверку» и «нет такого сообщения» — прежний смысл.
+export const CLI = {
+  name: 'session-mail',
+  summary: 'Типовые сообщения между параллельными сессиями с журналом в ~/.jidoka/board/_mail.',
+  selfTest: true,
+  options: {
+    send: { type: 'boolean', desc: 'отправить сообщение (--to, --type, --subject, --body, --reply-to)' },
+    answer: { type: 'string', value: 'id', desc: 'ответить на сообщение (--body, --type)' },
+    open: { type: 'boolean', desc: 'вопросы без ответа по всем сессиям' },
+    thread: { type: 'string', value: 'id', desc: 'цепочка сообщения' },
+    inbox: { type: 'boolean', desc: 'входящие этой сессии (режим по умолчанию)' },
+    from: { type: 'string', value: 'сессия', desc: 'от чьего имени (если не задан JIDOKA_SESSION)' },
+    to: { type: 'string', value: 'сессия', desc: 'кому (по умолчанию all)' },
+    type: { type: 'string', value: 'тип', desc: `${Object.keys(TYPES).join(' | ')} (по умолчанию claim; у --answer — verdict)` },
+    subject: { type: 'string', value: 'текст', desc: 'предмет' },
+    body: { type: 'string', value: 'текст', desc: 'текст сообщения' },
+    'reply-to': { type: 'string', value: 'id', desc: 'в ответ на' },
+  },
 };
 
-function me() {
-  return process.env.JIDOKA_SESSION || arg('--from') || `${path.basename(process.cwd())}-${String(process.pid).slice(-2)}`;
+function me(o = {}) {
+  return process.env.JIDOKA_SESSION || o.from || `${path.basename(process.cwd())}-${String(process.pid).slice(-2)}`;
 }
 
 /** Проверка сообщения ПЕРЕД записью: битую строку в журнал не пускаем. */
@@ -126,17 +144,17 @@ function append(msg) {
   fs.appendFileSync(path.join(MAIL_DIR, `${msg.from}.jsonl`), JSON.stringify(msg) + '\n');
 }
 
-function cmdSend() {
-  const from = me();
+function cmdSend(o) {
+  const from = me(o);
   const msg = {
     id: nextId(from),
     at: Date.now(),
     from,
-    to: arg('--to', 'all'),
-    type: arg('--type', 'claim'),
-    subject: arg('--subject', ''),
-    body: arg('--body', ''),
-    replyTo: arg('--reply-to', null),
+    to: o.to || 'all',
+    type: o.type || 'claim',
+    subject: o.subject || '',
+    body: o.body || '',
+    replyTo: o['reply-to'] || null,
   };
   const problems = validateMessage(msg);
   if (problems.length) {
@@ -152,15 +170,15 @@ function cmdSend() {
   }
 }
 
-function cmdAnswer() {
-  const from = me();
-  const rootId = arg('--answer');
+function cmdAnswer(o) {
+  const from = me(o);
+  const rootId = o.answer;
   const all = readMail();
   const root = all.find((m) => m.id === rootId);
   if (!root) { console.error(`нет сообщения с идентификатором ${rootId}`); process.exit(2); }
   const msg = {
     id: nextId(from), at: Date.now(), from, to: root.from,
-    type: arg('--type', 'verdict'), subject: root.subject || '', body: arg('--body', ''), replyTo: rootId,
+    type: o.type || 'verdict', subject: root.subject || '', body: o.body || '', replyTo: rootId,
   };
   const problems = validateMessage(msg);
   if (problems.length) { for (const p of problems) console.error(`  ✗ ${p}`); process.exit(2); }
@@ -173,8 +191,8 @@ function fmtAge(ms) {
   return m < 60 ? `${m}м` : `${Math.round(m / 60)}ч`;
 }
 
-function cmdInbox() {
-  const who = me();
+function cmdInbox(o) {
+  const who = me(o);
   const all = readMail();
   const mine = inboxFor(all, who);
   if (!mine.length) return console.log(`почта ${who}: пусто`);
@@ -202,8 +220,8 @@ function cmdOpen() {
   process.exit(1);
 }
 
-function cmdThread() {
-  const chain = threadOf(readMail(), arg('--thread'));
+function cmdThread(o) {
+  const chain = threadOf(readMail(), o.thread);
   if (!chain.length) return console.log('такой цепочки нет');
   for (const m of chain) {
     console.log(`  ${m.id}  ${m.from} → ${m.to}  [${m.type}]  ${new Date(m.at).toISOString().slice(11, 16)}`);
@@ -257,10 +275,11 @@ function selfTest() {
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  else if (process.argv.includes('--send')) cmdSend();
-  else if (process.argv.includes('--answer')) cmdAnswer();
-  else if (process.argv.includes('--open')) cmdOpen();
-  else if (process.argv.includes('--thread')) cmdThread();
-  else cmdInbox();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  else if (values.send) cmdSend(values);
+  else if (values.answer !== undefined) cmdAnswer(values);
+  else if (values.open) cmdOpen();
+  else if (values.thread !== undefined) cmdThread(values);
+  else cmdInbox(values);
 }

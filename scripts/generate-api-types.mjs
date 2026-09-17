@@ -39,6 +39,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -48,8 +49,15 @@ const REGISTRY_PATH = path.join(ROOT, 'docs', 'security', 'api-contract-registry
 const OUT_PATH = path.join(ROOT, 'lib', 'types', 'generated', 'api-contract.gen.ts');
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-const isCheck = args.includes('--check');
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до чтения реестра. Раньше опечатка
+// `--chek` молча переключала проверку в режим ЗАПИСИ файла типов.
+export const CLI = {
+  name: 'generate-api-types',
+  summary: 'Типы TypeScript из docs/security/api-contract-registry.json → lib/types/generated/api-contract.gen.ts.',
+  options: {
+    check: { type: 'boolean', desc: 'не писать: сравнить свежую генерацию с файлом; код 1 при расхождении' },
+  },
+};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -120,6 +128,8 @@ let registry;
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values } = runCli(CLI);
+  const isCheck = values.check === true;
   try {
     const raw = fs.readFileSync(REGISTRY_PATH, 'utf8');
     registry = JSON.parse(raw);

@@ -28,6 +28,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, statSync, rmSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { runCli, parseCli, formatUsage, EXIT_USAGE } from './lib/cli.mjs';
 import { plan } from './orchestration-planner.mjs';
 
 const STATUSES = ['pending', 'running', 'done', 'failed'];
@@ -280,24 +281,90 @@ function selfTest() {
   ok('verdictStatus: pass!==true → not ok even with green acs', verdictStatus({ wave: 'wv', pass: false, acs: [] }, 'wv').ok === false);
   ok('verdictStatus: wrong wave flagged', verdictStatus({ wave: 'other', pass: true, acs: [] }, 'wv').ok === false);
 
+  // разбор вызова: формы slash-команд и `jidoka resume` проходят, лишнее — отказ
+  const cli = (...a) => { const r = parseCli(a, CLI); return r.error ? r : pickMode(r.values, r.positionals); };
+  ok('cli: --advance w --phase build --status done', (() => { const r = cli('--advance', 'w', '--phase', 'build', '--status', 'done'); return r.mode === 'advance' && r.wave === 'w'; })());
+  ok('cli: --init w --task json', cli('--init', 'w', '--task', '{"risk":"low"}').mode === 'init');
+  ok('cli: --resume without a wave is allowed', (() => { const r = cli('--resume'); return r.mode === 'resume' && r.wave === undefined; })());
+  ok('cli: --audit-closed takes no wave', !!cli('--audit-closed', 'w').error);
+  ok('cli: no mode is refused', !!cli('w').error);
+  ok('cli: two modes are refused', !!cli('--resume', '--init', 'w').error);
+  ok('cli: a flag of another mode is refused', /--phase/.test(cli('--resume', 'w', '--phase', 'x').error || ''));
+  ok('cli: --init without a wave is refused', !!cli('--init', '--task', '{}').error);
+  ok('cli: an unknown flag is refused', !!cli('--resume', '--wave', 'w').error);
+
   if (fails.length) { console.log(`\n\x1b[31mrun-state self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ run-state: journal init/advance/resume/render correct\x1b[0m');
   process.exit(0);
 }
 
 // ── CLI ────────────────────────────────────────────────────────────
-function arg(k) { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; }
+// Разбор строгий (2026-09-16). Режим задаётся флагом (так зовут slash-команды и `jidoka resume`,
+// который дописывает --resume), волна — словом после него. Раньше режимом считался только
+// ПЕРВЫЙ аргумент, а всё прочее молча пропускалось: `--resume w --phase x` просто печатал позицию.
+// Код 2 у --advance занят другим смыслом (волну нельзя закрыть без вердикта) и оставлен как был.
+const USAGE = `run-state — журнал хода волны на диске: продолжение после сброса контекста.
+
+Использование (режим — ровно один):
+  node scripts/run-state.mjs --init <волна> [--task '<json>']
+  node scripts/run-state.mjs --advance <волна> --phase <фаза> --status <статус> [--note <текст>]
+  node scripts/run-state.mjs --resume [<волна>]       # без волны — последняя
+  node scripts/run-state.mjs --audit-closed          # ни одна волна не закрыта без вердикта
+  node scripts/run-state.mjs --self-test
+  node scripts/run-state.mjs --help
+
+Коды выхода: 0 — готово; 1 — отказ (нет журнала, неверный переход, сверка красная);
+2 — неверный вызов (ничего не выполнено) или --advance закрывает волну без независимого вердикта.`;
+
+// режим → флаги, которые к нему относятся
+export const MODES = { init: ['task'], advance: ['phase', 'status', 'note'], resume: [], 'audit-closed': [] };
+
+export const CLI = {
+  name: 'run-state',
+  usage: USAGE,
+  selfTest: true,
+  options: {
+    init: { type: 'boolean', desc: 'завести журнал волны' },
+    advance: { type: 'boolean', desc: 'продвинуть фазу' },
+    resume: { type: 'boolean', desc: 'показать позицию и следующий шаг' },
+    'audit-closed': { type: 'boolean', desc: 'сверить закрытые волны' },
+    task: { type: 'string', value: 'json', desc: 'задача для --init' },
+    phase: { type: 'string', value: 'фаза', desc: 'для --advance' },
+    status: { type: 'string', value: 'статус', desc: 'для --advance' },
+    note: { type: 'string', value: 'текст', desc: 'для --advance' },
+  },
+  positionals: { min: 0, max: 1, name: 'волна' },
+};
+
+/** Чистая: какой режим выбран и какая волна; при неверном сочетании — причина отказа. */
+export function pickMode(values, positionals) {
+  const on = Object.keys(MODES).filter((m) => values[m]);
+  if (on.length === 0) return { error: `нужен режим: ${Object.keys(MODES).map((m) => `--${m}`).join(', ')}` };
+  if (on.length > 1) return { error: `режим должен быть один, дано: ${on.map((m) => `--${m}`).join(' ')}` };
+  const mode = on[0];
+  const stray = Object.values(MODES).flat().find((f) => values[f] !== undefined && !MODES[mode].includes(f));
+  if (stray) return { error: `флаг --${stray} не относится к режиму --${mode}` };
+  const max = mode === 'audit-closed' ? 0 : 1;
+  if (positionals.length > max) return { error: `лишнее слово «${positionals[max]}»` };
+  if ((mode === 'init' || mode === 'advance') && !positionals.length) return { error: `режиму --${mode} нужна волна` };
+  return { mode, wave: positionals[0] };
+}
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, positionals, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const picked = pickMode(values, positionals);
+  if (picked.error) {
+    process.stderr.write(`run-state: неверный вызов — ${picked.error}\nНичего не выполнено.\n\n${formatUsage(CLI, 'run-state')}\n`);
+    process.exit(EXIT_USAGE);
+  }
   const ROOT = process.cwd();
-  const mode = process.argv[2];
+  const mode = picked.mode;
 
-  if (mode === '--init') {
-    const wave = process.argv[3];
-    if (!wave || wave.startsWith('--')) { console.error("usage: --init <wave> --task '<json>'"); process.exit(1); }
-    const task = JSON.parse(arg('--task') || '{"risk":"normal","surfaces":["frontend"]}');
+  if (mode === 'init') {
+    const wave = picked.wave;
+    const task = JSON.parse(values.task || '{"risk":"normal","surfaces":["frontend"]}');
     const s = initState(wave, task);
     const dir = saveState(ROOT, s);
     console.log(`✓ init ${wave}: ${s.phases.length} phases pending → ${join(dir, 'STATE.md')}`);
@@ -306,7 +373,7 @@ if (isMain) {
   }
 
   // the standing companion to the transition gate: judges what is ALREADY on disk, at any time
-  if (mode === '--audit-closed') {
+  if (mode === 'audit-closed') {
     const runsDir = join(ROOT, 'docs', 'runs');
     const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; } };
     const baseline = readJson(join(runsDir, '_UNVERIFIED_WAVES.json'))?.waves ?? [];
@@ -342,13 +409,13 @@ if (isMain) {
     process.exit(0);
   }
 
-  if (mode === '--advance') {
-    const wave = process.argv[3];
+  if (mode === 'advance') {
+    const wave = picked.wave;
     const s = loadState(ROOT, wave);
     if (!s) { console.error(`no run found for ${wave} (run --init first)`); process.exit(1); }
     try {
-      const phase = arg('--phase'), status = arg('--status');
-      const ns = advanceState(s, phase, status, arg('--note') || '');
+      const phase = values.phase, status = values.status;
+      const ns = advanceState(s, phase, status, values.note || '');
       // FORCING FUNCTION: the transition that closes the wave needs an independent acceptance verdict.
       if (completesWave(s, phase, status)) {
         const vs = verdictStatus(loadVerdict(ROOT, wave), wave);
@@ -370,8 +437,8 @@ if (isMain) {
     } catch (e) { console.error(`✗ ${e.message}`); process.exit(1); }
   }
 
-  if (mode === '--resume') {
-    const wave = process.argv[3] && !process.argv[3].startsWith('--') ? process.argv[3] : latestWave(ROOT);
+  if (mode === 'resume') {
+    const wave = picked.wave || latestWave(ROOT);
     if (!wave) { console.log('no run found — nothing to resume'); process.exit(0); }
     const s = loadState(ROOT, wave);
     if (!s) { console.log(`no run found for ${wave} — nothing to resume`); process.exit(0); }
@@ -382,6 +449,4 @@ if (isMain) {
     process.exit(0);
   }
 
-  console.error('usage: run-state.mjs --self-test | --init <wave> --task <json> | --advance <wave> --phase <p> --status <s> [--note ..] | --resume [<wave>]');
-  process.exit(1);
 }

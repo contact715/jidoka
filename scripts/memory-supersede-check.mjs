@@ -18,6 +18,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -383,14 +384,27 @@ function selfTest() {
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
 
+// Разбор строгий (2026-09-16): незнакомый флаг или второе слово — код 2 до чтения памяти.
+// Код 2 на ненайденный или битый файл staging был и раньше.
+export const CLI = {
+  name: 'memory-supersede-check',
+  summary: 'Окно действительности памяти: новый факт противоречит старому о той же сущности — кандидат в [superseded]. Память не правит.',
+  selfTest: true,
+  options: {
+    strict: { type: 'boolean', desc: 'код 1, если есть неразмеченное противоречие' },
+    json: { type: 'boolean', desc: 'вывод в JSON (candidates[])' },
+  },
+  positionals: { min: 0, max: 1, name: 'staging.json' },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  const argv = process.argv.slice(2);
-  if (argv.includes('--self-test')) selfTest();
+  const { values, positionals, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
-  const strict = argv.includes('--strict');
-  const asJson = argv.includes('--json');
-  const stagingArg = argv.find((a) => !a.startsWith('--'));
+  const strict = values.strict === true;
+  const asJson = values.json === true;
+  const stagingArg = positionals[0];
 
   let entities = loadSnapshotEntities();
   if (stagingArg) {

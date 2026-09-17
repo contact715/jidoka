@@ -28,6 +28,7 @@ import { execSync } from 'node:child_process';
 // REUSE the EARS/AC label primitives (do not reimplement the parser). ac-coverage-check owns the
 // "AC label -> test" axis; this script adds the complementary "declared AC -> proof present" axis.
 import { extractAcLabels, testReferencesLabel } from './ac-coverage-check.mjs';
+import { runCli } from './lib/cli.mjs';
 
 // ── AC-completeness (W29-R1) ───────────────────────────────────────
 // The gap: buildVerdict only ever runs the ACs LISTED in acceptance.json. If the spec DECLARES an
@@ -145,12 +146,21 @@ function selfTest() {
 }
 
 // ── CLI ────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово или отсутствие волны — код 2
+// до перезапуска доказательств и записи verdict.json.
+export const CLI = {
+  name: 'acceptance-verdict',
+  summary: 'Перезапустить команды-доказательства из docs/runs/<wave>/acceptance.json и записать verdict.json.',
+  selfTest: true,
+  positionals: { min: 1, max: 1, name: 'wave' },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { positionals, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const ROOT = process.cwd();
-  const wave = process.argv[2];
-  if (!wave || wave.startsWith('--')) { console.error('usage: acceptance-verdict.mjs <wave> | --self-test'); process.exit(1); }
+  const [wave] = positionals;
 
   const dir = join(ROOT, 'docs', 'runs', wave);
   const accFile = join(dir, 'acceptance.json');

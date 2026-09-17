@@ -9,6 +9,7 @@
  * Output is intentionally readable as a SessionStart banner. Exit code:
  *   0 — no staging files, or only the README
  *   1 — never (we don't want to block)
+ *   2 — bad call (unknown flag, stray word): nothing printed but the reason and the help
  *
  * Usage:
  *   node scripts/memory-staging-status.mjs              # plain text
@@ -18,18 +19,27 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const STAGING_DIR = path.join(ROOT, '.claude/memory-staging');
 
-const args = new Set(process.argv.slice(2));
-const isJson = args.has('--json');
-
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 вместо молчаливой текстовой сводки.
+export const CLI = {
+  name: 'memory-staging-status',
+  summary: 'Сводка неслитых файлов памяти в .claude/memory-staging/ (баннер для начала сессии).',
+  options: {
+    json: { type: 'boolean', desc: 'вывод в JSON' },
+  },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values } = runCli(CLI);
+  const isJson = values.json === true;
+
   if (!fs.existsSync(STAGING_DIR)) {
     print({ files: [], message: 'No memory-staging directory yet.' });
     process.exit(0);

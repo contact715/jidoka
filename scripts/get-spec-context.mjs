@@ -21,14 +21,24 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { retrieveAdaptive } from './memory-vector.mjs';
 import { mineDir, relevantConventions } from './standards-mine.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
 // ── CLI args ───────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-const featureName = args.find((_, i) => args[i - 1] === '--feature') ?? null;
-const format = args.find((_, i) => args[i - 1] === '--format') ?? 'text';
+// Строгий разбор (2026-09-16) — в стороже внизу файла: незнакомый флаг или лишнее слово дают
+// код 2 до поиска и до записи в docs/audits/spec-context-runs.jsonl (иначе опечатка во флаге
+// оставляла след «спеку прочли», хотя прочли не ту).
+export const CLI = {
+  name: 'get-spec-context',
+  summary: 'Найти спеку по имени фичи и вывести цепочку предков L4 → L0 (след — docs/audits/spec-context-runs.jsonl).',
+  selfTest: true,
+  options: {
+    feature: { type: 'string', value: 'имя', desc: 'фича или ключевое слово (без него — сообщение в stderr и код 0)' },
+    format: { type: 'string', choices: ['text', 'json'], default: 'text', desc: 'вид вывода' },
+  },
+};
 
 // ── YAML + bold-field two-pass parser (shared contract from T.1) ───────
 // ── evidence-gap loop: retrieval that closes its own gaps (2026-W28-R5, MemR3) ───────────────
@@ -331,7 +341,7 @@ function logRun(feature, found, matchedRelPath, ancestryDepth) {
 }
 
 // ── Main ───────────────────────────────────────────────────────────────
-function main() {
+function main({ feature: featureName = null, format = 'text' } = {}) {
   if (!featureName) {
     process.stderr.write('[get-spec-context] error: --feature <name> is required\n');
     process.exit(0);
@@ -450,6 +460,7 @@ function selfTest() {
 // program half may act.
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  main();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  main({ feature: values.feature ?? null, format: values.format });
 }

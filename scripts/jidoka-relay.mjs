@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { routeDevelopmentTask } from './model-router.mjs';
 import { classifyAgentError, retryPlan } from './agent-error-policy.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const DEFAULT_STORE = join(homedir(), '.jidoka', 'relay');
 const DEFAULT_CLAUDE_TIMEOUT_MS = 4 * 60 * 1000;
@@ -28,11 +29,14 @@ let RUNS = join(STORE, 'runs');
 const nowIso = () => new Date().toISOString();
 const safe = (s) => String(s || '').replace(/[^a-zA-Z0-9_.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
 const idNow = (task) => `${new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)}-${safe(task) || 'task'}-${randomUUID().slice(0, 8)}`;
+// Флаги разобраны строго (runCli, 2026-09-16) и лежат здесь; arg/has читают их, а не process.argv.
+// Раньше `watch --agnet codex --run` молча терял флаг, а незнакомое слово не останавливало запуск агента.
+let OPTS = {};
 const arg = (k, fallback = null) => {
-  const i = process.argv.indexOf(k);
-  return i === -1 ? fallback : process.argv[i + 1];
+  const v = OPTS[k.replace(/^--/, '')];
+  return v === undefined ? fallback : v;
 };
-const has = (k) => process.argv.includes(k);
+const has = (k) => OPTS[k.replace(/^--/, '')] === true;
 
 function numberSetting(cliName, envName, fallback) {
   const raw = arg(cliName, process.env[envName] || String(fallback));
@@ -165,8 +169,8 @@ function initialNext(route) {
 }
 
 function createRun({ task, cwd, from = 'user', phase = 'intake', changedLines = 0, risk = '' }) {
-  ensureStore();
   if (!task) throw new Error('missing --task');
+  ensureStore();
   const realCwd = resolve(cwd || process.cwd());
   const route = routeDevelopmentTask(task, { phase, changedLines, risk });
   const id = idNow(task);
@@ -354,7 +358,7 @@ function runCodex(run, { allowCodexWrite = false, codexTimeoutMs = null } = {}) 
 const RELAY_MAX_ATTEMPTS = Number(process.env.JIDOKA_RELAY_MAX_ATTEMPTS || 3);
 const relayWaitMs = () => {
   const v = arg('--wait');
-  return v ? Number(v) : (process.env.JIDOKA_RELAY_WAIT_MS ? Number(process.env.JIDOKA_RELAY_WAIT_MS) : null);
+  return v !== null ? Number(v) : (process.env.JIDOKA_RELAY_WAIT_MS ? Number(process.env.JIDOKA_RELAY_WAIT_MS) : null);
 };
 
 /** Block for ms without a scheduler — the relay is fully synchronous. */
@@ -576,36 +580,77 @@ function selfTest() {
   process.exit(0);
 }
 
-function help() {
-  console.log(`jidoka-relay - local no-API Claude/Codex relay
+// ── CLI ───────────────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): незнакомый флаг, флаг чужой команды, лишнее слово или флаг
+// без значения — код 2 ДО создания очереди и запуска агентов.
+const RUN_TUNING = {
+  'allow-codex-write': { type: 'boolean', desc: 'Codex может править файлы (sandbox workspace-write)' },
+  'claude-timeout-ms': { type: 'number', value: 'мс', desc: 'потолок Claude/Fable' },
+  'codex-timeout-ms': { type: 'number', value: 'мс', desc: 'потолок Codex' },
+  wait: { type: 'number', value: 'мс', desc: 'пауза перед повтором при лимите (иначе JIDOKA_RELAY_WAIT_MS)' },
+};
+const INTAKE = {
+  task: { type: 'string', value: 'текст', desc: 'задача' },
+  cwd: { type: 'string', value: 'папка', desc: 'рабочая папка агента' },
+  from: { type: 'string', value: 'кто', desc: 'кто поставил задачу' },
+  phase: { type: 'string', value: 'фаза', desc: 'фаза для маршрутизатора' },
+  'changed-lines': { type: 'number', desc: 'размер правки для маршрутизатора' },
+  risk: { type: 'string', value: 'риск', desc: 'риск для маршрутизатора' },
+};
+const AGENT = { agent: { type: 'string', choices: ['claude', 'codex'], desc: 'чей ход' } };
+const RUN_ID = { id: { type: 'string', value: 'run-id', desc: 'id прогона' } };
+const WATCH_TIMEOUTS = { 'allow-codex-write': RUN_TUNING['allow-codex-write'], 'claude-timeout-ms': RUN_TUNING['claude-timeout-ms'], 'codex-timeout-ms': RUN_TUNING['codex-timeout-ms'] };
+
+export const CLI = {
+  name: 'jidoka-relay',
+  usage: `jidoka-relay - local no-API Claude/Codex relay (file queue in ~/.jidoka/relay or $JIDOKA_RELAY_DIR)
 
 Commands:
-  start --task <text> [--cwd <dir>] [--from <who>] [--run] [--allow-codex-write] [--claude-timeout-ms N] [--codex-timeout-ms N]
-  auto --task <text> [--cwd <dir>] [--from <who>] [--allow-codex-write] [--dry-run] [--claude-timeout-ms N] [--codex-timeout-ms N]
+  start --task <text> [--cwd <dir>] [--from <who>] [--phase <p>] [--changed-lines N] [--risk <r>] [--run] [--allow-codex-write] [--claude-timeout-ms N] [--codex-timeout-ms N] [--wait MS]
+  auto --task <text> [--cwd <dir>] [--from <who>] [--phase <p>] [--changed-lines N] [--risk <r>] [--allow-codex-write] [--dry-run] [--claude-timeout-ms N] [--codex-timeout-ms N] [--wait MS]
   list [--agent claude|codex]
   next --agent claude|codex
   prompt --id <run-id> --agent claude|codex
-  run --agent claude|codex [--id <run-id>] [--allow-codex-write] [--claude-timeout-ms N] [--codex-timeout-ms N]
-  watch --agent claude|codex [--run] [--allow-codex-write] [--poll 5] [--claude-timeout-ms N] [--codex-timeout-ms N]
+  run --agent claude|codex [--id <run-id>] [--allow-codex-write] [--claude-timeout-ms N] [--codex-timeout-ms N] [--wait MS]
+  watch --agent claude|codex [--run] [--allow-codex-write] [--poll 5] [--claude-timeout-ms N] [--codex-timeout-ms N] [--wait MS]
   start-watchers [--allow-codex-write] [--claude-timeout-ms N] [--codex-timeout-ms N]
   watcher-status
   stop-watchers
-  --self-test
+  --self-test    самопроверка на временной очереди (агенты не запускаются)
+  -h, --help     эта справка
 
 Defaults:
   Claude/Fable timeout: ${DEFAULT_CLAUDE_TIMEOUT_MS}ms (override with JIDOKA_CLAUDE_TIMEOUT_MS)
   Codex timeout:        ${DEFAULT_CODEX_TIMEOUT_MS}ms (override with JIDOKA_CODEX_TIMEOUT_MS)
-`);
-}
+  --from user, --phase intake, --changed-lines 0, --poll 5, --cwd текущая папка
 
-const command = process.argv[2];
+Флаг, которого нет у команды, — отказ: например, --dry-run работает только с auto.
+
+Коды выхода: 0 — готово, 1 — отказ (нет --task/--agent, сбой агента), 2 — неверный вызов (ничего не выполнено).`,
+  selfTest: true,
+  commands: {
+    start: { options: { ...INTAKE, ...RUN_TUNING, run: { type: 'boolean', desc: 'сразу запустить первого агента' } } },
+    auto: { options: { ...INTAKE, ...RUN_TUNING, 'dry-run': { type: 'boolean', desc: 'только создать прогон и показать маршрут' } } },
+    list: { options: { ...AGENT } },
+    next: { options: { ...AGENT } },
+    prompt: { options: { ...RUN_ID, ...AGENT } },
+    run: { options: { ...AGENT, ...RUN_ID, ...RUN_TUNING } },
+    watch: { options: { ...AGENT, ...RUN_TUNING, run: { type: 'boolean', desc: 'выполнять задачи, а не только показывать' }, poll: { type: 'number', value: 'сек', desc: 'период опроса очереди' } } },
+    'start-watchers': { options: { ...WATCH_TIMEOUTS } },
+    'watcher-status': {},
+    'stop-watchers': {},
+  },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  // Без слова — справка с кодом 0, как было до строгого разбора (`jidoka relay` без команды).
+  const argv = process.argv.slice(2);
+  const { command, values, selfTest: wantsSelfTest } = runCli(CLI, argv.length ? argv : ['--help']);
+  OPTS = values;
   try {
-    if (has('--self-test')) selfTest();
-    if (!command || command === '-h' || command === '--help') help();
+    if (wantsSelfTest) selfTest();
     else if (command === 'start') commandStart();
     else if (command === 'auto') commandAuto();
     else if (command === 'list') commandList();
@@ -616,7 +661,6 @@ if (isMain) {
     else if (command === 'start-watchers') commandStartWatchers();
     else if (command === 'watcher-status') commandWatcherStatus();
     else if (command === 'stop-watchers') commandStopWatchers();
-    else { console.error(`unknown command: ${command}`); help(); process.exit(2); }
   } catch (e) {
     console.error(`jidoka-relay: ${e.message}`);
     process.exit(1);

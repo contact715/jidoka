@@ -7,6 +7,7 @@
 //   node scripts/debate-engine.mjs --plan "claim" [--spec-anchor docs/specs/wave-X_MASTER_SPEC.md]
 
 import { mkdirSync, writeFileSync, existsSync, appendFileSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 export function debatePlan() {
   return [
@@ -103,13 +104,26 @@ async function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): опечатка `--spec-anchr` раньше молча давала дебаты без якоря
+// спеки и запись скелета в docs/debates. Теперь — код 2 до записи.
+export const CLI = {
+  name: 'debate-engine',
+  summary: 'Структура раундов дебатов и скелет стенограммы в docs/debates/ (вызовы моделей делает оркестратор).',
+  selfTest: true,
+  options: {
+    plan: { type: 'string', value: 'утверждение', desc: 'что проверяем дебатами' },
+    claim: { type: 'string', value: 'утверждение', desc: 'то же, что --plan' },
+    'spec-anchor': { type: 'string', value: 'путь', desc: 'спека-якорь для судьи' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) { await selfTest(); }
-  const arg = (k) => { const i=process.argv.indexOf(k); return i!==-1?process.argv[i+1]:null; };
-  const claim = arg('--plan') || arg('--claim');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) { await selfTest(); }
+  const claim = values.plan || values.claim || null;
   if (!claim) { console.error('usage: --plan "<claim>" [--spec-anchor <path>] | --self-test'); process.exit(2); }
-  const anchor = arg('--spec-anchor');
+  const anchor = values['spec-anchor'] || null;
   console.log(`debate-engine: adversarial verification of — "${claim}"\n`);
   if (anchor) { console.log(`  spec-anchor: ${anchor}\n  (Orchestrator: include anchor content in every judge dispatch)\n`); }
   else { console.log('  WARN: no spec-anchor — judge verdict will be based on rubric only\n'); }

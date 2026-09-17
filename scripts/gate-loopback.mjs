@@ -24,6 +24,7 @@
  */
 
 import { pathToFileURL } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 export const MAX_ROUNDS = 5;
 
@@ -45,19 +46,31 @@ export function decideNext({ phase, verdict, rounds = 0, maxRounds = MAX_ROUNDS 
   return { next: null, rounds, action: 'noop' };
 }
 
-function arg(args, name) { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; }
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2. Вердикт — только pass|fail: опечатка
+// («fial») раньше молча давала «no routing change» и код 0. --rounds обязан быть числом.
+export const CLI = {
+  name: 'gate-loopback',
+  summary: 'Маршрут гейт → дебаг → гейт по вердикту гейта, с пределом раундов (эскалация — код 42).',
+  selfTest: true,
+  options: {
+    phase: { type: 'string', value: 'gate|debug', desc: 'текущая фаза (обязательно)' },
+    verdict: { type: 'string', choices: ['pass', 'fail'], desc: 'вердикт гейта' },
+    rounds: { type: 'number', default: 0, desc: 'сколько раундов уже было' },
+    json: { type: 'boolean', desc: 'решение в JSON' },
+  },
+};
 
 function main() {
-  const args = process.argv.slice(2);
-  if (args.includes('--self-test')) return selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) return selfTest();
 
-  const phase = arg(args, '--phase');
+  const phase = values.phase;
   if (!phase) { console.error('gate-loopback: --phase <gate|debug> required'); process.exit(2); }
-  const d = decideNext({ phase, verdict: arg(args, '--verdict'), rounds: Number(arg(args, '--rounds')) || 0 });
+  const d = decideNext({ phase, verdict: values.verdict, rounds: values.rounds || 0 });
 
-  if (args.includes('--json')) { process.stdout.write(JSON.stringify(d) + '\n'); return; }
+  if (values.json) { process.stdout.write(JSON.stringify(d) + '\n'); return; }
   const arrow = { advance: '→ memory (gate passed)', loopback: `→ debug (round ${d.rounds}/${MAX_ROUNDS})`, reenter: '→ gate (re-run after debug)', escalate: `→ HALT — ${MAX_ROUNDS}-round cap hit, escalate to human (andon)`, noop: '→ (no routing change)' };
-  console.log(`gate-loopback: ${phase}${arg(args, '--verdict') ? `/${arg(args, '--verdict')}` : ''}  ${arrow[d.action]}`);
+  console.log(`gate-loopback: ${phase}${values.verdict ? `/${values.verdict}` : ''}  ${arrow[d.action]}`);
   // escalate is the only non-zero exit so a caller/hook can branch on the round-cap.
   process.exit(d.action === 'escalate' ? 42 : 0);
 }

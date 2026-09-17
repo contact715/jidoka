@@ -48,6 +48,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -57,9 +58,16 @@ const REGISTRY_PATH = path.join(ROOT, 'docs', 'security', 'api-contract-registry
 const SNAPSHOT_PATH = path.join(ROOT, 'docs', 'contracts', 'openapi-snapshot.json');
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-const isUpdateSnapshot = args.includes('--update-snapshot');
-const isDry = args.includes('--dry');
+// Разбор строгий (2026-09-16): опечатка `--update-snapshto` раньше молча запускала проверку
+// вместо записи снимка. Теперь — код 2 до чтения реестра и сети.
+export const CLI = {
+  name: 'validate-contract',
+  summary: 'Сверить объявленные фронтом маршруты API с OpenAPI бэкенда (живой, снимок или список из CLAUDE.md).',
+  options: {
+    'update-snapshot': { type: 'boolean', desc: 'снять живой OpenAPI в docs/contracts/openapi-snapshot.json и выйти (без проверки)' },
+    dry: { type: 'boolean', desc: 'напечатать находки, но не выходить с кодом 1' },
+  },
+};
 
 // ── Output helpers ─────────────────────────────────────────────────────────────
 /** @param {string} msg */
@@ -116,6 +124,10 @@ async function fetchWithTimeout(url, timeoutMs) {
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values } = runCli(CLI);
+  const isUpdateSnapshot = values['update-snapshot'] === true;
+  const isDry = values.dry === true;
+
   if (!fs.existsSync(REGISTRY_PATH)) {
     log(`○ N/A — ${REGISTRY_PATH} absent; this repo exposes no HTTP API (framework/CLI engine). The contract gate is for product repos that declare an API surface — not a gap here.`);
     process.exit(0);

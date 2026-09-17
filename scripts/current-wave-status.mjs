@@ -20,11 +20,11 @@ import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { latestWave as latestRunWave, loadState, nextStep } from './run-state.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, 'docs/CURRENT_WAVE.md');
-const isDry = process.argv.includes('--dry');
 
 const sh = (cmd) => {
   try {
@@ -34,25 +34,40 @@ const sh = (cmd) => {
   }
 };
 
-// ── Latest wave (from git log subject) ─────────────────────────────
-const latestWave = sh("git log --pretty=%s -50 | grep -oE 'wave-[0-9]+(\\.[0-9]+[a-z]?)?' | sort -u | sort -t- -k2 -n | tail -1") || 'unknown';
-
-// ── Latest retro file ──────────────────────────────────────────────
-const latestRetro = sh("ls -1 docs/retros/wave-*.md 2>/dev/null | sort -V | tail -1") || '(none)';
-
-// ── Open audit findings (from backlog banner --machine-readable hack) ─
-const banner = sh('bash scripts/audit-backlog-status.sh');
-const openMatch = banner.match(/open\s+:\s+(\d+)/);
-const escMatch = banner.match(/escalated.*:\s+(\d+)/);
-const open = openMatch ? openMatch[1] : '?';
-const escalated = escMatch ? escMatch[1] : '?';
-
-// ── Outcomes status ────────────────────────────────────────────────
-let outcomesSummary = '(outcome-check not available)';
+// Строгий разбор (2026-09-16): незнакомый флаг или слово — код 2, файл не переписывается.
+export const CLI = {
+  name: 'current-wave-status',
+  summary: 'Переписать docs/CURRENT_WAVE.md: последняя волна, ретро, бэклог аудита, итоги, последние коммиты.',
+  options: {
+    dry: { type: 'boolean', desc: 'напечатать, не записывать' },
+  },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values } = runCli(CLI);
+  const isDry = values.dry === true;
+
+  // Сбор идёт только при запуске: раньше три команды (git log, ls, audit-backlog-status.sh)
+  // выполнялись при ИМПОРТЕ модуля, до сторожа — любой импорт запускал git и bash.
+
+  // ── Latest wave (from git log subject) ─────────────────────────────
+  const latestWave = sh("git log --pretty=%s -50 | grep -oE 'wave-[0-9]+(\\.[0-9]+[a-z]?)?' | sort -u | sort -t- -k2 -n | tail -1") || 'unknown';
+
+  // ── Latest retro file ──────────────────────────────────────────────
+  const latestRetro = sh("ls -1 docs/retros/wave-*.md 2>/dev/null | sort -V | tail -1") || '(none)';
+
+  // ── Open audit findings (from backlog banner --machine-readable hack) ─
+  const banner = sh('bash scripts/audit-backlog-status.sh');
+  const openMatch = banner.match(/open\s+:\s+(\d+)/);
+  const escMatch = banner.match(/escalated.*:\s+(\d+)/);
+  const open = openMatch ? openMatch[1] : '?';
+  const escalated = escMatch ? escMatch[1] : '?';
+
+  // ── Outcomes status ────────────────────────────────────────────────
+  let outcomesSummary = '(outcome-check not available)';
+
   try {
     const outcomesJson = JSON.parse(execSync('node scripts/outcome-check.mjs --json 2>/dev/null', { cwd: ROOT, encoding: 'utf8' }) || '{}');
     if (outcomesJson.results) {

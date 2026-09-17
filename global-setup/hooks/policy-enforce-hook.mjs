@@ -14,7 +14,27 @@
 //   node scripts/policy-enforce-hook.mjs --self-test
 //   (as a hook) echo '{"tool_name":"Write","tool_input":{"file_path":"..."}}' | node scripts/policy-enforce-hook.mjs
 
-import { readFileSync, appendFileSync } from 'node:fs';
+import { readFileSync, appendFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+// Строгий разбор аргументов (2026-09-16). Код отказа 1, а не 2: для Claude Code код 2 у
+// PreToolUse значит «заблокировать вызов инструмента», и опечатка в settings.json заперла бы
+// каждую правку.
+const HOOK_BAD_CALL_EXIT = 1;
+
+// Помощник грузится из СОБСТВЕННОГО дерева хука. В установке этот файл лежит в ~/.claude/hooks
+// рядом с lib/load-cli.mjs; в каноне (global-setup/hooks) загрузчик — hooks/lib/load-cli.mjs
+// репозитория. Статический импорт упал бы в одной из раскладок. Второй адрес проверяется только
+// в канонической раскладке: из ~/.claude/hooks путь ../../ ушёл бы в чужой ~/hooks.
+async function loadStrictCli() {
+  const here = fileURLToPath(new URL('.', import.meta.url));
+  const candidates = [new URL('./lib/load-cli.mjs', import.meta.url)];
+  if (/[\\/]global-setup[\\/]hooks[\\/]?$/.test(here)) candidates.push(new URL('../../hooks/lib/load-cli.mjs', import.meta.url));
+  const found = candidates.find((u) => existsSync(u));
+  if (!found) throw new Error(`policy-enforce-hook: не найден lib/load-cli.mjs рядом с ${here}`);
+  const { loadCli } = await import(found.href);
+  return loadCli(import.meta.url);
+}
 
 // case-INSENSITIVE: a red-team probe found that on a case-insensitive filesystem (macOS/Windows)
 // "docs/constitution.md" is the SAME file as "docs/CONSTITUTION.md" but a case-sensitive regex let
@@ -139,9 +159,20 @@ function selfTest() {
   process.exit(0);
 }
 
-const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
+// Разбор — первое, что делает хук: незнакомый флаг или лишнее слово — отказ до чтения stdin.
+// Слово события хук не читает, поэтому слов не принимает.
+export const CLI = {
+  name: 'policy-enforce-hook',
+  path: 'global-setup/hooks/policy-enforce-hook.mjs',
+  summary: 'Хук PreToolUse: блокирует запись в защищённые пути (секреты, .git, реестры, L0-документы). Данные события — в stdin.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+};
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = (await loadStrictCli()).runCli(CLI);
+  if (wantsSelfTest) selfTest();
   let raw = '';
   try { raw = readFileSync(0, 'utf8'); } catch { /* no stdin */ }
   let data = {};

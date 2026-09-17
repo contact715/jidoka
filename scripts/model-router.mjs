@@ -23,6 +23,7 @@
 //   node scripts/model-router.mjs --task-text "plan the billing migration" --json
 
 import { modelForAgent, classOf } from './model-tier.mjs';
+import { runCli } from './lib/cli.mjs';
 
 // local models for cost/privacy (capable = strong general/dev model; light = cheap mechanical)
 export const LOCAL = { capable: 'deepseek-3.2', light: 'llama-3.3-8b' };
@@ -213,20 +214,39 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово, число не числом — код 2 до
+// маршрутизации. Форма `jidoka.mjs model-route --task-text "<task>" --json` записана в
+// ~/.claude/CLAUDE.md и обязана разбираться; jidoka.mjs передаёт хвост сюда как есть.
+export const CLI = {
+  name: 'model-router',
+  summary: 'Маршрут задачи: разработка (--task-text → Fable или Codex) или вызов агента (--task → провайдер и модель).',
+  selfTest: true,
+  options: {
+    'task-text': { type: 'string', value: 'текст', desc: 'задача разработки словами — маршрут Fable/Codex' },
+    phase: { type: 'string', value: 'фаза', desc: 'фаза для --task-text (по умолчанию intake)' },
+    'changed-lines': { type: 'number', default: 0, desc: 'размер правки для --task-text' },
+    risk: { type: 'string', value: 'риск', desc: 'заданный риск для --task-text' },
+    json: { type: 'boolean', desc: 'ответ --task-text в JSON' },
+    task: { type: 'string', value: 'json', desc: 'вызов агента: {"role","tier"} (по умолчанию backend-agent / balanced)' },
+    usage: { type: 'number', default: 0, desc: 'доля израсходованного бюджета для --task' },
+    privacy: { type: 'boolean', desc: 'данные не покидают машину (для --task)' },
+    'allow-local': { type: 'boolean', desc: 'разрешить локальную модель для механических ролей (для --task)' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const taskText = arg('--task-text');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const taskText = values['task-text'];
   if (taskText) {
     const ctx = {
-      phase: arg('--phase') || 'intake',
-      changedLines: Number(arg('--changed-lines') || '0'),
-      risk: arg('--risk') || '',
+      phase: values.phase || 'intake',
+      changedLines: values['changed-lines'],
+      risk: values.risk || '',
     };
     const r = routeDevelopmentTask(taskText, ctx);
-    if (process.argv.includes('--json')) {
+    if (values.json) {
       console.log(JSON.stringify(r, null, 2));
     } else {
       console.log(`model-router: development task → \x1b[1m${r.route}\x1b[0m`);
@@ -239,8 +259,8 @@ if (isMain) {
     }
     process.exit(0);
   }
-  const task = JSON.parse(arg('--task') || '{"role":"backend-agent","tier":"balanced"}');
-  const ctx = { usageRatio: parseFloat(arg('--usage') || '0'), privacy: process.argv.includes('--privacy'), allowLocal: process.argv.includes('--allow-local') };
+  const task = JSON.parse(values.task || '{"role":"backend-agent","tier":"balanced"}');
+  const ctx = { usageRatio: values.usage, privacy: values.privacy === true, allowLocal: values['allow-local'] === true };
   const r = route(task, ctx);
   console.log(`model-router: ${task.role} → \x1b[1m${r.provider} / ${r.model}\x1b[0m — ${r.reason}`);
   process.exit(0);

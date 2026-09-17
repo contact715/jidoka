@@ -21,6 +21,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -101,8 +102,8 @@ function sign(delta) {
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────
-function main() {
-  const updateMode = process.argv.includes('--update');
+function main(values = {}) {
+  const updateMode = values.update === true;
 
   if (!fs.existsSync(LCOV_FILE)) {
     console.log('SKIP: coverage/lcov.info not found.');
@@ -171,8 +172,19 @@ function main() {
 }
 
 
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до чтения lcov и до записи
+// базовой линии покрытия.
+export const CLI = {
+  name: 'coverage-delta',
+  summary: 'Дельта покрытия по файлам: coverage/lcov.info против docs/metrics/coverage-baseline.json.',
+  options: {
+    update: { type: 'boolean', desc: 'принять текущее покрытие как новую базовую линию' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  main();
+  const { values } = runCli(CLI);
+  main(values);
 }

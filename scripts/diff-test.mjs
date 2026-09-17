@@ -57,6 +57,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -67,7 +68,13 @@ const BASELINES_DIR = path.join(ROOT, 'docs', 'differential-baselines');
 const NORMALIZE_PATH = path.join(ROOT, 'scripts', 'normalize.json');
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
-const updateMode = process.argv.includes('--update');
+export const CLI = {
+  name: 'diff-test',
+  summary: 'Дифференциальная проверка: вывод скриптов на фикстурах сверяется с базовыми линиями (расхождение — код 1).',
+  options: {
+    update: { type: 'boolean', desc: 'пересеять базовые линии из реальных прогонов' },
+  },
+};
 
 // ── Output helpers ────────────────────────────────────────────────────────────
 /** @param {string} msg */
@@ -80,6 +87,7 @@ let normalizeConfig;
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const updateMode = runCli(CLI).values.update === true;
   try {
     normalizeConfig = JSON.parse(fs.readFileSync(NORMALIZE_PATH, 'utf8'));
   } catch (err) {

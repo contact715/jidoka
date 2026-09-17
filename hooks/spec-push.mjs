@@ -17,6 +17,11 @@ import { readFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadCli } from './lib/load-cli.mjs';
+
+// Строгий разбор аргументов (2026-09-16). Код отказа 1, а не 2 — один договор на все хуки
+// Claude Code: у PreToolUse, UserPromptSubmit и Stop код 2 значит «заблокировать».
+const HOOK_BAD_CALL_EXIT = 1;
 
 const CANDIDATE_ROOTS = [
   join(homedir(), 'jidoka-framework'),
@@ -46,10 +51,21 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор — первое, что делает хук: незнакомый флаг или лишнее слово — отказ до чтения stdin.
+// Слово события хук не читает, поэтому слов не принимает.
+export const CLI = {
+  name: 'spec-push',
+  path: 'hooks/spec-push.mjs',
+  summary: 'Хук PostToolUse на Write|Edit: правка файла под спекой добавляет в контекст строку о спеке. Данные события — в stdin; не блокирует.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = (await loadCli(import.meta.url)).runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
   let raw = '';
   process.stdin.on('data', (c) => { raw += c; });

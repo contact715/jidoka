@@ -17,6 +17,7 @@
 //   node scripts/cost-crosscheck.mjs            # best-effort: run ccusage, print real $ spend
 
 import { execFileSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 // pure: deep-search a parsed ccusage JSON for the most plausible TOTAL cost in USD.
 // ccusage shapes vary across versions (totals.totalCost, totalCost, cost, daily[].totalCost…),
@@ -60,9 +61,18 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): флагов у прибора нет, кроме самопроверки. Незнакомый флаг
+// раньше молча запускал ccusage; теперь — код 2 без запуска.
+export const CLI = {
+  name: 'cost-crosscheck',
+  summary: 'Настоящие траты Claude Code в долларах по ccusage (если он не установлен — честное «недоступен», код 0).',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const res = runCcusage();
   if (!res) {
     console.log('💲 реальные траты: ccusage недоступен (офлайн или не установлен). Установите один раз: `npx ccusage` / `bun add -g ccusage`.');

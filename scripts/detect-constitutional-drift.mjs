@@ -22,6 +22,8 @@
  *
  * Exit codes:
  *   0  — no drift detected, or drift detected in soft mode
+ *   1  — fatal error
+ *   2  — bad call: unknown flag or extra word (nothing read, nothing written)
  *   42 — drift detected and constitutionalDrift.hardBlockEnabled: true
  *
  * EU AI Act Art 9(2)(c): post-market monitoring data feed
@@ -34,6 +36,7 @@ import { fileURLToPath } from 'node:url';
 
 import { readJsonlStream, emitTelemetry } from './emit-telemetry.mjs';
 import { writeHaltState } from './andon-halt-helpers.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -82,8 +85,8 @@ function computeStats(values) {
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
-async function main() {
-  const dryRun = process.argv.includes('--dry-run');
+async function main(values = {}) {
+  const dryRun = values['dry-run'] === true;
 
   // A14: absent stream — log + exit 0 (no events)
   if (!fs.existsSync(CONSTITUTIONAL_EVENTS_PATH)) {
@@ -220,10 +223,21 @@ async function main() {
 }
 
 
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до чтения потока. Раньше опечатка
+// `--dryrun` молча шла в боевой режим: писала телеметрию и могла поставить остановку (42).
+export const CLI = {
+  name: 'detect-constitutional-drift',
+  summary: 'Дрейф нарушений Q1–Q5 по docs/audits/constitutional-events.jsonl (7 дней, порог 2σ); код 42 в жёстком режиме.',
+  options: {
+    'dry-run': { type: 'boolean', desc: 'только отчёт: без телеметрии и без остановки' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  main().catch(err => {
+  const { values } = runCli(CLI);
+  main(values).catch(err => {
     process.stderr.write(`[drift] FATAL: ${err}\n`);
     process.exit(1);
   });

@@ -42,6 +42,8 @@
  *   node scripts/gate-receipt.mjs --verify --require tsc,tests
  *   node scripts/gate-receipt.mjs --list
  *   node scripts/gate-receipt.mjs --self-test
+ *   (полная справка: --help; незнакомый флаг, лишнее слово или флаг без значения — код 2
+ *   до любого прогона и записи квитанции)
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -49,16 +51,12 @@ import os from 'node:os';
 import crypto from 'node:crypto';
 import { execSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 export const RECEIPT_DIR = path.join(os.homedir(), '.jidoka', 'board', '_receipts');
 
-const arg = (name, dflt = undefined) => {
-  const i = process.argv.indexOf(name);
-  return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : dflt;
-};
-
-function me() {
-  return process.env.JIDOKA_SESSION || arg('--session') || `${path.basename(process.cwd())}-${String(process.pid).slice(-2)}`;
+function me(session) {
+  return process.env.JIDOKA_SESSION || session || `${path.basename(process.cwd())}-${String(process.pid).slice(-2)}`;
 }
 
 /**
@@ -157,9 +155,9 @@ function append(rec) {
   fs.appendFileSync(path.join(RECEIPT_DIR, `${rec.session}.jsonl`), JSON.stringify(rec) + '\n');
 }
 
-function cmdRun() {
-  const gate = arg('--gate');
-  const cmd = arg('--run');
+function cmdRun(values) {
+  const gate = values.gate;
+  const cmd = values.run;
   if (!gate || !cmd) { console.error('нужно --gate <имя> --run "<команда>"'); process.exit(2); }
   const cwd = process.cwd();
   // Отпечаток снимается ДО прогона: он описывает то, что проверяли, а не то, что стало после.
@@ -168,7 +166,7 @@ function cmdRun() {
   const res = spawnSync(cmd, { shell: true, stdio: 'inherit', cwd });
   const code = res.status === null ? 1 : res.status;
   const rec = {
-    session: me(), gate, at: Date.now(), durationMs: Date.now() - started,
+    session: me(values.session), gate, at: Date.now(), durationMs: Date.now() - started,
     cwd, repo: path.basename(sh('git rev-parse --show-toplevel', cwd).trim() || cwd),
     fingerprint,
     outcome: code === 0 ? 'pass' : 'fail',
@@ -180,8 +178,8 @@ function cmdRun() {
   process.exit(code);
 }
 
-function cmdVerify() {
-  const required = (arg('--require', '') || '').split(',').map((s) => s.trim()).filter(Boolean);
+function cmdVerify(values) {
+  const required = (values.require || '').split(',').map((s) => s.trim()).filter(Boolean);
   if (!required.length) { console.error('нужно --require <гейт,гейт>'); process.exit(2); }
   const fp = treeFingerprint();
   const r = verifyWork(readReceipts(), fp, required);
@@ -256,10 +254,28 @@ function selfTest() {
   process.exit(failed.length ? 1 : 0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово или флаг без значения — код 2
+// до прогона. Раньше `--gate tsc` без `--run` молча уходил в список, а опечатка `--requre`
+// молча превращалась в «нужно --require». --list — режим по умолчанию, флаг назван явно.
+export const CLI = {
+  name: 'gate-receipt',
+  summary: 'Квитанция прогона гейта: исход берётся из кода возврата, квитанция привязана к отпечатку состояния.',
+  selfTest: true,
+  options: {
+    gate: { type: 'string', value: 'имя', desc: 'имя гейта (вместе с --run)' },
+    run: { type: 'string', value: 'команда', desc: 'прогнать команду и записать квитанцию' },
+    verify: { type: 'boolean', desc: 'проверить, что обязательные гейты доказаны на текущем состоянии' },
+    require: { type: 'string', value: 'гейт,гейт', desc: 'обязательные гейты (вместе с --verify)' },
+    list: { type: 'boolean', desc: 'последние квитанции (режим по умолчанию)' },
+    session: { type: 'string', value: 'id', desc: 'чья квитанция (по умолчанию JIDOKA_SESSION или имя папки)' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  else if (process.argv.includes('--verify')) cmdVerify();
-  else if (process.argv.includes('--run')) cmdRun();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  else if (values.verify) cmdVerify(values);
+  else if (values.run !== undefined || values.gate !== undefined) cmdRun(values);
   else cmdList();
 }

@@ -19,6 +19,7 @@ import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const HOME = homedir();
 const LIST_PATH = process.env.CL_PROJECTS_LIST || join(HOME, '.claude/projects.list');
@@ -248,18 +249,28 @@ function selfTest() {
 
 // ---------- dispatch ----------
 
+// Самопроверка здесь — подкоманда selftest (так её зовёт cl.zsh-мир), флага --self-test нет.
+export const CLI = {
+  name: 'cl-launcher',
+  summary: 'Мозг запускатора проектов cl: светофор, превью, портфель, сторож «только чтение».',
+  commands: {
+    list: { desc: 'строки для fzf (точка + имя + метка <TAB> путь)' },
+    preview: { positionals: { min: 1, max: 1, name: 'путь' }, desc: 'панель превью одного проекта' },
+    portfolio: { desc: 'таблица статуса всех проектов (cl -s)' },
+    guard: { positionals: { min: 1, max: 1, name: 'путь' }, desc: 'код 3, если проект только для чтения, иначе 0' },
+    selftest: { desc: 'встроенные проверки, код 0/1' },
+  },
+};
+
 function main() {
-  const cmd = process.argv[2];
-  const arg = process.argv[3];
+  const { command: cmd, positionals } = runCli(CLI);
+  const arg = positionals[0];
   switch (cmd) {
     case 'list': return cmdList();
     case 'preview': return cmdPreview(arg);
     case 'portfolio': return cmdPortfolio();
     case 'guard': return cmdGuard(arg);
     case 'selftest': return process.exit(selfTest());
-    default:
-      process.stderr.write('usage: cl-launcher.mjs list|preview <path>|portfolio|guard <path>|selftest\n');
-      process.exit(2);
   }
 }
 

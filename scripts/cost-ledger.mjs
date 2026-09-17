@@ -13,6 +13,7 @@
 //   node scripts/cost-ledger.mjs --assess <ledger.jsonl> --limit-cents 2000 --date 2026-06-02
 
 import { readFileSync, existsSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 // AC-1: append without mutating the input
 export function record(ledger, entry) {
@@ -67,14 +68,26 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Разбор строгий (2026-09-16): опечатка `--limit-cent 2000` раньше молча давала лимит 0 и
+// вердикт BLOCK. Теперь незнакомый флаг, не число в лимите или лишнее слово — код 2.
+export const CLI = {
+  name: 'cost-ledger',
+  summary: 'Дневной лимит расходов по журналу токенов (целые центы): OK / WARN / BLOCK. Код 1 — BLOCK; код 2 — и неверный вызов, и отсутствующий журнал.',
+  selfTest: true,
+  options: {
+    assess: { type: 'string', value: 'ledger.jsonl', desc: 'журнал расходов' },
+    'limit-cents': { type: 'number', desc: 'дневной лимит в центах (по умолчанию 0 → BLOCK)' },
+    date: { type: 'string', value: 'YYYY-MM-DD', desc: 'день, за который считать' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const lp = arg('--assess');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const lp = values.assess;
   if (!lp || !existsSync(lp)) { console.error("usage: --assess <ledger.jsonl> --limit-cents <N> --date <YYYY-MM-DD>  (or --self-test)"); process.exit(2); }
-  const r = assess(readJsonl(lp), { dailyLimitCents: parseInt(arg('--limit-cents') || '0', 10), date: arg('--date') });
-  console.log(`cost-ledger — ${arg('--date')}: ${r.spentCents}¢ / ${r.limitCents}¢ = ${r.pctUsed}% → ${r.level.toUpperCase()}`);
+  const r = assess(readJsonl(lp), { dailyLimitCents: Math.trunc(values['limit-cents'] ?? 0), date: values.date ?? null });
+  console.log(`cost-ledger — ${values.date ?? null}: ${r.spentCents}¢ / ${r.limitCents}¢ = ${r.pctUsed}% → ${r.level.toUpperCase()}`);
   process.exit(r.level === 'block' ? 1 : 0);
 }

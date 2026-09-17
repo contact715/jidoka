@@ -11,6 +11,7 @@
  * Usage:
  *   node scripts/run-tla.mjs
  *   npm run tla:check
+ *   (full help: --help; any flag or word is a usage error — exit 2 before TLC is looked for)
  *
  * Exit codes:
  *   0  — TLC_UNAVAILABLE (tooling absent, not a clean pass) OR TLC ran and invariants hold
@@ -23,6 +24,7 @@ import { execSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -206,8 +208,16 @@ function main() {
 }
 
 
+// Strict parsing (2026-09-16): the runner takes no arguments. Before, anything passed was
+// silently ignored and the check ran anyway; now a flag or a word exits 2 before any work.
+export const CLI = {
+  name: 'run-tla',
+  summary: 'TLA+ model check of docs/formal/AndonHalt.tla via TLC; TLC_UNAVAILABLE (exit 0, not a pass) when Java or the jar is missing.',
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
   main();
 }

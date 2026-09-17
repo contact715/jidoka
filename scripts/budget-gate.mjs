@@ -15,6 +15,7 @@
 //   node scripts/budget-gate.mjs --tier normal --used '{"tool_calls":120,"est_tokens":800000,"max_solo":40}'
 
 import { readFileSync, existsSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 const POLICY = 'docs/quality/budget-policy.json';
 
@@ -40,9 +41,20 @@ export const DEFAULT_POLICY = { tiers: {
   critical: { tool_calls: 1000, est_tokens: 6000000, solo_agent_cap: 300 },
 } };
 
+export const CLI = {
+  name: 'budget-gate',
+  summary: 'Жёсткий потолок расхода волны: вызовы инструментов, токены, один агент-беглец. Превышение — код 1.',
+  selfTest: true,
+  options: {
+    tier: { type: 'string', value: 'уровень', default: 'normal', desc: 'уровень бюджета из политики (trivial | normal | critical)' },
+    used: { type: 'string', value: 'json', desc: 'расход в JSON: {"tool_calls":…,"est_tokens":…,"max_solo":…}' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-if (process.argv.includes('--self-test')) {
+const { values, selfTest: wantsSelfTest } = runCli(CLI);
+if (wantsSelfTest) {
   const P = DEFAULT_POLICY;
   const T = [
     { tier: 'normal', used: { tool_calls: 100, est_tokens: 500000, max_solo: 40 }, ok: true,  name: 'under budget' },
@@ -64,9 +76,8 @@ if (process.argv.includes('--self-test')) {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-const tier = arg('--tier') || 'normal';
-const used = JSON.parse(arg('--used') || '{}');
+const tier = values.tier || 'normal';
+const used = JSON.parse(values.used || '{}');
 const policy = existsSync(POLICY) ? JSON.parse(readFileSync(POLICY, 'utf8')) : DEFAULT_POLICY;
 const r = check(tier, used, policy);
 if (r.ok) { console.log(`\x1b[32m✓ within ${tier} budget\x1b[0m (${JSON.stringify(used)})`); process.exit(0); }

@@ -15,6 +15,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readLedger, DEFAULT_LEDGER } from './kaizen-ledger.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -162,15 +163,26 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до любой работы.
+export const CLI = {
+  name: 'kaizen-scorecard',
+  summary: 'Показатели недельного Kaizen по реестру исходов: доля внедрённого, сроки, откаты, тренд.',
+  selfTest: true,
+  options: {
+    file: { type: 'string', value: 'путь', desc: 'реестр kaizen (по умолчанию стандартный)' },
+    json: { type: 'boolean', desc: 'карта целиком в JSON' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const file = arg('--file') || DEFAULT_LEDGER;
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const file = values.file || DEFAULT_LEDGER;
   let metaTrendText = '';
   try { metaTrendText = execFileSync('node', [path.join(ROOT, 'scripts', 'meta-trend.mjs')], { cwd: ROOT, encoding: 'utf8' }); } catch { /* best-effort */ }
   const card = scorecard(readLedger(file), { metaTrendText });
-  if (process.argv.includes('--json')) { console.log(JSON.stringify(card, null, 2)); process.exit(0); }
+  if (values.json) { console.log(JSON.stringify(card, null, 2)); process.exit(0); }
   console.log('[kaizen-scorecard] ' + summarize(card));
   process.exit(0);
 }

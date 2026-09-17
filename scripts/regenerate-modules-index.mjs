@@ -21,12 +21,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const MODULES_DIR = path.join(ROOT, 'docs/specs/modules');
 const OUT = path.join(MODULES_DIR, '_MODULE_INDEX.md');
-const isDry = process.argv.includes('--dry');
 
 // Files to exclude from the index (by basename)
 const EXCLUDE_BASENAMES = new Set([
@@ -164,7 +164,7 @@ function extractModuleName(content) {
 }
 
 // ── Main ───────────────────────────────────────────────────────────────
-function main() {
+function main({ dry: isDry = false } = {}) {
   if (!fs.existsSync(MODULES_DIR)) {
     process.stderr.write('[warn] docs/specs/modules/ not found — nothing to index\n');
     process.exit(0);
@@ -239,8 +239,18 @@ _Total: ${rows.length} module specs indexed._
 }
 
 
+// Строгий разбор (2026-09-16): незнакомый флаг или слово — код 2, _MODULE_INDEX.md не переписывается.
+export const CLI = {
+  name: 'regenerate-modules-index',
+  summary: 'Пересобрать docs/specs/modules/_MODULE_INDEX.md из фронтматтера модульных спек.',
+  options: {
+    dry: { type: 'boolean', desc: 'напечатать таблицу, не записывать' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  main();
+  const { values } = runCli(CLI);
+  main({ dry: values.dry === true });
 }

@@ -19,9 +19,28 @@
 //
 // FULL & self-tested:  node ~/.claude/hooks/injection-watch.mjs --self-test
 
-import { appendFileSync, readFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Строгий разбор аргументов (2026-09-16). Код отказа 1, а не 2 — один договор на все хуки
+// Claude Code: у PreToolUse, UserPromptSubmit и Stop код 2 значит «заблокировать».
+const HOOK_BAD_CALL_EXIT = 1;
+
+// Помощник грузится из СОБСТВЕННОГО дерева хука. В установке этот файл лежит в ~/.claude/hooks
+// рядом с lib/load-cli.mjs; в каноне (global-setup/hooks) загрузчик — hooks/lib/load-cli.mjs
+// репозитория. Статический импорт упал бы в одной из раскладок. Второй адрес проверяется только
+// в канонической раскладке: из ~/.claude/hooks путь ../../ ушёл бы в чужой ~/hooks.
+async function loadStrictCli() {
+  const here = fileURLToPath(new URL('.', import.meta.url));
+  const candidates = [new URL('./lib/load-cli.mjs', import.meta.url)];
+  if (/[\\/]global-setup[\\/]hooks[\\/]?$/.test(here)) candidates.push(new URL('../../hooks/lib/load-cli.mjs', import.meta.url));
+  const found = candidates.find((u) => existsSync(u));
+  if (!found) throw new Error(`injection-watch: не найден lib/load-cli.mjs рядом с ${here}`);
+  const { loadCli } = await import(found.href);
+  return loadCli(import.meta.url);
+}
 
 // High-precision battery (precision over recall — a noisy watcher gets ignored). Each rule:
 // { id, severity, re }. Categories: instruction-override, role-injection, exfiltration, tool-abuse.
@@ -103,9 +122,20 @@ function selfTest() {
   process.exit(0);
 }
 
-const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
+// Разбор — первое, что делает хук: незнакомый флаг или лишнее слово — отказ до чтения stdin
+// и до записи в журнал. Слово события хук не читает, поэтому слов не принимает.
+export const CLI = {
+  name: 'injection-watch',
+  path: 'global-setup/hooks/injection-watch.mjs',
+  summary: 'Хук PostToolUse: ищет попытки внедрения инструкций во ВНЕШНЕМ содержимом (WebFetch, WebSearch, mcp__). Данные события — в stdin; только предупреждает.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+};
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = (await loadStrictCli()).runCli(CLI);
+  if (wantsSelfTest) selfTest();
   // PostToolUse payload on stdin: { tool_name, tool_input, tool_response, session_id, ... }
   let payload = {};
   try { payload = JSON.parse(readAll()); } catch { process.exit(0); } // never block on a parse error

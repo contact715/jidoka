@@ -11,6 +11,7 @@
  * Usage:
  *   npm run compute:slos
  *   node scripts/compute-slos.mjs
+ *   (full help: --help; any flag or word is a usage error — exit 2 before any stream is read)
  *
  * Decisions honored:
  *   T1: 7d primary alerting window + 28d budget-remaining (reported only)
@@ -28,6 +29,7 @@ import { fileURLToPath } from 'node:url';
 
 import { readJsonlStream, emitTelemetry } from './emit-telemetry.mjs';
 import { writeHaltState } from './andon-halt-helpers.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -224,9 +226,17 @@ async function main() {
 }
 
 
+// Strict parsing (2026-09-16): the script takes no arguments. Before, anything passed was
+// silently ignored and the evaluation (telemetry write, possible halt) ran anyway.
+export const CLI = {
+  name: 'compute-slos',
+  summary: 'Evaluate the behavioral SLOs (7d/28d windows) and emit slo_evaluated / budget_breach records.',
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
   main().catch(err => {
     process.stderr.write(`[slo] FATAL: ${err}\n`);
     process.exit(1);

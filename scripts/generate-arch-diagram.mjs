@@ -26,6 +26,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -33,7 +34,15 @@ const ROOT = path.resolve(__dirname, '..');
 const ROSTER_PATH = path.join(ROOT, 'docs', 'AGENT_ROSTER.md');
 const OUT_PATH    = path.join(ROOT, 'docs', 'governance', 'AGENT_TOPOLOGY.md');
 
-const isCheck = process.argv.includes('--check');
+// Разбор строгий (2026-09-16): опечатка `--chek` раньше молча превращала проверку дрейфа
+// в перезапись AGENT_TOPOLOGY.md. Теперь — код 2 до любой записи.
+export const CLI = {
+  name: 'generate-arch-diagram',
+  summary: 'Топология агентов из docs/AGENT_ROSTER.md → docs/governance/AGENT_TOPOLOGY.md.',
+  options: {
+    check: { type: 'boolean', desc: 'сторож дрейфа: код 1, если записанный файл устарел; ничего не пишет' },
+  },
+};
 
 // ── Roster parser ─────────────────────────────────────────────────────────────
 // Copied verbatim from scripts/check-cross-line-dispatch.mjs:72-106 (wave-154).
@@ -186,6 +195,8 @@ function generateContent(roster) {
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values } = runCli(CLI);
+  const isCheck = values.check === true;
   const roster = parseRoster();
   const agentCount = roster.size;
 

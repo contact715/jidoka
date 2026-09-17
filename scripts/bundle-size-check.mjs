@@ -18,6 +18,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { runCli } from "./lib/cli.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -48,10 +49,20 @@ function loadPerfBudgetThresholds() {
   }
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до чтения .next и до записи
+// базовой линии (раньше опечатка вроде `--updte` молча шла в режим проверки).
+export const CLI = {
+  name: "bundle-size-check",
+  summary: "Размер бандла по маршрутам против scripts/.bundle-baseline.json (после npm run build).",
+  options: {
+    update: { type: "boolean", desc: "принять текущие размеры как новую базовую линию" },
+  },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values } = runCli(CLI);
   const { warnPct: WARN_PCT, failPct: FAIL_PCT } = loadPerfBudgetThresholds();
 
   function fileSize(rel) {
@@ -115,7 +126,7 @@ if (isMain) {
   }
 
   function main() {
-    const updateMode = process.argv.includes("--update");
+    const updateMode = values.update === true;
 
     if (!fs.existsSync(NEXT_DIR)) {
       console.log("SKIP: No .next build found. Run `npm run build` first.");

@@ -23,6 +23,7 @@
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const INDEX = path.join(ROOT, 'docs/audits/spec-path-index.json');
@@ -146,12 +147,26 @@ function selfTest() {
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до любой работы. Код 2 здесь же
+// значит и «индекс не построен» у --reverse/--lookup — это прежний смысл, он сохранён.
+export const CLI = {
+  name: 'spec-path-index',
+  summary: 'Какая спека управляет этим файлом: индекс «файл → спеки» из упоминаний в docs/specs.',
+  selfTest: true,
+  options: {
+    build: { type: 'boolean', desc: 'построить docs/audits/spec-path-index.json' },
+    lookup: { type: 'string', value: 'путь', desc: 'какие спеки называют этот файл' },
+    reverse: { type: 'boolean', desc: 'обратная ось: код, который ни одна спека не называет' },
+    days: { type: 'number', default: 30, desc: 'окно «свежего» кода для --reverse, дней' },
+  },
+};
+
 const isMain = process.argv[1] && process.argv[1].endsWith('spec-path-index.mjs');
 if (isMain) {
-  const argv = process.argv.slice(2);
-  if (argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
-  if (argv.includes('--build')) {
+  if (values.build) {
     const specs = {};
     (function walk(d) {
       let entries; try { entries = readdirSync(d, { withFileTypes: true }); } catch { return; }
@@ -170,7 +185,7 @@ if (isMain) {
     process.exit(0);
   }
 
-  if (argv.includes('--reverse')) {
+  if (values.reverse) {
     if (!existsSync(INDEX)) { console.error('индекс не построен: --build'); process.exit(2); }
     const idx = JSON.parse(readFileSync(INDEX, 'utf8'));
     const { execFileSync } = await import('node:child_process');
@@ -189,8 +204,7 @@ if (isMain) {
         ages[rel] = days;
       }
     }
-    const winIdx = argv.indexOf('--days');
-    const win = winIdx !== -1 ? Number(argv[winIdx + 1]) : 30;
+    const win = values.days;
     const rev = unrequested(idx, ages, win);
     console.log('обратная ось: код, который ни одна спека не называет');
     console.log('');
@@ -208,14 +222,13 @@ if (isMain) {
     process.exit(0);
   }
 
-  const i = argv.indexOf('--lookup');
-  if (i !== -1) {
+  if (values.lookup !== undefined) {
     if (!existsSync(INDEX)) { console.error('индекс не построен: --build'); process.exit(2); }
     const idx = JSON.parse(readFileSync(INDEX, 'utf8'));
-    const line = injectionLine(idx, argv[i + 1] || '');
+    const line = injectionLine(idx, values.lookup);
     console.log(line || '(этот файл не под спекой)');
     process.exit(0);
   }
 
-  console.log('usage: spec-path-index.mjs --build | --lookup <path>  |  --self-test');
+  console.log('usage: spec-path-index.mjs --build | --lookup <path> | --reverse [--days N]  |  --self-test');
 }

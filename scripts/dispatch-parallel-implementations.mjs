@@ -20,28 +20,24 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { persistArtifact } from './reasoning-bank.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
-// ── CLI args ─────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-
-
-const isMain = process.argv[1] === fileURLToPath(import.meta.url);
-
-if (isMain) {
-  if (args.includes('--help')) {
-    console.log(`
-dispatch-parallel-implementations.mjs — Best-of-N parallel implementation dispatcher
+// ── CLI ──────────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): незнакомый флаг раньше молча пропускался, и скрипт
+// шёл создавать ветки и worktree. Теперь — код 2 до любого обращения к git.
+export const CLI = {
+  name: 'dispatch-parallel-implementations',
+  usage: `dispatch-parallel-implementations.mjs — Best-of-N parallel implementation dispatcher
 
 Creates N git branches via git worktree for parallel implementations. After all
 N attempts complete, --collect mode runs best-of-N-judge for comparison.
 
 Usage:
   # Create N parallel implementation branches
-  node scripts/dispatch-parallel-implementations.mjs \\
-    --n 3 --wave wave-103 --spec docs/specs/wave-103_MASTER_SPEC.md
+  node scripts/dispatch-parallel-implementations.mjs --n 3 --wave wave-103 --spec docs/specs/wave-103_MASTER_SPEC.md
 
   # After N attempts are complete, collect and compare
   node scripts/dispatch-parallel-implementations.mjs --wave wave-103 --collect
@@ -56,7 +52,7 @@ Flags:
   --story          Also build + copy a flattened story bundle (spec + inlined ancestry + ACs)
   --collect        Collect and compare completed attempts via best-of-N-judge
   --dry-run        Print what would happen without executing git commands
-  --help           Show this message
+  -h, --help       Show this message
 
 Prerequisites:
   git worktree support (verified: git worktree list works on this machine)
@@ -64,26 +60,35 @@ Prerequisites:
 Exit codes:
   0  Branches created successfully (or collection complete)
   1  Error creating worktrees or judge failed
-`);
-    process.exit(0);
-  }
+  2  Invalid call: unknown flag, stray word or missing value (nothing executed)`,
+  options: {
+    n: { type: 'number', default: 1, value: 'число', desc: 'сколько параллельных попыток' },
+    wave: { type: 'string', value: 'id', desc: 'идентификатор волны' },
+    spec: { type: 'string', value: 'путь', desc: 'мастер-спека (копируется в каждую попытку)' },
+    story: { type: 'boolean', desc: 'собрать и положить плоский story-бандл' },
+    collect: { type: 'boolean', desc: 'собрать и сравнить готовые попытки' },
+    'dry-run': { type: 'boolean', desc: 'только напечатать, git не трогать' },
+  },
+};
 
-  const nIdx = args.indexOf('--n');
-  const n = nIdx !== -1 ? parseInt(args[nIdx + 1], 10) : 1;
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-  const waveIdx = args.indexOf('--wave');
-  const waveId = waveIdx !== -1 ? args[waveIdx + 1] : 'unknown';
+if (isMain) {
+  const { values } = runCli(CLI);
 
-  const specIdx = args.indexOf('--spec');
-  const specPath = specIdx !== -1 ? args[specIdx + 1] : null;
+  const n = Math.trunc(values.n);   // как прежний parseInt: 2.5 → 2
+
+  const waveId = values.wave ?? 'unknown';
+
+  const specPath = values.spec ?? null;
 
   // --story (opt-in): hand each implementer a flattened story bundle (spec + inlined
   // ancestry + ACs) instead of just the raw spec, so it does retrieval zero times (gap #5).
-  const useStory = args.includes('--story');
+  const useStory = values.story === true;
   const storyRel = useStory && waveId ? `docs/specs/stories/${String(waveId).toLowerCase().replace(/[^a-z0-9.-]+/g, '-')}-build.story.md` : null;
 
-  const collect = args.includes('--collect');
-  const dryRun = args.includes('--dry-run');
+  const collect = values.collect === true;
+  const dryRun = values['dry-run'] === true;
 
   // ── Helpers ─────────────────────────────────────────────────────────────
 

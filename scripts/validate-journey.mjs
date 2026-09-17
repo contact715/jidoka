@@ -51,6 +51,7 @@
  * Exit codes:
  *   0 — no I1, I2, I3, or I4 violations
  *   1 — one or more violations found
+ *   2 — bad call: unknown flag or extra word (nothing read)
  *
  * Usage:
  *   node scripts/validate-journey.mjs
@@ -62,6 +63,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -336,8 +338,17 @@ function main() {
 }
 
 
+// Разбор строгий (2026-09-16): флагов нет; незнакомый флаг или слово — код 2 до чтения
+// реестра путей клиента.
+export const CLI = {
+  name: 'validate-journey',
+  summary: 'Инварианты I1–I4 реестра путей клиента docs/research/journey-registry.json; код 1 при нарушении.',
+  options: {},
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
   main();
 }

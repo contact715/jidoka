@@ -13,7 +13,7 @@
 //
 // FULL & self-tested. Usage:
 //   node scripts/orchestration-planner.mjs --self-test
-//   node scripts/orchestration-planner.mjs --task '{"type":"feature","risk":"critical","surfaces":["backend","frontend"]}'
+//   node scripts/orchestration-planner.mjs --task '{"type":"feature","risk":"critical","surfaces":["backend","frontend"]}' [--json]
 
 import { shouldDebate } from './debate-trigger.mjs';
 import { planN } from './adaptive-verify.mjs';
@@ -22,6 +22,7 @@ import { replan as replanLedger } from './replan-ledger.mjs';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { runCli } from './lib/cli.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 // post-wave frontier evals the memory phase runs: outcome benchmark, trajectory score, judge calibration
@@ -146,9 +147,23 @@ export function replanPhase(ledger, diagnosis = {}, evidenceText = '') {
 
 const agentsIn = (g) => new Set(g.phases.flatMap(p => p.agents));
 
+// Разбор строгий (2026-09-16): опечатка `--taks '{…}'` раньше молча строила план для задачи
+// по умолчанию (feature/normal/frontend). Теперь незнакомый флаг, лишнее слово или --task без
+// значения — код 2 до построения графа.
+export const CLI = {
+  name: 'orchestration-planner',
+  summary: 'Собрать граф агентов и гейтов под задачу (тип, риск, поверхности).',
+  selfTest: true,
+  options: {
+    task: { type: 'string', value: 'json', desc: 'описание задачи, по умолчанию {"type":"feature","risk":"normal","surfaces":["frontend"]}' },
+    json: { type: 'boolean', desc: 'граф одной строкой JSON' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-if (process.argv.includes('--self-test')) {
+const { values, selfTest: wantsSelfTest } = runCli(CLI);
+if (wantsSelfTest) {
   const trivial = plan({ risk: 'trivial', surfaces: ['frontend'] });
   const critical = plan({ risk: 'critical', surfaces: ['backend', 'frontend'] });
   const ta = agentsIn(trivial), ca = agentsIn(critical);
@@ -197,10 +212,9 @@ if (process.argv.includes('--self-test')) {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-const task = JSON.parse(arg('--task') || '{"type":"feature","risk":"normal","surfaces":["frontend"]}');
+const task = JSON.parse(values.task || '{"type":"feature","risk":"normal","surfaces":["frontend"]}');
 const g = plan(task);
-if (process.argv.includes('--json')) { console.log(JSON.stringify(g)); process.exit(0); }
+if (values.json) { console.log(JSON.stringify(g)); process.exit(0); }
 console.log(`orchestration plan for ${JSON.stringify(task)}:`);
 g.phases.forEach((p, i) => {
   console.log(`  ${i + 1}. ${p.phase}${p.parallel ? ' (parallel)' : ''}${p.verifyN ? ` [verifyN=${p.verifyN}]` : ''}: ${p.agents.join(', ')}${p.skills?.length ? `  ·  skill: ${p.skills.join(', ')}` : ''}`);

@@ -31,6 +31,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from '
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { hostname } from 'node:os';
+import { runCli, HOOK_BAD_CALL_EXIT } from './lib/cli.mjs';
 
 const TTL_MS = 30 * 60 * 1000; // a lease not refreshed for 30 min is abandoned
 
@@ -121,14 +122,29 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16). Скрипт стоит хуком Claude Code (SessionStart, UserPromptSubmit
+// с --hook), поэтому неверный вызов отвечает кодом 1: код 2 у UserPromptSubmit стёр бы сообщение.
+export const CLI = {
+  name: 'session-lock',
+  summary: 'Аренда рабочей папки: вторая сессия в той же папке получает громкое предупреждение.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+  options: {
+    hook: { type: 'boolean', desc: 'режим хука: данные события Claude Code в stdin, взять или продлить аренду' },
+    check: { type: 'boolean', desc: 'показать состояние аренды (JSON)' },
+    release: { type: 'boolean', desc: 'снять аренду' },
+    cwd: { type: 'string', value: 'папка', desc: 'для --check/--release (по умолчанию текущая)' },
+    session: { type: 'string', value: 'id', desc: 'для --check/--release: чья сессия' },
+  },
+};
+
 const isMain = process.argv[1] && process.argv[1].endsWith('session-lock.mjs');
 if (isMain) {
-  const argv = process.argv.slice(2);
-  const flag = (n) => { const i = argv.indexOf(n); return i >= 0 ? (argv[i + 1] || true) : null; };
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
 
-  if (argv.includes('--self-test')) selfTest();
+  if (wantsSelfTest) selfTest();
 
-  if (argv.includes('--hook')) {
+  if (values.hook) {
     // stdin: Claude Code hook JSON (SessionStart / UserPromptSubmit)
     let ctx = {};
     try { ctx = JSON.parse(readFileSync(0, 'utf8') || '{}'); } catch { /* none */ }
@@ -146,18 +162,18 @@ if (isMain) {
     process.exit(0);
   }
 
-  if (argv.includes('--check')) {
-    const cwd = flag('--cwd') || process.cwd();
+  if (values.check) {
+    const cwd = values.cwd || process.cwd();
     const lease = readLease(cwd);
-    const state = classify(lease, flag('--session') || '', Date.now(), isPidAlive(lease?.pid));
+    const state = classify(lease, values.session || '', Date.now(), isPidAlive(lease?.pid));
     console.log(JSON.stringify({ state, lease }, null, 2));
     process.exit(0);
   }
 
-  if (argv.includes('--release')) {
-    const cwd = flag('--cwd') || process.cwd();
+  if (values.release) {
+    const cwd = values.cwd || process.cwd();
     const lease = readLease(cwd);
-    if (lease && (!flag('--session') || lease.session_id === flag('--session'))) {
+    if (lease && (!values.session || lease.session_id === values.session)) {
       try { unlinkSync(join(LOCK_DIR, lockName(cwd))); console.log('released'); } catch { /* ok */ }
     } else console.log('not owner / no lease');
     process.exit(0);

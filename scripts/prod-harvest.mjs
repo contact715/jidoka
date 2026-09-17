@@ -10,9 +10,11 @@
 // Usage:
 //   node scripts/prod-harvest.mjs --self-test
 //   node scripts/prod-harvest.mjs --incident '{"id":"INC-42","title":"...","affectedFlow":"..."}'
-//   node scripts/prod-harvest.mjs --incident '...' --append  (append to docs/benchmarks/_tasks.jsonl)
+//   append to docs/benchmarks/_tasks.jsonl:
+//   node scripts/prod-harvest.mjs --incident '...' --append
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 const TASKS_FILE = 'docs/benchmarks/_tasks.jsonl';
 
@@ -56,14 +58,26 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Разбор строгий (2026-09-16): незнакомый флаг или --incident без значения — код 2 до
+// записи в docs/benchmarks/_tasks.jsonl. Код 2 при отсутствии --incident был и раньше.
+export const CLI = {
+  name: 'prod-harvest',
+  summary: 'Инцидент прода → вечная регрессионная задача бенчмарка (docs/benchmarks/_tasks.jsonl).',
+  selfTest: true,
+  options: {
+    incident: { type: 'string', value: 'json', desc: 'инцидент: {"id","title","description","affectedFlow","verifyCmd","date"}' },
+    append: { type: 'boolean', desc: 'дописать задачу в docs/benchmarks/_tasks.jsonl (иначе только печать)' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const incJson = arg('--incident');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const incJson = values.incident || null;
   if (!incJson) { console.error('usage: --incident <json> [--append]  (or --self-test)'); process.exit(2); }
   const inc = JSON.parse(incJson);
-  if (process.argv.includes('--append')) {
+  if (values.append) {
     const r = append(inc);
     console.log(r.appended ? `\x1b[32m✓ harvest-${inc.id} added to benchmark (${TASKS_FILE})\x1b[0m` : `  already present: ${r.reason}`);
   } else {

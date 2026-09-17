@@ -15,6 +15,7 @@ import { readFileSync, statSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { fmtTok, modelFamily } from '../cc-stats.mjs';
+import { runCli } from '../lib/cli.mjs';
 
 export { fmtTok };
 
@@ -243,5 +244,17 @@ async function selfTest() {
   console.log('\n\x1b[32m✓ economics: fold/cost/usd/sparkline/question/io correct\x1b[0m'); process.exit(0);
 }
 
+// Модуль-библиотека панели; запуск напрямую нужен только для самопроверки. Разбор строгий
+// (2026-09-16): незнакомый флаг или слово — код 2; без флагов, как и раньше, ничего не делает.
+export const CLI = {
+  name: 'economics',
+  path: 'scripts/dashboard/economics.mjs',
+  summary: 'Деньги и токены сессий для панели jidoka top. Напрямую запускается только ради --self-test.',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
-if (isMain && process.argv.includes('--self-test')) selfTest();
+if (isMain) {
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+}

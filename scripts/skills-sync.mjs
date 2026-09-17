@@ -30,6 +30,7 @@ import {
   readSkillLock, folderOf, upstreamMapForFolder, readLocalUnit, compareUnit, resolveLocalDir, isIgnored,
 } from './skills-freshness.mjs';
 import { treeOf, blob } from './skills-diff.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const HOME = os.homedir();
 const SKILL_LOCK = path.join(HOME, '.agents', '.skill-lock.json');
@@ -96,16 +97,26 @@ function selfTest() {
   return failedChecks.length === 0 ? 0 : 1;
 }
 
-async function main() {
-  const argv = process.argv.slice(2);
-  if (argv.includes('--self-test')) process.exit(selfTest());
-  const apply = argv.includes('--apply');
-  const onlyIdx = argv.indexOf('--only');
-  if (onlyIdx < 0 || !argv[onlyIdx + 1]) {
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово или --only без значения — код 2 до
+// похода в сеть и до записи. Опечатка `--aply` раньше молча давала dry-run, а `--apply` перед
+// словом-опечаткой — запись. Код 2 здесь по-прежнему значит и «реестр скиллов не прочитан».
+export const CLI = {
+  name: 'skills-sync',
+  summary: 'Подтянуть отставшие сторонние скиллы из источника; по умолчанию только план, запись — с --apply.\nКод 2 также значит: не прочитан реестр ~/.agents/.skill-lock.json.',
+  selfTest: true,
+  options: {
+    only: { type: 'string', value: 'имя,имя,…', desc: 'какие скиллы (обязателен: без явного списка скрипт ничего не трогает)' },
+    apply: { type: 'boolean', desc: 'записать файлы (без флага — только план)' },
+  },
+};
+
+async function main(values) {
+  const apply = values.apply === true;
+  if (!values.only) {
     console.error('нужен --only <имя,имя,...> — этот скрипт не трогает то, что не названо явно');
     process.exit(2);
   }
-  const only = new Set(argv[onlyIdx + 1].split(',').map((s) => s.trim()).filter(Boolean));
+  const only = new Set(values.only.split(',').map((s) => s.trim()).filter(Boolean));
 
   let lock;
   try { lock = readSkillLock(fs.readFileSync(SKILL_LOCK, 'utf8')); } catch (e) {
@@ -135,5 +146,7 @@ async function main() {
 
 const invokedDirectly = process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(new URL(import.meta.url).pathname);
 if (invokedDirectly) {
-  main().catch((e) => { console.error(`skills-sync: ошибка (${e.message})`); process.exit(1); });
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) process.exit(selfTest());
+  main(values).catch((e) => { console.error(`skills-sync: ошибка (${e.message})`); process.exit(1); });
 }

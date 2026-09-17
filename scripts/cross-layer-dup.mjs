@@ -14,6 +14,7 @@
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join, extname } from 'node:path';
+import { runCli } from './lib/cli.mjs';
 
 // JS keywords to keep (they define structure, not naming)
 const JS_KW = new Set(['if','else','while','for','forEach','map','reduce','return','const','let','var','function','async','await','class','new','import','export','from','try','catch','throw','switch','case','break','continue','of','in','typeof','instanceof']);
@@ -92,12 +93,22 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+export const CLI = {
+  name: 'cross-layer-dup',
+  summary: 'Найти одинаковую логику, продублированную между серверным и клиентским слоем. Находка — код 1.',
+  selfTest: true,
+  options: {
+    'be-dir': { type: 'string', value: 'папка', default: 'src/server', desc: 'серверный слой' },
+    'fe-dir': { type: 'string', value: 'папка', default: 'src/client', desc: 'клиентский слой' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const beDir = arg('--be-dir') || 'src/server';
-  const feDir = arg('--fe-dir') || 'src/client';
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const beDir = values['be-dir'] || 'src/server';
+  const feDir = values['fe-dir'] || 'src/client';
   const r = findDuplicates(beDir, feDir);
   if (r.count === 0) { console.log(`\x1b[32m✓ cross-layer-dup: no logic duplication found between ${beDir} and ${feDir}\x1b[0m`); process.exit(0); }
   console.error(`\x1b[31m✗ cross-layer-dup: ${r.count} duplicated logic block(s) between BE and FE\x1b[0m`);

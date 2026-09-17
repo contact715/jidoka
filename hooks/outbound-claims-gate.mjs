@@ -26,10 +26,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from 'node:url';
-import { хвостТранскрипта } from "./lib/transcript-tail.mjs";
+import { хвостТранскрипта, началоХода } from "./lib/transcript-tail.mjs";
+import { loadCli } from "./lib/load-cli.mjs";
+
+// Строгий разбор аргументов (2026-09-16). Код отказа 1, а не 2: для Claude Code код 2 у
+// PreToolUse и Stop значит «заблокировать», и опечатка в settings.json заперла бы сессию.
+const HOOK_BAD_CALL_EXIT = 1;
 
 // Проверка кейса расхождения — исполняемая, не упоминание (--self-test-tail).
-if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.includes("--self-test-tail")) {
+async function selfTestTail() {
     // «древность отрезана (кейс расхождения)»: строка старше хвоста гейту не
     // видна — вход, где величина говорит «чисто», а правило нарушено в
     // древнем ходе. Принято осознанно: block-once, fail-open.
@@ -100,14 +105,7 @@ function collectAssistantText(transcriptPath) {
     }
   }
 
-  let start = 0;
-  for (let i = parsed.length - 1; i >= 0; i--) {
-    const role = parsed[i] && parsed[i].message && parsed[i].message.role;
-    if (role === "user") {
-      start = i + 1;
-      break;
-    }
-  }
+  const start = началоХода(parsed);   // после реплики человека, не после результата инструмента
 
   const chunks = [];
   for (const obj of parsed.slice(start)) {
@@ -242,8 +240,7 @@ async function stop(payload) {
   process.exit(2);
 }
 
-async function main() {
-  const mode = process.argv[2] || "PreToolUse";
+async function main(mode = "PreToolUse") {
   const raw = readStdin();
   let payload = {};
   try {
@@ -256,8 +253,24 @@ async function main() {
 }
 
 
+// Разбор — первое, что делает хук: чужое имя события или незнакомый флаг — отказ до чтения
+// stdin и до проверки адресов. Без слова хук работает как PreToolUse, как и раньше.
+export const EVENTS = ["PreToolUse", "Stop"];
+export const CLI = {
+  name: "outbound-claims-gate",
+  path: "hooks/outbound-claims-gate.mjs",
+  summary: "Хук против выдуманных адресов: PreToolUse — перед отправкой наружу, Stop — в собственном тексте хода. Данные события — в stdin.",
+  badCallExit: HOOK_BAD_CALL_EXIT,
+  options: {
+    "self-test-tail": { type: "boolean", desc: "кейс расхождения: строка старше хвоста транскрипта гейту не видна" },
+  },
+  positionals: { min: 0, max: 1, name: "событие", label: "[PreToolUse|Stop]", choices: EVENTS },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  main().catch(() => process.exit(0));
+  const { values, positionals } = (await loadCli(import.meta.url)).runCli(CLI);
+  if (values["self-test-tail"]) await selfTestTail();
+  main(positionals[0] || "PreToolUse").catch(() => process.exit(0));
 }

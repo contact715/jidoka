@@ -31,6 +31,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const DATASET = process.env.ELICITATION_SET || join(ROOT, 'docs', 'evals', 'elicitation', 'scenarios.jsonl');
@@ -138,9 +139,17 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): флагов у прогона нет — любое лишнее слово даёт код 2.
+export const CLI = {
+  name: 'elicitation-gym',
+  summary: 'Оценить по размеченному набору, вытаскивают ли вопросы clarify-engine скрытые требования (без набора — DORMANT).',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const scenarios = loadScenarios();
   if (!scenarios.length) {
     console.log('elicitation-gym: \x1b[33mDORMANT\x1b[0m — размеченного набора нет.');

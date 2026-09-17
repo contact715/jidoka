@@ -27,12 +27,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const SPECS_DIR = path.join(ROOT, 'docs', 'specs');
 const OUT = path.join(ROOT, 'docs', 'compliance', 'eu-ai-act', 'annex-iv-auto.md');
-const isDry = process.argv.includes('--dry');
 
 // ── Frontmatter helpers (mirrors regenerate-specs-index.mjs) ──────────────
 function extractYamlBlock(content) {
@@ -91,7 +91,8 @@ function globWaveSpecs() {
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────
-function main() {
+function main(values = {}) {
+  const isDry = values.dry === true;
   const allSpecs = globWaveSpecs();
 
   if (allSpecs.length === 0) {
@@ -340,8 +341,19 @@ Scaffolding:
 }
 
 
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до чтения спек и до записи
+// annex-iv-auto.md (раньше опечатка `--dyr` молча перезаписывала файл).
+export const CLI = {
+  name: 'regenerate-annex-iv',
+  summary: 'Каркас EU AI Act Annex IV из ARC42 §10/§11 спек волн → docs/compliance/eu-ai-act/annex-iv-auto.md.',
+  options: {
+    dry: { type: 'boolean', desc: 'печатать в stdout, файл не писать' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  main();
+  const { values } = runCli(CLI);
+  main(values);
 }

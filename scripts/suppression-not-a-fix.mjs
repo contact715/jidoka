@@ -31,6 +31,7 @@
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 /** Что считаем подавлением. */
 const ПОДАВЛЕНИЯ = [
@@ -126,11 +127,20 @@ const запущенНапрямую =
   process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 
+// Разбор строгий (2026-09-16): гейт стоит в pre-commit и флагов, кроме самопроверки, не берёт.
+// Незнакомый флаг раньше молча давал обычный прогон по индексу; теперь — код 2 без прогона.
+export const CLI = {
+  name: 'suppression-not-a-fix',
+  summary: 'Гейт коммита: добавленное подавление (as any, @ts-ignore, eslint-disable, пропуск теста) требует объяснения рядом.',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
   if (запущенНапрямую) {
-    if (process.argv.includes('--self-test')) process.exit(самопроверка() ? 0 : 1);
+    const { selfTest: wantsSelfTest } = runCli(CLI);
+    if (wantsSelfTest) process.exit(самопроверка() ? 0 : 1);
 
     let diff = '';
     try {

@@ -14,9 +14,19 @@ FW="$(cd "$SRC/.." && pwd)"            # framework root (source of truth for eng
 DEST="$HOME/.claude"
 mkdir -p "$DEST/hooks" "$DEST/skills/dev-pipeline" "$DEST/jidoka/scripts" "$DEST/jidoka/lib/redaction" "$DEST/jidoka/docs/templates" "$DEST/agents"
 
-# 1. hooks (shell guards + node policy-enforce hook)
+# 0. общие модули — ДО хуков и скриптов, без глушения ошибок. Хук грузит помощник строгого разбора
+#    (scripts/lib/cli.mjs) через hooks/lib/load-cli.mjs; поставленный без них, он отвечает отказом с
+#    кодом 1 на каждом событии, а Claude Code такой отказ пропускает — блокирующие проверки молча гаснут.
+mkdir -p "$DEST/hooks/lib" "$DEST/jidoka/scripts/lib"
+cp "$FW/scripts/lib/"*.mjs "$DEST/jidoka/scripts/lib/"
+cp "$FW/hooks/lib/"*.mjs "$DEST/hooks/lib/"
+echo "  ✓ shared modules → ~/.claude/jidoka/scripts/lib/, ~/.claude/hooks/lib/"
+
+# 1. hooks (shell guards + node hooks: global-setup/hooks and the framework's hooks/, which the
+#    settings fragment wires by name)
 cp "$SRC/hooks/"*.sh "$DEST/hooks/" 2>/dev/null; chmod +x "$DEST/hooks/"*.sh 2>/dev/null || true
 cp "$SRC/hooks/"*.mjs "$DEST/hooks/" 2>/dev/null || true
+cp "$FW/hooks/"*.mjs "$DEST/hooks/" 2>/dev/null || true
 echo "  ✓ hooks → ~/.claude/hooks/"
 # wire policy-enforce-hook into PreToolUse (idempotent, preserves any existing hooks)
 node -e 'const fs=require("fs"),os=require("os");const p=os.homedir()+"/.claude/settings.json";let s={};try{s=JSON.parse(fs.readFileSync(p,"utf8"))}catch{}s.hooks=s.hooks||{};s.hooks.PreToolUse=s.hooks.PreToolUse||[];const c="node "+os.homedir()+"/.claude/hooks/policy-enforce-hook.mjs";if(!s.hooks.PreToolUse.some(e=>(e.hooks||[]).some(h=>(h.command||"").includes("policy-enforce-hook")))){s.hooks.PreToolUse.push({matcher:"Write|Edit|MultiEdit|NotebookEdit",hooks:[{type:"command",command:c,timeout:15}]});fs.writeFileSync(p,JSON.stringify(s,null,2)+"\n")}' 2>/dev/null && echo "  ✓ policy-enforce-hook wired into PreToolUse"
@@ -99,5 +109,10 @@ console.log("  ✓ merged hooks into settings.json (permissions untouched)");
 if [ -f "$SRC/install-codex.sh" ]; then
   sh "$SRC/install-codex.sh"
 fi
+
+# 8. проверка: без этих двух файлов каждый хук и строка состояния отказывают на каждом событии
+for f in "$DEST/jidoka/scripts/lib/cli.mjs" "$DEST/hooks/lib/load-cli.mjs"; do
+  [ -f "$f" ] || { echo "✗ не установлен $f — хуки не смогут разобрать аргументы"; exit 1; }
+done
 
 echo "✓ Global jidoka setup restored. Restart Claude Code and start a new Codex session to load hooks/instructions."

@@ -13,6 +13,7 @@
 
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { runCli } from './lib/cli.mjs';
 
 const ESCAPE = /(:\s*any\b|<any>|\bany\[\]|\bas\s+any\b|@ts-ignore|@ts-nocheck|@ts-expect-error)/g;
 
@@ -56,18 +57,27 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k, d) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : d; };
+export const CLI = {
+  name: 'type-coverage',
+  summary: 'Плотность обходов типизации (any, @ts-ignore …) на 1000 строк TypeScript; выше предела — код 1.',
+  selfTest: true,
+  options: {
+    dir: { type: 'string', value: 'папка', desc: 'где искать .ts/.tsx (по умолчанию src, если есть, иначе .)' },
+    'max-per-1k': { type: 'number', default: 5, desc: 'предел обходов на 1000 строк' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const dir = arg('--dir', existsSync('src') ? 'src' : '.');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const dir = values.dir ?? (existsSync('src') ? 'src' : '.');
   const files = existsSync(dir) ? tsFiles(dir) : [];
   if (files.length === 0) {
     console.log(`type-coverage: no .ts/.tsx files under ${dir}/ — N/A (this repo is not TypeScript). The gate ships to products.`);
     process.exit(0);
   }
-  const maxPer1k = parseFloat(arg('--max-per-1k', '5'));
+  const maxPer1k = values['max-per-1k'];
   const r = assess(files, { maxPer1k });
   console.log(`type-coverage: ${r.files} TS files · ${r.loc} LOC · ${r.escapes} type-escape(s) · ${r.per1k}/1k (max ${maxPer1k})`);
   if (!r.ok) { console.error(`\n\x1b[31m✗ type-escape density ${r.per1k}/1k > ${maxPer1k}/1k — too many any/@ts-ignore. Type the code, don't escape it.\x1b[0m`); process.exit(1); }

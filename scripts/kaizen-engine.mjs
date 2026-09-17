@@ -20,6 +20,7 @@ import { renderDashboard } from './kaizen-dashboard.mjs';
 import { scorecard, summarize } from './kaizen-scorecard.mjs';
 import { rank } from './kaizen-rank.mjs';
 import { critique } from './kaizen-critique.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -89,14 +90,26 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до любой работы.
+export const CLI = {
+  name: 'kaizen-engine',
+  summary: 'Оркестратор недельного Kaizen: аудит → карта → ранжирование → критика, и дашборд.',
+  selfTest: true,
+  options: {
+    dashboard: { type: 'boolean', desc: 'собрать docs/research/weekly/_DASHBOARD.md' },
+    file: { type: 'string', value: 'путь', desc: 'реестр kaizen (по умолчанию стандартный)' },
+    week: { type: 'string', value: 'неделя', desc: 'неделя, например 2026-W27' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const file = arg('--file') || DEFAULT_LEDGER;
-  const week = arg('--week') || '';
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const file = values.file || DEFAULT_LEDGER;
+  const week = values.week || '';
 
-  if (process.argv.includes('--dashboard')) {
+  if (values.dashboard) {
     const exists = (rel) => fs.existsSync(path.join(ROOT, rel));
     // read: required by the path#anchor probe form (2026-W32-R5). Without it every anchored
     // point-of-integration resolves false, and an entry that was shipped flips to regressed.

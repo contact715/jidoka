@@ -177,7 +177,7 @@ export function renderEmpty(snapshot, cols) {
   const recent = (snapshot.waves || []).filter((w) => !w.current || w.progress === 100).slice(0, 5);
   if (!recent.length) lines.push('  (нет завершённых волн)');
   else for (const w of recent) lines.push(`  ${G}✓${R} ${pad(w.wave || '—', 26)} завершена ${w.updatedAt ? String(w.updatedAt).slice(0, 10) : '—'}  ${w.progress ?? 0}%`);
-  return [...lines, hline(cols), sec('КАК ЗАПУСТИТЬ ВОЛНУ', cols), '  Скажи Claude: "запусти dev-pipeline для [название задачи]"', '  или запусти вручную: node .jidoka/scripts/common-launcher.mjs', hline(cols)];
+  return [...lines, hline(cols), sec('КАК ЗАПУСТИТЬ ВОЛНУ', cols), '  Скажи Claude: "запусти dev-pipeline для [название задачи]"', '  или вручную: node .jidoka/scripts/common-launcher.mjs <скрипт>', hline(cols)];
 }
 
 function renderHeader(snapshot, at, cols) {
@@ -375,5 +375,18 @@ async function selfTest() {
   console.log('\n\x1b[32m✓ tui-render: screen states + sessions + done-wave correct\x1b[0m'); process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2, а не тихий выход с кодом 0, который
+// читался как пройденная самопроверка. Помощник грузится только при запуске: рендерер остаётся
+// чистым модулем для тех, кто его импортирует.
+export const CLI = {
+  name: 'tui-render',
+  path: 'scripts/dashboard/tui-render.mjs',
+  summary: 'Чистый рендерер панели jidoka top. Сам по себе ничего не выводит; запускается только ради самопроверки.',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
-if (isMain && process.argv.includes('--self-test')) selfTest();
+if (isMain) {
+  const { selfTest: wantsSelfTest } = (await import('../lib/cli.mjs')).runCli(CLI);
+  if (wantsSelfTest) selfTest();
+}

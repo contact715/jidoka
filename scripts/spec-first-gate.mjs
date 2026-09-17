@@ -31,11 +31,18 @@
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
-const args = process.argv.slice(2);
-const staged = args.includes('--staged');
-const block = args.includes('--block');
-const sinceArg = args.find((_, i) => args[i - 1] === '--since') ?? '6h';
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до чтения индекса git.
+export const CLI = {
+  name: 'spec-first-gate',
+  summary: 'Гейт «сначала спека»: продуктовый код в индексе требует недавнего запуска get-spec-context.',
+  options: {
+    staged: { type: 'boolean', desc: 'проверить подготовленный коммит (без флага — пустой проход)' },
+    block: { type: 'boolean', desc: 'код 1 вместо предупреждения' },
+    since: { type: 'string', value: 'окно', default: '6h', desc: 'окно поиска запуска: 30m, 8h, 1d' },
+  },
+};
 
 // Product-code roots that REQUIRE a controlling spec read first.
 const PRODUCT_DIRS = ['app/', 'components/', 'lib/', 'src/'];
@@ -85,7 +92,7 @@ function recentSpecRun(windowMs) {
   return latest;
 }
 
-function main() {
+function main({ staged, block, since: sinceArg }) {
   if (!staged) {
     console.log('check-spec-first: pass --staged to gate a commit. (dry mode, no-op)');
     process.exit(0);
@@ -125,5 +132,6 @@ function main() {
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  main();
+  const { values } = runCli(CLI);
+  main(values);
 }

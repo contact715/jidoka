@@ -30,6 +30,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { detect } from './stuck-detector.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const PROJECTS = path.join(homedir(), '.claude', 'projects');
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -223,11 +224,23 @@ function selfTest() {
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово или --limit не число — код 2 до
+// чтения транскриптов. Код 2 здесь по-прежнему значит и «нет каталога сессий».
+export const CLI = {
+  name: 'replan-replay',
+  summary: 'Офлайн-калибровка правила остановки: прогон реальных транскриптов через текущее правило и серию.\nКод 2 также значит: нет каталога сессий ~/.claude/projects.',
+  selfTest: true,
+  options: {
+    limit: { type: 'number', desc: 'сколько транскриптов взять (0 или без флага — все)' },
+    json: { type: 'boolean', desc: 'отчёт в JSON' },
+  },
+};
+
 const isMain = process.argv[1] && process.argv[1].endsWith('replan-replay.mjs');
 if (isMain) {
-  const argv = process.argv.slice(2);
-  if (argv.includes('--self-test')) selfTest();
-  const limit = Number((argv[argv.indexOf('--limit') + 1]) || 0) || Infinity;
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const limit = values.limit || Infinity;
 
   if (!existsSync(PROJECTS)) { console.error(`replan-replay: нет каталога сессий ${PROJECTS}`); process.exit(2); }
   const files = [];
@@ -280,7 +293,7 @@ if (isMain) {
     },
   };
 
-  if (argv.includes('--json')) { console.log(JSON.stringify(report, null, 2)); process.exit(0); }
+  if (values.json) { console.log(JSON.stringify(report, null, 2)); process.exit(0); }
   console.log(`replan-replay: ${sessions} сессий, ${totalRows} шагов ассистента, ${totalStalls} событий застоя\n`);
   console.log('| правило | остановок | из них преждевременных | доля |');
   console.log('|---|---|---|---|');

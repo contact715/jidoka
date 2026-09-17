@@ -34,7 +34,7 @@ import { readFileSync, existsSync, writeFileSync, unlinkSync, statSync, mkdtempS
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { parseArgs } from 'node:util';
+import { parseCli as parseStrict, runCli } from './lib/cli.mjs';
 import { acquire, release } from './commit-lock.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -329,7 +329,7 @@ function selfTest() {
   // On a dirty tree it stopped only for lack of --message; on a clean tree with unpushed
   // commits it went on to `git push origin HEAD:main`. Unknown input must stop BEFORE any work.
   {
-    const p = (argv) => parseCli(argv);
+    const p = (argv) => parseCommitArgs(argv);
     ok('--help is recognised (long and short)', p(['--help']).help === true && p(['-h']).help === true);
     ok('unknown flag is an error', Boolean(p(['--bogus']).error));
     ok('unknown flag next to a valid --message is an error', Boolean(p(['--message', 'x', '--bogus']).error));
@@ -462,63 +462,50 @@ Exit codes: 0 done, 1 refused or failed, 2 bad invocation (nothing was run).`;
 // ran the whole commit-and-push flow.
 // A message value is taken verbatim, like `git commit -m`, so "- item" or "-fix: typo" pass.
 // A value shaped like a flag ("--no-push", "-x") stays an error: a forgotten message must
-// not quietly become a commit named after the next flag.
-const FLAG_SHAPED = /^--?[A-Za-z][\w-]*(=.*)?$/;
-function foldMessageValue(argv) {
-  const out = [];
-  for (let i = 0; i < argv.length; i += 1) {
-    const a = argv[i], next = argv[i + 1];
-    if ((a === '--message' || a === '-m') && typeof next === 'string' && next.startsWith('-') && !FLAG_SHAPED.test(next)) {
-      out.push(`--message=${next}`);
-      i += 1;
-    } else out.push(a);
-  }
-  return out;
-}
+// not quietly become a commit named after the next flag. Both rules live in scripts/lib/cli.mjs;
+// the spec is exported so every call site of this script is checked against it.
+export const CLI = {
+  name: 'safe-commit',
+  usage: USAGE,
+  selfTest: true,
+  options: {
+    message: { type: 'string', short: 'm' },
+    repo: { type: 'string' },
+    session: { type: 'string' },
+    target: { type: 'string' },
+    wait: { type: 'number', default: 120 },
+    'no-push': { type: 'boolean' },
+    'dry-run': { type: 'boolean' },
+    'only-staged': { type: 'boolean' },
+    'force-sweep': { type: 'boolean' },
+  },
+};
 
-export function parseCli(argv) {
-  let values;
-  try {
-    ({ values } = parseArgs({
-      args: foldMessageValue(argv),
-      strict: true,
-      allowPositionals: false,
-      options: {
-        message: { type: 'string', short: 'm' },
-        repo: { type: 'string' },
-        session: { type: 'string' },
-        target: { type: 'string' },
-        wait: { type: 'string' },
-        'no-push': { type: 'boolean' },
-        'dry-run': { type: 'boolean' },
-        'only-staged': { type: 'boolean' },
-        'force-sweep': { type: 'boolean' },
-        'self-test': { type: 'boolean' },
-        help: { type: 'boolean', short: 'h' },
-      },
-    }));
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : String(e) };
-  }
-  const wait = values.wait === undefined ? 120 : Number(values.wait);
-  if (!Number.isFinite(wait) || wait <= 0) return { error: `--wait takes a positive number of seconds, got: ${values.wait}` };
+function toOpts(r) {
+  if (r.error) return { error: r.error };
+  const { values } = r;
+  if (!(values.wait > 0)) return { error: `--wait takes a positive number of seconds, got: ${values.wait}` };
   return {
-    help: values.help === true,
-    selfTest: values['self-test'] === true,
+    help: r.help,
+    selfTest: r.selfTest,
     opts: {
       repo: values.repo, message: values.message, session: values.session, target: values.target,
-      noPush: values['no-push'] === true, dryRun: values['dry-run'] === true, wait,
+      noPush: values['no-push'] === true, dryRun: values['dry-run'] === true, wait: values.wait,
       onlyStaged: values['only-staged'] === true, forceSweep: values['force-sweep'] === true,
     },
   };
 }
 
+/** Pure: parse argv against CLI (the self-test drives it directly). */
+export function parseCommitArgs(argv) {
+  return toOpts(parseStrict(argv, CLI));
+}
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  const cli = parseCli(process.argv.slice(2));
+  const cli = toOpts(runCli(CLI));
   if (cli.error) { console.error(`safe-commit: bad invocation — ${cli.error}\nNothing was run.\n\n${USAGE}`); process.exit(2); }
-  if (cli.help) { console.log(USAGE); process.exit(0); }
   if (cli.selfTest) selfTest();
   else {
     const r = await run(cli.opts);

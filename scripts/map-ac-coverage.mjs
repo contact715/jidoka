@@ -9,6 +9,7 @@
  *   node scripts/map-ac-coverage.mjs          # report + generate stubs, exit 0
  *   node scripts/map-ac-coverage.mjs --strict  # exit 1 if any uncovered ACs exist
  *   node scripts/map-ac-coverage.mjs --dry     # print summary, no file writes
+ *   (full help: --help; an unknown flag or a stray word exits 2 before any file is written)
  *
  * Outputs:
  *   docs/metrics/ac-coverage-map.json   — per-wave per-AC traceability artifact
@@ -24,6 +25,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 // D1 — REUSE: import extractACs from sync-specs-to-memory.mjs:114–123. No new parser.
 import { extractACs } from './sync-specs-to-memory.mjs';
@@ -36,11 +38,6 @@ const TESTS_DIR = path.join(ROOT, 'tests');
 const METRICS_DIR = path.join(ROOT, 'docs', 'metrics');
 const STUBS_DIR = path.join(ROOT, 'tests', 'spec-stubs');
 const COVERAGE_MAP_PATH = path.join(METRICS_DIR, 'ac-coverage-map.json');
-
-// ── CLI args ───────────────────────────────────────────────────────────────────
-const args = new Set(process.argv.slice(2));
-const isStrict = args.has('--strict');
-const isDry = args.has('--dry');
 
 // ── Spec-ID helpers ────────────────────────────────────────────────────────────
 function inferWaveId(filename) {
@@ -100,7 +97,9 @@ export function resolveNeeds(decl, exists, read) {
   // дымовым прогоном, а не самопроверкой.
   const runnable = /(^|\n)\s*(export\s+)?(async\s+)?function\s+selfTest\b/.test(src)
     || /(^|\n)\s*(const|let)\s+selfTest\s*=/.test(src)
-    || /process\.argv\.includes\(\s*['"]--self-test/.test(src);
+    || /process\.argv\.includes\(\s*['"]--self-test/.test(src)
+    // строгий разбор (scripts/lib/cli.mjs, 2026-09-16): вход в самопроверку объявлен в спецификации
+    || /(^|\n)\s*export\s+const\s+CLI\s*=\s*\{[\s\S]{0,600}?\n\s*selfTest\s*:\s*true\b/.test(src);
   if (!runnable) return { ok: false, why: `у модуля нет исполняемой самопроверки: ${decl.target}` };
   return { ok: true, why: `самопроверка ${decl.target}` };
 }
@@ -248,7 +247,7 @@ function generateStubFile(waveId, uncoveredAcs) {
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────────
-function main() {
+function main({ strict: isStrict = false, dry: isDry = false } = {}) {
   // 1. Collect all spec files
   let specFiles;
   try {
@@ -471,6 +470,12 @@ function selfTest() {
     resolveNeeds({ kind: 'selftest', target: 'scripts/kaizen-dispatch.mjs' }, has, read).ok === true);
 
   // КРАСНЫЕ ПЛЕЧИ: каждое из них — вход, на котором прибор ОБЯЗАН сказать нет.
+  ok('самопроверка, объявленная в спецификации CLI (selfTest: true), резолвится',
+    resolveNeeds({ kind: 'selftest', target: 'scripts/x.mjs' }, () => true,
+      () => "export const CLI = {\n  name: 'x',\n  selfTest: true,\n};\n").ok === true);
+  ok('слово selfTest: true в комментарии самопроверкой не считается',
+    resolveNeeds({ kind: 'selftest', target: 'scripts/x.mjs' }, () => true,
+      () => '// пример: selfTest: true\nexport const X = 1;\n').ok === false);
   ok('РАСХОЖДЕНИЕ: объявление на файл, который лишь УПОМИНАЕТ --self-test, не резолвится',
     resolveNeeds({ kind: 'selftest', target: 'package.json' }, has, read).ok === false);
   ok('несуществующий модуль не резолвится',
@@ -488,10 +493,21 @@ function selfTest() {
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url) || (() => { try { return fs.realpathSync(process.argv[1] || '') === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; } })();
 
-if (isMain && process.argv.includes('--self-test')) {
-  process.exit(selfTest() ? 0 : 1);
-}
+// ── CLI ────────────────────────────────────────────────────────────────────────
+// Strict parsing (2026-09-16): an unknown flag or a stray word exits 2 before any write.
+// Before, a typo like `--dyr` silently ran the full pass and rewrote the map and the stubs.
+export const CLI = {
+  name: 'map-ac-coverage',
+  summary: 'Map every acceptance criterion in docs/specs/*_MASTER_SPEC.md to tests; write the coverage map and it.todo stubs.',
+  selfTest: true,
+  options: {
+    strict: { type: 'boolean', desc: 'exit 1 if any uncovered ACs exist' },
+    dry: { type: 'boolean', desc: 'print the summary only, write no files' },
+  },
+};
 
 if (isMain) {
-  main();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) process.exit(selfTest() ? 0 : 1);
+  main({ strict: values.strict === true, dry: values.dry === true });
 }

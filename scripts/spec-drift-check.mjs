@@ -38,6 +38,7 @@ import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { resolve, dirname, join, relative, basename, isAbsolute } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 // Extensions we treat as "a reference to a real project file". A backtick token that
 // ends in one of these (or contains a path separator) is a candidate; anything else
@@ -303,20 +304,35 @@ function selfTest() {
 
 // ── CLI ──────────────────────────────────────────────────────────────────────────
 
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово или флаг без значения
+// (--root, --config, --specs) — код 2 до чтения конфига и спек.
+export const CLI = {
+  name: 'spec-drift-check',
+  summary: 'Дрейф «спека → файл»: ссылки из спек и объявленные родители обязаны существовать.',
+  selfTest: true,
+  options: {
+    root: { type: 'string', value: 'папка', desc: 'корень проекта (по умолчанию текущая папка)' },
+    config: { type: 'string', value: 'путь', desc: 'конфиг (по умолчанию <root>/.sdd-config.json)' },
+    specs: { type: 'string', value: 'a.md,b.md', desc: 'явный список спек через запятую (без глобов конфига)' },
+    hard: { type: 'boolean', desc: 'жёсткий режим: код 1 на отсутствующем файле' },
+    quiet: { type: 'boolean', desc: 'не печатать находки поштучно' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const root = resolve(arg('--root') || process.cwd());
-  const quiet = process.argv.includes('--quiet');
-  const configPath = arg('--config') || join(root, '.sdd-config.json');
+  const root = resolve(values.root || process.cwd());
+  const quiet = values.quiet === true;
+  const configPath = values.config || join(root, '.sdd-config.json');
   const cfg = readConfig(configPath);
-  const hard = process.argv.includes('--hard') || cfg.hardBlockEnabled === true;
+  const hard = values.hard === true || cfg.hardBlockEnabled === true;
 
   const DEFAULT_SPEC_PATHS = ['docs', 'whatsapp_agent', 'specs', 'SPEC.md', 'README.md'];
-  const specPaths = arg('--specs') ? arg('--specs').split(',').map(s => s.trim())
+  const specPaths = values.specs ? values.specs.split(',').map(s => s.trim())
     : (Array.isArray(cfg.specPaths) && cfg.specPaths.length ? cfg.specPaths : DEFAULT_SPEC_PATHS);
 
   // Prefer the committed tree (deterministic across CI / local); fall back to a filesystem

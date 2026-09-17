@@ -21,13 +21,15 @@
  *   node scripts/skills-freshness.mjs --brief      # одна строка (для дайджеста)
  *   node scripts/skills-freshness.mjs --json       # машиночитаемо
  *   node scripts/skills-freshness.mjs --strict     # код 1, если что-то устарело
+ *   node scripts/skills-freshness.mjs --full       # таблица без сокращения списка отставших
+ *   node scripts/skills-freshness.mjs --official-only  # только официальные, без сторонних
  *   node scripts/skills-freshness.mjs --self-test  # самопроверка
  *
  * Коды возврата:
  *   0 — проверено, всё свежее ИЛИ есть устаревшие, но без --strict
  *       ИЛИ проверить не удалось (сеть/лимит) — намеренно fail-open
  *   1 — есть устаревшие И передан --strict
- *   2 — ошибка конфигурации
+ *   2 — ошибка конфигурации или неверный вызов (незнакомый флаг, лишнее слово; сеть не трогается)
  *
  * Fail-open осознанно: рутина, которая падает при отсутствии сети, будет мешать
  * каждый раз, когда ноутбук в самолёте, и её отключат. Молчаливого «всё хорошо»
@@ -45,6 +47,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 const HOME = os.homedir();
 
@@ -681,12 +684,24 @@ function selfTest() {
 
 /* ---------------------------------- main ---------------------------------- */
 
-async function main() {
-  const argv = process.argv.slice(2);
-  if (argv.includes('--self-test')) process.exit(selfTest());
+// Разбор строгий (2026-09-16): незнакомый флаг или слово — код 2 ДО похода в сеть. Раньше
+// опечатка `--stirct` давала код 0 и ежедневная рутина молча теряла свой порог.
+export const CLI = {
+  name: 'skills-freshness',
+  summary: 'Сверка установленных скиллов и плагинов с их источником на GitHub (по SHA блобов, без скачивания).',
+  selfTest: true,
+  options: {
+    brief: { type: 'boolean', desc: 'одна строка (для дайджеста)' },
+    json: { type: 'boolean', desc: 'машиночитаемый отчёт (главнее --brief)' },
+    strict: { type: 'boolean', desc: 'код 1, если отстал хоть один ОФИЦИАЛЬНЫЙ скилл' },
+    full: { type: 'boolean', desc: 'полный список отставших в таблице' },
+    'official-only': { type: 'boolean', desc: 'только официальные источники, без сторонних' },
+  },
+};
 
-  const full = argv.includes('--full');
-  const officialOnly = argv.includes('--official-only');
+async function main(values) {
+  const full = values.full === true;
+  const officialOnly = values['official-only'] === true;
 
   // Официальные источники и сторонние качаются одновременно: последовательно это
   // были бы десятки запросов подряд, и ежедневная рутина растянулась бы на минуту.
@@ -708,9 +723,9 @@ async function main() {
     unsourced = unsourcedSkills(collectSkillNames(SKILL_ROOTS), lock, officialNames);
   }
 
-  if (argv.includes('--json')) {
+  if (values.json) {
     console.log(JSON.stringify({ summary: summarize(sources, unsourced.length), sources, unsourced }, null, 2));
-  } else if (argv.includes('--brief')) {
+  } else if (values.brief) {
     console.log(briefLine(sources, unsourced.length));
   } else {
     console.log(render(sources, unsourced, full));
@@ -719,12 +734,14 @@ async function main() {
   // --strict реагирует только на ОФИЦИАЛЬНЫЕ: сторонних отставших много, они чинятся
   // не за один вечер, и ронять на них ежедневную рутину значит приучить её игнорировать.
   const { official: off } = summarize(sources, unsourced.length);
-  process.exit(argv.includes('--strict') && off.stale > 0 ? 1 : 0);
+  process.exit(values.strict && off.stale > 0 ? 1 : 0);
 }
 
 const invokedDirectly = process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(new URL(import.meta.url).pathname);
 if (invokedDirectly) {
-  main().catch((e) => {
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) process.exit(selfTest());
+  main(values).catch((e) => {
     // fail-open: неожиданная ошибка не должна ломать ежедневную рутину
     console.error(`skills-freshness: не удалось проверить (${e.message})`);
     process.exit(0);

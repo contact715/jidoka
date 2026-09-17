@@ -19,6 +19,7 @@
 
 import { execSync } from 'node:child_process';
 import { recordTrip } from './meta-lib.mjs';
+import { runCli } from './lib/cli.mjs';
 
 // pure: classify a claim into a proof-TYPE that constrains acceptable proofs. Conservative —
 // returns 'generic' unless the claim CLEARLY needs a browser run or a full-history scan.
@@ -64,10 +65,21 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): ровно два слова — утверждение и команда-доказательство.
+// Третье слово или незнакомый флаг раньше молча отбрасывались; теперь — код 2 до запуска
+// доказательства. Отсутствие слов по-прежнему объясняется своим текстом (тоже код 2).
+export const CLI = {
+  name: 'proof-gate',
+  summary: 'Утверждение «сделано» принимается только с исполнимым доказательством подходящего вида.',
+  selfTest: true,
+  positionals: { min: 0, max: 2, label: '"<утверждение>" "<команда-доказательство>"' },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const [, , claim, proof] = process.argv;
+  const { positionals, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const [claim, proof] = positionals;
   if (!claim || !proof) {
     console.error('usage: proof-gate.mjs "<claim>" "<proof shell command>"  |  --self-test');
     console.error('A claim without a runnable proof is, by definition, not done.');

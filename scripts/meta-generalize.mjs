@@ -20,18 +20,28 @@
 import { loadLedger, groupByClass } from './meta-lib.mjs';
 import { REMEDIES } from './meta-remedies.mjs';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 // adjacent class -> the gated parent classes whose gate also covers it
 const coveredBy = {};
 
+// Разбор строгий (2026-09-16): раньше все слова склеивались в имя класса, поэтому `--help`
+// отвечал «класс "--help" не покрыт» с кодом 1. Теперь флаги разбираются, класс — одно слово.
+export const CLI = {
+  name: 'meta-generalize',
+  summary: 'Карта семейств уроков по гейтам; с именем класса — ответ, покрыт ли он уже (0) или нужен свой гейт (1).',
+  positionals: { min: 0, max: 1, name: 'класс' },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { positionals } = runCli(CLI);
   for (const [parent, r] of Object.entries(REMEDIES)) {
     for (const fam of r.family || []) (coveredBy[fam] ??= []).push(parent);
   }
 
-  const arg = process.argv.slice(2).join(' ').trim();
+  const arg = (positionals[0] ?? '').trim();
 
   if (arg) {
     if (REMEDIES[arg]) {

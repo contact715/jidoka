@@ -30,6 +30,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { readBoard, matchesGlob, isStale } from './session-board.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -228,13 +229,26 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): опечатка `--rpeo <путь>` раньше молча проверяла индекс движка
+// вместо продукта и отвечала «чисто».
+export const CLI = {
+  name: 'session-collision',
+  summary: 'Проверить, нет ли в индексе git работы другой живой сессии (код 1 при столкновении).',
+  selfTest: true,
+  options: {
+    check: { type: 'boolean', desc: 'проверить индекс (действие по умолчанию)' },
+    repo: { type: 'string', value: 'путь', desc: 'репозиторий (по умолчанию движок)' },
+    notify: { type: 'boolean', desc: 'написать соседним сессиям при столкновении' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
-  const argAfter = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
   // Репозиторий задаётся явно: столкновение случается в ПРОДУКТЕ, а прибор живёт в движке.
-  const repo = argAfter('--repo') || ROOT;
+  const repo = values.repo || ROOT;
   const me = process.env.JIDOKA_SESSION || `${repo.split('/').pop()}-${String(process.pid).slice(-2)}`;
   const staged = stagedFiles(repo);
   if (!staged.length) { console.log('session-collision: индекс пуст — сталкиваться не о что.'); process.exit(0); }
@@ -267,7 +281,7 @@ if (isMain) {
   }
 
   const msgs = draftMessages({ conflicts, foreign, me });
-  if (process.argv.includes('--notify') && msgs.length) {
+  if (values.notify && msgs.length) {
     for (const m of msgs) {
       try {
         execFileSync('node', [

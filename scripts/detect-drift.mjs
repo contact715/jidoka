@@ -34,6 +34,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 import {
   emitTelemetry,
   readJsonlStream,
@@ -44,10 +45,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
 // ── CLI flags ────────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-const MODE_STAGED = args.includes('--staged');
-const MODE_COMPREHENSIVE = args.includes('--comprehensive');
-const DRY_RUN = args.includes('--dry-run');
+// Разбор строгий (2026-09-16): незнакомый флаг или слово — код 2 до проверок и до записи
+// в drift-events.jsonl. Раньше опечатка `--dryrun` молча писала события в поток.
+// Без режима, как и раньше, — подсказка в stderr и код 0.
+export const CLI = {
+  name: 'detect-drift',
+  summary: 'Расхождение спек и кода (DR1–DR8): --staged — быстро по индексу, --comprehensive — полный ежедневный обход.',
+  selfTest: true,
+  options: {
+    staged: { type: 'boolean', desc: 'DR1–DR3 по файлам индекса; код 1 только при hardBlockEnabled и блокирующей находке' },
+    comprehensive: { type: 'boolean', desc: 'DR1–DR7 целиком и сводка; всегда код 0' },
+    'dry-run': { type: 'boolean', desc: 'события только в вывод, без записи в docs/audits/drift-events.jsonl' },
+  },
+};
 
 // ── Paths ────────────────────────────────────────────────────────────────────
 const SDD_CONFIG_PATH = path.join(ROOT, '.sdd-config.json');
@@ -702,7 +712,7 @@ function emitDriftEvent(event, dryRun) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-async function main() {
+async function main({ MODE_STAGED = false, MODE_COMPREHENSIVE = false, DRY_RUN = false } = {}) {
   if (!MODE_STAGED && !MODE_COMPREHENSIVE) {
     process.stderr.write('[drift-daemon] Usage: node scripts/detect-drift.mjs [--staged | --comprehensive] [--dry-run]\n');
     process.exit(0);
@@ -820,8 +830,13 @@ async function main() {
 // file today whose module body did real work on import.
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  main().catch(err => {
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  main({
+    MODE_STAGED: values.staged === true,
+    MODE_COMPREHENSIVE: values.comprehensive === true,
+    DRY_RUN: values['dry-run'] === true,
+  }).catch(err => {
     process.stderr.write(`[drift-daemon] FATAL: ${err}\n`);
     process.exit(0); // non-fatal per A10
   });

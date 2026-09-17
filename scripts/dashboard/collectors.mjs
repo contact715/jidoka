@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runCli } from '../lib/cli.mjs';
 
 // The canonical pipeline graph lives in orchestration-planner.plan() — the single source of truth for
 // the phase graph. The dashboard renders that REAL graph (phases · agents · gates) overlaid with the
@@ -461,5 +462,17 @@ function selfTest() {
 
 // самопроверка — только при прямом запуске. Раньше она срабатывала при импорте,
 // и tui-top.mjs вырезал --self-test из argv, чтобы её обойти
+// Разбор строгий (2026-09-16): модуль библиотечный, у запуска есть только --self-test и --help;
+// любое другое слово — код 2, а не молчаливый выход с 0.
+export const CLI = {
+  name: 'collectors',
+  path: 'scripts/dashboard/collectors.mjs',
+  summary: 'Слой данных дашборда jidoka (библиотека); прямой запуск нужен только для самопроверки.',
+  selfTest: true,
+};
+
 const isMainCollectors = process.argv[1] === fileURLToPath(import.meta.url);
-if (isMainCollectors && process.argv.includes('--self-test')) selfTest();
+if (isMainCollectors) {
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+}

@@ -10,9 +10,10 @@
 //
 // FULL & self-tested. Usage:
 //   node scripts/trajectory-score.mjs --self-test
-//   node scripts/trajectory-score.mjs --trace <trace.json> [--max-steps N]
+//   node scripts/trajectory-score.mjs --trace <trace.json> [--max-steps <число>]
 
 import { readFileSync, existsSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 // pure: score one trajectory. trace = { steps: [{ tool, ok, inScope }], ... }
 export function scoreTrajectory(trace = {}, { maxSteps } = {}) {
@@ -49,14 +50,26 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k, d) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : d; };
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово, флаг без значения или
+// нечисловой --max-steps — код 2 до чтения траектории. Код 2 без --trace был и раньше.
+export const CLI = {
+  name: 'trajectory-score',
+  summary: 'Оценка ПУТИ агента по записанной траектории: шаги, ошибки, вызовы вне области, бюджет.',
+  selfTest: true,
+  options: {
+    trace: { type: 'string', value: 'trace.json', desc: 'траектория {steps:[{tool, ok, inScope}]} (обязательна)' },
+    'max-steps': { type: 'number', desc: 'бюджет шагов; превышение снижает оценку на 0.2' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const tp = arg('--trace');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const tp = values.trace || null;
   if (!tp || !existsSync(tp)) { console.error('usage: --trace <trace.json> [--max-steps N]  (or --self-test)'); process.exit(2); }
-  const maxSteps = arg('--max-steps') ? parseInt(arg('--max-steps'), 10) : undefined;
+  // целое, как раньше давал parseInt; --max-steps 0 — бюджет ноль шагов, как и раньше
+  const maxSteps = values['max-steps'] !== undefined ? Math.trunc(values['max-steps']) : undefined;
   const r = scoreTrajectory(JSON.parse(readFileSync(tp, 'utf8')), { maxSteps });
   console.log(`trajectory-score: ${r.steps} steps · ${r.errors} errors · ${r.outOfScope} out-of-scope · efficiency ${r.efficiency} · score ${r.score}${r.overBudget ? ' (OVER BUDGET)' : ''}`);
   process.exit(0);

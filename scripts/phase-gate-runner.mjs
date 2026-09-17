@@ -24,6 +24,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -221,14 +222,26 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до запуска гейтов.
+export const CLI = {
+  name: 'phase-gate-runner',
+  summary: 'Прогнать скриптовые гейты одной фазы волны по плану orchestration-planner.',
+  selfTest: true,
+  options: {
+    phase: { type: 'string', value: 'фаза', desc: 'имя фазы (обязательно)' },
+    plan: { type: 'string', value: 'plan.json', desc: 'план волны (обязательно)' },
+    changed: { type: 'string', value: 'a,b', desc: 'изменённые файлы через запятую' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const phase = arg('--phase'), planPath = arg('--plan');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const phase = values.phase, planPath = values.plan;
   if (!phase || !planPath) { console.error('usage: --phase <name> --plan <plan.json> [--changed "a,b"] | --self-test'); process.exit(2); }
   const plan = JSON.parse(readFileSync(planPath, 'utf8'));
-  const changed = (arg('--changed') || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const changed = (values.changed || '').split(',').map((s) => s.trim()).filter(Boolean);
   const r = runPhaseGates(phase, plan, { changed });
   console.log(`phase-gate-runner — phase "${phase}"\n`);
   // the mark is driven by the OUTCOME, not by a two-state guess: a step that never ran must not

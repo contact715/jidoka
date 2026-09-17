@@ -17,11 +17,11 @@
  *
  * Usage:
  *   node scripts/detect-injection.mjs --input "<string>" [--wave <wave-id>] [--agent <agent-id>]
- *   echo "text" | node scripts/detect-injection.mjs --stdin
  *
  * Exit codes:
  *   0  — no injection detected (or soft-flag: injection flagged but not blocked)
  *   1  — usage error (missing/empty --input)
+ *   2  — bad call: unknown flag, stray word, flag without its value (nothing scanned, --help lists flags)
  *   42 — hard-block: injection detected and securityScan.hardBlockEnabled is true
  *
  * Spec: docs/specs/wave-165_MASTER_SPEC.md §7 A7–A11
@@ -33,6 +33,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { emitTelemetry } from './emit-telemetry.mjs';
 import { writeHaltState } from './andon-halt-helpers.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -168,26 +169,28 @@ function readHardBlockEnabled() {
 
 // ── CLI argument parser ───────────────────────────────────────────────────────
 
+// Strict parsing (2026-09-16): the old loop took any `--key value` pair and silently skipped
+// the rest, so `--inptu "..."` scanned nothing and exited like a usage error, and a trailing
+// flag vanished. Now an unknown flag, a stray word or a flag without its value exits 2.
+export const CLI = {
+  name: 'detect-injection',
+  summary: 'OWASP LLM01 prompt-injection scan of one input string (soft flag by default, halt 42 when hard-block is on).',
+  options: {
+    input: { type: 'string', value: 'text', desc: 'text to scan (required, non-empty; missing or empty exits 1)' },
+    wave: { type: 'string', value: 'wave-id', desc: 'wave for the event (default wave-unknown)' },
+    agent: { type: 'string', value: 'agent-id', desc: 'agent for the event (default unknown)' },
+  },
+};
+
 /**
  * @returns {{ input: string; wave: string; agent: string }}
  */
 function parseArgs() {
-  const argv = process.argv.slice(2);
-  /** @type {Record<string, string>} */
-  const parsed = {};
-
-  for (let i = 0; i < argv.length; i++) {
-    if (argv[i].startsWith('--') && i + 1 < argv.length) {
-      const key = argv[i].slice(2);
-      parsed[key] = argv[i + 1];
-      i++;
-    }
-  }
-
+  const { values } = runCli(CLI);
   return {
-    input: parsed['input'] ?? '',
-    wave: parsed['wave'] ?? 'wave-unknown',
-    agent: parsed['agent'] ?? 'unknown',
+    input: values.input ?? '',
+    wave: values.wave ?? 'wave-unknown',
+    agent: values.agent ?? 'unknown',
   };
 }
 

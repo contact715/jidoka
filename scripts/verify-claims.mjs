@@ -34,11 +34,14 @@
  *   --quiet          only print problems
  *
  * Exit codes: 0 = no definitive problems · 1 = at least one fabricated/dead specific · 2 = usage error
+ * (full help: --help; an unknown flag, a stray word or a flag without its value is a usage
+ * error — exit 2 before any file, network or stdin is touched)
  */
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import dns from "node:dns/promises";
+import { runCli } from "./lib/cli.mjs";
 
 const HTTP_TIMEOUT_MS = 10_000;
 const MAX_CHECKS = 40;
@@ -371,20 +374,37 @@ async function selfTest() {
 
 /* ------------------------------------------------------------------------- cli */
 
+// Strict parsing (2026-09-16, class extra-argument-silently-swallowed): the old loop skipped
+// every flag it did not know, so `--ofline` quietly ran the network checks and `--repo` with
+// no value crashed on a TypeError. Now both are exit 2 before any work.
+export const CLI = {
+  name: "verify-claims",
+  summary: "Verify every URL / host / email in a draft: DNS, a real HTTP request, and the route in the repo for hosts we own.",
+  selfTest: true,
+  options: {
+    file: { type: "string", value: "path", desc: "draft to check" },
+    text: { type: "string", value: "text", desc: "draft passed inline" },
+    repo: { type: "string", value: "path", desc: "repo root used to resolve route claims (default: cwd)" },
+    owned: { type: "string", value: "a,b", desc: "comma-separated owned domains (default: ~/.claude/owned-domains.json)" },
+    offline: { type: "boolean", desc: "skip all network, report every network claim as UNVERIFIED" },
+    json: { type: "boolean", desc: "machine-readable output" },
+    quiet: { type: "boolean", desc: "only print problems" },
+  },
+};
+
+/** argv is the full process.argv; a bad call exits 2 (help exits 0) inside runCli. */
 function parseArgs(argv) {
-  const out = { owned: null, repo: process.cwd(), offline: false, json: false, quiet: false };
-  for (let i = 2; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--self-test") out.selfTest = true;
-    else if (a === "--file") out.file = argv[++i];
-    else if (a === "--text") out.text = argv[++i];
-    else if (a === "--repo") out.repo = argv[++i];
-    else if (a === "--owned") out.owned = argv[++i].split(",").map((s) => s.trim()).filter(Boolean);
-    else if (a === "--offline") out.offline = true;
-    else if (a === "--json") out.json = true;
-    else if (a === "--quiet") out.quiet = true;
-  }
-  return out;
+  const { values: v, selfTest } = runCli(CLI, argv.slice(2));
+  return {
+    selfTest,
+    file: v.file,
+    text: v.text,
+    repo: v.repo ?? process.cwd(),
+    owned: v.owned === undefined ? null : v.owned.split(",").map((s) => s.trim()).filter(Boolean),
+    offline: v.offline === true,
+    json: v.json === true,
+    quiet: v.quiet === true,
+  };
 }
 
 const ICON = { LIVE: "ok  ", PROTECTED: "~   ", PLAUSIBLE: "ok  ", UNVERIFIED: "?   ", DEAD: "DEAD" };

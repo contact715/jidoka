@@ -14,6 +14,11 @@
 // FULL & self-tested. Usage:
 //   node scripts/parallel-guard.mjs --self-test
 //   node scripts/parallel-guard.mjs --agents '[{"slug":"backend","write_scope":"app/api/**"},{"slug":"frontend","write_scope":"components/**"}]'
+//   node scripts/parallel-guard.mjs --check-escape --slug fe --scope 'components/**' --written a.tsx,b.tsx
+//   node scripts/parallel-guard.mjs --check-escape --slug fe --scope 'components/**' --git
+//   (full help: --help; an unknown flag, a stray word or a flag without its value exits 2 before any check)
+
+import { runCli } from './lib/cli.mjs';
 
 // base path of a glob = everything before the first wildcard
 const base = (g) => String(g).split(/[*?]/)[0].replace(/\/+$/, '');
@@ -128,21 +133,38 @@ function selfTest() {
   process.exit(0);
 }
 
+// Strict parsing (2026-09-16): an unknown flag, a stray word or a flag without its value exits 2
+// before any check. Before, `--scope` at the end of the line read as «no value» (undefined, not
+// null) and slipped past the «scope is required» refusal.
+export const CLI = {
+  name: 'parallel-guard',
+  summary: 'Before a parallel dispatch: do the agents\' write_scopes overlap? And the leaf gate: did an agent write outside its scope?',
+  selfTest: true,
+  options: {
+    agents: { type: 'string', value: 'json', desc: 'agents queued for parallel dispatch: [{"slug","write_scope"},…]' },
+    'check-escape': { type: 'boolean', desc: 'leaf gate: compare a declared scope with what was written' },
+    slug: { type: 'string', value: 'name', desc: 'agent name (with --check-escape)' },
+    scope: { type: 'string', value: 'globs', desc: 'declared write_scope, comma-separated (required with --check-escape)' },
+    written: { type: 'string', value: 'a,b', desc: 'files the agent wrote (with --check-escape)' },
+    git: { type: 'boolean', desc: 'take the written files from git diff HEAD instead of --written' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
   // the leaf gate: compare what a leaf agent DECLARED against what it actually wrote (W28-R2)
-  if (process.argv.includes('--check-escape')) {
-    const slug = arg('--slug') || '(unnamed)';
-    const scope = arg('--scope');
-    if (scope === null) {
+  if (values['check-escape']) {
+    const slug = values.slug || '(unnamed)';
+    const scope = values.scope;
+    if (scope === undefined) {
       console.error('✗ --check-escape требует --scope. Отсутствие области это не «можно всё»: без объявленной области гейт не может ничего разрешить.');
       process.exit(2);
     }
-    let written = (arg('--written') || '').split(',').map((s) => s.trim()).filter(Boolean);
-    if (process.argv.includes('--git')) {
+    let written = (values.written || '').split(',').map((s) => s.trim()).filter(Boolean);
+    if (values.git) {
       const { execSync } = await import('node:child_process');
       // what this agent actually touched, straight from git rather than from its own report
       const out = execSync('git diff --name-only HEAD', { encoding: 'utf8', timeout: 20_000 });
@@ -157,7 +179,7 @@ if (isMain) {
     process.exit(1);
   }
 
-  const agents = JSON.parse(arg('--agents') || '[]');
+  const agents = JSON.parse(values.agents || '[]');
   if (!agents.length) { console.error('usage: --agents \'[{"slug":"x","write_scope":"app/**"},...]\''); process.exit(2); }
   const c = conflicts(agents);
   console.log(`parallel-guard: ${agents.length} agents queued for parallel dispatch\n`);

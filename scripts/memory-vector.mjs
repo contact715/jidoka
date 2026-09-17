@@ -23,6 +23,7 @@
 
 import { pathToFileURL } from 'node:url';
 import { tokenize, buildIdf, scoreItem, retrieve } from './memory-retrieve.mjs';
+import { runCli } from './lib/cli.mjs';
 
 /** term-frequency map (kept local — buildIdf/scoreItem consume tf maps). */
 function tf(tokens) {
@@ -374,7 +375,16 @@ function selfTest() {
   process.exit(fail === 0 ? 0 : 1);
 }
 
+// Разбор строгий (2026-09-16): модуль — библиотека; напрямую запускается только самопроверка.
+// Незнакомый флаг раньше молча печатал подсказку с кодом 0; теперь — код 2.
+export const CLI = {
+  name: 'memory-vector',
+  summary: 'Библиотека смыслового слоя памяти (retrieveFused/rrfFuse/cosine). Напрямую — только самопроверка.',
+  selfTest: true,
+};
+
 if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   else { console.log('memory-vector: a library (retrieveFused/rrfFuse/cosine). Run --self-test, or import it.'); process.exit(0); }
 }

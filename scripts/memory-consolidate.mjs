@@ -22,6 +22,7 @@ import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { loadLedger, groupByClass, daysBetween, todayISO, consolidationVerdict } from './meta-lib.mjs';
 import { REMEDIES } from './meta-remedies.mjs';
+import { runCli } from './lib/cli.mjs';
 
 export const HALF_LIFE = 30;   // days — an incident's weight halves every 30 days
 export const ACTIVE = 1.5;     // score ≥ → 🔴 front-of-mind
@@ -427,9 +428,21 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): зовётся из стартовой сводки сессии без флагов. Незнакомый флаг
+// раньше молча давал пересборку дайджеста; теперь — код 2 до чтения реестра.
+export const CLI = {
+  name: 'memory-consolidate',
+  summary: 'Свёртка реестра ошибок в дайджест уроков (memory-consolidated.md). Пути — через META_LEDGER, MEMORY_OUT, META_TODAY.',
+  selfTest: true,
+  options: {
+    force: { type: 'boolean', desc: 'перезаписать дайджест, даже если свёртка теряет уроки' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-if (process.argv.includes('--self-test')) selfTest();
+const { values, selfTest: wantsSelfTest } = runCli(CLI);
+if (wantsSelfTest) selfTest();
 
 // CLI: read episodic ledger → consolidate → write semantic digest
 if (!existsSync(INPUT)) { console.error(`memory-consolidate: ledger not found at ${INPUT}`); process.exit(2); }
@@ -449,7 +462,7 @@ try {
   if (before) lossVerdict = consolidationVerdict(before, md);
 } catch { /* fail-open: a guard that cannot judge must not stop memory from being rebuilt */ }
 
-if (!lossVerdict.ok && !process.argv.includes('--force')) {
+if (!lossVerdict.ok && values.force !== true) {
   console.error(`memory-consolidate: ОТКАЗ — ${lossVerdict.reason}`);
   console.error(`  потеряно: ${lossVerdict.lost.join(', ')}`);
   console.error('  Урок исчезает законно только через пометку об устаревании: тогда он остаётся в хвосте History.');

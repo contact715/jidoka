@@ -9,9 +9,8 @@
  *
  * Usage:
  *   node scripts/check-cross-line-dispatch.mjs --caller <agent> --callee <agent>
- *   node scripts/check-cross-line-dispatch.mjs --caller <agent> --callee <agent> \
- *     --override '{"approver":"platform-owner","reason":"emergency hotfix"}'
- *   node scripts/check-cross-line-dispatch.mjs --staged   (pre-commit mode)
+ *   node scripts/check-cross-line-dispatch.mjs --caller <agent> --callee <agent> --override '{"approver":"platform-owner","reason":"emergency hotfix"}'
+ *   node scripts/check-cross-line-dispatch.mjs --staged   # pre-commit mode
  *   node scripts/check-cross-line-dispatch.mjs --help
  *
  * Exit codes:
@@ -24,6 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { emitTelemetry } from './emit-telemetry.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -34,26 +34,40 @@ const CONFIG_PATH = path.join(ROOT, '.sdd-config.json');
 const VERDICTS_PATH = path.join(ROOT, 'docs', 'audits', 'cross-line-verdicts.jsonl');
 
 // ── CLI args ─────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
+// Разбор строгий (2026-09-16): режим --caller/--callee дописывает вердикт в журнал аудита,
+// поэтому незнакомый флаг или флаг без значения — код 2 до любой записи. Раньше `--caller`
+// без значения падал на undefined.toLowerCase().
+export const CLI = {
+  name: 'check-cross-line-dispatch',
+  usage: `check-cross-line-dispatch.mjs — IIA Three Lines cross-boundary enforcement
 
+Usage:
+  node scripts/check-cross-line-dispatch.mjs --caller <agent> --callee <agent> [--override <JSON>]
+  node scripts/check-cross-line-dispatch.mjs --staged      # pre-commit: roster parses, config present
+
+Flags:
+  --caller <agent>    who dispatches
+  --callee <agent>    who is dispatched
+  --override <JSON>   attributed override: {"approver":"<name>","reason":"<justification>"}
+  --staged            pre-commit mode
+  -h, --help          this help
+
+Exit codes:
+  0  PASS or WARN (soft-trial mode)
+  1  BLOCK (hardBlockEnabled: true + cross-line violation without valid override), or --caller/--callee missing
+  2  bad call (unknown flag, flag without value) — nothing was run or written`,
+  options: {
+    caller: { type: 'string', value: 'agent' },
+    callee: { type: 'string', value: 'agent' },
+    override: { type: 'string', value: 'JSON' },
+    staged: { type: 'boolean' },
+  },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (args.includes('--help')) {
-    console.log(`
-check-cross-line-dispatch.mjs — IIA Three Lines cross-boundary enforcement
-
-Usage:
-  node scripts/check-cross-line-dispatch.mjs --caller <agent> --callee <agent> [--override <JSON>]
-  node scripts/check-cross-line-dispatch.mjs --staged   (pre-commit: checks staged ROSTER/agent diffs)
-
-Exit codes:
-  0  PASS or WARN (soft-trial mode)
-  1  BLOCK (hardBlockEnabled: true + cross-line violation without valid override)
-`);
-    process.exit(0);
-  }
+  const { values } = runCli(CLI);
 
   // ── Config ────────────────────────────────────────────────────────────────
   function readConfig() {
@@ -172,7 +186,7 @@ Exit codes:
   const roster = parseRoster();
 
   // --staged mode: check staged ROSTER/agent diffs (pre-commit path)
-  if (args.includes('--staged')) {
+  if (values.staged) {
     // In staged mode we just verify the roster is parseable and config is present.
     // Actual per-dispatch enforcement happens at pipeline time.
     // This is the A7 guard path — only runs when ROSTER or .claude/agents/* staged.
@@ -186,18 +200,14 @@ Exit codes:
   }
 
   // --caller / --callee mode
-  const callerIdx = args.indexOf('--caller');
-  const calleeIdx = args.indexOf('--callee');
-  const overrideIdx = args.indexOf('--override');
-
-  if (callerIdx === -1 || calleeIdx === -1) {
+  if (values.caller === undefined || values.callee === undefined) {
     process.stderr.write('[cross-line] ERROR: --caller and --callee are required\n');
     process.exit(1);
   }
 
-  const callerName = args[callerIdx + 1];
-  const calleeName = args[calleeIdx + 1];
-  const overrideRaw = overrideIdx !== -1 ? args[overrideIdx + 1] : null;
+  const callerName = values.caller;
+  const calleeName = values.callee;
+  const overrideRaw = values.override ?? null;
 
   const callerEntry = roster.get(callerName.toLowerCase());
   const calleeEntry = roster.get(calleeName.toLowerCase());

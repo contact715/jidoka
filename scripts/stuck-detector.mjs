@@ -30,6 +30,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, appendFileSync } fr
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 export const DEFAULT_CAP = 20;
 
@@ -99,19 +100,32 @@ const EVENTS = join(homedir(), '.claude', 'jidoka', 'stuck-events.jsonl');
 
 function loadRing(sid) { try { return JSON.parse(readFileSync(ringPath(sid), 'utf8')); } catch { return []; } }
 function saveRing(sid, ring) { mkdirSync(SESSION_DIR, { recursive: true }); writeFileSync(ringPath(sid), JSON.stringify(ring)); }
-function arg(args, name) { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; }
+// Строгий разбор (2026-09-16): незнакомый флаг или слово — код 2 до записи кольца сессии.
+export const CLI = {
+  name: 'stuck-detector',
+  summary: 'Поймать зацикливание агента: отпечаток действия в кольцо сессии, диагноз при повторе/пинг-понге/цикле.',
+  selfTest: true,
+  options: {
+    push: { type: 'string', value: 'отпечаток', desc: 'добавить отпечаток действия в кольцо' },
+    'from-tool': { type: 'string', value: 'инструмент', desc: 'собрать отпечаток из вызова инструмента (вместо --push)' },
+    input: { type: 'string', value: 'json', desc: 'вход инструмента для --from-tool' },
+    session: { type: 'string', value: 'id', desc: 'сессия (по умолчанию default)' },
+    cap: { type: 'number', default: DEFAULT_CAP, desc: 'размер кольца' },
+    andon: { type: 'boolean', desc: 'при зацикливании выйти с кодом 42' },
+  },
+};
 
 async function main() {
-  const args = process.argv.slice(2);
-  if (args.includes('--self-test')) return selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) return selfTest();
 
-  const sid = arg(args, '--session') || 'default';
-  const cap = Number(arg(args, '--cap')) || DEFAULT_CAP;
-  let fp = arg(args, '--push');
-  if (fp === undefined && args.includes('--from-tool')) {
+  const sid = values.session || 'default';
+  const cap = values.cap || DEFAULT_CAP;
+  let fp = values.push;
+  if (fp === undefined && values['from-tool'] !== undefined) {
     const { describeActivity } = await import('../hooks/session-state.mjs');
-    let input = {}; try { input = JSON.parse(arg(args, '--input') || '{}'); } catch { /* keep {} */ }
-    fp = describeActivity(arg(args, '--from-tool'), input);
+    let input = {}; try { input = JSON.parse(values.input || '{}'); } catch { /* keep {} */ }
+    fp = describeActivity(values['from-tool'], input);
   }
   if (fp === undefined) { console.error('stuck-detector: --push "<fp>" or --from-tool <name> required'); process.exit(2); }
 
@@ -121,7 +135,7 @@ async function main() {
   if (verdict.stuck) {
     try { mkdirSync(join(homedir(), '.claude', 'jidoka'), { recursive: true }); appendFileSync(EVENTS, JSON.stringify({ ts: new Date().toISOString(), session: sid, ...verdict }) + '\n'); } catch { /* best-effort */ }
     console.error(`stuck-detector: 🔴 STUCK [${verdict.pattern}] ${verdict.detail}`);
-    process.exit(args.includes('--andon') ? 42 : 0);
+    process.exit(values.andon ? 42 : 0);
   }
   console.log(`stuck-detector: ok (ring ${ring.length}/${cap})`);
 }

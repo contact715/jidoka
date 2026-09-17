@@ -22,6 +22,7 @@
  *
  * Usage:
  *   node scripts/detect-recurrences.mjs [--dry-run]
+ *   (full help: --help; an unknown flag or a stray word exits 2 before any stream is written)
  *   npm run detect:recurrences
  *
  * Schema: docs/specs/wave-148_MASTER_SPEC.md §3
@@ -37,6 +38,7 @@ import {
   sanitizeField,
 } from './emit-telemetry.mjs';
 import { writeHaltState } from './andon-halt-helpers.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -501,11 +503,20 @@ function runDetection({ dryRun }) {
 // This allows `import('./scripts/detect-recurrences.mjs')` to succeed
 // without triggering process.exit() on import.
 
+// Strict parsing (2026-09-16): an unknown flag or a stray word exits 2 before anything runs.
+// Before, a typo like `--dryrun` silently ran the REAL detection: records written, halt possible.
+export const CLI = {
+  name: 'detect-recurrences',
+  summary: 'Group telemetry events by fingerprint, apply the recurrence thresholds, write recurrence-events.jsonl.',
+  options: {
+    'dry-run': { type: 'boolean', desc: 'evaluate and print, write nothing and never halt' },
+  },
+};
+
 const isDirectExecution = process.argv[1] &&
   path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
 
 if (isDirectExecution) {
-  const args = process.argv.slice(2);
-  const dryRun = args.includes('--dry-run');
-  runDetection({ dryRun });
+  const { values } = runCli(CLI);
+  runDetection({ dryRun: values['dry-run'] === true });
 }

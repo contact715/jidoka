@@ -10,6 +10,7 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { score } from './llm-eval-score.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const EVALS = 'docs/evals';
 const readJsonl = (p) => readFileSync(p, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
@@ -135,14 +136,26 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): --write-calibration пишет файлы, поэтому опечатка во флаге
+// больше не превращается молча в обычный показ — код 2 до любой работы.
+export const CLI = {
+  name: 'agent-eval-dashboard',
+  summary: 'Какие LLM-судьи измерены (MEASURED), а какие только заготовлены (DORMANT).',
+  selfTest: true,
+  options: {
+    'write-calibration': { type: 'boolean', desc: 'записать calibration.json по уже существующим прогонам' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
   // --write-calibration: turn the runs that already exist into the record two P0 entries have been
   // waiting for since June. Written by THIS tool, with THIS tool's scorer, so the calibration and
   // the dashboard cannot disagree about the same judge.
-  if (process.argv.includes('--write-calibration')) {
+  if (values['write-calibration']) {
     const { writeFileSync } = await import('node:fs');
     let written = 0, skipped = 0;
     for (const e of scanFs()) {

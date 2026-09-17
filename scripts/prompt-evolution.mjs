@@ -16,6 +16,7 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { score } from './llm-eval-score.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const EVALS = 'docs/evals';
 const readJsonl = (p) => readFileSync(p, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
@@ -163,9 +164,16 @@ function selfTest() {
   process.exit(0);
 }
 
+export const CLI = {
+  name: 'prompt-evolution',
+  summary: 'Агенты-судьи ниже 100% на своих эталонных случаях — кандидаты на правку промпта.',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const rows = scan();
   const cands = findCandidates(rows);
   console.log(`prompt-evolution: ${rows.length} measured agent(s), ${cands.length} below 100% (evolution candidates)\n`);

@@ -16,6 +16,8 @@
 //   node scripts/property-test.mjs --self-test
 //   (library) import { forAll, gens } from './property-test.mjs'
 
+import { runCli } from './lib/cli.mjs';
+
 // deterministic PRNG — same seed → same sequence (reproducible counterexamples, stable CI)
 export function mulberry32(seed) {
   let a = seed >>> 0;
@@ -84,9 +86,17 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): модуль библиотечный, у запуска есть только --self-test и --help.
+export const CLI = {
+  name: 'property-test',
+  summary: 'Проверка свойств на случайных входах (библиотека: forAll, gens); запуск без флагов печатает пример.',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   console.log('property-test is a library. Usage:');
   console.log("  import { forAll, gens } from './property-test.mjs'");
   console.log("  forAll(gens.int(0,100), (x) => myFn(x) >= 0, { runs: 200 })  // → {ok, counterexample?, runs}");

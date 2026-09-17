@@ -13,12 +13,13 @@
 // FULL & self-tested. Usage:
 //   node scripts/skill-selector.mjs --self-test
 //   node scripts/skill-selector.mjs --prompt "debug why the git push fails"
-//   echo '{"prompt":"..."}' | node scripts/skill-selector.mjs --hook   (UserPromptSubmit hook mode)
+//   echo '{"prompt":"..."}' | node scripts/skill-selector.mjs --hook   # UserPromptSubmit hook mode
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { installedSkills } from './skill-coverage.mjs';
+import { runCli, HOOK_BAD_CALL_EXIT } from './lib/cli.mjs';
 
 // NOTE: \b word-boundaries do NOT work around Cyrillic in JS regex, and \btest\b misses "tests" —
 // so Cyrillic stems are matched bare, and English stems use a LEADING \b only (matches test/tests/testing
@@ -83,20 +84,35 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Разбор строгий (2026-09-16). Скрипт стоит в ~/.claude/settings.json хуком UserPromptSubmit
+// (`--hook`): у такого хука код 2 значит «заблокировать сообщение человека». Поэтому неверный
+// вызов отвечает кодом 1 (HOOK_BAD_CALL_EXIT) — ошибка видна, сообщение не стирается.
+// Отказ в самом хуке прежним: нечитаемый stdin → пустая задача → ничего не предписано, код 0.
+export const CLI = {
+  name: 'skill-selector',
+  summary: 'Предписать скилл, подходящий к сигналу задачи (отладка → systematic-debugging и т.д.); --hook — режим хука UserPromptSubmit.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+  options: {
+    prompt: { type: 'string', value: 'текст', desc: 'текст задачи' },
+    hook: { type: 'boolean', desc: 'режим хука: задача — JSON из stdin ({"prompt": …})' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const hookMode = values.hook === true;
   let task = {};
-  if (process.argv.includes('--hook')) { try { task = JSON.parse(readFileSync(0, 'utf8') || '{}'); } catch { /* no stdin */ } }
-  else task = { prompt: arg('--prompt') || '' };
+  if (hookMode) { try { task = JSON.parse(readFileSync(0, 'utf8') || '{}'); } catch { /* no stdin */ } }
+  else task = { prompt: values.prompt || '' };
 
   const skills = selectSkills(task);
   const inst = installedSkills(join(homedir(), '.claude', 'skills'));
   const { available, missing } = partition(skills, inst);
 
-  if (process.argv.includes('--hook')) {
+  if (hookMode) {
     if (available.length) console.log(`Load and follow these skills for this task (mandatory): ${available.join(', ')}.`);
     if (missing.length) console.log(`(Heads-up: this task also fits ${missing.join(', ')}, which is not installed — run a superpowers update to enable it.)`);
     process.exit(0);

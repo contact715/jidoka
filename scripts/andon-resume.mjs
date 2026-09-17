@@ -8,11 +8,12 @@
  *
  * Usage:
  *   node scripts/andon-resume.mjs --wave <id> --approver <name> --reason <text> --root-cause <annotation>
- *   node scripts/andon-resume.mjs --force-clear   (emergency escape — skips field validation)
+ *   node scripts/andon-resume.mjs --force-clear   # emergency escape — skips field validation
  *
  * Exit codes:
  *   0  — halt cleared successfully
  *   1  — validation failure or missing halt state
+ *   2  — invalid call (unknown flag, stray word, flag without value) — nothing read or written
  *
  * Append-only: this script ONLY calls appendFileSync on halt-events.jsonl.
  * It never calls writeFileSync, truncate, or unlink on halt-events.jsonl.
@@ -22,6 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { emitTelemetry } from './emit-telemetry.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -76,30 +78,6 @@ function appendHaltEvent(record) {
 }
 
 /**
- * Parse CLI args into a key→value map.
- * @param {string[]} args
- * @returns {Record<string, string | boolean>}
- */
-function parseArgs(args) {
-  /** @type {Record<string, string | boolean>} */
-  const result = {};
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg.startsWith('--')) {
-      const key = arg.slice(2);
-      const next = args[i + 1];
-      if (!next || next.startsWith('--')) {
-        result[key] = true;
-      } else {
-        result[key] = next;
-        i++;
-      }
-    }
-  }
-  return result;
-}
-
-/**
  * Validate that a field value is a non-empty string of at least minLen characters.
  * @param {string} name
  * @param {string | boolean | undefined} value
@@ -119,12 +97,25 @@ function validateField(name, value, minLen) {
 // Main
 // ---------------------------------------------------------------------------
 
-const args = process.argv.slice(2);
+// Разбор строгий (2026-09-16): самодельный разбор молча пропускал незнакомые флаги и опечатки
+// (`--root_cause` вместо `--root-cause`), а флаг без значения превращал в true. Теперь — код 2
+// до чтения и записи состояния остановки.
+export const CLI = {
+  name: 'andon-resume',
+  summary: 'Снять активную остановку конвейера (andon) после разбора человеком; поля обязательны, от 10 символов.',
+  options: {
+    wave: { type: 'string', value: 'id', desc: 'волна (по умолчанию — из состояния остановки)' },
+    approver: { type: 'string', value: 'имя', desc: 'кто разрешил продолжить' },
+    reason: { type: 'string', value: 'текст', desc: 'почему можно продолжать' },
+    'root-cause': { type: 'string', value: 'текст', desc: 'первопричина остановки' },
+    'force-clear': { type: 'boolean', desc: 'аварийный выход: снять без проверки полей (пишется как FORCED_RESUME)' },
+  },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  const flags = parseArgs(args);
+  const { values: flags } = runCli(CLI);
   const forceFlag = flags['force-clear'] === true;
 
   // ── Verify halt state exists ────────────────────────────────────────────────

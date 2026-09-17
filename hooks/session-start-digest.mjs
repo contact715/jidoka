@@ -14,6 +14,11 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { homedir, tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { loadCli } from './lib/load-cli.mjs';
+
+// Строгий разбор аргументов (2026-09-16). Код отказа 1, а не 2 — один договор на все хуки
+// Claude Code: у PreToolUse, UserPromptSubmit и Stop код 2 значит «заблокировать».
+const HOOK_BAD_CALL_EXIT = 1;
 
 const REGISTRY_REL = 'docs/specs/_CLAIMED_WAVES.jsonl';
 const sh = (cmd, cwd) => execSync(cmd, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -182,10 +187,21 @@ function selfTest() {
 }
 
 
+// Разбор — первое, что делает хук: незнакомый флаг или лишнее слово — отказ до пересборки
+// дайджеста и до любого вывода в контекст сессии.
+export const CLI = {
+  name: 'session-start-digest',
+  path: 'hooks/session-start-digest.mjs',
+  summary: 'Хук SessionStart: пересобирает дайджест уроков и печатает короткую сводку в контекст сессии.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = (await loadCli(import.meta.url)).runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
   try {
     const jidoka = join(homedir(), '.claude', 'jidoka');

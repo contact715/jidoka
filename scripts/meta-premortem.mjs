@@ -18,13 +18,23 @@
 import { execSync } from 'node:child_process';
 import { REMEDIES } from './meta-remedies.mjs';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
-const argText = process.argv.slice(2).join(' ');
-let staged = '';
+// Разбор строгий (2026-09-16): описание действия — слова (любое число, склеиваются пробелом).
+// Слово, похожее на флаг (`--no-verify` отдельным аргументом), — код 2: такой текст берётся в
+// кавычки одним аргументом. Раньше незнакомый флаг молча становился частью описания.
+export const CLI = {
+  name: 'meta-premortem',
+  summary: 'Проверить ЗАДУМАННОЕ действие по известным классам ошибок до того, как его сделать (читает и индекс git).',
+  positionals: { min: 0, max: Infinity, name: 'описание действия' },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { positionals } = runCli(CLI);
+  const argText = positionals.join(' ');
+  let staged = '';
   try { staged = execSync('git diff --cached --name-only', { encoding: 'utf8' }); } catch { /* not a git repo / nothing staged */ }
   const action = `${argText}\n${staged}`.trim();
 

@@ -29,7 +29,7 @@
 // HONEST BOUNDARY, and it matters. Like the existing l0-write-grant, this is owner DELEGATION
 // with an audit trail, not a security boundary: a process that can run git can also write this
 // file. It exists so nothing is silent and nothing is permanent by accident. Every grant and
-// every use is appended; `--log` shows the history.
+// every use is appended; `list --all` shows the history.
 //
 // Zero dependencies. Usage:
 //   node scripts/permission-ledger.mjs --self-test
@@ -41,6 +41,7 @@
 import { existsSync, mkdirSync, readFileSync, appendFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
+import { runCli } from './lib/cli.mjs';
 
 export const STORE = process.env.JIDOKA_PERMISSIONS
   || join(homedir(), '.jidoka', 'permissions.jsonl');
@@ -176,24 +177,45 @@ function selfTest() {
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): незнакомый флаг, опечатка в команде, флаг без значения,
+// нечисловые --hours — код 2 до записи в реестр. Раньше `grant x --scpe /repo` молча
+// выдавал разрешение на текущую папку, а `--hours шесть` писал срок NaN.
+const SCOPE = { type: 'string', value: 'путь|*', desc: 'где действует (по умолчанию текущая папка)' };
+export const CLI = {
+  name: 'permission-ledger',
+  summary: 'Реестр разрешений: одноразовое «да» владельца — запись с областью и сроком, а не воспоминание.',
+  selfTest: true,
+  commands: {
+    grant: {
+      desc: 'выдать разрешение',
+      positionals: { min: 1, max: 1, name: 'действие' },
+      options: {
+        scope: SCOPE,
+        reason: { type: 'string', value: 'текст', desc: 'почему разрешено' },
+        by: { type: 'string', value: 'кто', desc: 'кто разрешил (по умолчанию $USER)' },
+        hours: { type: 'number', default: DEFAULT_TTL_HOURS, desc: 'срок в часах' },
+      },
+    },
+    check: { desc: 'есть ли живое разрешение (0 — да, 1 — нет)', positionals: { min: 1, max: 1, name: 'действие' }, options: { scope: SCOPE } },
+    revoke: { desc: 'отозвать разрешение', positionals: { min: 1, max: 1, name: 'id' } },
+    list: { desc: 'живые разрешения', options: { all: { type: 'boolean', desc: 'все выданные, включая истёкшие' } } },
+  },
+};
+
 const isMain = process.argv[1] && process.argv[1].endsWith('permission-ledger.mjs');
 if (isMain) {
-  const argv = process.argv.slice(2);
-  const has = (f) => argv.includes(f);
-  const arg = (f, d = null) => { const i = argv.indexOf(f); return i !== -1 ? argv[i + 1] : d; };
-  if (has('--self-test')) selfTest();
+  const { command: cmd, positionals, values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
-  const cmd = argv[0];
-  const action = argv[1];
+  const action = positionals[0];
 
   if (cmd === 'grant') {
-    if (!action) { console.error('usage: grant <action> --scope <path|*> --reason "..." [--hours N] [--by name]'); process.exit(2); }
     const ev = makeGrant({
       action,
-      scope: arg('--scope', process.cwd()),
-      reason: arg('--reason', ''),
-      by: arg('--by', process.env.USER || ''),
-      hours: Number(arg('--hours', DEFAULT_TTL_HOURS)),
+      scope: values.scope ?? process.cwd(),
+      reason: values.reason ?? '',
+      by: values.by ?? (process.env.USER || ''),
+      hours: values.hours,
     });
     appendEvent(ev);
     console.log(`granted ${ev.action} on ${ev.scope} until ${new Date(ev.expiresAt).toISOString()} (id ${ev.id})`);
@@ -201,13 +223,12 @@ if (isMain) {
   }
 
   if (cmd === 'check') {
-    const r = checkPermission(readEvents(), action, arg('--scope', process.cwd()));
+    const r = checkPermission(readEvents(), action, values.scope ?? process.cwd());
     console.log(`${r.allowed ? 'ALLOWED' : 'REFUSED'}: ${r.reason}`);
     process.exit(r.allowed ? 0 : 1);
   }
 
   if (cmd === 'revoke') {
-    if (!action) { console.error('usage: revoke <id>'); process.exit(2); }
     appendEvent({ type: 'revoke', id: action, at: Date.now() });
     console.log(`revoked ${action}`);
     process.exit(0);
@@ -215,7 +236,7 @@ if (isMain) {
 
   if (cmd === 'list') {
     const events = readEvents();
-    const rows = has('--all') ? events.filter(e => e.type === 'grant') : liveGrants(events);
+    const rows = values.all === true ? events.filter(e => e.type === 'grant') : liveGrants(events);
     if (!rows.length) { console.log('(no live permissions)'); process.exit(0); }
     for (const g of rows) {
       const left = Math.round((g.expiresAt - Date.now()) / 60000);
@@ -223,6 +244,4 @@ if (isMain) {
     }
     process.exit(0);
   }
-
-  console.log('usage: permission-ledger.mjs grant|check|revoke|list [...]  |  --self-test');
 }

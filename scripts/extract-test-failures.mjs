@@ -18,6 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -134,9 +135,17 @@ function walkPlaywrightSuite(suite, file) {
 
 // ── Main ─────────────────────────────────────────────────────────────────
 
+// Разбор строгий (2026-09-16): флагов нет. «Всегда 0» относится к разбору отчётов;
+// неверный вызов (незнакомый флаг, лишнее слово) — код 2 без разбора.
+export const CLI = {
+  name: 'extract-test-failures',
+  summary: 'Падения из .test-results/vitest.json и playwright.json, по строке на падение (код 0 при любом разборе).',
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
   parseVitest();
   parsePlaywright();
 

@@ -16,6 +16,8 @@
 //   node scripts/adaptive-verify.mjs --self-test
 //   node scripts/adaptive-verify.mjs --task '{"risk":"critical","hard":true}'
 
+import { runCli } from './lib/cli.mjs';
+
 const TIER = { trivial: 1, normal: 2, critical: 5 };
 const WEIGHTS = { correctness: 0.4, safety: 0.3, completeness: 0.2, efficiency: 0.1 };
 
@@ -70,12 +72,20 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+export const CLI = {
+  name: 'adaptive-verify',
+  summary: 'Сколько проверок потратить на задачу (риск × сложность) и как выбрать победителя по рубрике.',
+  selfTest: true,
+  options: {
+    task: { type: 'string', value: 'json', desc: 'задача в JSON, например {"risk":"critical","hard":true}' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const task = JSON.parse(arg('--task') || '{}');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const task = JSON.parse(values.task || '{}');
   console.log(`adaptive-verify: task risk=${task.risk || 'normal'}${task.hard ? ' (hard)' : ''} → spend N=${planN(task)} verification sample(s), select the winner by weighted rubric.`);
   process.exit(0);
 }

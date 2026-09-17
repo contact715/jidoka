@@ -30,6 +30,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
+import { runCli } from './lib/cli.mjs';
 
 const STORE = process.env.TASK_QUEUE || join(process.env.HOME || '', '.jidoka', 'task-queue', 'queue.jsonl');
 
@@ -197,18 +198,37 @@ function selfTest() {
 }
 
 // ---- CLI ----
-const argv = process.argv.slice(2);
-const arg = (k) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : undefined; };
-const isMain = import.meta.url === pathToFileURL(process.argv[1] || '').href;
-const cmd = argv[0];
+// Разбор строгий (2026-09-16): незнакомый флаг, неверная команда или лишнее слово — код 2
+// до любой записи в очередь. Раньше `next --bogus` молча брал задачу.
+export const CLI = {
+  name: 'task-queue',
+  summary: 'Строго последовательная очередь задач: в работе одна за раз.',
+  selfTest: true,
+  commands: {
+    add: {
+      desc: 'поставить задачу',
+      options: { prompt: { type: 'string', desc: 'что сделать' }, repo: { type: 'string', value: 'путь', desc: 'где делать' } },
+      positionals: { min: 1, max: 1, name: 'название' },
+    },
+    list: { desc: 'показать очередь', options: { all: { type: 'boolean', desc: 'вместе с закрытыми' } } },
+    status: { desc: 'счётчики и активная задача' },
+    next: { desc: 'взять следующую (последовательный затвор)' },
+    done: { desc: 'закрыть задачу', positionals: { min: 1, max: 1, name: 'id' } },
+    fail: { desc: 'отметить провал', positionals: { min: 1, max: 2, name: 'id', label: '<id> [причина]' } },
+    reset: { desc: 'вернуть в очередь', positionals: { min: 1, max: 1, name: 'id' } },
+  },
+};
 
-if (!isMain) { /* imported — no CLI */ }
-else if (argv.includes('--self-test')) selfTest();
-else if (cmd === 'add') cmdAdd(argv[1], arg('--prompt'), arg('--repo'));
-else if (cmd === 'list') cmdList(argv.includes('--all'));
-else if (cmd === 'status') cmdStatus();
-else if (cmd === 'next') cmdNext();
-else if (cmd === 'done') cmdTransition(argv[1], 'done', { finished: Date.now() });
-else if (cmd === 'fail') cmdTransition(argv[1], 'failed', { finished: Date.now(), note: argv[2] || '' });
-else if (cmd === 'reset') cmdTransition(argv[1], 'queued', {});
-else { console.log('task-queue — usage: add|list|status|next|done <id>|fail <id> "reason"|reset <id>|--self-test'); }
+const isMain = import.meta.url === pathToFileURL(process.argv[1] || '').href;
+
+if (isMain) {
+  const { command, positionals: p, values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  else if (command === 'add') cmdAdd(p[0], values.prompt, values.repo);
+  else if (command === 'list') cmdList(values.all === true);
+  else if (command === 'status') cmdStatus();
+  else if (command === 'next') cmdNext();
+  else if (command === 'done') cmdTransition(p[0], 'done', { finished: Date.now() });
+  else if (command === 'fail') cmdTransition(p[0], 'failed', { finished: Date.now(), note: p[1] || '' });
+  else if (command === 'reset') cmdTransition(p[0], 'queued', {});
+}

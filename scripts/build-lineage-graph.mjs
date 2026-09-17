@@ -31,17 +31,26 @@ import crypto from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { emitTelemetry } from './emit-telemetry.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, 'docs/specs/_LINEAGE.md');
 const OUT_JSON = path.join(ROOT, 'docs/specs/_LINEAGE.json');
-const isDry = process.argv.includes('--dry');
-const isJson = process.argv.includes('--json');
 // --counts: read-only measurement for the structural gate. Computes orphan / missing-meta
 // counts and prints ONLY the summary line; writes nothing (no _LINEAGE.md, no _LINEAGE.json,
 // no telemetry). This is what lets spec-structural-gate measure without self-mutating.
-const isCounts = process.argv.includes('--counts');
+// Разбор строгий (2026-09-16): опечатка `--dyr` раньше молча давала запись в docs/specs,
+// теперь — код 2 до любой записи.
+export const CLI = {
+  name: 'build-lineage-graph',
+  summary: 'Граф происхождения спек: docs/specs/_LINEAGE.md (и _LINEAGE.json с --json).',
+  options: {
+    dry: { type: 'boolean', desc: 'печатать в stdout, ничего не записывать' },
+    json: { type: 'boolean', desc: 'также docs/specs/_LINEAGE.json (с --dry — JSON в stdout)' },
+    counts: { type: 'boolean', desc: 'только счётчики сирот и пустых метаданных, ничего не записывать' },
+  },
+};
 
 // ── Wave-169: ID normalization ─────────────────────────────────────────
 // Canonical wave ID: wave-NNN (3-digit zero-padded, no R2/Tn suffix).
@@ -235,7 +244,7 @@ function filterGitIgnored(absPaths) {
 }
 
 // ── Main ───────────────────────────────────────────────────────────────
-function main() {
+function main({ dry: isDry = false, json: isJson = false, counts: isCounts = false } = {}) {
   const files = collectSpecFiles();
 
   // Build spec metadata map
@@ -820,5 +829,6 @@ function buildJsonGraph(specMap, orphans) {
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  main();
+  const { values } = runCli(CLI);
+  main({ dry: values.dry === true, json: values.json === true, counts: values.counts === true });
 }

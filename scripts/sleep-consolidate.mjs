@@ -22,6 +22,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -61,11 +62,22 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): опечатка в --dry раньше запускала консолидацию по-настоящему.
+export const CLI = {
+  name: 'sleep-consolidate',
+  summary: 'Консолидация памяти между волнами: memory-consolidate и reasoning-distill.',
+  selfTest: true,
+  options: {
+    dry: { type: 'boolean', desc: 'показать план и ничего не запускать' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const steps = consolidationPlan();
-  if (process.argv.includes('--dry')) {
+  if (values.dry) {
     console.log('[sleep-consolidate] plan (--dry, nothing run):');
     for (const s of steps) console.log(`  • ${s.name} — ${s.purpose}`);
     process.exit(0);

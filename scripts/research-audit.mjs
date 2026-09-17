@@ -25,7 +25,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawnSync } from 'node:child_process';
-import { parseArgs as parseCliArgs } from 'node:util';
+import { parseCli, runCli } from './lib/cli.mjs';
 import { fileURLToPath } from 'node:url';
 
 /** Метки силы источника. */
@@ -394,27 +394,28 @@ export const USAGE = [
   '                 сравнения или замера (голый домен, таблица «Статус», слова о конкурентах или замере).',
 ].join('\n');
 
+// Строгий разбор: незнакомый флаг, лишнее слово или флаг без значения — ошибка ДО любой
+// работы. Прежний разбор молча пропускал незнакомое, и «--bogus --self-test» шёл работать.
+// Спецификация экспортирована: по ней сверяются места вызова (scripts/lib/cli-replay.mjs).
+export const CLI = {
+  name: 'research-audit',
+  usage: USAGE,
+  selfTest: true,
+  options: {
+    doc: { type: 'string' },
+    tier: { type: 'string', choices: ['light', 'deep'], default: 'light' },
+  },
+};
+
 /**
- * Строгий разбор: незнакомый флаг, лишнее слово или флаг без значения — ошибка ДО любой
- * работы. Прежний разбор молча пропускал незнакомое, и «--bogus --self-test» шёл работать.
+ * Чистая обёртка для самопроверки: бросает на неверном вызове.
  * @param {string[]} argv
  * @returns {{doc: string|null, tier: 'light'|'deep', selfTest: boolean, help: boolean}}
  */
 export function parseArgs(argv) {
-  const { values } = parseCliArgs({
-    args: argv,
-    strict: true,
-    allowPositionals: false,
-    options: {
-      doc: { type: 'string' },
-      tier: { type: 'string' },
-      'self-test': { type: 'boolean' },
-      help: { type: 'boolean', short: 'h' },
-    },
-  });
-  const tier = values.tier ?? 'light';
-  if (tier !== 'light' && tier !== 'deep') throw new Error(`--tier принимает light или deep, получено: ${tier}`);
-  return { doc: values.doc ?? null, tier, selfTest: values['self-test'] === true, help: values.help === true };
+  const r = parseCli(argv, CLI);
+  if (r.error) throw new Error(r.error);
+  return { doc: r.values.doc ?? null, tier: r.values.tier, selfTest: r.selfTest, help: r.help };
 }
 
 // ---------------------------------------------------------------- самопроверка
@@ -681,22 +682,13 @@ export function runFile(file, tier, quiet = true) {
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
 
 if (isMain) {
-  let args;
-  try {
-    args = parseArgs(process.argv.slice(2));
-  } catch (e) {
-    console.error(`неверный вызов: ${String(e instanceof Error ? e.message : e)}\n\n${USAGE}`);
-    process.exit(2);
-  }
-  if (args.help) {
-    console.log(USAGE);
-    process.exit(0);
-  } else if (args.selfTest) {
+  const r = runCli(CLI);
+  if (r.selfTest) {
     process.exit(selfTest());
-  } else if (!args.doc) {
+  } else if (!r.values.doc) {
     console.error(USAGE);
     process.exit(2);
   } else {
-    process.exit(runFile(args.doc, args.tier, false));
+    process.exit(runFile(r.values.doc, r.values.tier, false));
   }
 }

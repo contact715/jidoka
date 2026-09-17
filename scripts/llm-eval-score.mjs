@@ -12,9 +12,10 @@
 //
 // FULL & self-tested. Usage:
 //   node scripts/llm-eval-score.mjs --self-test
-//   node scripts/llm-eval-score.mjs --golden docs/evals/<agent>/golden-cases.jsonl --run docs/evals/<agent>/run-<date>.jsonl
+//   node scripts/llm-eval-score.mjs --golden docs/evals/<agent>/golden-cases.jsonl --run docs/evals/<agent>/run-<date>.jsonl [--json]
 
 import { readFileSync, existsSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 const readJsonl = (p) => readFileSync(p, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l));
 
@@ -193,11 +194,24 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): опечатка `--jsno` раньше молча теряла JSON-вывод. Теперь
+// незнакомый флаг, лишнее слово или флаг без пути — код 2. Код 2 и раньше означал «нет файлов».
+export const CLI = {
+  name: 'llm-eval-score',
+  summary: 'Оценить записанный прогон LLM-агента против золотых кейсов (детерминированно). Код 2 — и неверный вызов, и отсутствующие файлы.',
+  selfTest: true,
+  options: {
+    golden: { type: 'string', value: 'golden-cases.jsonl', desc: 'золотые кейсы' },
+    run: { type: 'string', value: 'run-<date>.jsonl', desc: 'записанный прогон агента' },
+    json: { type: 'boolean', desc: 'дописать точность и промахи в JSON' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const goldenPath = arg('--golden'), runPath = arg('--run');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const goldenPath = values.golden, runPath = values.run;
   if (!goldenPath || !runPath || !existsSync(goldenPath) || !existsSync(runPath)) {
     console.error('usage: --golden <golden-cases.jsonl> --run <run-<date>.jsonl>  (both must exist)'); process.exit(2);
   }
@@ -213,7 +227,7 @@ if (isMain) {
     console.log(`\n  промахи по видам: ${Object.entries(kinds).map(([k, n]) => `${k}=${n}`).join(', ')}`);
     console.log('  \x1b[2mno-run это дефект прогона, no-verdict это формат ответа, и только wrong-verdict лечится правкой промпта.\x1b[0m');
   }
-  if (process.argv.includes('--json')) console.log(JSON.stringify({ accuracy: r.accuracy, misses: r.misses }, null, 2));
+  if (values.json) console.log(JSON.stringify({ accuracy: r.accuracy, misses: r.misses }, null, 2));
   console.log('  \x1b[2msnapshot of one LLM run on a small set — re-run the agent periodically; not a CI gate.\x1b[0m');
   process.exit(0);
 }

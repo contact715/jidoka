@@ -23,6 +23,11 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { loadCli } from './lib/load-cli.mjs';
+
+// Строгий разбор аргументов (2026-09-16). Код отказа 1, а не 2: для Claude Code код 2 у
+// PreToolUse значит «заблокировать вызов инструмента», и опечатка в settings.json заперла бы правку.
+const HOOK_BAD_CALL_EXIT = 1;
 
 /** Инструменты, которые ПИШУТ. Чтение файла заявкой не является. */
 const WRITE_TOOLS = /^(Write|Edit|MultiEdit|NotebookEdit)$/;
@@ -130,9 +135,20 @@ async function main() {
   process.exit(0);
 }
 
+// Разбор — первое, что делает хук: незнакомый флаг или лишнее слово — отказ до чтения stdin
+// и до записи на доску. Слово события хук не читает, поэтому слов не принимает.
+export const CLI = {
+  name: 'session-claim',
+  path: 'hooks/session-claim.mjs',
+  summary: 'Хук PreToolUse: правка файла публикует на доску сессий, какой каталог трогает эта сессия. Данные события — в stdin; не блокирует.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) {
+  const { selfTest: wantsSelfTest } = (await loadCli(import.meta.url)).runCli(CLI);
+  if (wantsSelfTest) {
     const fails = [];
     let ran = 0;
     const ok = (n, c) => { ran++; if (!c) fails.push(n); console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };

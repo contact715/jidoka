@@ -96,6 +96,12 @@ if [ $rc -ne 0 ]; then
 fi
 echo "✓ pre-commit · instantiation-audit: no ghosts"
 
+# Модули движка в этой правке. Объявлено ДО первого использования: до 2026-09-16 строка
+# стояла ниже блока cyrillic-boundary, переменная там была пустой, и тот блок не срабатывал
+# ни разу с момента появления (0f2c494).
+# R — переименованные с правкой (git mv), иначе они выпадали из проверки
+staged_mjs=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^(scripts|hooks|lib|global-setup)/.*\.mjs$' | grep -v '__tests__' || true)
+
 # cyrillic-boundary — ИНФОРМИРУЕТ, если в правке есть \b рядом с кириллицей. В JavaScript
 # \b определена через [A-Za-z0-9_], поэтому между пробелом и русской буквой границы нет и
 # правило молча ничего не находит. Класс встретился ЧЕТЫРЕ раза за три дня, каждый раз
@@ -115,7 +121,6 @@ fi
 # import-safety — BLOCKS if a staged .mjs does work at import time. Замер 2026-08-15:
 # 86 модулей печатали при импорте, один зависал, 19 файлов репозитория переписывались
 # сами. Проверяются ТОЛЬКО файлы этой правки: гейт соразмерен изменению.
-staged_mjs=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(scripts|hooks|lib|global-setup)/.*\.mjs$' | grep -v '__tests__' || true)
 if [ -n "$staged_mjs" ]; then
   out=$(node "$ROOT/scripts/import-safety.mjs" $staged_mjs 2>&1); rc=$?
   if [ $rc -ne 0 ]; then
@@ -128,6 +133,26 @@ if [ -n "$staged_mjs" ]; then
 else
   echo "✓ pre-commit · import-safety: модули движка не менялись — пропуск"
 fi
+
+# cli-strictness — BLOCKS if a staged CLI swallows an unknown flag (2026-09-16: `safe-commit
+# --help` ran commit+push to main; 232 of 244 scripts did not know --help). Статический, файлы
+# не запускает. Область — файлы правки; вся область — только если менялся сам сторож,
+# помощник разбора или храповик (иначе устаревшую запись храповика не увидеть).
+cli_all=$(git diff --cached --name-only | grep -E '^(scripts/cli-strictness\.mjs|scripts/lib/cli\.mjs|hooks/lib/load-cli\.mjs|docs/metrics/cli-strictness-baseline\.json)$' || true)
+if [ -n "$staged_mjs" ] && [ -z "$cli_all" ]; then
+  out=$(node "$ROOT/scripts/cli-strictness.mjs" $staged_mjs 2>&1); rc=$?
+elif [ -n "$cli_all" ]; then
+  out=$(node "$ROOT/scripts/cli-strictness.mjs" --all 2>&1); rc=$?
+else
+  out="✓ pre-commit · cli-strictness: модули движка не менялись — пропуск"; rc=0
+fi
+if [ $rc -ne 0 ]; then
+  echo "$out"
+  echo "✗ pre-commit BLOCKED by cli-strictness (скрипт молча проглотит незнакомый флаг)."
+  echo "  починить: export const CLI = {...} + runCli(CLI) из scripts/lib/cli.mjs; образец — scripts/task-queue.mjs"
+  exit 1
+fi
+echo "$out" | tail -1
 
 # clarify-gate — WARN by default: a staged master spec must have complete business-question
 # coverage (clarify-engine). Soft trial; promote to --block via gate-graduation once stable.

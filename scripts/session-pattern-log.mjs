@@ -22,7 +22,8 @@
  * Usage:
  *   node session-pattern-log.mjs log <class> "<note>" [--session <id>]
  *   node session-pattern-log.mjs report            [--session <id>]
- *   node session-pattern-log.mjs resolve <class> "<fix>" [--session <id>]
+ *   node session-pattern-log.mjs report --all
+ *   node session-pattern-log.mjs resolve <class> "<fix>" [--session <id>] [--mode <FM-x.y|none>]
  *   node session-pattern-log.mjs --self-test
  *
  * Class = short kebab-case (e.g. preview-empty-blocks-visual-verify). Session
@@ -34,6 +35,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const THRESHOLD = Number(process.env.ISK_THRESHOLD || 2);
@@ -42,9 +44,8 @@ const SELF = 'session-pattern-log.mjs';
 function ledgerPath() {
   return process.env.SESSION_PATTERNS || join(HERE, '..', 'docs', 'audits', 'session-patterns.jsonl');
 }
-function sessionFrom(args) {
-  const i = args.indexOf('--session');
-  if (i >= 0 && args[i + 1]) return args[i + 1];
+function sessionFrom(values) {
+  if (values.session) return values.session;
   return process.env.CLAUDE_SESSION_ID || 'current';
 }
 function readAll() {
@@ -65,11 +66,11 @@ function openCount(records, session, cls) {
   return records.filter((r) => r.session === session && r.class === cls && r.status === 'open').length;
 }
 
-function cmdLog(rest) {
-  const cls = rest[0];
-  const note = rest[1] || '';
+function cmdLog(args, values) {
+  const cls = args[0];
+  const note = args[1] || '';
   if (!cls || cls.startsWith('--')) { console.error(`usage: ${SELF} log <class> "<note>" [--session id]`); return 2; }
-  const session = sessionFrom(rest);
+  const session = sessionFrom(values);
   append({ ts: new Date().toISOString(), session, class: cls, note, status: 'open' });
   const count = openCount(readAll(), session, cls);
   console.log(`logged: ${cls} (${count}× open this session)`);
@@ -83,12 +84,12 @@ function cmdLog(rest) {
   return 0;
 }
 
-function cmdReport(rest) {
+function cmdReport(values) {
   // --all: scan EVERY session for still-open ≥threshold classes. This is the
   // enforcement read wired into the session-start digest — unresolved recurring
   // patterns resurface at the start of the next session so the loop can't be
   // silently dropped.
-  if (rest.includes('--all')) {
+  if (values.all) {
     const recs = readAll();
     const byClass = {};
     for (const r of recs) if (r.status === 'open') byClass[r.class] = (byClass[r.class] || 0) + 1;
@@ -98,7 +99,7 @@ function cmdReport(rest) {
     for (const d of due) console.log(`  • ${d.class} — ${d.count}×`);
     return 0;
   }
-  const session = sessionFrom(rest);
+  const session = sessionFrom(values);
   const recs = readAll();
   const classes = [...new Set(recs.filter((r) => r.session === session && r.status === 'open').map((r) => r.class))];
   const due = classes.map((c) => ({ class: c, count: openCount(recs, session, c) })).filter((x) => x.count >= THRESHOLD);
@@ -108,11 +109,11 @@ function cmdReport(rest) {
   return 0;
 }
 
-function cmdResolve(rest) {
-  const cls = rest[0];
-  const fix = rest[1] || '';
+function cmdResolve(args, values) {
+  const cls = args[0];
+  const fix = args[1] || '';
   if (!cls || cls.startsWith('--')) { console.error(`usage: ${SELF} resolve <class> "<fix>" [--session id]`); return 2; }
-  const session = sessionFrom(rest);
+  const session = sessionFrom(values);
   const recs = readAll();
   let changed = 0;
   const out = recs.map((r) => {
@@ -141,8 +142,7 @@ function cmdResolve(rest) {
   if (!process.env.ISK_NO_META) {
     const metaLog = join(HERE, 'meta-log.mjs');
     if (existsSync(metaLog)) {
-      const mi = rest.indexOf('--mode');
-      const mode = mi >= 0 ? rest[mi + 1] : 'none';
+      const mode = values.mode || 'none';
       const args = [metaLog, cls, `recurred ${changed}x within one session`, `systemic fix: ${fix}`, 'in-session-kaizen', 'remediation', '--mode', mode];
       if (mode === 'none') args.push('--note', 'внутрисессионный повтор: режим отказа зависит от класса, проставляется на разборе ошибок');
       try {
@@ -190,16 +190,38 @@ function selfTest() {
   return pass === total ? 0 : 1;
 }
 
-const [cmd, ...rest] = process.argv.slice(2);
-let code = 0;
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово или чужой команде флаг — код 2
+// до записи в журнал. Форма вызова записана в ~/.claude/CLAUDE.md: `log <class> "<note>"`.
+export const CLI = {
+  name: 'session-pattern-log',
+  summary: 'Повторы внутри одной сессии: записать, показать, закрыть (закрытие уходит в мета-реестр через meta-log).',
+  selfTest: true,
+  options: {
+    session: { type: 'string', value: 'id', desc: 'сессия (по умолчанию $CLAUDE_SESSION_ID или current)' },
+  },
+  commands: {
+    log: { desc: 'записать один повтор; на пороге — сигнал поднять вопрос', positionals: { min: 1, max: 2, label: '<class> ["<note>"]' } },
+    report: {
+      desc: 'что поднять на ближайшей паузе',
+      options: { all: { type: 'boolean', desc: 'открытые повторы по ВСЕМ сессиям' } },
+    },
+    resolve: {
+      desc: 'закрыть класс и передать починку в мета-реестр',
+      options: { mode: { type: 'string', value: 'FM-x.y|none', desc: 'режим отказа для meta-log (по умолчанию none)' } },
+      positionals: { min: 1, max: 2, label: '<class> ["<fix>"]' },
+    },
+    'self-test': { desc: 'то же, что --self-test' },
+  },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (cmd === 'log') code = cmdLog(rest);
-  else if (cmd === 'report') code = cmdReport(rest);
-  else if (cmd === 'resolve') code = cmdResolve(rest);
-  else if (cmd === '--self-test' || cmd === 'self-test') code = selfTest();
-  else { console.error(`session-pattern-log — usage:\n  log <class> "<note>" [--session id]\n  report [--session id]\n  resolve <class> "<fix>" [--session id]\n  --self-test`); code = 2; }
+  const { values, positionals, command, selfTest: wantsSelfTest } = runCli(CLI);
+  let code = 0;
+  if (wantsSelfTest || command === 'self-test') code = selfTest();
+  else if (command === 'log') code = cmdLog(positionals, values);
+  else if (command === 'report') code = cmdReport(values);
+  else if (command === 'resolve') code = cmdResolve(positionals, values);
   process.exit(code);
 }

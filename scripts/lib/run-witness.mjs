@@ -31,6 +31,7 @@ import { existsSync, readdirSync, statSync, readFileSync, writeFileSync, realpat
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './cli.mjs';
 
 // Наблюдаемые корни: машинное состояние движка ВНЕ любого клона. Список короткий и явный —
 // «всё, что вне папки» не перечислимо, а честный прибор не притворяется, что видит всё.
@@ -136,14 +137,27 @@ function selfTest() {
 const isMain = process.argv[1] === fileURLToPath(import.meta.url) || sameRealPath(process.argv[1], fileURLToPath(import.meta.url));
 function sameRealPath(a, b) { try { return !!a && realpathSync(a) === realpathSync(b); } catch { return false; } }
 
-if (isMain && process.argv.includes('--self-test')) {
-  process.exit(selfTest() ? 0 : 1);
-}
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово или флаг без файла — код 2 ДО
+// снятия слепка. Раньше `--verdcit f` молча печатал справку с кодом 0, а `--snapshot --strict`
+// записывал слепок в файл с именем «--strict». Код 2 здесь несёт и прежний смысл: «проверка
+// не состоялась» (слепка нет или наблюдать нечего) — в обоих случаях вердикта нет.
+export const CLI = {
+  name: 'run-witness',
+  path: 'scripts/lib/run-witness.mjs',
+  summary: 'Свидетель прогона: что тронуто вне рабочей папки (~/.claude/jidoka, ~/.claude/hooks, settings.json, ~/.jidoka).',
+  selfTest: true,
+  options: {
+    snapshot: { type: 'string', value: 'файл', desc: 'снять слепок ДО работы' },
+    verdict: { type: 'string', value: 'файл', desc: 'сравнить слепок с текущим состоянием' },
+    strict: { type: 'boolean', desc: 'с --verdict: код 1, если что-то тронуто' },
+  },
+};
 
 if (isMain) {
-  const arg = (f) => { const i = process.argv.indexOf(f); return i !== -1 ? process.argv[i + 1] : null; };
-  const snap = arg('--snapshot');
-  const verdictFile = arg('--verdict');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) process.exit(selfTest() ? 0 : 1);
+  const snap = values.snapshot;
+  const verdictFile = values.verdict;
 
   if (snap) {
     const inv = inventory();
@@ -166,7 +180,7 @@ if (isMain) {
     for (const p of d.added.slice(0, 20)) console.log(`  добавлено: ${p}`);
     for (const p of d.removed.slice(0, 20)) console.log(`  удалено:   ${p}`);
     if (v.verdict === 'nothing-watched') process.exit(2);
-    if (v.verdict === 'touched' && process.argv.includes('--strict')) process.exit(1);
+    if (v.verdict === 'touched' && values.strict) process.exit(1);
     process.exit(0);
   }
 

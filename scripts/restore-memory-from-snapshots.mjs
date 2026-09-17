@@ -14,6 +14,7 @@
  * Usage:
  *   node scripts/restore-memory-from-snapshots.mjs        # parse all 5 files, write staging
  *   node scripts/restore-memory-from-snapshots.mjs --dry  # print entity count, no staging write
+ *   (full help: --help; an unknown flag or a stray word exits 2 before any file is read or written)
  *
  * Conflict behavior (T6 resolved — graph-wins):
  *   The staging JSON represents the snapshot state at last export time.
@@ -32,6 +33,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { emitTelemetry } from './emit-telemetry.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -46,9 +48,6 @@ const SNAPSHOT_FILES = {
 };
 
 const STAGING_DIR = path.join(ROOT, '.claude/memory-staging');
-
-const args  = process.argv.slice(2);
-const isDry = args.includes('--dry');
 
 // ── Markdown entity block parser ─────────────────────────────────────────────
 
@@ -172,7 +171,8 @@ function parseSnapshotFile(filePath, expectedClass) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-function main() {
+/** @param {{ dry?: boolean }} [opts] */
+function main({ dry: isDry = false } = {}) {
   // ── 1. Parse all 5 per-class snapshot files ────────────────────────────────
   let totalSkipped = 0;
   const allEntities = /** @type {Array<{name:string,entityType:string,observations:string[],wave?:string}>} */ ([]);
@@ -291,8 +291,19 @@ function main() {
 }
 
 
+// Strict parsing (2026-09-16): an unknown flag or a stray word exits 2 before anything runs.
+// Before, a typo like `--dyr` silently wrote the staging file and emitted telemetry.
+export const CLI = {
+  name: 'restore-memory-from-snapshots',
+  summary: 'Parse the five per-class memory snapshot files in docs/ and write one staging JSON to .claude/memory-staging/.',
+  options: {
+    dry: { type: 'boolean', desc: 'print the entity count, write no staging file' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  main();
+  const { values } = runCli(CLI);
+  main({ dry: values.dry === true });
 }

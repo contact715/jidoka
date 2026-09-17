@@ -11,10 +11,12 @@
 // FULL & self-tested. Usage:
 //   node scripts/pipeline-contract.mjs --self-test
 //   node scripts/pipeline-contract.mjs            # audit the real planner graphs
+//   (full help: --help; an unknown flag or a stray word exits 2 before the audit)
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { plan } from './orchestration-planner.mjs';
+import { runCli } from './lib/cli.mjs';
 
 // every phase the planner emits must declare what artifact it is responsible for producing
 export const PHASE_ARTIFACTS = {
@@ -87,9 +89,18 @@ function selfTest() {
   process.exit(0);
 }
 
+// Strict parsing (2026-09-16): the audit takes no flags besides --self-test. Before, a typo like
+// `--self-tset` silently ran the full audit instead of the self-test.
+export const CLI = {
+  name: 'pipeline-contract',
+  summary: 'Is the orchestrator graph well-formed: every node a real agent/script, every phase an artifact contract?',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const r = auditMatrix();
   console.log(`pipeline-contract: audited ${MATRIX.length} task graphs, ${r.nodeCount} distinct nodes`);
   if (r.ghosts.length) { console.error(`\x1b[31m✗ ghost nodes (no agent/script):\x1b[0m ${r.ghosts.join(', ')}`); process.exit(1); }

@@ -10,6 +10,7 @@
 // Self-test: node focus.mjs --self-test   (exits 0; uses a stub exec, never a real osascript)
 
 import { execFileSync } from 'node:child_process';
+import { runCli } from '../lib/cli.mjs';
 
 // Terminal.app focus AppleScript (verbatim from §5; compiles on macOS 25.5). Matches a tab by tty.
 const TERMINAL_APPLESCRIPT = `on run argv
@@ -222,5 +223,18 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): у модуля нет своей работы из командной строки, только
+// самопроверка. Незнакомый флаг — код 2, а не молчаливый пустой выход.
+export const CLI = {
+  name: 'focus',
+  path: 'scripts/dashboard/focus.mjs',
+  summary: 'Диспетчер фокуса для `jidoka top` (библиотека): из командной строки — только самопроверка.',
+  selfTest: true,
+  options: {},
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
-if (isMain && process.argv.includes('--self-test')) selfTest();
+if (isMain) {
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+}

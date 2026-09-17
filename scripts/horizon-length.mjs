@@ -24,10 +24,12 @@
 //
 // FULL & self-tested. Usage:
 //   node scripts/horizon-length.mjs --self-test
-//   node scripts/horizon-length.mjs [--wave <id>]
+//   node scripts/horizon-length.mjs          # all waves in the checkpoint store
+//   (a --wave filter was documented here but never read by the code; removed 2026-09-16)
 
 import { readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { runCli } from './lib/cli.mjs';
 import { homedir } from 'node:os';
 import { loadEvents } from './checkpoint.mjs';
 
@@ -130,9 +132,17 @@ function selfTest() {
   process.exit(0);
 }
 
+// Флагов, кроме --self-test, нет. Разбор строгий (2026-09-16): незнакомый флаг или слово — код 2.
+export const CLI = {
+  name: 'horizon-length',
+  summary: 'Длина работы без человека: отрезки между вмешательствами, в узлах и в минутах, по всем волнам.',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const waves = existsSync(STORE)
     ? readdirSync(STORE).filter((f) => f.endsWith('.jsonl')).map((f) => f.replace(/\.jsonl$/, ''))
     : [];

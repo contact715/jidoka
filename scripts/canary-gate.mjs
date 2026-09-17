@@ -10,6 +10,8 @@
 //   node scripts/canary-gate.mjs --self-test
 //   node scripts/canary-gate.mjs --baseline '{"errorRate":0.01,"p95ms":200}' --canary '{"errorRate":0.05,"p95ms":210}'
 
+import { runCli } from './lib/cli.mjs';
+
 export function decide(baseline = {}, canary = {}, { maxRegressionPct = 20, holdBand = 5 } = {}) {
   const regressions = [];
   for (const [k, bv] of Object.entries(baseline)) {
@@ -51,13 +53,26 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до решения; --max-regression
+// теперь обязан быть числом (раньше «20abc» молча читалось как 20).
+export const CLI = {
+  name: 'canary-gate',
+  summary: 'Решение по канарейке: PROMOTE, HOLD или ROLLBACK по сравнению метрик с базовой линией.',
+  selfTest: true,
+  options: {
+    baseline: { type: 'string', value: 'json', desc: 'метрики базовой линии, JSON-объект' },
+    canary: { type: 'string', value: 'json', desc: 'метрики канарейки, JSON-объект' },
+    'max-regression': { type: 'number', default: 20, desc: 'порог отката, процентов (целая часть)' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const baseline = JSON.parse(arg('--baseline') || '{}');
-  const canary = JSON.parse(arg('--canary') || '{}');
-  const maxReg = arg('--max-regression') ? parseInt(arg('--max-regression'), 10) : 20;
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const baseline = JSON.parse(values.baseline || '{}');
+  const canary = JSON.parse(values.canary || '{}');
+  const maxReg = Math.trunc(values['max-regression']);
   const r = decide(baseline, canary, { maxRegressionPct: maxReg });
   const colour = { PROMOTE: '\x1b[32m', HOLD: '\x1b[33m', ROLLBACK: '\x1b[31m' }[r.action];
   console.log(`${colour}${r.action}\x1b[0m — ${r.reasons.join('; ')}`);

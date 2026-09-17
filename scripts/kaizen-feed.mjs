@@ -24,6 +24,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, mkdirSync } from 
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { assessOne } from './kaizen-loop.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const TARGETS_PATH = join('docs', 'metrics', 'kaizen-targets.json');
 const DEFAULT_TARGETS = [
@@ -80,9 +81,19 @@ function selfTest() {
 }
 
 // ── CLI ────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): скрипт пишет docs/metrics/kaizen-targets.json, поэтому
+// незнакомый флаг или лишнее слово — код 2 до записи.
+export const CLI = {
+  name: 'kaizen-feed',
+  summary: 'Посчитать метрики последней волны по журналам docs/runs, дописать их в kaizen-targets.json и оценить.',
+  selfTest: true,
+  options: {},
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const ROOT = process.cwd();
   const runsDir = join(ROOT, 'docs', 'runs');
   if (!existsSync(runsDir)) { console.log('no docs/runs — nothing to feed'); process.exit(0); }

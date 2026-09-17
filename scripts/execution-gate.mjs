@@ -20,6 +20,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 // pure: given package.json + a file listing, what RUNS this project?
 export function detectVerify(pkg, files) {
@@ -62,12 +63,24 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): опечатка `--rnu` или `--dri x` раньше молча давала «только
+// показать» в текущей папке. Теперь незнакомый флаг, лишнее слово или --dir без пути — код 2.
+export const CLI = {
+  name: 'execution-gate',
+  summary: 'Найти команды, которые проверяют проект ЗАПУСКОМ (тесты, e2e), и при --run выполнить их.',
+  selfTest: true,
+  options: {
+    dir: { type: 'string', value: 'папка', desc: 'проект (по умолчанию текущая папка)' },
+    run: { type: 'boolean', desc: 'выполнить найденные тесты и e2e' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const dir = arg('--dir') || process.cwd();
-  const doRun = process.argv.includes('--run');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const dir = values.dir || process.cwd();
+  const doRun = values.run === true;
   const pkg = existsSync(join(dir, 'package.json')) ? JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) : null;
   const files = existsSync(dir) ? readdirSync(dir) : [];
   const cmds = detectVerify(pkg, files);

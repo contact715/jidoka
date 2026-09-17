@@ -42,6 +42,7 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 // AC-4: import readJsonlStream from emit-telemetry.mjs (REUSE, not re-implemented)
 import { readJsonlStream } from './emit-telemetry.mjs';
@@ -403,8 +404,14 @@ function padLeft(s, w) {
 
 // ── Entrypoint ──────────────────────────────────────────────────────────────
 
+export const CLI = {
+  name: 'validate-schema',
+  summary: 'Сверить записи всех потоков телеметрии JSONL со схемой; нарушение — код 1 (LEGACY, SCHEMA_TBD, TRANSITIONAL — только предупреждения).',
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
   main();
 }

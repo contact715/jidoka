@@ -15,13 +15,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const SPECS_DIR = path.join(ROOT, 'docs/specs');
 const OUT = path.join(SPECS_DIR, '_INDEX.md');
 const RETROS_DIR = path.join(ROOT, 'docs/retros');
-const isDry = process.argv.includes('--dry');
 
 // Files to exclude from the index
 const EXCLUDE = new Set(['_INDEX.md', '_COVERAGE.md', '_TASKS_TEMPLATE.md']);
@@ -178,7 +178,7 @@ function checkDangling(deps, knownIds) {
 }
 
 // ── Main ───────────────────────────────────────────────────────────────
-function main() {
+function main({ dry: isDry = false } = {}) {
   if (!fs.existsSync(SPECS_DIR)) {
     process.stderr.write('[warn] docs/specs/ not found — nothing to index\n');
     process.exit(0);
@@ -261,8 +261,18 @@ ${table}
 }
 
 
+// Строгий разбор (2026-09-16): незнакомый флаг или слово — код 2, _INDEX.md не переписывается.
+export const CLI = {
+  name: 'regenerate-specs-index',
+  summary: 'Пересобрать docs/specs/_INDEX.md из фронтматтера спек.',
+  options: {
+    dry: { type: 'boolean', desc: 'напечатать таблицу, не записывать' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  main();
+  const { values } = runCli(CLI);
+  main({ dry: values.dry === true });
 }

@@ -15,6 +15,7 @@ import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 import { methodFromTerminalId, runFocus } from './focus.mjs';   // jump the OS terminal to a session
+import { runCli } from '../lib/cli.mjs';
 
 // ── pure builders (self-tested) ───────────────────────────────────────────
 // AC-6: escape for a shell command embedded in an AppleScript double-quoted string.
@@ -29,7 +30,8 @@ export function buildTerminalScript(dir, command) {
 }
 
 export function buildResumeArgs(scriptPath, { wave, reason }) {
-  return [scriptPath, '--wave', wave || 'unknown', '--approver', 'operator-tui', '--reason', reason, '--root-cause', reason];
+  // текст оператора — через «=»: причина, начатая с дефиса («-откат»), иначе читалась бы как флаг
+  return [scriptPath, '--wave', wave || 'unknown', '--approver', 'operator-tui', `--reason=${reason}`, `--root-cause=${reason}`];
 }
 
 export function buildAdvanceArgs(scriptPath, { wave, phase, status, note }) {
@@ -171,7 +173,7 @@ async function selfTest() {
 
   // builders
   const ra = buildResumeArgs('/x/andon-resume.mjs', { wave: 'w-1', reason: 'причина' });
-  ok('resume args: wave+approver+reason+root-cause', ra.includes('--wave') && ra.includes('w-1') && ra.includes('operator-tui') && ra.filter((a) => a === 'причина').length === 2);
+  ok('resume args: wave+approver+reason+root-cause', ra.includes('--wave') && ra.includes('w-1') && ra.includes('operator-tui') && ra.includes('--reason=причина') && ra.includes('--root-cause=причина'));
   const aa = buildAdvanceArgs('/x/run-state.mjs', { wave: 'w-2', phase: 'gate', status: 'pending', note: 'n' });
   ok('advance args: --advance w --phase --status --note', aa[1] === '--advance' && aa[2] === 'w-2' && aa.includes('gate') && aa.includes('pending'));
 
@@ -236,5 +238,17 @@ async function selfTest() {
   console.log('\n\x1b[32m✓ tui-actions: builders (AC-6) + journal (AC-7) + log tail + focus + graceful failures correct\x1b[0m'); process.exit(0);
 }
 
+// Модуль — библиотека для tui-control; сам по себе умеет только --self-test и --help.
+// Строгий разбор (2026-09-16): любой другой флаг или слово — код 2.
+export const CLI = {
+  name: 'tui-actions',
+  path: 'scripts/dashboard/tui-actions.mjs',
+  summary: 'Слой действий панели управления jidoka (библиотека tui-control); из командной строки — только самопроверка.',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
-if (isMain && process.argv.includes('--self-test')) await selfTest();
+if (isMain) {
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) await selfTest();
+}

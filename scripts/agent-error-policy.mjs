@@ -33,6 +33,8 @@
 //   node scripts/agent-error-policy.mjs --self-test
 //   node scripts/agent-error-policy.mjs --classify "API Error: 529 overloaded"
 
+import { runCli } from './lib/cli.mjs';
+
 // ── the table ────────────────────────────────────────────────────────────────
 // Order matters: fatal is checked before transient so that a 500 (which we treat as a real
 // server-side defect worth surfacing) is not swallowed by a generic 5xx rule.
@@ -191,12 +193,22 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2, а не молчаливая справка.
+export const CLI = {
+  name: 'agent-error-policy',
+  summary: 'Классифицировать ошибку агента: повторять, ждать или остановиться.',
+  selfTest: true,
+  options: {
+    classify: { type: 'string', value: 'текст', desc: 'вывод агента, который нужно классифицировать' },
+  },
+};
+
 const isMain = process.argv[1] && process.argv[1].endsWith('agent-error-policy.mjs');
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const i = process.argv.indexOf('--classify');
-  if (i !== -1) {
-    const cls = classifyAgentError(process.argv[i + 1] || '');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  if (values.classify !== undefined) {
+    const cls = classifyAgentError(values.classify);
     console.log(`${cls.kind}: ${cls.why}${cls.matched ? ` (matched "${cls.matched}")` : ''}`);
     console.log(`  plan: ${JSON.stringify(retryPlan(cls, { attempt: 1 }))}`);
     process.exit(0);

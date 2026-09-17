@@ -32,21 +32,19 @@
  *   node scripts/session-board.mjs --conflicts
  *   node scripts/session-board.mjs --release
  *   node scripts/session-board.mjs --self-test
+ *   (полная справка: --help; незнакомый флаг, лишнее слово или флаг без значения — код 2
+ *   до любой записи на доску)
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 export const BOARD_DIR = path.join(os.homedir(), '.jidoka', 'board');
 /** Запись считается протухшей, если сессия не обновляла её дольше этого срока. */
 export const STALE_MS = 45 * 60 * 1000;
-
-const arg = (name, dflt = undefined) => {
-  const i = process.argv.indexOf(name);
-  return i >= 0 && process.argv[i + 1] && !process.argv[i + 1].startsWith('--') ? process.argv[i + 1] : dflt;
-};
 
 function sh(cmd, cwd) {
   try { return execSync(cmd, { cwd, encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] }).trim(); }
@@ -178,8 +176,8 @@ export function conflicts(entries = []) {
 
 // ---------- ввод-вывод ----------
 
-function sessionName() {
-  return process.env.JIDOKA_SESSION || arg('--session') ||
+function sessionName(session) {
+  return process.env.JIDOKA_SESSION || session ||
     `${path.basename(process.cwd())}-${String(process.ppid || process.pid).slice(-2)}`;
 }
 
@@ -195,19 +193,19 @@ export function readBoard(dir = BOARD_DIR) {
 
 function pidAlive(pid) { try { process.kill(pid, 0); return true; } catch { return false; } }
 
-function cmdPublish() {
+function cmdPublish(values) {
   const cwd = process.cwd();
-  const name = sessionName();
+  const name = sessionName(values.session);
   const entry = {
     session: name,
     // pid ТОЛЬКО если его назвали явно: pid публикующего `node` бесполезен, он умирает сразу
-    pid: Number(arg('--pid', '')) || null,
+    pid: values.pid || null,
     host: os.hostname(),
     worktree: cwd,
     repo: repoNameFrom(sh('git rev-parse --path-format=absolute --git-common-dir', cwd), sh('git rev-parse --show-toplevel', cwd) || cwd),
     branch: sh('git branch --show-current', cwd) || null,
-    intent: arg('--intent', '') || '',
-    claims: (arg('--claims', '') || '').split(',').map((s) => s.trim()).filter(Boolean),
+    intent: values.intent || '',
+    claims: (values.claims || '').split(',').map((s) => s.trim()).filter(Boolean),
     startedAt: Date.now(),
     updatedAt: Date.now(),
     status: 'working',
@@ -251,8 +249,8 @@ function cmdConflicts() {
   process.exit(c.some((x) => x.level === 'high') ? 1 : 0);
 }
 
-function cmdRelease() {
-  const f = path.join(BOARD_DIR, `${sessionName()}.json`);
+function cmdRelease(values) {
+  const f = path.join(BOARD_DIR, `${sessionName(values.session)}.json`);
   if (!fs.existsSync(f)) return console.log('нечего освобождать');
   try {
     const e = JSON.parse(fs.readFileSync(f, 'utf8'));
@@ -326,11 +324,31 @@ function selfTest() {
   process.exit(failed.length ? 1 : 0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово или флаг без значения — код 2
+// до любой записи на доску. Раньше опечатка `--intnet` молча публиковала запись без намерения.
+// --list — режим по умолчанию, флаг назван явно.
+export const CLI = {
+  name: 'session-board',
+  summary: 'Доска «кто что делает» для параллельных сессий: объявить намерение, увидеть пересечения.',
+  selfTest: true,
+  options: {
+    publish: { type: 'boolean', desc: 'объявить на доске, чем занята сессия' },
+    intent: { type: 'string', value: 'текст', desc: 'что делаю (вместе с --publish)' },
+    claims: { type: 'string', value: 'глоб,глоб', desc: 'какие пути правлю (вместе с --publish)' },
+    pid: { type: 'number', value: 'pid', desc: 'живой процесс сессии (вместе с --publish)' },
+    list: { type: 'boolean', desc: 'все записи доски (режим по умолчанию)' },
+    conflicts: { type: 'boolean', desc: 'пересечения живых сессий (код 1 при высоком)' },
+    release: { type: 'boolean', desc: 'снять свою запись' },
+    session: { type: 'string', value: 'имя', desc: 'имя сессии (по умолчанию JIDOKA_SESSION или имя папки)' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  else if (process.argv.includes('--publish')) cmdPublish();
-  else if (process.argv.includes('--conflicts')) cmdConflicts();
-  else if (process.argv.includes('--release')) cmdRelease();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  else if (values.publish) cmdPublish(values);
+  else if (values.conflicts) cmdConflicts();
+  else if (values.release) cmdRelease(values);
   else cmdList();
 }

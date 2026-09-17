@@ -35,7 +35,7 @@ Each AC names the executable check that proves it. ACs are the contract; the com
 ### AC-1 — A cross-line dispatch without override blocks in hard mode (exit 1)
 
 ```
-node scripts/check-cross-line-dispatch.mjs --self-check
+fixture: --caller <агент первой линии> --callee <агент третьей линии>, crossLineBlock.hardBlockEnabled=true → exit 1
 ```
 
 ### AC-2 — An override with empty approver is rejected (anonymous bypass blocked)

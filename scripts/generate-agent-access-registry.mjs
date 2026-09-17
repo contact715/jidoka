@@ -15,6 +15,7 @@
 import { readFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const AGENTS_DIR = '.claude/agents';
 const ROSTER = 'docs/AGENT_ROSTER.md';
@@ -68,9 +69,18 @@ function getLine(slug) {
 
 const agents = [];
 
+// Разбор строгий (2026-09-16): скрипт перезаписывает реестр доступа, поэтому любой флаг,
+// кроме --help, — код 2 до записи. Флагов у генератора нет.
+export const CLI = {
+  name: 'generate-agent-access-registry',
+  summary: 'Пересобрать docs/governance/agent-access-registry.json из .claude/agents/*.md и docs/AGENT_ROSTER.md.',
+  options: {},
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
   for (const f of readdirSync(AGENTS_DIR).filter(f => f.endsWith('.md')).sort()) {
     const slug = f.replace(/\.md$/, '');
     const tools = extractTools(readFileSync(`${AGENTS_DIR}/${f}`, 'utf8'));

@@ -60,6 +60,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -528,9 +529,17 @@ async function main() {
 }
 
 
+// Разбор строгий (2026-09-16): флагов у сканера нет, поэтому `--help` или опечатка раньше
+// запускали полный прогон trivy с записью в реестр находок. Теперь — справка или код 2.
+export const CLI = {
+  name: 'run-container-scan',
+  summary: 'Просканировать образы из docs/security/container-image-inventory.json через trivy и записать находки C17. Код 1 — есть CRITICAL.',
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
   main().catch((err) => {
     process.stderr.write(`[run-container-scan] Unhandled error: ${err.message}\n`);
     process.exit(1);

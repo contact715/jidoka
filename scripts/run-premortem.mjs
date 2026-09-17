@@ -17,6 +17,7 @@
  * Exit codes:
  *   0   Success (artifact written, or dry-run complete)
  *   1   Error (spec not found, unhandled error)
+ *   2   Bad call (unknown flag, extra word, --wave without value) — nothing done
  *
  * LLM mechanism: npx claude --print subprocess (NO Anthropic SDK).
  * Model: claude-sonnet-4-5
@@ -31,6 +32,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync, spawn } from 'node:child_process';
 import { emitTelemetry } from './emit-telemetry.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -46,25 +48,11 @@ const CONFIG_PATH = path.join(ROOT, '.sdd-config.json');
 const MODEL = 'claude-sonnet-4-5';
 
 // ── CLI args ─────────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-
-function getArg(flag) {
-  const idx = args.indexOf(flag);
-  return idx !== -1 ? args[idx + 1] : null;
-}
-
-function hasFlag(flag) {
-  return args.includes(flag);
-}
-
-// ── Help ─────────────────────────────────────────────────────────────────────
-
-const isMain = process.argv[1] === fileURLToPath(import.meta.url);
-
-if (isMain) {
-  if (hasFlag('--help')) {
-    process.stdout.write(`
-run-premortem.mjs — Wave-156 Pre-Mortem Agent
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово или --wave без значения —
+// код 2 до чтения спеки и до вызова модели.
+export const CLI = {
+  name: 'run-premortem',
+  usage: `run-premortem.mjs — Wave-156 Pre-Mortem Agent
 
 Usage:
   node scripts/run-premortem.mjs --wave <wave-NNN>
@@ -76,12 +64,13 @@ Flags:
                      Reads docs/specs/<wave-NNN>_MASTER_SPEC.md.
   --dry              Dry-run mode. Prints 4-lens prompts and synthesis
                      structure to stdout. Does NOT invoke LLM or write files.
-                     Exits 0.
+                     Exits 0. Alias: --dry-run.
   --help             Show this help text and exit 0.
 
 Exit codes:
   0   Success or dry-run complete
-  1   Spec not found or unhandled error
+  1   Spec not found, --wave missing, or unhandled error
+  2   Bad call: unknown flag, extra word, --wave without a value (nothing was done)
 
 Example:
   node scripts/run-premortem.mjs --wave wave-156 --dry
@@ -89,14 +78,22 @@ Example:
 
 Config (.sdd-config.json):
   preMortem.enabled: false          -> soft-gate default (runs but does not block)
-  andonCord.hardBlockEnabled: true  -> enables hard-block mode
-`);
-    process.exit(0);
-  }
+  andonCord.hardBlockEnabled: true  -> enables hard-block mode`,
+  options: {
+    wave: { type: 'string', value: 'wave-NNN', desc: 'идентификатор волны' },
+    dry: { type: 'boolean', desc: 'сухой прогон: без вызова модели и без записи' },
+    'dry-run': { type: 'boolean', desc: 'то же, что --dry' },
+  },
+};
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  const { values } = runCli(CLI);
 
   // ── Wave flag ────────────────────────────────────────────────────────────────
-  const waveArg = getArg('--wave');
-  const isDry = hasFlag('--dry') || hasFlag('--dry-run');
+  const waveArg = values.wave || null;
+  const isDry = values.dry === true || values['dry-run'] === true;
 
   if (!waveArg) {
     process.stderr.write('[premortem] ERROR: --wave <wave-NNN> is required. Run with --help for usage.\n');

@@ -30,6 +30,7 @@
  * Exit codes:
  *   0 — success (files written or dry run)
  *   1 — fatal I/O error (no partial file written, via atomic write pattern)
+ *   2 — bad call: unknown flag, --class without a value or outside the list (nothing done)
  *
  * PII hook (T7 — identity in v1, wave-165 provides implementation):
  *   redactPii(obs) returns obs unchanged in v1.
@@ -46,6 +47,7 @@ import { fileURLToPath } from 'node:url';
 import { emitTelemetry } from './emit-telemetry.mjs';
 // Wave-165: PII redaction — import shared module (TS/MJS boundary: .mjs only)
 import { redactPiiString } from '../lib/redaction/redact-pii.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -70,24 +72,23 @@ const CLASS_TO_PATH = new Map([
 ]);
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
-const args    = process.argv.slice(2);
-const isDry   = args.includes('--dry');
-const classArg = (() => {
-  const idx = args.indexOf('--class');
-  return idx !== -1 ? args[idx + 1] : null;
-})();
-
+// Разбор строгий (2026-09-16): незнакомый флаг, --class без значения или с классом
+// не из списка — код 2 до любой записи.
+export const CLI = {
+  name: 'export-memory-snapshot',
+  summary: 'Выгрузить сущности памяти (AntiPattern, Skill, Lesson, wave, Spec) в docs/memory-*.md.',
+  options: {
+    class: { type: 'string', choices: ['all', ...CLASS_TO_PATH.keys()], desc: 'только этот класс (по умолчанию все пять)' },
+    dry: { type: 'boolean', desc: 'только посчитать, ничего не записывать' },
+  },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (classArg && classArg !== 'all' && !CLASS_TO_PATH.has(classArg)) {
-    process.stderr.write(
-      `[export-memory-snapshot] ERROR: unknown class "${classArg}". ` +
-      `Valid values: all, ${[...CLASS_TO_PATH.keys()].join(', ')}\n`
-    );
-    process.exit(1);
-  }
+  const { values } = runCli(CLI);
+  const isDry = values.dry === true;
+  const classArg = values.class ?? null;
 
   // ── KNOWN_ENTITIES (wave-145 compat fallback for AntiPattern/Skill/Lesson) ───
   /** @type {Array<{name: string, entityType: string, observations: string[], wave: string}>} */

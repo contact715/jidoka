@@ -37,6 +37,7 @@ import { readFileSync, existsSync, readdirSync, mkdtempSync, writeFileSync, rmSy
 import { resolve, join, relative, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 const DEFAULTS = {
   enabled: true,
@@ -100,20 +101,17 @@ function* walk(dir, suffixRe) {
   }
 }
 
-function run() {
-  const args = process.argv.slice(2);
-  const rootArg = args.find((_, i) => args[i - 1] === '--root');
-  const specsArg = args.find((_, i) => args[i - 1] === '--specs');
+function run({ root: rootArg, specs: specsArg, staged = false, hard: hardArg = false } = {}) {
   const root = resolve(rootArg ?? process.cwd());
   const cfg = loadConfig(root);
   if (cfg.enabled === false) { console.log('[ac-coverage] disabled via .sdd-config.json'); return 0; }
-  const hard = args.includes('--hard') || cfg.hardBlockEnabled === true;
+  const hard = hardArg === true || cfg.hardBlockEnabled === true;
 
   // Which specs to check
   let specFiles = [];
   if (specsArg) {
     specFiles = specsArg.split(',').map((f) => resolve(root, f.trim())).filter(existsSync);
-  } else if (args.includes('--staged')) {
+  } else if (staged === true) {
     try {
       specFiles = execSync('git diff --cached --name-only', { cwd: root, encoding: 'utf8' })
         .split('\n')
@@ -246,9 +244,25 @@ function realArtifactCheck() {
   return 0;
 }
 
+// Разбор строгий (2026-09-16): стоит в pre-commit установленных проектов. Опечатка `--hrad`
+// раньше молча превращала жёсткий гейт в мягкий. Теперь — код 2 до чтения спек.
+export const CLI = {
+  name: 'ac-coverage-check',
+  summary: 'Гейт коммита: у каждого критерия приёмки спеки есть тест, который на него ссылается.',
+  selfTest: true,
+  options: {
+    staged: { type: 'boolean', desc: 'проверить спеки из индекса git' },
+    specs: { type: 'string', value: 'файлы через запятую', desc: 'проверить названные спеки' },
+    root: { type: 'string', value: 'папка', desc: 'корень проекта (по умолчанию текущая папка)' },
+    hard: { type: 'boolean', desc: 'код 1 при непокрытом критерии (иначе — по .sdd-config.json)' },
+    'real-artifact': { type: 'boolean', desc: 'проверить извлечение критериев на настоящем дереве docs/specs' },
+  },
+};
+
 if (process.argv[1] && process.argv[1].endsWith('ac-coverage-check.mjs')) {
-  if (process.argv.includes('--self-test')) process.exit(selfTest());
-  if (process.argv.includes('--real-artifact')) process.exit(realArtifactCheck());
-  process.exit(run());
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) process.exit(selfTest());
+  if (values['real-artifact'] === true) process.exit(realArtifactCheck());
+  process.exit(run({ root: values.root, specs: values.specs, staged: values.staged === true, hard: values.hard === true }));
 }
 

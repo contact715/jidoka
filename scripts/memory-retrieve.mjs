@@ -25,6 +25,7 @@
  * Usage:
  *   node scripts/memory-retrieve.mjs --task "<text>" [--k 5] [--json] [--no-docs]
  *   node scripts/memory-retrieve.mjs --self-test
+ *   (full help: --help; an unknown flag, a stray word or a flag without its value exits 2)
  */
 
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
@@ -32,6 +33,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { loadLedger, groupByClass, todayISO, LEDGER } from './meta-lib.mjs';
 import { scoreCluster } from './memory-consolidate.mjs';
+import { runCli } from './lib/cli.mjs';
 
 // Same path the curator writes (next to the ledger), so priors are found in both contexts.
 const LESSON_UTILITY = process.env.LESSON_UTILITY || LEDGER.replace(/meta-mistakes\.jsonl$/, 'lesson-utility.json');
@@ -160,20 +162,32 @@ function docItems(dirs = ['docs/specs', 'docs/retros'], cap = 400) {
   });
 }
 
-function arg(args, name, dflt) { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : dflt; }
+// Strict parsing (2026-09-16): an unknown flag, a stray word or a flag without its value exits 2.
+// Before, `--nodocs` silently searched the docs too and `--k ten` silently fell back to 5.
+export const CLI = {
+  name: 'memory-retrieve',
+  summary: 'Task-relevant recall by meaning (TF-IDF) over the mistake ledger and docs/specs + docs/retros.',
+  selfTest: true,
+  options: {
+    task: { type: 'string', value: 'text', desc: 'what you are about to do (required)' },
+    k: { type: 'number', default: 5, desc: 'how many results' },
+    json: { type: 'boolean', desc: 'machine-readable output' },
+    'no-docs': { type: 'boolean', desc: 'search the ledger only, skip the markdown corpus' },
+  },
+};
 
 function main() {
-  const args = process.argv.slice(2);
-  if (args.includes('--self-test')) return selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) return selfTest();
 
-  const task = arg(args, '--task');
+  const task = values.task;
   if (!task) { console.error('memory-retrieve: --task "<text>" required'); process.exit(2); }
-  const k = Number(arg(args, '--k', '5')) || 5;
+  const k = values.k || 5;
   const today = todayISO();
-  const items = [...ledgerItems(today), ...(args.includes('--no-docs') ? [] : docItems())];
+  const items = [...ledgerItems(today), ...(values['no-docs'] ? [] : docItems())];
   const { results, relevanceDriven } = retrieve(items, task, k);
 
-  if (args.includes('--json')) { process.stdout.write(JSON.stringify({ task, relevanceDriven, results }, null, 2) + '\n'); return; }
+  if (values.json) { process.stdout.write(JSON.stringify({ task, relevanceDriven, results }, null, 2) + '\n'); return; }
 
   console.log(`memory-retrieve: top ${results.length} for "${task}" (${relevanceDriven ? 'relevance-driven' : 'recency fallback — task overlaps nothing'})`);
   for (const r of results) {

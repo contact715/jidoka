@@ -12,12 +12,23 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rbank-test-'));
+// Разбор строгий (2026-09-16): сам файл и есть проверка, флагов у него нет; незнакомое
+// слово или флаг — код 2 до создания временной папки.
+export const CLI = {
+  name: 'test-reasoning-bank',
+  summary: 'Регрессионный тест reasoning-bank.mjs во временной папке (настоящее хранилище не трогается).',
+  options: {},
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
+  // Временная папка создаётся только при запуске: раньше mkdtempSync стоял на верхнем
+  // уровне и срабатывал при любом импорте файла, оставляя пустую папку в tmp.
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'rbank-test-'));
   process.env.REASONING_BANK_DIR = tmp;
 
   const { persistArtifact, readBank, bankPath, MAX_CONTENT } = await import('./reasoning-bank.mjs');

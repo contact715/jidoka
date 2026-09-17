@@ -29,6 +29,7 @@ import { homedir } from 'node:os';
 import { loadLedgerUnion, groupByClass, daysBetween, todayISO, recurrencesAfter } from './meta-lib.mjs';
 import { REMEDIES } from './meta-remedies.mjs'; // single source of truth for gates
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 /**
  * 2026-W35-A1 — ВТОРАЯ ОСЬ РЕЦИДИВА: по режиму отказа, а не по имени класса.
@@ -114,11 +115,17 @@ export function modeCoverage(ledgerRows = [], remedies = {}) {
   return out.sort((a, b) => b.classes - a.classes);
 }
 
-const rows = loadLedgerUnion(); // union-ledger-read: both addresses, deduped (2026-W32-R2)
+export const CLI = {
+  name: 'meta-audit',
+  summary: 'Движок мета-ошибок: повторяющиеся классы из реестра и состояние их гейтов. Рецидив без держащего гейта — код 1.',
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
+  // Чтение реестра — только при запуске: раньше оно шло при импорте (тест импортирует recurrenceByMode).
+  const rows = loadLedgerUnion(); // union-ledger-read: both addresses, deduped (2026-W32-R2)
   if (rows.length === 0) { console.log('meta-audit: ledger empty — nothing to analyze.'); process.exit(0); }
 
   const grouped = groupByClass(rows);

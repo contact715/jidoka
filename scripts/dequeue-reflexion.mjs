@@ -13,13 +13,14 @@
  * Usage:
  *   node scripts/dequeue-reflexion.mjs --reviewed <sha>      # drain one (by short or full SHA)
  *   node scripts/dequeue-reflexion.mjs --list                # show the backlog
- *   node scripts/dequeue-reflexion.mjs --reviewed <sha> [...] # drain several
+ *   node scripts/dequeue-reflexion.mjs --reviewed <sha> --reviewed <sha2> # drain several
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { persistArtifact } from './reasoning-bank.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const QUEUE = path.resolve(__dirname, '..', '.claude', 'reflexion-queue');
@@ -29,13 +30,22 @@ function listQueue() {
   return fs.readdirSync(QUEUE).filter((f) => f.endsWith('.md') && f !== 'README.md');
 }
 
-const args = process.argv.slice(2);
-
+// Разбор строгий (2026-09-16): незнакомый флаг или лишнее слово — код 2 до удаления из очереди.
+// Раньше `--reviewed a b` молча снимал только a, а `--reviwed a` печатал отказ с кодом 1.
+export const CLI = {
+  name: 'dequeue-reflexion',
+  summary: 'Снять из очереди .claude/reflexion-queue коммиты, которые уже прошли адверсариальный разбор. Без флагов — показать очередь.',
+  options: {
+    list: { type: 'boolean', desc: 'показать очередь (действует и без флагов)' },
+    reviewed: { type: 'string', multiple: true, value: 'sha', desc: 'снять коммит (короткий или полный SHA); флаг повторяется' },
+  },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (args.includes('--list') || args.length === 0) {
+  const { values } = runCli(CLI);
+  if (values.list || values.reviewed === undefined) {
     const items = listQueue();
     if (items.length === 0) {
       console.log('[reflexion] queue empty — no pending adversarial reviews.');
@@ -46,13 +56,7 @@ if (isMain) {
     process.exit(0);
   }
 
-  const reviewed = [];
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--reviewed') {
-      const sha = args[i + 1];
-      if (sha && !sha.startsWith('--')) reviewed.push(sha);
-    }
-  }
+  const reviewed = values.reviewed.filter(Boolean);
 
   if (reviewed.length === 0) {
     console.error('[reflexion] no --reviewed <sha> given. Use --list to see the backlog.');

@@ -26,6 +26,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseModule } from './code-map.mjs';
 import { tokenize, buildIdf, scoreItem } from './memory-retrieve.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -172,8 +173,7 @@ function collectFiles(absDir) {
 }
 
 // ── self-test ──────────────────────────────────────────────────────────────
-const isMain = process.argv[1] === fileURLToPath(import.meta.url);
-if (isMain && process.argv.includes('--self-test')) {
+function selfTest() {
   let fails = 0;
   const ok = (name, cond) => { if (!cond) fails++; console.log(`  ${cond ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); };
 
@@ -202,22 +202,40 @@ if (isMain && process.argv.includes('--self-test')) {
   process.exit(0);
 }
 
+// ── CLI ────────────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): опечатка `--wirte` или `--tsak` раньше молча пропускалась,
+// и прибор отвечал не на тот вопрос. Теперь — код 2 до чтения файлов.
+export const CLI = {
+  name: 'standards-mine',
+  summary: 'Фактические соглашения кода в папке: как здесь уже пишут (только чтение; --write — в docs/standards).',
+  selfTest: true,
+  options: {
+    dir: { type: 'string', value: 'папка', desc: 'что читать (по умолчанию scripts)' },
+    task: { type: 'string', value: 'текст', desc: 'оставить только соглашения, относящиеся к задаче' },
+    k: { type: 'number', value: 'число', desc: 'сколько соглашений оставить для задачи (по умолчанию 4)' },
+    json: { type: 'boolean', desc: 'вывод в JSON' },
+    write: { type: 'boolean', desc: 'также записать docs/standards/conventions.md' },
+  },
+};
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const dir = arg('--dir') || 'scripts';
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const dir = values.dir || 'scripts';
   const absDir = path.resolve(ROOT, dir);
   const files = collectFiles(absDir);
   if (files.length === 0) { console.log(`[standards-mine] no source files under ${dir} — nothing to mine.`); process.exit(0); }
   let conv = mineConventions(files);
-  const task = arg('--task');
-  if (task) conv = relevantConventions(conv, task, Number(arg('--k')) || 4);
+  const task = values.task || null;
+  if (task) conv = relevantConventions(conv, task, values.k || 4);
 
-  if (process.argv.includes('--json')) { console.log(JSON.stringify({ dir, files: files.length, conventions: conv }, null, 2)); process.exit(0); }
+  if (values.json === true) { console.log(JSON.stringify({ dir, files: files.length, conventions: conv }, null, 2)); process.exit(0); }
 
   console.log(`[standards-mine] ${files.length} file(s) under ${dir}${task ? ` — top ${conv.length} for task` : ''}:`);
   for (const c of conv) console.log(`  ${c.dimension.padEnd(20)} ${c.dominant.padEnd(34)} ${c.prevalence}%`);
 
-  if (process.argv.includes('--write')) {
+  if (values.write === true) {
     const outDir = path.resolve(ROOT, 'docs', 'standards');
     fs.mkdirSync(outDir, { recursive: true });
     const outFile = path.join(outDir, 'conventions.md');

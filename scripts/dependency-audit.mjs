@@ -12,6 +12,7 @@
 
 import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 // pure: decide pass/fail from `npm audit --json` output
 export function assess(auditJson, { failOn = ['critical', 'high'] } = {}) {
@@ -45,9 +46,18 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): флагов нет, любой незнакомый — код 2 до запуска npm audit.
+export const CLI = {
+  name: 'dependency-audit',
+  summary: 'Гейт поставок: npm audit в текущей папке, отказ на high/critical (честный проход, если зависимостей нет).',
+  selfTest: true,
+  options: {},
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   if (!hasDeps()) { console.log('dependency-audit: zero-dependency project — nothing to scan (honest pass, not a fake).'); process.exit(0); }
   let out = '';
   try { out = execSync('npm audit --json', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); }

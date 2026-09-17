@@ -4,14 +4,14 @@
     "total": 91,
     "byKind": {
       "self": 11,
-      "engine": 2,
-      "cli": 38,
-      "manual": 40,
+      "engine": 3,
+      "cli": 36,
+      "manual": 41,
       "unrecognized": 0
     },
     "wired": 91,
-    "executable": 13,
-    "credited": 40
+    "executable": 14,
+    "credited": 41
   },
   "rows": [
     {
@@ -251,10 +251,10 @@
     {
       "spec": "docs/specs/modules/meta-engine/meta-gate-registry.md",
       "id": "AC-1",
-      "title": "Self-test passes",
-      "command": "node scripts/meta-remedies.mjs --self-test",
-      "kind": "self",
-      "script": "scripts/meta-remedies.mjs",
+      "title": "The registry loads and drives the recurrence audit",
+      "command": "node --test scripts/__tests__/meta-audit.test.mjs",
+      "kind": "engine",
+      "script": "scripts/__tests__/meta-audit.test.mjs",
       "wired": true
     },
     {
@@ -387,9 +387,9 @@
       "spec": "docs/specs/modules/observability/gdoc-export.md",
       "id": "AC-1",
       "title": "snapshotMarkdown returns a heading and a tasks section",
-      "command": "node scripts/dashboard/serve.mjs --self-test (gdoc export self-check)",
-      "kind": "cli",
-      "script": "scripts/dashboard/serve.mjs",
+      "command": "node scripts/dashboard/gdoc-export.mjs --self-test",
+      "kind": "self",
+      "script": "scripts/dashboard/gdoc-export.mjs",
       "wired": true
     },
     {
@@ -423,9 +423,9 @@
       "spec": "docs/specs/modules/orchestration/cross-line-dispatch-guard.md",
       "id": "AC-1",
       "title": "A cross-line dispatch without override blocks in hard mode (exit 1)",
-      "command": "node scripts/check-cross-line-dispatch.mjs --self-check",
-      "kind": "cli",
-      "script": "scripts/check-cross-line-dispatch.mjs",
+      "command": "fixture: --caller <агент первой линии> --callee <агент третьей линии>, crossLineBlock.hardBlockEnabled=true → exit 1",
+      "kind": "manual",
+      "script": null,
       "wired": true
     },
     {
@@ -852,10 +852,6 @@
       "ok": true
     },
     {
-      "command": "node scripts/meta-remedies.mjs --self-test",
-      "ok": true
-    },
-    {
       "command": "node --test scripts/__tests__/meta-lib.test.mjs",
       "ok": true
     },
@@ -873,6 +869,10 @@
     },
     {
       "command": "node scripts/dashboard/collectors.mjs --self-test",
+      "ok": true
+    },
+    {
+      "command": "node scripts/dashboard/gdoc-export.mjs --self-test",
       "ok": true
     },
     {

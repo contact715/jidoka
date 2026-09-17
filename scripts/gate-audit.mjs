@@ -17,6 +17,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { runCli } from './lib/cli.mjs';
 
 export const GATES = [
   // CI — run on every push/PR, hard-block
@@ -686,9 +687,21 @@ function selfTest() {
   process.exit(0);
 }
 
+// Строгий разбор (2026-09-16): незнакомый флаг или слово — код 2 до аудита и до записи
+// очереди человеческих шагов (--emit-pending пишет в docs/audits/_PENDING_HUMAN.jsonl).
+export const CLI = {
+  name: 'gate-audit',
+  summary: 'Карта всех гейтов по слоям и проверка, что каждый реально стоит где заявлено (CI, хуки, реестр классов, область).',
+  selfTest: true,
+  options: {
+    'emit-pending': { type: 'boolean', desc: 'только наполнить очередь человеческих шагов (регистрация классов) и выйти' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
   // --emit-pending работает ОТДЕЛЬНОЙ, ранней веткой намеренно.
   //
@@ -698,7 +711,7 @@ if (isMain) {
   // висело в хвосте главного прохода, оно молча не выполнялось бы каждый день, и очередь
   // человеческих шагов протухла бы — тот самый класс, против которого она и заведена.
   // Наполнение не зависит ни от одной из репозиторных проверок, поэтому идёт до них.
-  if (process.argv.includes('--emit-pending')) {
+  if (values['emit-pending']) {
     let settingsEarly = '';
     try { settingsEarly = readFileSync(join(homedir(), '.claude', 'settings.json'), 'utf8'); } catch { /* no global config */ }
     const files = collectMechanisms(process.cwd(), { extraDirs: [join(homedir(), '.claude', 'hooks')] });

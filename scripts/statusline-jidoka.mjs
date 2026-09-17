@@ -20,6 +20,22 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { execSync, spawn } from 'node:child_process';
 import { join } from 'node:path';
+import { fileURLToPath as toPath } from 'node:url';
+
+// Строгий разбор аргументов (2026-09-16). По docs/CLI_APPEARANCE.md эта версия ставится в
+// ~/.claude/statusline-jidoka.mjs, где рядом нет scripts/lib — статический импорт помощника упал бы
+// там на каждом кадре. Загрузчик ищется в собственном дереве: в установке — ./hooks/lib, в каноне
+// (scripts/) — ../hooks/lib; второй адрес только в канонической раскладке, иначе ../ ушёл бы в чужой HOME.
+const HOOK_BAD_CALL_EXIT = 1;
+async function loadStrictCli() {
+  const here = toPath(new URL('.', import.meta.url));
+  const candidates = [new URL('./hooks/lib/load-cli.mjs', import.meta.url)];
+  if (/[\\/]scripts[\\/]?$/.test(here)) candidates.push(new URL('../hooks/lib/load-cli.mjs', import.meta.url));
+  const found = candidates.find((u) => existsSync(u));
+  if (!found) throw new Error(`statusline-jidoka: не найден hooks/lib/load-cli.mjs рядом с ${here}`);
+  const { loadCli } = await import(found.href);
+  return loadCli(import.meta.url);
+}
 
 // ---------- tiny ANSI helpers (256-color, colorblind-safe set) ----------
 const C = {
@@ -245,9 +261,19 @@ function readTodos(sessionId) {
   } catch { return []; }
 }
 
+// Строгий разбор (2026-09-16). Это строка состояния Claude Code: неверный вызов — код 1, как у хуков
+// (видимая ошибка без блокировки), данные сессии — в stdin, аргументов нет.
+export const CLI = {
+  name: 'statusline-jidoka',
+  summary: 'Строка состояния Claude Code: здоровье jidoka, ветка, модель, контекст, стоимость. Данные сессии — JSON в stdin.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = (await loadStrictCli()).runCli(CLI);
+  if (wantsSelfTest) selfTest();
   let raw = ''; try { raw = readFileSync(0, 'utf8'); } catch { /* no stdin */ }
   let ctx = {}; try { ctx = JSON.parse(raw || '{}'); } catch { /* none */ }
   const cwd = ctx.workspace?.current_dir || ctx.cwd || process.cwd();

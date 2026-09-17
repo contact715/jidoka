@@ -29,6 +29,7 @@
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { loadLedger } from './meta-lib.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const INFLATED = ['comprehensive', 'seamless', 'flawless', 'bulletproof', 'robust', 'exhaustive', 'perfectly', 'thoroughly', 'fully tested', 'production-ready', 'rock-solid'];
 const VAGUE_REAL = new Set(['fixed', 'done', 'ok', 'okay', 'resolved', 'works', 'good', 'n/a', 'na', 'same', 'nothing', 'none']);
@@ -246,9 +247,19 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): гейт стоит в pre-commit и CI; незнакомый флаг — код 2 до аудита,
+// а не молча пропущенный. Путь к реестру по-прежнему задаётся переменной META_LEDGER.
+export const CLI = {
+  name: 'meta-honesty',
+  summary: 'Аудит честности сигнала в реестре ошибок: самоподтверждение (блок), раздутые заявки, самоотчёт.',
+  selfTest: true,
+  options: {},
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
   const rows = loadLedger();
   if (rows.length === 0) { console.log('meta-honesty: ledger empty — no signal to audit.'); process.exit(0); }

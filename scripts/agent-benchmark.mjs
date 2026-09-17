@@ -18,11 +18,12 @@
 //
 // Usage:
 //   node scripts/agent-benchmark.mjs --self-test
-//   node scripts/agent-benchmark.mjs --verify [tasks.jsonl]     run each task's verifier in the CURRENT tree, score
+//   node scripts/agent-benchmark.mjs --verify [tasks.jsonl]     # run each task's verifier in the CURRENT tree, score
 //   node scripts/agent-benchmark.mjs --score <results.jsonl> --tasks <tasks.jsonl>
 
 import { readFileSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 const DEFAULT_TASKS = 'docs/benchmarks/_tasks.jsonl';
 
@@ -87,14 +88,31 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k, d) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : d; };
+// Разбор строгий (2026-09-16). У --verify путь необязателен (`--verify` и `--verify <файл>` оба
+// живые), поэтому флаг булев, а путь — необязательное слово после него.
+export const CLI = {
+  name: 'agent-benchmark',
+  summary: 'Оценка агентов по исходу: прогнать проверки задач в текущем дереве или посчитать записанные результаты.',
+  selfTest: true,
+  options: {
+    verify: { type: 'boolean', desc: 'прогнать проверку каждой задачи в текущем дереве; путь к набору — словом после флага' },
+    score: { type: 'string', value: 'results.jsonl', desc: 'посчитать долю решённых по записанным результатам' },
+    tasks: { type: 'string', value: 'tasks.jsonl', default: DEFAULT_TASKS, desc: 'набор задач для --score' },
+  },
+  positionals: { min: 0, max: 1, name: 'tasks.jsonl' },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, positionals, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  if (positionals.length && !values.verify) {
+    process.stderr.write(`agent-benchmark: неверный вызов — лишнее слово «${positionals[0]}»: путь к набору задач принимается только после --verify\nНичего не выполнено.\n`);
+    process.exit(2);
+  }
 
-  if (process.argv.includes('--verify')) {
-    const tp = arg('--verify', DEFAULT_TASKS);
+  if (values.verify) {
+    const tp = positionals[0];
     const tasksPath = existsSync(tp) ? tp : DEFAULT_TASKS;
     if (!existsSync(tasksPath)) { console.error(`no task set at ${tasksPath}`); process.exit(2); }
     const tasks = readJsonl(tasksPath);
@@ -108,7 +126,7 @@ if (isMain) {
     process.exit(s.rate === 100 ? 0 : 1);
   }
 
-  const rp = arg('--score'), tp = arg('--tasks', DEFAULT_TASKS);
+  const rp = values.score, tp = values.tasks;
   if (!rp || !existsSync(rp)) { console.error('usage: --verify [tasks.jsonl] | --score <results.jsonl> --tasks <tasks.jsonl>  (or --self-test)'); process.exit(2); }
   const s = scoreRun(readJsonl(tp), readJsonl(rp));
   console.log(`agent-benchmark: ${s.resolved}/${s.total} resolved = ${s.rate}%`);

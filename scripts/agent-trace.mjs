@@ -16,8 +16,10 @@
 //   node scripts/agent-trace.mjs --self-test
 //   node scripts/agent-trace.mjs --ingest '{"agent":"reflexion-critic","label":"RC-PASS","outcome":"PASS","tokens":10613,"ms":2281}'
 //   node scripts/agent-trace.mjs            # summary per agent from agent-traces.jsonl
+//   (full help: --help; an unknown flag or a stray word exits 2 before anything is appended)
 
 import { appendFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 const TRACES = process.env.AGENT_TRACES || 'docs/audits/agent-traces.jsonl';
 const readJsonl = (p) => existsSync(p) ? readFileSync(p, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) : [];
@@ -66,11 +68,22 @@ function selfTest() {
   process.exit(0);
 }
 
+// Strict parsing (2026-09-16): an unknown flag or a stray word exits 2 before anything is
+// appended. Before, `--ingset '{...}'` silently printed the summary and the run was never recorded.
+export const CLI = {
+  name: 'agent-trace',
+  summary: 'Trace log of real agent dispatches: append one row, or print the per-agent summary.',
+  selfTest: true,
+  options: {
+    ingest: { type: 'string', value: 'json', desc: 'append one trace row ({"agent","label","outcome","tokens","ms"})' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const ing = arg('--ingest');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const ing = values.ingest;
   if (ing) {
     const row = JSON.parse(ing);
     row.ts = row.ts || process.env.META_TODAY || new Date().toISOString().slice(0, 10);

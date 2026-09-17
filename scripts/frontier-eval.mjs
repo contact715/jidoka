@@ -18,6 +18,7 @@ import { existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -50,13 +51,23 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до запуска оценок.
+export const CLI = {
+  name: 'frontier-eval',
+  summary: 'Прогнать оценки после волны: agent-benchmark всегда, trajectory-score и judge-calibration — если есть данные.',
+  selfTest: true,
+  options: {
+    trace: { type: 'string', value: 'trace.json', desc: 'записанная траектория волны' },
+    verdicts: { type: 'string', value: 'rows.json', desc: 'записанные вердикты судей' },
+  },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const trace = arg('--trace');
-  const verdicts = arg('--verdicts');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const trace = values.trace ?? null;
+  const verdicts = values.verdicts ?? null;
   const plan = planPostWaveEval({ hasTrace: !!(trace && existsSync(trace)), hasVerdicts: !!(verdicts && existsSync(verdicts)) });
   console.log(`frontier-eval — post-wave evals: ${plan.join(', ')}`);
 

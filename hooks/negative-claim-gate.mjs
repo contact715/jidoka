@@ -42,7 +42,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { хвостТранскрипта } from "./lib/transcript-tail.mjs";
+import { хвостТранскрипта, началоХода } from "./lib/transcript-tail.mjs";
+import { loadCli } from './lib/load-cli.mjs';
+
+// Строгий разбор аргументов (2026-09-16). Код отказа 1, а не 2: для Claude Code код 2 у
+// Stop значит «заблокировать завершение», и опечатка в settings.json заперла бы сессию.
+const HOOK_BAD_CALL_EXIT = 1;
 
 /** Утверждение об ОТСУТСТВИИ или о НЕДОСТИЖИМОСТИ. */
 // ГРАНИЦА СЛОВА НЕ \b. В JavaScript она определена по ASCII, поэтому перед кириллицей её
@@ -142,10 +147,7 @@ function collectLastTurn(transcriptPath) {
     parsed = хвостТранскрипта(transcriptPath).split('\n').filter(Boolean)
       .map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
   } catch { return ''; }
-  let start = 0;
-  for (let i = parsed.length - 1; i >= 0; i--) {
-    if (parsed[i]?.message?.role === 'user') { start = i + 1; break; }
-  }
+  const start = началоХода(parsed);   // после реплики человека, не после результата инструмента
   const chunks = [];
   for (let i = start; i < parsed.length; i++) {
     const m = parsed[i]?.message;
@@ -204,9 +206,20 @@ async function main() {
   process.exit(0);
 }
 
+// Разбор — первое, что делает хук: незнакомый флаг или лишнее слово — отказ до чтения stdin
+// и транскрипта. Слово события хук не читает, поэтому слов не принимает.
+export const CLI = {
+  name: 'negative-claim-gate',
+  path: 'hooks/negative-claim-gate.mjs',
+  summary: 'Хук Stop: утверждение об отсутствии без исчерпывающей проверки — предупреждение раз в сессию, без блокировки. Данные события — в stdin.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) {
+  const { selfTest: wantsSelfTest } = (await loadCli(import.meta.url)).runCli(CLI);
+  if (wantsSelfTest) {
     const fails = [];
     let ran = 0;
     const ok = (n, c) => { ran++; if (!c) fails.push(n); console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };

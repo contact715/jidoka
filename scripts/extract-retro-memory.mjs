@@ -29,15 +29,22 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const RETROS_DIR = path.join(ROOT, 'docs/retros');
 const STAGING_DIR = path.join(ROOT, '.claude/memory-staging');
 
-const args = new Set(process.argv.slice(2));
-const isDry = args.has('--dry');
-const isVerbose = args.has('--verbose');
+export const CLI = {
+  name: 'extract-retro-memory',
+  summary: 'Выжать уроки из docs/retros в файл для графа памяти (.claude/memory-staging).',
+  selfTest: true,
+  options: {
+    dry: { type: 'boolean', desc: 'только сводка, файл не пишется' },
+    verbose: { type: 'boolean', desc: 'разбор по каждому ретро' },
+  },
+};
 
 // ─── Section taxonomy ──────────────────────────────────────────────────
 // Map heading regex → (category, weight). Higher weight = more memory-worthy.
@@ -117,7 +124,7 @@ export function distillBatch(lessons = []) {
 }
 
 // ─── Entry point ───────────────────────────────────────────────────────
-function main() {
+function main({ isDry = false, isVerbose = false } = {}) {
   if (!fs.existsSync(RETROS_DIR)) {
     console.error(`✗ retros dir not found: ${RETROS_DIR}`);
     process.exit(2);
@@ -359,6 +366,7 @@ function selfTest() {
 // distillStrategy() ran the whole extractor and wrote a staging file as a side effect of a test.
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  main();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  main({ isDry: values.dry === true, isVerbose: values.verbose === true });
 }

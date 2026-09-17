@@ -36,6 +36,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { execSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 export const DEFAULTS = {
   small: { maxFiles: 2, maxLoc: 40 },
@@ -107,16 +108,15 @@ function loadConfig(root) {
   } catch { return DEFAULTS; }
 }
 
-function run() {
-  const args = process.argv.slice(2);
-  const rootArg = args.find((_, i) => args[i - 1] === '--root');
-  const metricsArg = args.find((_, i) => args[i - 1] === '--metrics');
+function run(values) {
+  const rootArg = values.root;
+  const metricsArg = values.metrics;
   const root = resolve(rootArg ?? process.cwd());
   const cfg = loadConfig(root);
 
   let m = null;
   if (metricsArg) m = JSON.parse(metricsArg);
-  else if (args.includes('--staged')) {
+  else if (values.staged) {
     try { m = metricsFromStaged(root); } catch { m = null; }
   }
   if (!m) { console.log('[change-ceremony] nothing to classify (pass --staged with a staged diff, or --metrics)'); return 0; }
@@ -145,6 +145,19 @@ function selfTest() {
   return pass === checks.length ? 0 : 1;
 }
 
+// Разбор строгий (2026-09-16): опечатка `--stagd` раньше молча давала «nothing to classify».
+export const CLI = {
+  name: 'change-ceremony',
+  summary: 'Классифицировать правку S/M/L по размеру и путям и назвать, какой процесс она должна (совет).',
+  selfTest: true,
+  options: {
+    staged: { type: 'boolean', desc: 'взять размер из подготовленного к коммиту диффа' },
+    root: { type: 'string', value: 'каталог', desc: 'корень репозитория (по умолчанию текущий)' },
+    metrics: { type: 'string', value: 'json', desc: 'готовые метрики {"filesTouched","locDelta",...}' },
+  },
+};
+
 if (process.argv[1] && process.argv[1].endsWith('change-ceremony.mjs')) {
-  process.exit(process.argv.includes('--self-test') ? selfTest() : run());
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  process.exit(wantsSelfTest ? selfTest() : run(values));
 }

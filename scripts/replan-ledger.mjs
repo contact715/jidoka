@@ -29,6 +29,7 @@
 
 import { readFileSync } from 'node:fs';
 import { EventEmitter } from 'node:events';
+import { runCli } from './lib/cli.mjs';
 
 // ── two-registry ledger ────────────────────────────────────────────
 export function newLedger({ wave = '?', coreProperty = '', facts = [], guesses = [], plan = [] } = {}) {
@@ -291,18 +292,49 @@ function selfTest() {
 }
 
 // ── CLI ────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): незнакомый флаг, флаг без значения — отказ до решения.
+// Раньше опечатка `--patern` молча давала «застоя нет» и код 0 — прогон шёл дальше.
+// Код 2 у скрипта уже занят остановкой (андон), и неверный вызов тоже даёт 2: для
+// вызывающего это безопасная сторона — неверный вызов останавливает прогон, а не пропускает.
+export const CLI = {
+  name: 'replan-ledger',
+  usage: `Перепланировщик на двух реестрах: на застое решает — перепланировать или остановить прогон.
+
+Использование:
+  node scripts/replan-ledger.mjs --decide <ledger.json> [--pattern <p>] [--detail "<d>"] [--evidence "<text>"]
+  node scripts/replan-ledger.mjs --self-test
+
+Флаги:
+  --decide <ledger.json>   реестр волны (обязателен)
+  --pattern <p>            образец застоя из stuck-detector; без него — «застоя нет»
+  --detail <текст>         подробность застоя
+  --evidence <текст>       текст для проверки подмены несущего свойства каркасом
+  -h, --help               эта справка
+  --self-test              самопроверка
+
+Коды выхода: 0 — решение replan или застоя нет; 1 — нет --decide или реестр не читается;
+2 — остановка прогона (halt) ИЛИ неверный вызов (тогда в stderr «неверный вызов», ничего не выполнено).`,
+  selfTest: true,
+  options: {
+    decide: { type: 'string' },
+    pattern: { type: 'string' },
+    detail: { type: 'string' },
+    evidence: { type: 'string' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  const args = process.argv.slice(2);
-  if (args.includes('--self-test')) selfTest();
-  const arg = (n) => { const i = args.indexOf(n); return i >= 0 ? args[i + 1] : undefined; };
-  const ledgerPath = arg('--decide');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const arg = (n) => values[n];
+  const ledgerPath = arg('decide');
   if (!ledgerPath) { console.error('usage: replan-ledger.mjs --decide <ledger.json> --pattern <p> --detail "<d>" [--evidence "<text>"] | --self-test'); process.exit(1); }
   let ledger;
   try { ledger = JSON.parse(readFileSync(ledgerPath, 'utf8')); }
   catch (e) { console.error(`✗ cannot read ledger ${ledgerPath}: ${e.message}`); process.exit(1); }
-  const pattern = arg('--pattern');
-  const decision = replan(ledger, pattern ? { stuck: true, pattern, detail: arg('--detail') || '' } : { stuck: false }, arg('--evidence') || '');
+  const pattern = arg('pattern');
+  const decision = replan(ledger, pattern ? { stuck: true, pattern, detail: arg('detail') || '' } : { stuck: false }, arg('evidence') || '');
   console.log(JSON.stringify(decision, null, 2));
   // exit 2 = andon tripwire (same convention as policy-enforce-hook): a halt stops the run.
   process.exit(decision.action === 'halt' ? 2 : 0);

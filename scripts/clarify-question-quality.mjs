@@ -16,6 +16,7 @@
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 // 14 interviewer-error types. Each detector is a pure (text)->boolean over a lowercased question.
 // Conservative: a detector fires on a clear signal, not a guess (false positives erode trust).
@@ -96,11 +97,21 @@ function selfTest() {
   process.exit(0);
 }
 
+// Строгий разбор (2026-09-16): незнакомый флаг или слово — код 2 до чтения stdin.
+export const CLI = {
+  name: 'clarify-question-quality',
+  summary: 'Качество уточняющего вопроса: 14 ошибок интервьюера + рубрика Грайса. Без --question читает вопросы из stdin (по одному в строке).',
+  selfTest: true,
+  options: {
+    question: { type: 'string', value: 'текст', desc: 'один вопрос; ответ — разбор в JSON' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const i = process.argv.indexOf('--question');
-  if (i === -1) {
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  if (values.question === undefined) {
     // read questions from stdin (one per line) as a gate
     let raw = '';
     try { raw = readFileSync(0, 'utf8'); } catch { /* no stdin */ }
@@ -111,7 +122,7 @@ if (isMain) {
     console.log(bad.length ? `\nclarify-question-quality: ${bad.length}/${qs.length} question(s) need rework.` : `\n✓ all ${qs.length} question(s) clean.`);
     process.exit(0); // WARN by default (soft gate)
   }
-  const r = scoreQuestion(process.argv[i + 1] || '');
+  const r = scoreQuestion(values.question);
   console.log(JSON.stringify(r, null, 2));
   process.exit(0);
 }

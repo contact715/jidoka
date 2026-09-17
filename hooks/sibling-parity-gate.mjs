@@ -23,6 +23,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { loadCli } from './lib/load-cli.mjs';
+
+// Строгий разбор аргументов (2026-09-16). Код отказа 1, а не 2: для Claude Code код 2 у
+// Stop значит «заблокировать завершение», и опечатка в settings.json заперла бы сессию.
+const HOOK_BAD_CALL_EXIT = 1;
 
 /**
  * Механизм ищется в СОБСТВЕННОМ дереве хука, а не в домашнем каталоге: установленная
@@ -176,13 +181,21 @@ function selfTest() {
   return fail === 0;
 }
 
+// Разбор — первое, что делает хук: незнакомый флаг или лишнее слово — отказ до чтения stdin
+// и до git diff. Слово события хук не читает, поэтому слов не принимает.
+export const CLI = {
+  name: 'sibling-parity-gate',
+  path: 'hooks/sibling-parity-gate.mjs',
+  summary: 'Хук Stop: правка коснулась одного места из нескольких похожих — предупреждает один раз за сессию. Данные события — в stdin.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url) || sameReal(process.argv[1], fileURLToPath(import.meta.url));
 function sameReal(a, b) { try { return !!a && fs.realpathSync(a) === fs.realpathSync(b); } catch { return false; } }
 
-if (isMain && process.argv.includes('--self-test')) {
-  process.exit(selfTest() ? 0 : 1);
-}
-
 if (isMain) {
+  const { selfTest: wantsSelfTest } = (await loadCli(import.meta.url)).runCli(CLI);
+  if (wantsSelfTest) process.exit(selfTest() ? 0 : 1);
   main().catch(() => process.exit(0));
 }

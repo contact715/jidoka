@@ -74,6 +74,7 @@
     "gate:e2e": "node scripts/e2e-run-gate.mjs",
     "gate:selftest": "node scripts/selftest-reality.mjs",
     "gate:import-safety": "node scripts/import-safety.mjs --self-test && node scripts/import-safety.mjs --all",
+    "gate:cli-strictness": "node scripts/cli-strictness.mjs --self-test && node scripts/cli-strictness.mjs --all",
     "gate:ledger-schema": "node scripts/ledger-schema-gate.mjs",
     "gate:parity": "node scripts/sibling-parity.mjs --staged",
     "gate:hooks": "node scripts/hooks-reachability.mjs",

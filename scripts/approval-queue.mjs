@@ -16,6 +16,7 @@
 //   node scripts/approval-queue.mjs --log                           # the decision history
 
 import { appendFileSync, readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { runCli, formatUsage, EXIT_USAGE } from './lib/cli.mjs';
 
 const QUEUE = process.env.APPROVAL_QUEUE || 'docs/audits/approval-queue.jsonl';
 const LOG = process.env.DECISION_LOG || 'docs/audits/decision-log.jsonl';
@@ -61,32 +62,68 @@ function selfTest() {
   process.exit(0);
 }
 
+export const CLI = {
+  name: 'approval-queue',
+  usage: [
+    'Очередь согласований: изменение ставится в очередь с вердиктами гейтов, человек решает, решение пишется в журнал.',
+    '',
+    'Использование:',
+    '  node scripts/approval-queue.mjs                      # очередь и готовность',
+    '  node scripts/approval-queue.mjs --submit <json>      # поставить в очередь',
+    '  node scripts/approval-queue.mjs --decide <id> approve|reject|edit [--by <кто>] [--reason <почему>]',
+    '  node scripts/approval-queue.mjs --log                # журнал решений',
+    '  node scripts/approval-queue.mjs --self-test',
+    '',
+    'Флаги:',
+    '      --submit <json>     изменение: {"id":…,"title":…,"gates":{…}}',
+    '      --decide <id>       решение по элементу очереди; слово после id — approve | reject | edit',
+    '      --by <кто>          кто решил (по умолчанию unknown)',
+    '      --reason <почему>   причина решения',
+    '      --log               история решений',
+    '  -h, --help              эта справка',
+  ].join('\n'),
+  selfTest: true,
+  options: {
+    submit: { type: 'string', value: 'json' },
+    decide: { type: 'string', value: 'id' },
+    by: { type: 'string', value: 'кто' },
+    reason: { type: 'string', value: 'почему' },
+    log: { type: 'boolean' },
+  },
+  positionals: { min: 0, max: 1, name: 'решение', label: '[approve|reject|edit]' },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+  const { values, positionals, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  // решение — единственное слово, и только после --decide <id>; иначе оно было бы молча проглочено
+  if (positionals.length && values.decide === undefined) {
+    process.stderr.write(`approval-queue: неверный вызов — лишнее слово «${positionals[0]}» (решение пишется после --decide <id>)\nНичего не выполнено.\n\n${formatUsage(CLI)}\n`);
+    process.exit(EXIT_USAGE);
+  }
   const today = process.env.META_TODAY || new Date().toISOString().slice(0, 10);
   mkdirSync('docs/audits', { recursive: true });
 
-  if (arg('--submit')) {
-    const item = JSON.parse(arg('--submit')); item.status = 'pending'; item.ts = item.ts || today;
+  if (values.submit) {
+    const item = JSON.parse(values.submit); item.status = 'pending'; item.ts = item.ts || today;
     appendFileSync(QUEUE, JSON.stringify(item) + '\n');
     console.log(`approval-queue: submitted "${item.title || item.id}" (${isReady(item.gates) ? 'ready' : 'NOT ready — gates red'})`);
     process.exit(0);
   }
-  if (process.argv.includes('--decide')) {
-    const di = process.argv.indexOf('--decide'); const id = process.argv[di + 1], decision = process.argv[di + 2];
+  if (values.decide !== undefined) {
+    const id = values.decide, decision = positionals[0];
     if (!['approve', 'reject', 'edit'].includes(decision)) { console.error('decision must be approve|reject|edit'); process.exit(2); }
     const status = decision === 'approve' ? 'approved' : decision === 'reject' ? 'rejected' : 'edited';
     const items = readJsonl(QUEUE);
     if (!items.some(i => i.id === id)) { console.error(`no queued item "${id}"`); process.exit(1); }
     writeFileSync(QUEUE, applyDecision(items, id, status).map(i => JSON.stringify(i)).join('\n') + '\n');
-    const entry = { id, decision: status, by: arg('--by') || 'unknown', reason: arg('--reason') || '', ts: today };
+    const entry = { id, decision: status, by: values.by || 'unknown', reason: values.reason || '', ts: today };
     appendFileSync(LOG, JSON.stringify(entry) + '\n');
     console.log(`approval-queue: ${id} → ${status} by ${entry.by}. Logged to decision-log.`);
     process.exit(0);
   }
-  if (process.argv.includes('--log')) {
+  if (values.log) {
     const log = readJsonl(LOG);
     if (!log.length) { console.log('decision-log: empty.'); process.exit(0); }
     for (const e of log) console.log(`  ${e.ts}  ${e.id} → ${e.decision} by ${e.by}${e.reason ? ' — ' + e.reason : ''}`);

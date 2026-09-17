@@ -16,8 +16,8 @@
  * Usage:
  *   npm run compute:cost
  *   node scripts/compute-cost.mjs
- *   node scripts/compute-cost.mjs --dry    (print output; no JSONL write, no dashboard append)
- *   node scripts/compute-cost.mjs --debug  (verbose per-wave breakdown)
+ *   node scripts/compute-cost.mjs --dry    # print output; no JSONL write, no dashboard append
+ *   node scripts/compute-cost.mjs --debug  # verbose per-wave breakdown
  *
  * Decisions honored:
  *   D1: 17th stream cost-events.jsonl — compute scripts get their own stream
@@ -40,6 +40,7 @@ import { fileURLToPath } from 'node:url';
 
 import { emitTelemetry } from './emit-telemetry.mjs';
 import { writeHaltState } from './andon-halt-helpers.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -49,8 +50,9 @@ const COST_BUDGET_PATH = path.join(ROOT, 'docs', 'quality', 'cost-budget.json');
 const DASHBOARD_PATH = path.join(ROOT, 'docs', 'metrics', '_DASHBOARD.md');
 const COST_EVENTS_PATH = path.join(ROOT, 'docs', 'audits', 'cost-events.jsonl');
 
-const isDry = process.argv.includes('--dry');
-const isDebug = process.argv.includes('--debug');
+// Задаются разбором аргументов в точке входа (runCli); при импорте — обычный режим.
+let isDry = false;
+let isDebug = false;
 
 // ── Config readers ────────────────────────────────────────────────────────────
 
@@ -535,9 +537,23 @@ function appendDashboardSummary(summary) {
 }
 
 
+// Разбор строгий (2026-09-16): опечатка `--dyr` раньше молча писала в cost-events.jsonl и
+// дописывала сводку в _DASHBOARD.md. Теперь незнакомый флаг — код 2 до всякой работы.
+export const CLI = {
+  name: 'compute-cost',
+  summary: 'Оценить стоимость волн (est.) и записать cost-events.jsonl и сводку FinOps в _DASHBOARD.md.',
+  options: {
+    dry: { type: 'boolean', desc: 'только напечатать: без записи в JSONL и в дашборд' },
+    debug: { type: 'boolean', desc: 'подробная разбивка по волнам' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values } = runCli(CLI);
+  isDry = values.dry === true;
+  isDebug = values.debug === true;
   main().catch(err => {
     process.stderr.write(`[cost] FATAL: ${err}\n`);
     process.exit(1);

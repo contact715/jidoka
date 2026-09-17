@@ -31,6 +31,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tokenize, buildIdf, scoreItem } from './memory-retrieve.mjs';
 import { lessonKeys, consolidationVerdict } from './meta-lib.mjs';
+import { runCli, HOOK_BAD_CALL_EXIT } from './lib/cli.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -400,9 +401,19 @@ function selfTest() {
   process.exit(0);
 }
 
+// Скрипт устроен как хук PreToolUse: код 2 здесь значит «заблокировать запись». Поэтому неверный
+// вызов отвечает кодом 1, как у хуков (видимая ошибка, но не блокировка чужой записи).
+export const CLI = {
+  name: 'memory-guard',
+  summary: 'Гейт записи в память (хук PreToolUse): вызов инструмента — JSON в stdin; отказ — код 2.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
   let raw = '';
   try { raw = readFileSync(0, 'utf8'); } catch { /* no stdin */ }

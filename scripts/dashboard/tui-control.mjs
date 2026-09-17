@@ -12,6 +12,7 @@
 // Side effects live in tui-actions.mjs; stdin/stdout wiring lives in tui-top.mjs.
 
 import { needsYouSessions } from './tui-render.mjs';   // shared "waiting on the owner" predicate (pure)
+import { runCli } from '../lib/cli.mjs';                // strict argv parsing — used only under isMain
 
 const R = '\x1b[0m', G = '\x1b[32m', A = '\x1b[33m', X = '\x1b[31m', D = '\x1b[90m', I = '\x1b[7m';
 const strip = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
@@ -309,12 +310,24 @@ function selfTest() {
   console.log('\n\x1b[32m✓ tui-control: reducer ACs 1-5,10,11 + overlays correct\x1b[0m'); process.exit(0);
 }
 
+// Модуль — чистая библиотека tui-top; из командной строки умеет только --self-test и --help.
+// Строгий разбор (2026-09-16): любой другой флаг или слово — код 2.
+export const CLI = {
+  name: 'tui-control',
+  path: 'scripts/dashboard/tui-control.mjs',
+  summary: 'Чистый автомат клавиш и оверлеи панели управления jidoka (библиотека tui-top); из командной строки — только самопроверка.',
+  selfTest: true,
+};
+
 let SRC_FOR_PURITY = '';
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
-if (isMain && process.argv.includes('--self-test')) {
-  const { readFileSync } = await import('node:fs');
-  const all = readFileSync(new URL(import.meta.url).pathname, 'utf8').split('\n');
-  const stL = all.findIndex((l) => /^function selfTest/.test(l));
-  SRC_FOR_PURITY = all.slice(0, stL).filter((l) => !l.trimStart().startsWith('//')).join('\n');
-  selfTest();
+if (isMain) {
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) {
+    const { readFileSync } = await import('node:fs');
+    const all = readFileSync(new URL(import.meta.url).pathname, 'utf8').split('\n');
+    const stL = all.findIndex((l) => /^function selfTest/.test(l));
+    SRC_FOR_PURITY = all.slice(0, stL).filter((l) => !l.trimStart().startsWith('//')).join('\n');
+    selfTest();
+  }
 }

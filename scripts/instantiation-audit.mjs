@@ -27,8 +27,9 @@
 // they are lazily created and their absence is normal, not a ghost.
 //
 // Usage:
-//   node scripts/instantiation-audit.mjs          exit 1 if any ghost (hard gate)
-//   node scripts/instantiation-audit.mjs --warn    report + exit 0 (soft trial, for CI onboarding)
+//   node scripts/instantiation-audit.mjs          # exit 1 if any ghost (hard gate)
+//   node scripts/instantiation-audit.mjs --warn   # report + exit 0 (soft trial, for CI onboarding)
+//   (full help: --help; an unknown flag or a stray word exits 2 before any scan)
 //
 // The --warn mode follows the framework's own soft→hard gate doctrine: observe and
 // report while the known ghosts are being filled, then drop --warn to make it block.
@@ -37,8 +38,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { dirname, resolve as resolvePath, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-const warnOnly = process.argv.includes('--warn');
+import { runCli } from './lib/cli.mjs';
 
 // Count functional files only — exclude scaffolding (_TEMPLATE, _INDEX, README) so a
 // "28 agent roles" doc claim matches reality instead of counting the template as a role.
@@ -62,9 +62,21 @@ let ghosts = 0, dormant = 0;
 
 // ── Class 1 — ghost automation ────────────────────────────────────────────────
 
+// Strict parsing (2026-09-16): an unknown flag or a stray word exits 2 before any scan.
+// Before, a typo like `--wran` silently ran the HARD gate instead of the soft trial.
+export const CLI = {
+  name: 'instantiation-audit',
+  summary: 'Does the scaffolding point at things that exist? Ghost automation, doc-count drift, registry ghosts, dead imports.',
+  options: {
+    warn: { type: 'boolean', desc: 'report and exit 0 (soft trial) instead of failing on a ghost' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values } = runCli(CLI);
+  const warnOnly = values.warn === true;
   console.log('\x1b[1m▌ Class 1 — ghost automation (declared in docs/code, not on disk)\x1b[0m');
   const autoRefs = [...new Set(
     grepLines('\\.(github/workflows/[A-Za-z0-9_.-]+\\.ya?ml|husky/[A-Za-z0-9_.-]+|githooks/[A-Za-z0-9_.-]+)')

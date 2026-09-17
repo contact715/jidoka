@@ -13,9 +13,12 @@
 //   noisy      — the gate fired with false-positives → calibrate first, hardening would block good work.
 //   READY      — horizon passed, fired on real issues, zero false-positives → safe to flip to hard.
 //
-// FULL & self-tested. Usage: node scripts/gate-graduation.mjs [--self-test]   (META_TODAY overrides "today")
+// FULL & self-tested. META_TODAY overrides "today". Usage:
+//   node scripts/gate-graduation.mjs
+//   node scripts/gate-graduation.mjs --self-test
 
 import { readFileSync, existsSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 const GRADUATION_DAYS = 30;
 
@@ -52,9 +55,17 @@ function selfTest() {
   process.exit(0);
 }
 
+// Флагов, кроме --self-test, нет. Разбор строгий (2026-09-16): незнакомый флаг или слово — код 2.
+export const CLI = {
+  name: 'gate-graduation',
+  summary: 'Готовность мягких гейтов (.sdd-config.json) стать жёсткими; только отчёт, сам ничего не переключает. META_TODAY подменяет «сегодня».',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   if (!existsSync('.sdd-config.json')) { console.log('gate-graduation: no .sdd-config.json here (soft-gates live in products).'); process.exit(0); }
   const cfg = JSON.parse(readFileSync('.sdd-config.json', 'utf8'));
   const today = process.env.META_TODAY || new Date().toISOString().slice(0, 10);

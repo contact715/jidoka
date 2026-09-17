@@ -12,9 +12,10 @@
 //
 // FULL logic / DORMANT data. Usage:
 //   node scripts/kaizen-loop.mjs --self-test
-//   node scripts/kaizen-loop.mjs --targets <product>/docs/kaizen-targets.json
+//   node scripts/kaizen-loop.mjs --targets <путь-к-продукту/docs/kaizen-targets.json>
 
 import { readFileSync, existsSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 // trend of a numeric series: 'up' | 'down' | 'flat' (1% noise band → flat).
 // The band was 5%, which was a BUG: it swallowed real progress on near-target metrics — a test
@@ -83,11 +84,23 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): опечатка `--target` раньше молча давала «usage» с кодом 2,
+// а лишнее слово пропускалось. Теперь любой неверный вызов — код 2 с причиной. Отсутствующий
+// файл целей по-прежнему объясняется своим текстом (тоже код 2).
+export const CLI = {
+  name: 'kaizen-loop',
+  summary: 'Тренд реальной метрики продукта против цели North Star: on-track / stalled / diverging / achieved.',
+  selfTest: true,
+  options: {
+    targets: { type: 'string', value: 'kaizen-targets.json', desc: 'цели и ряды измерений продукта' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const tp = arg('--targets');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const tp = values.targets || null;
   if (!tp || !existsSync(tp)) {
     console.error('usage: --targets <kaizen-targets.json>  { "product": "...", "targets": [ { "metric","direction":"up|down","target",series:[...] } ] }');
     console.error('  (DORMANT until a product supplies real measurements — the product\'s data-analyst writes this file)');

@@ -26,6 +26,7 @@ import { readFileSync, writeFileSync, existsSync, appendFileSync, mkdirSync } fr
 import { join, basename } from 'node:path';
 import { homedir } from 'node:os';
 import { execFileSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 // ── pure core ──────────────────────────────────────────────────────
 // parse "<iso-ts> commit=<hash>" lines newer than sinceMs (now injected for tests)
@@ -58,8 +59,7 @@ function gitHas(repo, ref) {
   try { execFileSync('git', ['-C', repo, 'cat-file', '-e', `${ref}^{commit}`], { stdio: 'ignore' }); return true; }
   catch { return false; }
 }
-function resolveRepos(argv) {
-  const fromArgs = argv.filter(a => !a.startsWith('--'));
+function resolveRepos(fromArgs) {
   if (fromArgs.length) return fromArgs;
   const cfg = join(homedir(), '.claude', 'jidoka', 'enforcement-repos.json');
   if (existsSync(cfg)) { try { const a = JSON.parse(readFileSync(cfg, 'utf8')); if (Array.isArray(a) && a.length) return a; } catch { /* fall through */ } }
@@ -98,11 +98,24 @@ function selfTest() {
 }
 
 // ── CLI ────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до чтения репозиториев.
+// Раньше любое слово с двумя дефисами молча отбрасывалось, а остальные считались путями.
+export const CLI = {
+  name: 'enforcement-reconcile',
+  summary: 'Красная лампа: гейт сказал «отказано», а коммит всё равно есть. Обходы и ложные отказы за 26 часов.',
+  selfTest: true,
+  options: {
+    'no-log': { type: 'boolean', desc: 'найти и записать в свой журнал, но не трогать реестр ошибок (для тестов)' },
+  },
+  positionals: { min: 0, max: Infinity, name: 'репозиторий' },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const noLog = process.argv.includes('--no-log'); // tests: detect + audit, but never touch the meta-ledger
-  const repos = resolveRepos(process.argv.slice(2));
+  const { values, positionals, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const noLog = values['no-log'] === true; // tests: detect + audit, but never touch the meta-ledger
+  const repos = resolveRepos(positionals);
   const sinceMs = Date.now() - 26 * 3600 * 1000;
   const allBypasses = [], allViolations = [];
 
@@ -138,7 +151,11 @@ if (isMain) {
     appendFileSync(auditFile, JSON.stringify({ ...v, detectedAt: new Date().toISOString() }) + '\n');
     if (!noLog) try {
       execFileSync('node', [join(homedir(), '.claude', 'jidoka', 'scripts', 'meta-log.mjs'),
-        v.kind, `gate "${v.gate}" refused commit ${v.ref}`, `commit ${v.ref} exists in ${basename(v.repo)} — refusal was not enforced`, 'enforcement-reconcile'],
+        v.kind, `gate "${v.gate}" refused commit ${v.ref}`, `commit ${v.ref} exists in ${basename(v.repo)} — refusal was not enforced`, 'enforcement-reconcile',
+        // режим отказа обязателен с 2026-08-18; без него meta-log отказывал с кодом 2, а вывод
+        // глушился — ложный отказ гейта не попадал в реестр ошибок (найдено 2026-09-16).
+        // Гейт объявил отказ, а коммит прошёл: проверка сказала неправду — FM-3.3.
+        'incident', '--mode', 'FM-3.3'],
         { cwd: v.repo, stdio: 'ignore' });
     } catch { /* meta-log best-effort; the audit line is the durable record */ }
     seen.add(v.ref); newViolations++;

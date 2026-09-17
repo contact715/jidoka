@@ -12,7 +12,9 @@
 // FULL & self-tested. Usage:
 //   node scripts/resource-guard.mjs --self-test
 //   node scripts/resource-guard.mjs --code <file>
-//   node scripts/resource-guard.mjs --budget '{"writesPerSec":100}' (validate a declaration)
+//   node scripts/resource-guard.mjs --budget '{"writesPerSec":100}'   # validate a declaration
+
+import { runCli } from './lib/cli.mjs';
 
 // patterns that indicate a loop/interval context
 const LOOP_CTX = [
@@ -145,20 +147,30 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до сканирования.
+export const CLI = {
+  name: 'resource-guard',
+  summary: 'Найти неограниченную запись/сеть в циклах и таймерах; проверить объявленный бюджет ресурсов.',
+  selfTest: true,
+  options: {
+    code: { type: 'string', value: 'файл', desc: 'просканировать файл' },
+    budget: { type: 'string', value: 'json', desc: 'проверить объявление бюджета, JSON-объект' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
-  if (arg('--budget')) {
-    const r = validateBudget(JSON.parse(arg('--budget')));
+  if (values.budget) {
+    const r = validateBudget(JSON.parse(values.budget));
     console.log(r.ok ? `\x1b[32m✓ ${r.message}\x1b[0m` : `\x1b[31m✗ ${r.message}\x1b[0m`);
     process.exit(r.ok ? 0 : 1);
   }
 
   const { readFileSync } = await import('node:fs');
-  const file = arg('--code');
+  const file = values.code;
   if (!file) { console.error('usage: --code <file> | --budget <json> | --self-test'); process.exit(2); }
   const code = readFileSync(file, 'utf8');
   const r = scan(code);

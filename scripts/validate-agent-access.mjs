@@ -37,6 +37,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -449,8 +450,16 @@ function main() {
 }
 
 
+// Строгий разбор (2026-09-16): флагов нет; незнакомый флаг или слово — код 2 до проверки
+// и до записи в docs/audits/agent-access-verdicts.jsonl.
+export const CLI = {
+  name: 'validate-agent-access',
+  summary: 'Zero-trust проверка доступа агентов: реестр против tools: в .claude/agents/*.md (I0–I2), вердикты в docs/audits/agent-access-verdicts.jsonl.',
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
   main();
 }

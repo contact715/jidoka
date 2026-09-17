@@ -13,10 +13,12 @@
 //
 // FULL & self-tested. Usage:
 //   node scripts/dead-code.mjs --self-test
-//   node scripts/dead-code.mjs            (report orphans in scripts/; exit 1 if any)
+//   node scripts/dead-code.mjs
+//     report orphans in scripts/; exit 1 if any
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { runCli } from './lib/cli.mjs';
 
 // pure: a script is an orphan if no OTHER file's text and no external reference text mentions it
 export function orphans(scripts, fileTexts, externalText = '') {
@@ -81,9 +83,16 @@ function selfTest() {
   process.exit(0);
 }
 
+export const CLI = {
+  name: 'dead-code',
+  summary: 'Найти скрипты движка, на которые никто не ссылается (сироты). Находка — код 1.',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const { scripts, fileTexts, externalText } = gather(process.cwd());
   const dead = orphans(scripts, fileTexts, externalText);
   console.log(`dead-code — ${scripts.length} engine scripts scanned across 6 reference sources\n`);

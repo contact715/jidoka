@@ -20,21 +20,30 @@
 // Output is advisory: a human decides the downgrade. Downgrade ≠ delete; a monitored
 // gate still watches, and a recurrence flips it straight back to a meta-audit regression.
 //
-// Usage: node scripts/meta-decay.mjs        (META_TODAY/META_LEDGER/META_TRIP_LOG override)
+// META_TODAY / META_LEDGER / META_TRIP_LOG override today and the inputs. Usage:
+//   node scripts/meta-decay.mjs
 
 import { loadLedger, loadTrips, groupByClass, daysBetween, todayISO, recurrencesAfter } from './meta-lib.mjs';
 import { REMEDIES } from './meta-remedies.mjs';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const DECAY_DAYS = 90; // a quarter with no regression and no trips = candidate to age out
-const today = todayISO();
-const byClass = groupByClass(loadLedger());
-const trips = loadTrips();
 
+// Флагов и слов нет. Разбор строгий (2026-09-16): незнакомый флаг — код 2 до чтения реестров.
+export const CLI = {
+  name: 'meta-decay',
+  summary: 'Старение гейтов: какие можно ослабить до наблюдения, какие навсегда жёсткие (совет, сам ничего не меняет). META_TODAY / META_LEDGER / META_TRIP_LOG подменяют входы.',
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
+  // Реестры читаются только при запуске: раньше это делал сам импорт модуля.
+  const today = todayISO();
+  const byClass = groupByClass(loadLedger());
+  const trips = loadTrips();
   console.log(`meta-decay: aging report for ${Object.keys(REMEDIES).length} gate(s) (today=${today}, horizon=${DECAY_DAYS}d)\n`);
 
   let keepHard = 0, working = 0, mature = 0, active = 0;

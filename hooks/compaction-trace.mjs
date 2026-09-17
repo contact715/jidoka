@@ -29,6 +29,11 @@ import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { хвостТранскрипта } from './lib/transcript-tail.mjs';
+import { loadCli } from './lib/load-cli.mjs';
+
+// Строгий разбор аргументов (2026-09-16). Код отказа 1, а не 2 — один договор на все хуки
+// Claude Code: у PreToolUse, UserPromptSubmit и Stop код 2 значит «заблокировать».
+const HOOK_BAD_CALL_EXIT = 1;
 
 const LOG = process.env.JIDOKA_COMPACTION_LOG || join(homedir(), '.jidoka', 'compaction-events.jsonl');
 
@@ -156,10 +161,24 @@ function selfTest() {
 function sameFileByRealPath(a, b) {
   try { return !!a && realpathSync(a) === realpathSync(b); } catch { return false; }
 }
+// Разбор — первое, что делает хук: чужое имя события или незнакомый флаг — отказ до чтения stdin
+// и до записи в журнал. Без слова событие берётся из hook_event_name во входных данных, и
+// фильтр ниже по-прежнему пропускает в журнал только события сжатия.
+export const EVENTS = ['PreCompact', 'PostCompact'];
+export const CLI = {
+  name: 'compaction-trace',
+  path: 'hooks/compaction-trace.mjs',
+  summary: 'Хук PreCompact/PostCompact: одна строка в журнал сжатий контекста на событие. Данные события — в stdin; не блокирует.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+  positionals: { min: 0, max: 1, name: 'событие', label: '[PreCompact|PostCompact]', choices: EVENTS },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url) || sameFileByRealPath(process.argv[1], fileURLToPath(import.meta.url));
 
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { positionals, selfTest: wantsSelfTest } = (await loadCli(import.meta.url)).runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
   let raw = '';
   process.stdin.on('data', (c) => { raw += c; });
@@ -168,7 +187,7 @@ if (isMain) {
       const input = JSON.parse(raw || '{}');
       // Умолчание 'PreCompact' было ложью: неизвестное событие записывалось как сжатие.
       // Честное умолчание это 'unknown', а решает не оно, а фильтр ниже.
-      const event = process.argv[2] || input.hook_event_name || 'unknown';
+      const event = positionals[0] || input.hook_event_name || 'unknown';
 
       // Журнал сжатий принимает ТОЛЬКО события сжатия. 15 августа сюда попали 6 PreToolUse
       // и 3 Stop от чужой регистрации; с тех пор чужих нет, но защита от повторения стоит

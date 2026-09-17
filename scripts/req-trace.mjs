@@ -36,6 +36,8 @@
 // a second traceability instrument would be a second answer to "is this requirement covered?", and
 // two instruments answering one question with different bars is the defect this engine keeps
 // closing (see docs/METRICS_GLOSSARY.md). One register, one verdict, one more axis on it.
+import { runCli } from './lib/cli.mjs';
+
 const STAGES = ['spec', 'ac', 'task', 'test', 'code', 'deployed'];
 
 /**
@@ -186,16 +188,28 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Строгий разбор (2026-09-16): незнакомый флаг или слово — код 2 (как и отсутствие реестра).
+export const CLI = {
+  name: 'req-trace',
+  summary: 'Сквозная прослеживаемость: требование → спека → AC → задача → тест → код → выкладка, плюс лишний код и сироты.',
+  selfTest: true,
+  options: {
+    register: { type: 'string', value: 'file.json', desc: 'реестр требований (обязателен)' },
+    code: { type: 'string', value: 'inventory.json', desc: 'опись кода — для поиска кода, который никто не просил' },
+    parents: { type: 'string', value: 'parents.json', desc: 'известные родители — для поиска сирот' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const { readFileSync, existsSync } = await import('node:fs');
-  const rp = arg('--register');
+  const rp = values.register;
   if (!rp || !existsSync(rp)) { console.error('usage: --register <file.json> [--code <inventory.json>] [--parents <parents.json>]  (or --self-test)'); process.exit(2); }
   const reg = JSON.parse(readFileSync(rp, 'utf8'));
-  const cp = arg('--code');
-  const pp = arg('--parents');
+  const cp = values.code;
+  const pp = values.parents;
   const opts = {};
   if (cp && existsSync(cp)) opts.codeInventory = JSON.parse(readFileSync(cp, 'utf8'));
   if (pp && existsSync(pp)) opts.knownParents = JSON.parse(readFileSync(pp, 'utf8'));

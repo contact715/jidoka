@@ -19,6 +19,7 @@ import { readFileSync, existsSync, writeFileSync, mkdtempSync, rmSync, mkdirSync
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+import { runCli } from './lib/cli.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -411,9 +412,20 @@ function countLines(p) {
 
 // ── main ─────────────────────────────────────────────────────────────
 
+// Разбор строгий (2026-09-16): у приёмки нет флагов и нет своей самопроверки (--self-test в
+// тексте выше — это вызовы ЧУЖИХ скриптов). Раньше любой флаг, включая --help, молча запускал
+// весь прогон: три запуска tui-top.mjs и дозапись в настоящий docs/audits/tui-panel-launches.jsonl
+// (AC-13 ждёт там +1 строку). Теперь незнакомый флаг — код 2 до первого запуска.
+export const CLI = {
+  name: 'tui-top-acceptance',
+  summary: 'Приёмка волны wave-tui-top: 28 критериев. Внимание: запускает tui-top.mjs и дописывает строку в docs/audits/tui-panel-launches.jsonl.',
+  options: {},
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
   console.log('\x1b[1mwave-tui-top acceptance harness\x1b[0m — 28 ACs (18 base + 10 kanban-port: 5 ported-feature + 5 focus/hook)\n');
   await groupRunState();
   await groupRender();

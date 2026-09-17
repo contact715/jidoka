@@ -11,6 +11,7 @@
 
 import { execSync } from 'node:child_process';
 import { appendFileSync, mkdirSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 const run = (c) => { try { return execSync(c, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }); } catch (e) { return (e.stdout || '') + (e.stderr || ''); } };
 
@@ -41,9 +42,18 @@ function selfTest() {
   process.exit(0);
 }
 
+// Строгий разбор (2026-09-16): флагов у проверки нет; незнакомый флаг или слово — код 2
+// до запуска трёх проверок и до записи в журнал.
+export const CLI = {
+  name: 'cron-audit',
+  summary: 'Плановая самопроверка: eval-suite + instantiation-audit + meta-audit, строка в docs/audits/cron-runs.jsonl.',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const today = process.env.META_TODAY || new Date().toISOString().slice(0, 10);
   const row = summarize(run('node scripts/eval-suite.mjs'), run('node scripts/instantiation-audit.mjs'), run('node scripts/meta-audit.mjs'), today);
   mkdirSync('docs/audits', { recursive: true });

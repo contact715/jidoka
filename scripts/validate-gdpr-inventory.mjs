@@ -48,6 +48,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
+import { runCli } from './lib/cli.mjs';
 
 // DUPLICATE-BLOCK: IMPORT detectPiiTokens — do NOT reimplement.
 import { detectPiiTokens } from '../lib/redaction/redact-pii.mjs';
@@ -60,9 +61,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-const isDry = args.includes('--dry');
-const streamOnly = args.includes('--stream-only');
+// Разбор строгий (2026-09-16): незнакомый флаг или слово — код 2 до проверки, до записи в реестр
+// находок и до событий телеметрии. Код 1 по-прежнему значит «нарушение G1/G2». run-fuzz.mjs
+// зовёт скрипт с --stream-only, поэтому флаг обязан разбираться.
+export const CLI = {
+  name: 'validate-gdpr-inventory',
+  summary: 'Сверка RoPA (docs/compliance/gdpr/data-inventory.md) с реестром потоков телеметрии: G1–G5.',
+  options: {
+    dry: { type: 'boolean', desc: 'только проверка: без записи в реестр находок и без событий' },
+    'stream-only': { type: 'boolean', desc: 'пропустить G4 (поиск персональных данных в старых JSONL)' },
+  },
+};
+
+// Значения ставит точка входа из runCli; при импорте модуль ничего не читает из argv.
+let isDry = false;
+let streamOnly = false;
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
 const INVENTORY_PATH = path.join(ROOT, 'docs', 'compliance', 'gdpr', 'data-inventory.md');
@@ -612,5 +625,8 @@ function main() {
 
 // Guard: only run when this file is the entry point
 if (fileURLToPath(import.meta.url) === process.argv[1]) {
+  const { values } = runCli(CLI);
+  isDry = values.dry === true;
+  streamOnly = values['stream-only'] === true;
   main();
 }

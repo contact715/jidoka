@@ -34,6 +34,7 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 // Слова длиной от двух символов. Односимвольные отбрасываются: они шумят и различают
 // строки там, где смысл одинаков (индексы, координаты).
@@ -216,19 +217,30 @@ function stagedChanges() {
 const isMain = process.argv[1] === fileURLToPath(import.meta.url) || sameRealPath(process.argv[1], fileURLToPath(import.meta.url));
 function sameRealPath(a, b) { try { return !!a && realpathSync(a) === realpathSync(b); } catch { return false; } }
 
-if (isMain && process.argv.includes('--self-test')) {
-  process.exit(selfTest() ? 0 : 1);
-}
+// Разбор строгий (2026-09-16): незнакомый флаг, флаг без значения — код 2 до разбора.
+// Раньше опечатка `--strickt` молча снимала отказ, и находка уходила кодом 0.
+export const CLI = {
+  name: 'sibling-parity',
+  summary: 'Правило, применённое к одному месту из нескольких похожих: называет соседей правленой строки.',
+  selfTest: true,
+  options: {
+    file: { type: 'string', value: 'файл', desc: 'разобрать этот файл' },
+    lines: { type: 'string', value: '12,40', desc: 'номера правленых строк через запятую (вместе с --file)' },
+    staged: { type: 'boolean', desc: 'разобрать правку в индексе git' },
+    strict: { type: 'boolean', desc: 'находка — код 1 (по умолчанию только предупреждение)' },
+  },
+};
 
 if (isMain) {
-  const arg = (f) => { const i = process.argv.indexOf(f); return i !== -1 ? process.argv[i + 1] : null; };
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) process.exit(selfTest() ? 0 : 1);
   const targets = new Map();
 
-  const one = arg('--file');
+  const one = values.file || null;
   if (one) {
-    const ln = (arg('--lines') || '').split(',').map((x) => Number(x.trim())).filter(Boolean);
+    const ln = (values.lines || '').split(',').map((x) => Number(x.trim())).filter(Boolean);
     targets.set(one, ln);
-  } else if (process.argv.includes('--staged')) {
+  } else if (values.staged === true) {
     for (const [f, ln] of stagedChanges()) targets.set(f, ln);
   } else {
     console.log('usage: sibling-parity.mjs --file <файл> --lines 1,2 | --staged | --self-test');
@@ -249,5 +261,5 @@ if (isMain) {
   const rep = parityReport(all, examined);
   console.log(`sibling-parity: ${rep.text}`);
   for (const x of all.slice(0, 10)) console.log(`  ${x.file}:${x.line}`);
-  process.exit(rep.verdict === 'odd' && process.argv.includes('--strict') ? 1 : 0);
+  process.exit(rep.verdict === 'odd' && values.strict === true ? 1 : 0);
 }

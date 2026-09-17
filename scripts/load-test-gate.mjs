@@ -11,6 +11,8 @@
 //   node scripts/load-test-gate.mjs --self-test
 //   node scripts/load-test-gate.mjs --results '{"p50ms":80,"p95ms":400,"errorRate":0.01,"rps":200}'
 
+import { runCli } from './lib/cli.mjs';
+
 export const DEFAULTS = { p50ms: 100, p95ms: 500, p99ms: 1000, errorRate: 0.01, rps: 100 };
 
 export function assess(results = {}, thresholds = DEFAULTS) {
@@ -45,12 +47,24 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Разбор строгий (2026-09-16): опечатка во флаге раньше молча давала пустые результаты и «все SLO
+// выполнены». Теперь — код 2 до оценки.
+export const CLI = {
+  name: 'load-test-gate',
+  summary: 'Сверить результаты нагрузочного прогона с порогами задержки, ошибок и пропускной способности.',
+  selfTest: true,
+  options: {
+    results: { type: 'string', value: 'json', desc: 'результаты: {"p50ms","p95ms","p99ms","errorRate","rps"} (по умолчанию {})' },
+    thresholds: { type: 'string', value: 'json', desc: 'пороги той же формы (по умолчанию встроенные)' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const results = JSON.parse(arg('--results') || '{}');
-  const thr = arg('--thresholds') ? JSON.parse(arg('--thresholds')) : DEFAULTS;
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const results = JSON.parse(values.results || '{}');
+  const thr = values.thresholds ? JSON.parse(values.thresholds) : DEFAULTS;
   const r = assess(results, thr);
   if (!r.ok) {
     console.error(`\x1b[31m✗ load-test-gate: ${r.violations.length} SLO violation(s):\x1b[0m`);

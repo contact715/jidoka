@@ -15,19 +15,30 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extractBoldField, extractTitle, extractAdrNumber } from './regenerate-adr-index.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const DECISIONS_DIR = path.join(ROOT, 'docs/decisions');
 const OUT = path.join(DECISIONS_DIR, '_RFC_INDEX.md');
 const EXCLUDE = new Set(['_TEMPLATE.md', 'README.md', '_INDEX.md', '_RFC_INDEX.md']);
-const isDry = process.argv.includes('--dry');
-
 const rows = [];
+
+// Разбор строгий (2026-09-16): опечатка `--dyr` раньше молча перезаписывала индекс
+// вместо печати. Теперь — код 2 до чтения папки.
+export const CLI = {
+  name: 'regenerate-rfc-index',
+  summary: 'Собрать docs/decisions/_RFC_INDEX.md из ADR в статусе Proposed с периодом комментариев.',
+  options: {
+    dry: { type: 'boolean', desc: 'напечатать таблицу, не записывая файл' },
+  },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values } = runCli(CLI);
+  const isDry = values.dry === true;
   // чтение папки — работа, поэтому только при прямом запуске
   const files = fs.readdirSync(DECISIONS_DIR)
     .filter((f) => f.endsWith('.md') && !EXCLUDE.has(f) && f.startsWith('ADR-'))

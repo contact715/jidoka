@@ -19,6 +19,7 @@
 //   node scripts/spec-size-check.mjs --metrics '{"objectives":12,"surfaces":4}'
 
 import { readFileSync, existsSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 export const DEFAULTS = { objectives: 8, acceptanceCriteria: 20, surfaces: 3, specLoc: 600 };
 
@@ -75,12 +76,23 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово, --spec или --metrics без
+// значения — код 2 до чтения спеки. Код 2 без обоих флагов был и раньше.
+export const CLI = {
+  name: 'spec-size-check',
+  summary: 'Спека слишком велика для одной волны? Код 1 — разбить до сборки.',
+  selfTest: true,
+  options: {
+    spec: { type: 'string', value: 'файл.md', desc: 'спека, из которой считаются метрики' },
+    metrics: { type: 'string', value: 'json', desc: 'готовые метрики: {"objectives","acceptanceCriteria","surfaces","specLoc"}' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const specPath = arg('--spec'); const metricsJson = arg('--metrics');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const specPath = values.spec || null; const metricsJson = values.metrics || null;
   if (!specPath && !metricsJson) { console.error("usage: --spec <file.md> | --metrics '<json>'  (or --self-test)"); process.exit(2); }
   const metrics = metricsJson ? JSON.parse(metricsJson) : extractMetrics(readFileSync(specPath, 'utf8'));
   const r = assess(metrics);

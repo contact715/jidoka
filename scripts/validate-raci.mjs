@@ -36,6 +36,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -46,9 +47,18 @@ const RACI_MD_PATH = path.join(ROOT, 'docs', 'governance', 'raci.md');
 const ROSTER_PATH = path.join(ROOT, 'docs', 'AGENT_ROSTER.md');
 
 // ── CLI args ───────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-const emitMd = args.includes('--emit-md');
-const isDry = args.includes('--dry');
+// Разбор строгий (2026-09-16): незнакомый флаг или слово — код 2 до проверки и до записи raci.md.
+// Код 2 здесь не значит «нарушение»: нарушения по-прежнему дают 1. run-fuzz.mjs зовёт этот
+// скрипт с --dry, поэтому флаг обязан разбираться, иначе фаззер принял бы отказ разбора за
+// «корректную обработку испорченного входа».
+export const CLI = {
+  name: 'validate-raci',
+  summary: 'Проверка docs/governance/raci.json (R1–R6); по --emit-md — пересборка docs/governance/raci.md.',
+  options: {
+    'emit-md': { type: 'boolean', desc: 'записать docs/governance/raci.md из raci.json' },
+    dry: { type: 'boolean', desc: 'только проверка, без записи (поведение по умолчанию; отменяет --emit-md)' },
+  },
+};
 
 // ── Roster parser ──────────────────────────────────────────────────────────
 // Reads the 30-agent table from docs/AGENT_ROSTER.md.
@@ -198,7 +208,7 @@ function emitMarkdown(raci) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────
-function main() {
+function main({ emitMd = false, isDry = false } = {}) {
   // Load raci.json
   if (!fs.existsSync(RACI_JSON_PATH)) {
     process.stdout.write(`⊘ DORMANT — ${RACI_JSON_PATH} not seeded yet; RACI gate inactive, not failed. Seed the matrix to activate.\n`);
@@ -377,5 +387,6 @@ function main() {
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  main();
+  const { values } = runCli(CLI);
+  main({ emitMd: values['emit-md'] === true, isDry: values.dry === true });
 }

@@ -15,6 +15,7 @@
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { runCli } from './lib/cli.mjs';
 
 export function parseFrontmatter(text) {
   const m = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
@@ -58,9 +59,16 @@ function selfTest() {
   process.exit(0);
 }
 
+export const CLI = {
+  name: 'check-commands',
+  summary: 'Проверить слэш-команды .claude/commands/jidoka-*.md: описание, allowed-tools, argument-hint и что упомянутые скрипты существуют.',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   const ROOT = process.cwd();
   const dir = join(ROOT, '.claude', 'commands');
   if (!existsSync(dir)) { console.error('no .claude/commands directory'); process.exit(1); }

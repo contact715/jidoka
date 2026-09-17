@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // @closes-class: conflict-found-but-nobody-acted
+// @divergence: "вопрос между ДРУГОЙ парой не засчитывается" — мера «по конфликту кто-то спросил» говорит «разобрано», а спросили не те сессии
 // @scope: all
 // @scope-ok: роль тимлида по определению смотрит на ВСЕ сессии машины
 /**
@@ -27,6 +28,7 @@
  *   node scripts/teamlead.mjs                 # сводка: что найдено и что с этим сделано
  *   node scripts/teamlead.mjs --escalate      # только то, что требует человека; код 1 если есть
  *   node scripts/teamlead.mjs --self-test
+ *   (полная справка: --help; незнакомый флаг или лишнее слово — код 2 до любого чтения доски)
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,6 +38,7 @@ import { fileURLToPath } from 'node:url';
 import { readBoard, conflicts, isStale } from './session-board.mjs';
 import { readMail, unanswered } from './session-mail.mjs';
 import { readReceipts, treeFingerprint, classifyReceipt } from './gate-receipt.mjs';
+import { runCli } from './lib/cli.mjs';
 
 /** Сколько вопрос может ждать ответа, прежде чем это станет делом человека. */
 export const WAITING_LIMIT_MS = 30 * 60 * 1000;
@@ -271,9 +274,21 @@ function selfTest() {
   process.exit(failed.length ? 1 : 0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг или лишнее слово — код 2. Раньше опечатка
+// `--escalte` молча печатала полную сводку с кодом 0, и эскалация человеку терялась.
+export const CLI = {
+  name: 'teamlead',
+  summary: 'Тимлид параллельных сессий: сводка найденного и сделанного по доске, почте и квитанциям.',
+  selfTest: true,
+  options: {
+    escalate: { type: 'boolean', desc: 'только то, что требует человека; код 1, если такое есть' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  else if (process.argv.includes('--escalate')) cmdEscalate();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  else if (values.escalate) cmdEscalate();
   else cmdReport();
 }

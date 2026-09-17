@@ -40,6 +40,7 @@ import { existsSync, statSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, isAbsolute, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 /** Хуки, без которых защита пуша не работает. */
 export const REQUIRED_HOOKS = ['pre-commit', 'pre-push'];
@@ -193,11 +194,23 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово или --repo без значения —
+// код 2 до обращения к git.
+export const CLI = {
+  name: 'hooks-reachability',
+  summary: 'Достижимы ли git-хуки из КАЖДОЙ рабочей копии репозитория; код 1 при дыре.',
+  selfTest: true,
+  options: {
+    repo: { type: 'string', value: 'путь', desc: 'репозиторий (по умолчанию корень движка)' },
+    json: { type: 'boolean', desc: 'вывод в JSON' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const argAfter = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const repo = argAfter('--repo') || dirname(dirname(fileURLToPath(import.meta.url)));
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const repo = values.repo || dirname(dirname(fileURLToPath(import.meta.url)));
   let audit;
   try { audit = auditRepo(repo); }
   catch (e) {
@@ -206,7 +219,7 @@ if (isMain) {
     console.log(`hooks-reachability: не git-репозиторий или git недоступен (${repo}) — пропуск.`);
     process.exit(0);
   }
-  if (process.argv.includes('--json')) { console.log(JSON.stringify(audit, null, 2)); process.exit(audit.holes.length ? 1 : 0); }
+  if (values.json) { console.log(JSON.stringify(audit, null, 2)); process.exit(audit.holes.length ? 1 : 0); }
 
   console.log(`hooks-reachability — core.hooksPath: ${audit.hooksPath || '(не задан)'}`);
   for (const r of audit.rows) {

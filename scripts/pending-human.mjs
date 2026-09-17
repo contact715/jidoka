@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // @closes-class: mechanism-built-human-step-never-taken
+// @divergence: "повторное объявление НЕ перезаписывает since" — мера «возраст от последнего объявления» говорила «свежий», а правило «шаг ждёт человека с первого объявления» нарушено
 // @scope: all
 /**
  * pending-human — реестр незакрытых ЧЕЛОВЕЧЕСКИХ шагов, у каждого свой ВОЗРАСТ.
@@ -35,12 +36,13 @@
  *   node scripts/pending-human.mjs --json
  *   node scripts/pending-human.mjs --add '{"id":"...","what":"...","why":"...","source":"..."}'
  *   node scripts/pending-human.mjs --emit '[{...},{...}]'   # идемпотентно, для механизмов
- *   node scripts/pending-human.mjs --close <id> [--by имя]
+ *   node scripts/pending-human.mjs --close <id> [--by <имя>]
  *   node scripts/pending-human.mjs --self-test
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 export const LEDGER_REL = 'docs/audits/_PENDING_HUMAN.jsonl';
 
@@ -266,15 +268,28 @@ function selfTest() {
 
 // ---------- запуск ----------
 
+export const CLI = {
+  name: 'pending-human',
+  summary: 'Очередь человеческих шагов с возрастом: что построено и ждёт решения человека. Без флагов — список, старшие сверху.',
+  selfTest: true,
+  options: {
+    json: { type: 'boolean', desc: 'список открытых шагов в JSON' },
+    add: { type: 'string', value: 'json', desc: 'добавить шаг: {"id","what","why","source"}' },
+    emit: { type: 'string', value: 'json', desc: 'добавить список шагов идемпотентно (для механизмов)' },
+    close: { type: 'string', value: 'id', desc: 'закрыть шаг' },
+    by: { type: 'string', value: 'имя', desc: 'кто закрыл (по умолчанию human)' },
+    root: { type: 'string', value: 'папка', desc: 'корень репозитория (по умолчанию текущая папка)' },
+  },
+};
+
 function main() {
-  const argv = process.argv.slice(2);
-  const arg = (f) => { const i = argv.indexOf(f); return i >= 0 ? argv[i + 1] : undefined; };
-  const root = arg('--root') || process.cwd();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  const root = values.root || process.cwd();
 
-  if (argv.includes('--self-test')) return selfTest();
+  if (wantsSelfTest) return selfTest();
 
-  if (argv.includes('--add') || argv.includes('--emit')) {
-    const raw = arg('--add') || arg('--emit') || '[]';
+  if (values.add !== undefined || values.emit !== undefined) {
+    const raw = values.add || values.emit || '[]';
     let incoming;
     try { incoming = JSON.parse(raw); } catch (e) { console.error(`не разобрал JSON: ${e.message}`); process.exit(2); }
     if (!Array.isArray(incoming)) incoming = [incoming];
@@ -288,9 +303,9 @@ function main() {
     return;
   }
 
-  if (argv.includes('--close')) {
-    const id = arg('--close');
-    const { rows, closed } = closeRow(loadLedger(root), id, todayIso(), arg('--by') || 'human');
+  if (values.close !== undefined) {
+    const id = values.close;
+    const { rows, closed } = closeRow(loadLedger(root), id, todayIso(), values.by || 'human');
     if (!closed) { console.error(`pending-human: шаг "${id}" не найден или уже закрыт`); process.exit(1); }
     saveLedger(rows, root);
     console.log(`pending-human: закрыт "${id}"`);
@@ -298,7 +313,7 @@ function main() {
   }
 
   const steps = pendingSteps(loadLedger(root), todayIso());
-  if (argv.includes('--json')) { console.log(JSON.stringify(steps, null, 2)); return; }
+  if (values.json) { console.log(JSON.stringify(steps, null, 2)); return; }
   if (!steps.length) { console.log('\x1b[32m✓ pending-human: человеческих шагов в очереди нет\x1b[0m'); return; }
   console.log(`\x1b[33m⚠ ${digestLine(steps)}\x1b[0m\n`);
   for (const s of steps) {

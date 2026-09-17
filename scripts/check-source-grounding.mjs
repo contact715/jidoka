@@ -34,6 +34,7 @@ import {
   emitTelemetry,
   getCurrentTraceId,
 } from './emit-telemetry.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -385,43 +386,46 @@ function runGroundingCheck(opts) {
 // ── CLI entrypoint ─────────────────────────────────────────────────────────
 // Guard: only run when executed directly (not when imported as a module).
 
+// Разбор строгий (2026-09-16): вне --dry-run скрипт пишет в поток телеметрии, поэтому опечатка
+// (`--dryrun`) раньше молча писала запись. Незнакомое имя --fixture раньше тихо давало пустой
+// вывод агента и вердикт «чисто». Теперь оба случая — код 2 до проверки.
+export const CLI = {
+  name: 'check-source-grounding',
+  usage: [
+    'Usage: node scripts/check-source-grounding.mjs [--dry-run] [--fixture <name>] [--agent <name>] [--wave <wave>]',
+    '',
+    'Options:',
+    '  --dry-run                 Log verdict to stdout, do not write to halluc-events.jsonl',
+    '  --fixture <name>          Use a built-in test fixture as agent output',
+    `                            Available: ${Object.keys(FIXTURES).join(', ')}`,
+    '  --agent <name>            Agent name (looks up .claude/agents/<name>.md for citation_schema)',
+    '  --wave <wave>             Wave identifier (default: wave-163)',
+    '  -h, --help                Show this help',
+    '',
+    'Config gate: .sdd-config.json hallucination.enabled',
+    'Stream: docs/audits/halluc-events.jsonl (10th telemetry stream)',
+    'Schema: docs/GROUNDING_CONTRACT.md',
+    '',
+    'Exit codes: 0 — verdict logged (soft-fail default), 42 — hard block (hallucination_detected with hardBlockEnabled), 2 — bad call (nothing checked or written).',
+  ].join('\n'),
+  options: {
+    'dry-run': { type: 'boolean' },
+    fixture: { type: 'string', choices: Object.keys(FIXTURES) },
+    agent: { type: 'string', default: '' },
+    wave: { type: 'string', default: 'wave-163' },
+  },
+};
+
 const isDirectExecution = process.argv[1] &&
   path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
 
 if (isDirectExecution) {
-  const args = process.argv.slice(2);
+  const { values } = runCli(CLI);
 
-  // Help
-  if (args.includes('--help') || args.includes('-h')) {
-    process.stdout.write([
-      'Usage: node scripts/check-source-grounding.mjs [options]',
-      '',
-      'Options:',
-      '  --dry-run                 Log verdict to stdout, do not write to halluc-events.jsonl',
-      '  --fixture <name>          Use a built-in test fixture as agent output',
-      '                            Available: all-resolved, missing-citations, unresolved-chunk, empty-citations',
-      '  --agent <name>            Agent name (looks up .claude/agents/<name>.md for citation_schema)',
-      '  --wave <wave>             Wave identifier (default: wave-163)',
-      '  --help                    Show this help',
-      '',
-      'Config gate: .sdd-config.json hallucination.enabled',
-      'Stream: docs/audits/halluc-events.jsonl (10th telemetry stream)',
-      'Schema: docs/GROUNDING_CONTRACT.md',
-      '',
-    ].join('\n'));
-    process.exit(0);
-  }
-
-  const dryRun = args.includes('--dry-run');
-
-  const fixtureIdx = args.indexOf('--fixture');
-  const fixture = fixtureIdx !== -1 ? args[fixtureIdx + 1] ?? null : null;
-
-  const agentIdx = args.indexOf('--agent');
-  const agentName = agentIdx !== -1 ? args[agentIdx + 1] ?? '' : '';
-
-  const waveIdx = args.indexOf('--wave');
-  const wave = waveIdx !== -1 ? args[waveIdx + 1] ?? 'wave-163' : 'wave-163';
+  const dryRun = values['dry-run'] === true;
+  const fixture = values.fixture ?? null;
+  const agentName = values.agent;
+  const wave = values.wave;
 
   runGroundingCheck({
     dryRun,

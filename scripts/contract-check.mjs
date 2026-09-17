@@ -15,6 +15,7 @@
 //   node scripts/contract-check.mjs --contract <c.json> --fe <fe.json> --be <be.json>
 
 import { readFileSync, existsSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 const key = (e) => `${String(e.method || 'GET').toUpperCase()} ${e.path}`;
 
@@ -49,13 +50,26 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово или флаг без значения — код 2.
+// Без трёх списков скрипт, как и раньше, честно говорит «N/A» и выходит с 0.
+export const CLI = {
+  name: 'contract-check',
+  summary: 'Сверка контракта API: фронт зовёт только объявленное, бэкенд реализует всё обещанное и ничего сверх.',
+  selfTest: true,
+  options: {
+    contract: { type: 'string', value: 'c.json', desc: 'объявленный контракт (список {method, path})' },
+    fe: { type: 'string', value: 'fe.json', desc: 'вызовы фронта' },
+    be: { type: 'string', value: 'be.json', desc: 'обработчики бэкенда' },
+  },
+};
+
 const load = (p) => (p && existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : null);
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const contract = load(arg('--contract')), fe = load(arg('--fe')), be = load(arg('--be'));
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const contract = load(values.contract), fe = load(values.fe), be = load(values.be);
   if (!contract || !fe || !be) {
     console.log('contract-check: N/A here — needs --contract/--fe/--be endpoint lists (a product supplies them; this repo exposes no HTTP API). The gate ships to products.');
     process.exit(0);

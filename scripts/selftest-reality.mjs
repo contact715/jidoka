@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // @closes-class: self-test-blindspot
+// @divergence: "exit 0 + NO assertion output → blindspot (the never-ran bug)" — мера «код выхода 0» говорила «зелено», а правило «самопроверка что-то утверждала» нарушено
 // selftest-reality — the gate for the self-test-blindspot class.
 //
 // THE CLASS IT GATES (3 recurring incidents): a self-test reads GREEN but never actually exercised the
@@ -24,6 +25,7 @@ import { readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -62,8 +64,14 @@ export function summaryPair(text) {
 }
 
 // A script declares a self-test if it handles the --self-test flag AND names a selfTest function.
+// Строгий разбор (2026-09-16): флаг теперь объявляется строкой `selfTest: true` в спецификации
+// CLI (scripts/lib/cli.mjs), и литерала «--self-test» в файле может не остаться вовсе. Без второй
+// формы прибор молча перестал бы гонять такие самопроверки — зелёный над непроверенным.
 export function declaresSelfTest(src) {
-  return /--self-test/.test(src) && /selfTest/.test(src);
+  // строгий CLI объявляет самопроверку в спецификации; слово --self-test в комментарии
+  // («флага --self-test нет») самопроверкой не является (найдено ревью 2026-09-16, cl-launcher)
+  if (/^\s*export\s+const\s+CLI\s*=/m.test(src)) return /^\s*selfTest\s*:\s*true\b/m.test(src);
+  return (/--self-test/.test(src) && /selfTest/.test(src)) || /^\s*selfTest\s*:\s*true\b/m.test(src);
 }
 
 // Classify one run by (exit code, captured output):
@@ -135,7 +143,13 @@ function selfTest() {
   ok('exit 0 + empty output → blindspot', classifyRun({ exit: 0, output: '' }) === 'blindspot');
   ok('non-zero exit → failing (not a blindspot)', classifyRun({ exit: 1, output: '✗ x failed' }) === 'failing');
   ok('exit 0 + single marker → thin (warn, not block)', classifyRun({ exit: 0, output: '✓ only one check' }) === 'thin');
+  ok('declaresSelfTest: строгий CLI без selfTest: true — не самопроверка, даже если слово --self-test есть в комментарии',
+    declaresSelfTest("export const CLI = {\n  name: 'x',\n};\n// флага --self-test нет\nfunction selfTestish() {}") === false
+    && declaresSelfTest("export const CLI = {\n  selfTest: true,\n};\n") === true);
   ok('declaresSelfTest: needs both --self-test and selfTest', declaresSelfTest("if(argv.includes('--self-test')) selfTest()") === true && declaresSelfTest('console.log("hi")') === false);
+  ok('declaresSelfTest: строгий CLI со строкой selfTest: true засчитывается без литерала флага',
+    declaresSelfTest("export const CLI = {\n  name: 'x',\n  selfTest: true,\n};\nif (wantsSelfTest) selfTest();") === true
+    && declaresSelfTest("export const CLI = {\n  name: 'x',\n  selfTest: false,\n};") === false);
   ok('N/N ratio counts as assertion', classifyRun({ exit: 0, output: '11/11 green and 3/3 ok' }) === 'real');
   // кириллица (2026-08-22) — живая самопроверка на русском не должна читаться как пустышка
   ok('русский вывод «36 прошло, 0 упало» → real, а не blindspot',
@@ -156,7 +170,19 @@ function selfTest() {
 const isMain = (() => {
   try { return realpathSync(process.argv[1] || '') === realpathSync(fileURLToPath(import.meta.url)); } catch { return false; }
 })();
+// Разбор строгий (2026-09-16): опечатка `--chnaged` раньше молча давала полный прогон всех
+// самопроверок вместо быстрого. Теперь — код 2 до первого запуска.
+export const CLI = {
+  name: 'selftest-reality',
+  summary: 'Гейт: каждая самопроверка, вышедшая с 0, действительно что-то утверждала (иначе это слепое пятно).',
+  selfTest: true,
+  options: {
+    changed: { type: 'boolean', desc: 'только скрипты из текущего git diff (быстро)' },
+  },
+};
+
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  else scan(process.argv.includes('--changed') ? changedSelfTestFiles() : null);
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  else scan(values.changed === true ? changedSelfTestFiles() : null);
 }

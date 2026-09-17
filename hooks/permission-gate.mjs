@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // @closes-class: precedent-generalized-into-standing-permission
+// @divergence: "a real flag OUTSIDE quotes still fires alongside a quoted message" — мера «вырезать всё в кавычках» сказала бы «чисто», а настоящий --no-verify вне кавычек остаётся обходом
 // permission-gate — PreToolUse hook on Bash. Blocks the actions that are only ever allowed by
 // an explicit, scoped, expiring permission, and refuses to accept precedent as a substitute.
 //
@@ -18,6 +19,12 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadCli } from './lib/load-cli.mjs';
+
+// Строгий разбор аргументов (2026-09-16). Код отказа 1, а не 2: для Claude Code код 2 у
+// PreToolUse значит «заблокировать вызов инструмента», и опечатка в settings.json заперла бы
+// каждую команду Bash.
+const HOOK_BAD_CALL_EXIT = 1;
 
 const LEDGER = process.env.JIDOKA_PERMISSIONS || join(homedir(), '.jidoka', 'permissions.jsonl');
 
@@ -78,10 +85,21 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор — первое, что делает хук: незнакомый флаг или лишнее слово — отказ до чтения stdin
+// и реестра разрешений. Слово события хук не читает, поэтому слов не принимает.
+export const CLI = {
+  name: 'permission-gate',
+  path: 'hooks/permission-gate.mjs',
+  summary: 'Хук PreToolUse на Bash: действие вроде git --no-verify проходит только по живой записи в реестре разрешений. Данные события — в stdin.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = (await loadCli(import.meta.url)).runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
   const readStdin = () => new Promise((res) => {
     let d = '';

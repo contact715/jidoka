@@ -32,6 +32,7 @@ import {
   readSkillLock, folderOf, upstreamMapForFolder, readLocalUnit,
   compareUnit, resolveLocalDir, isIgnored,
 } from './skills-freshness.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const HOME = os.homedir();
 const SKILL_LOCK = path.join(HOME, '.agents', '.skill-lock.json');
@@ -324,16 +325,22 @@ function selfTest() {
 
 /* --------------------------------- main ---------------------------------- */
 
-async function main() {
-  const argv = process.argv.slice(2);
-  if (argv.includes('--self-test')) process.exit(selfTest());
-  const argOf = (flag, dflt) => {
-    const i = argv.indexOf(flag);
-    return i >= 0 && argv[i + 1] ? argv[i + 1] : dflt;
-  };
-  const maxDiff = Number(argOf('--max-diff', '120')) || 120;
-  const onlyRepo = argOf('--only', null);
-  const outFile = argOf('-o', argOf('--out', null));
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до первого запроса в сеть.
+export const CLI = {
+  name: 'skills-diff',
+  summary: 'Что именно изменилось в отставших скиллах: дифф с источником (GitHub) в один markdown-документ.',
+  selfTest: true,
+  options: {
+    out: { type: 'string', short: 'o', value: 'файл', desc: 'записать отчёт в файл, а не в stdout' },
+    only: { type: 'string', value: 'владелец/репо', desc: 'только скиллы из этого репозитория' },
+    'max-diff': { type: 'number', default: 120, desc: 'строк диффа на файл' },
+  },
+};
+
+async function main(values) {
+  const maxDiff = values['max-diff'] || 120;
+  const onlyRepo = values.only || null;
+  const outFile = values.out || null;
 
   const entries = readSkillLock(fs.readFileSync(SKILL_LOCK, 'utf8'))
     .filter((e) => !onlyRepo || e.repo === onlyRepo);
@@ -405,4 +412,8 @@ async function main() {
 }
 
 const direct = process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(new URL(import.meta.url).pathname);
-if (direct) main().catch((e) => { console.error(`skills-diff: ${e.message}`); process.exit(0); });
+if (direct) {
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) process.exit(selfTest());
+  main(values).catch((e) => { console.error(`skills-diff: ${e.message}`); process.exit(0); });
+}

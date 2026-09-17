@@ -42,6 +42,7 @@ import { readFileSync, existsSync, readdirSync, mkdtempSync, writeFileSync, rmSy
 import { resolve, join, relative, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 const DEFAULTS = {
   enabled: true,
@@ -127,15 +128,24 @@ function* walkMd(dir) {
   }
 }
 
-function run() {
-  const args = process.argv.slice(2);
-  const rootArg = args.find((_, i) => args[i - 1] === '--root');
-  const root = resolve(rootArg ?? process.cwd());
+export const CLI = {
+  name: 'spec-amendment-gate',
+  summary: 'Код под живой спекой не меняется без правки самой спеки (или явного SPEC_AMEND_WAIVE=1).',
+  selfTest: true,
+  options: {
+    staged: { type: 'boolean', desc: 'проверить подготовленные к коммиту файлы (без него гейт ничего не делает)' },
+    root: { type: 'string', value: 'папка', desc: 'корень репозитория (по умолчанию текущая папка)' },
+    hard: { type: 'boolean', desc: 'нарушение — код 1 (иначе только предупреждение)' },
+  },
+};
+
+function run(values) {
+  const root = resolve(values.root ?? process.cwd());
   const cfg = loadConfig(root);
   if (cfg.enabled === false) { console.log('[spec-amendment] disabled via .sdd-config.json'); return 0; }
-  const hard = args.includes('--hard') || cfg.hardBlockEnabled === true;
+  const hard = values.hard === true || cfg.hardBlockEnabled === true;
 
-  if (!args.includes('--staged')) {
+  if (!values.staged) {
     console.log('[spec-amendment] commit-time gate: pass --staged');
     return 0;
   }
@@ -203,5 +213,6 @@ function selfTest() {
 }
 
 if (process.argv[1] && process.argv[1].endsWith('spec-amendment-gate.mjs')) {
-  process.exit(process.argv.includes('--self-test') ? selfTest() : run());
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  process.exit(wantsSelfTest ? selfTest() : run(values));
 }

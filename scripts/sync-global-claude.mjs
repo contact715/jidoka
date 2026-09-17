@@ -19,6 +19,7 @@
  * Exit codes:
  *   0 — user confirmed and write succeeded, OR already in sync
  *   1 — user declined, or non-TTY, or fatal error
+ *   2 — bad call: unknown flag or extra word (nothing read, nothing written)
  */
 
 import fs from 'node:fs';
@@ -26,6 +27,7 @@ import path from 'node:path';
 import readline from 'node:readline';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -144,8 +146,17 @@ function main() {
 }
 
 
+// Разбор строгий (2026-09-16): флагов нет; незнакомый флаг или слово — код 2 до проверки
+// терминала и до чтения ~/.claude/CLAUDE.md.
+export const CLI = {
+  name: 'sync-global-claude',
+  summary: 'Дописать раздел Proactive Holistic Analysis в ~/.claude/CLAUDE.md (только в терминале, после подтверждения y).',
+  options: {},
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
   main();
 }

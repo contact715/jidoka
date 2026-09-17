@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // @closes-class: heavy-steps-stack-across-worktrees
+// @divergence: "занятость свопа 70% САМА ПО СЕБЕ не критична — она накопительная" — мера «своп занят» говорила «критично», а правило «машина душится СЕЙЧАС» не нарушено: выброса в своп нет
 // @scope: all
 // @scope-ok: смотрит на состояние ВСЕЙ машины по определению — это и есть его предмет
 /**
@@ -32,6 +33,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 /**
  * Шаги, которые стоят гигабайты. Список намеренно узкий: точность важнее полноты.
@@ -406,9 +408,22 @@ function selfTest() {
   process.exit(failed.length ? 1 : 0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг или слово — код 2, а не молчаливая проверка.
+// Код 1 по-прежнему значит «сейчас тяжёлое запускать нельзя».
+export const CLI = {
+  name: 'machine-guard',
+  summary: 'Память всей машины: можно ли сейчас запускать тяжёлый шаг (код 1 — нельзя). Процессы не трогает.',
+  selfTest: true,
+  options: {
+    check: { type: 'boolean', desc: 'вердикт и код возврата (режим по умолчанию)' },
+    watch: { type: 'boolean', desc: 'писать снимок раз в 30 с (главнее --check)' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  else if (process.argv.includes('--watch')) cmdWatch();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  else if (values.watch) cmdWatch();
   else cmdCheck();
 }

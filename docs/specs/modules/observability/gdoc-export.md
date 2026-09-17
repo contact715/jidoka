@@ -34,7 +34,7 @@ Each AC names the executable check that proves it. ACs are the contract; the com
 ### AC-1 — snapshotMarkdown returns a heading and a tasks section
 
 ```
-node scripts/dashboard/serve.mjs --self-test (gdoc export self-check)
+node scripts/dashboard/gdoc-export.mjs --self-test
 ```
 
 ### AC-2 — Output escapes <, >, & from user data (XSS-safe)

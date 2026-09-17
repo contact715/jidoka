@@ -22,6 +22,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { retrieve } from './memory-retrieve.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DEFAULT_FILE = 'docs/evals/memory-retrieve/golden-cases.jsonl';
@@ -112,19 +113,31 @@ function selfTest() {
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
+// Строгий разбор (2026-09-16): незнакомый флаг или слово — код 2 до чтения набора. Код 2 и
+// раньше означал «нет файла случаев»: оба смысла — «ничего не оценено», их не различаем.
+export const CLI = {
+  name: 'memory-eval',
+  summary: 'Оценка извлечения памяти на золотых случаях (включая воздержание). Без LLM и сети.',
+  selfTest: true,
+  options: {
+    file: { type: 'string', value: 'путь', default: DEFAULT_FILE, desc: 'набор случаев (от корня репозитория)' },
+    json: { type: 'boolean', desc: 'ответ в JSON' },
+    embed: { type: 'boolean', desc: 'сравнить лексический канал со слитным лексика+вектор' },
+  },
+};
+
 const isMain = process.argv[1] && process.argv[1].endsWith('memory-eval.mjs');
 if (isMain) {
-  const argv = process.argv.slice(2);
-  if (argv.includes('--self-test')) selfTest();
-  const i = argv.indexOf('--file');
-  const file = path.join(ROOT, i !== -1 ? argv[i + 1] : DEFAULT_FILE);
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const file = path.join(ROOT, values.file);
   if (!existsSync(file)) { console.error(`memory-eval: нет файла случаев ${file}`); process.exit(2); }
 
   // the first line is a _meta record (it carries the point-of-integration anchor), not a case
   // --embed re-runs the same golden set through the fused lexical+vector channel. This exists so
   // the decision to keep the vector layer asleep stays CHECKABLE: anyone proposing to wake it can
   // run this and show it wins, instead of arguing that it should.
-  if (argv.includes('--embed')) {
+  if (values.embed) {
     const { retrieveFused, hashingEmbed } = await import('./memory-vector.mjs');
     const cases2 = readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((c) => !c._meta);
     let lex = 0; let fus = 0; const diffs = [];
@@ -160,7 +173,7 @@ if (isMain) {
   });
   const s = summarizeCompetencies(rows);
 
-  if (argv.includes('--json')) { console.log(JSON.stringify({ ...s, rows }, null, 2)); process.exit(s.passed === s.total ? 0 : 1); }
+  if (values.json) { console.log(JSON.stringify({ ...s, rows }, null, 2)); process.exit(s.passed === s.total ? 0 : 1); }
 
   console.log(`memory-eval: ${s.passed}/${s.total} (${Math.round(s.accuracy * 100)}%)\n`);
   for (const r of rows) {

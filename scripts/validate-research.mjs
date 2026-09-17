@@ -40,13 +40,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
-
-// ── CLI args ──────────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-const isDry = args.includes('--dry');
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
 const REGISTER_PATH = path.join(ROOT, 'docs', 'research', 'insights-register.json');
@@ -127,7 +124,7 @@ function parseUri(uri) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-function main() {
+function main({ dry: isDry = false } = {}) {
   log(`[validate-research] register: ${REGISTER_PATH}${isDry ? ' (--dry)' : ''}`);
 
   // ── Parse register ────────────────────────────────────────────────────────
@@ -224,8 +221,19 @@ function main() {
 }
 
 
+// ── CLI ───────────────────────────────────────────────────────────────────────
+// Строгий разбор (2026-09-16): незнакомый флаг или слово — код 2 до проверки реестра.
+export const CLI = {
+  name: 'validate-research',
+  summary: 'Проверка docs/research/insights-register.json по четырём инвариантам (I1–I3 блокируют, I4 предупреждает).',
+  options: {
+    dry: { type: 'boolean', desc: 'только проверить (валидатор и так ничего не пишет; флаг ради единообразия)' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  main();
+  const { values } = runCli(CLI);
+  main({ dry: values.dry === true });
 }

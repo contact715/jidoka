@@ -24,6 +24,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -59,10 +60,17 @@ function safeExit(code) {
   process.exit(code);
 }
 
+// Разбор строгий (2026-09-16): флагов у скрипта нет. Раньше `--help` или любое слово
+// молча запускали прогон, который переписывает исходники lib/ мутантами.
+export const CLI = {
+  name: 'run-mutation',
+  summary: 'Мутационный прогон: внести искусственные дефекты в lib/, посчитать, сколько поймали тесты (отчёт в docs/metrics/mutation-report.json).',
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
   process.on('SIGINT', () => {
     process.stderr.write('\n[mutation] SIGINT received — restoring lib/ sources before exit\n');
     safeExit(0);

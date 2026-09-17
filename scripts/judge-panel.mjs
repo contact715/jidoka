@@ -9,6 +9,7 @@
 //   node scripts/judge-panel.mjs --rubrics 3 --seed 7
 
 import { debiasedVerdict } from './debate-engine.mjs';
+import { runCli } from './lib/cli.mjs';
 
 export const RUBRICS = [
   { id: 'correctness',         frame: 'Does the change do what the spec says, correctly, with edge cases handled?' },
@@ -51,10 +52,22 @@ function aggregateSingle(votes) {
   return { verdict: 'CONTESTED', mode: 'split', counts };
 }
 
-const arg = (k) => { const i=process.argv.indexOf(k); return i!==-1?process.argv[i+1]:null; };
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
+// Строгий разбор (2026-09-16): незнакомый флаг или слово — код 2 (раньше `--vote PASS` молча
+// печатал рубрики и выходил с 0, как будто панель проголосовала).
+export const CLI = {
+  name: 'judge-panel',
+  summary: 'Панель судей с разными рубриками: большинство + вето безопасности; или выбор рубрик на прогон.',
+  selfTest: true,
+  options: {
+    votes: { type: 'string', value: 'PASS,FAIL,…', desc: 'голоса через запятую → вердикт (код 0 только при PASS)' },
+    rubrics: { type: 'number', default: 3, desc: 'сколько разных рубрик выбрать' },
+    seed: { type: 'number', default: 0, desc: 'сдвиг ротации рубрик' },
+  },
+};
 if (isMain) {
-if (process.argv.includes('--self-test')) {
+const { values, selfTest: wantsSelfTest } = runCli(CLI);
+if (wantsSelfTest) {
   const T = [
     {votes:['PASS','PASS','PASS'],  expect:'PASS',      mode:'consensus'},
     {votes:['PASS','PASS','FAIL'],  expect:'CONTESTED',  mode:'majority-vetoed'},
@@ -84,14 +97,14 @@ if (process.argv.includes('--self-test')) {
   console.log('\n\x1b[32m✓ judge-panel aggregation + rotation correct\x1b[0m');
   process.exit(0);
 }
-const votesArg=arg('--votes');
+const votesArg=values.votes;
 if (votesArg) {
   const r=aggregate(votesArg.split(','));
   console.log(`verdict: \x1b[1m${r.verdict}\x1b[0m (${r.mode})  counts: ${JSON.stringify(r.counts)}`);
   if (r.verdict==='CONTESTED') console.log('  → judges disagree or a veto fired — escalate to a human, do not auto-merge.');
   process.exit(r.verdict==='PASS'?0:1);
 }
-const n=parseInt(arg('--rubrics')||'3',10), seed=parseInt(arg('--seed')||'0',10);
+const n=Math.trunc(values.rubrics), seed=Math.trunc(values.seed);
 console.log(`judge-panel: ${n} distinct rubrics for this run (seed ${seed}):`);
 for (const r of pickRubrics(n,seed)) console.log(`  · ${r.id}: ${r.frame}`);
 console.log('\nLLM judging is DORMANT (wire a model like run-evals). Aggregation/rotation logic is live & self-tested.');

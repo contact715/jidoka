@@ -31,11 +31,14 @@
 //   node scripts/worktree-session.mjs create fix-login          # branch + worktree + seed + port
 //   node scripts/worktree-session.mjs list
 //   node scripts/worktree-session.mjs remove fix-login          # refuses if work would be lost
+//   node scripts/worktree-session.mjs remove fix-login --force  # deletes even unsaved work
+//   (полная справка: --help; незнакомый флаг или команда — код 2 до любого обращения к git)
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, mkdirSync, cpSync, symlinkSync, statSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import path from 'node:path';
+import { runCli } from './lib/cli.mjs';
 
 export const DEFAULT_SEED = [
   { path: '.env', mode: 'copy' },
@@ -168,13 +171,30 @@ function selfTest() {
 }
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): незнакомый флаг, неверная команда или лишнее слово — код 2
+// до любого обращения к git. Код 2 здесь исторически значит ещё и «не git-репозиторий»,
+// «копия уже существует / не существует» — эти отказы оставлены как были.
+export const CLI = {
+  name: 'worktree-session',
+  summary: 'Изолированная рабочая копия целиком: ветка, копия, подсев файлов, свободный порт, безопасное удаление.',
+  selfTest: true,
+  commands: {
+    create: { desc: 'ветка wt/<имя> + копия + подсев + порт', positionals: { min: 1, max: 1, name: 'имя' } },
+    list: { desc: 'список рабочих копий' },
+    remove: {
+      desc: 'удалить копию (отказ, если работа потеряется)',
+      options: { force: { type: 'boolean', desc: 'удалить, даже если есть несохранённая работа' } },
+      positionals: { min: 1, max: 1, name: 'имя' },
+    },
+  },
+};
+
 const isMain = process.argv[1] && process.argv[1].endsWith('worktree-session.mjs');
 if (isMain) {
-  const argv = process.argv.slice(2);
-  if (argv.includes('--self-test')) selfTest();
-  const cmd = argv[0];
-  const name = argv[1];
-  const force = argv.includes('--force');
+  const { command: cmd, positionals, values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const name = positionals[0];
+  const force = values.force === true;
 
   let root;
   try { root = sh(['rev-parse', '--show-toplevel'], process.cwd()); }
@@ -186,7 +206,6 @@ if (isMain) {
   }
 
   if (cmd === 'create') {
-    if (!name) { console.error('usage: create <имя>'); process.exit(2); }
     const wt = worktreePathFor(root, name);
     const branch = branchFor(name);
     if (existsSync(wt)) { console.error(`worktree-session: ${wt} уже существует`); process.exit(2); }
@@ -218,7 +237,6 @@ if (isMain) {
   }
 
   if (cmd === 'remove') {
-    if (!name) { console.error('usage: remove <имя>'); process.exit(2); }
     const wt = worktreePathFor(root, name);
     if (!existsSync(wt)) { console.error(`worktree-session: ${wt} не существует`); process.exit(2); }
     let porcelain = ''; let ahead = 0;
@@ -234,6 +252,4 @@ if (isMain) {
     console.log(`✓ удалено: ${wt} (${v.reason})`);
     process.exit(0);
   }
-
-  console.log('usage: worktree-session.mjs create <имя> | list | remove <имя> [--force]  |  --self-test');
 }

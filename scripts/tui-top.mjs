@@ -10,15 +10,14 @@ import { appendFileSync, mkdirSync, readdirSync, readFileSync, statSync, watch }
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
+import { runCli } from './lib/cli.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
-const args = process.argv.slice(2);
-const argVal = (k) => { const i = args.indexOf(k); return i !== -1 ? args[i + 1] : null; };
-const hasFlag = (k) => args.includes(k);
 
 // Раньше здесь вырезался --self-test из argv: collectors.mjs запускал свою
-// самопроверку при импорте. Теперь она под сторожем, и обход не нужен.
+// самопроверку при импорте. Теперь она под сторожем, и обход не нужен; аргументы
+// разбираются строго (runCli внизу файла), argv больше никто не правит.
 const isMainTui = process.argv[1] === fileURLToPath(import.meta.url);
 
 const { collectProject, discoverProjects } = await import('./dashboard/collectors.mjs');
@@ -62,8 +61,7 @@ function logLaunch(name, snap) {
   } catch { /* non-fatal */ }
 }
 
-function projectPath() {
-  const n = argVal('--project');
+function projectPath(n) {
   if (n) { const f = discoverProjects().find((p) => p.name === n); if (f) return f.path; }
   return ROOT;
 }
@@ -295,7 +293,19 @@ async function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг или лишнее слово — код 2 до того, как панель
+// займёт экран. Раньше опечатка `--projcet x` молча открывала панель текущего проекта.
+export const CLI = {
+  name: 'tui-top',
+  summary: 'Панель управления jidoka top: в терминале — живая панель, в трубе — плоский снимок без ANSI.',
+  selfTest: true,
+  options: {
+    project: { type: 'string', value: 'имя', desc: 'проект из списка найденных (по умолчанию текущий движок)' },
+  },
+};
+
 if (isMainTui) {
-  if (hasFlag('--self-test')) await selfTest();
-  else runLive(projectPath());
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) await selfTest();
+  else runLive(projectPath(values.project));
 }

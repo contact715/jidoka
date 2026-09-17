@@ -28,6 +28,7 @@
 
 import { existsSync, appendFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 import {
   loadLedger, mergeLedgers, missingFrom, ledgerKey, validateLedgerEntry,
   GLOBAL_LEDGER, REPO_LEDGER,
@@ -97,9 +98,21 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг или слово — код 2 до сравнения и до записи.
+// Опечатка `--sycn` раньше молча превращалась в проверку; теперь pre-push увидит отказ разбора.
+export const CLI = {
+  name: 'ledger-sync-gate',
+  summary: 'Сверка реестра ошибок в репозитории с глобальным; код 1 — в репозитории не хватает записей.',
+  selfTest: true,
+  options: {
+    sync: { type: 'boolean', desc: 'дописать недостающие записи (прошедшие схему) в реестр репозитория' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
   const canon = existsSync(REPO_LEDGER) ? loadLedger(REPO_LEDGER) : null;
   const inbox = existsSync(GLOBAL_LEDGER) ? loadLedger(GLOBAL_LEDGER) : null;
@@ -114,7 +127,7 @@ if (isMain) {
     process.exit(0);
   }
 
-  if (process.argv.includes('--sync')) {
+  if (values.sync) {
     const rows = absorbable(canon, inbox);
     if (rows.length) appendFileSync(REPO_LEDGER, rows.map(r => JSON.stringify(r)).join('\n') + '\n');
     console.log(`\x1b[32m✓ ledger-sync-gate: absorbed ${rows.length} incident(s) into ${REPO_LEDGER}\x1b[0m`);
@@ -131,6 +144,7 @@ if (isMain) {
   console.log('  scorecard) is reading the optimistic half of the history.');
   for (const r of v.missing.slice(0, 8)) console.log(`    ${r.date}  ${r.class}`);
   if (v.missing.length > 8) console.log(`    ... and ${v.missing.length - 8} more`);
-  console.log('\n  fix: node scripts/ledger-sync-gate.mjs --sync   (then commit docs/audits/meta-mistakes.jsonl)');
+  console.log('\n  fix: node scripts/ledger-sync-gate.mjs --sync');
+  console.log('       then commit docs/audits/meta-mistakes.jsonl');
   process.exit(1);
 }

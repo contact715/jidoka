@@ -14,7 +14,8 @@
  *
  * Exit codes:
  *   0 — PASS or dry-run or seed-baseline
- *   1 — REGRESSION DETECTED or usage error
+ *   1 — REGRESSION DETECTED
+ *   2 — invalid call (unknown flag, stray word, flag without value) — nothing executed
  *
  * Stream: docs/audits/eval-events.jsonl (11th telemetry stream, wave-164 T3)
  * EU AI Act Art 15: task-completion rate declarable metric.
@@ -27,6 +28,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -122,20 +124,32 @@ function reducerSelfTest() {
   process.exit(0);
 }
 
-const args = process.argv.slice(2);
+// Разбор строгий (2026-09-16): опечатка `--dryrun` раньше молча запускала настоящий прогон с
+// вызовами модели и записью файлов. Теперь — код 2 до любой работы.
+export const CLI = {
+  name: 'run-evals',
+  summary: 'Оценка LLM-агентов по золотым кейсам со сверкой с базовой линией (событие в eval-events.jsonl).',
+  selfTest: true,
+  options: {
+    agent: { type: 'string', value: 'slug', desc: 'оценить одного агента (по умолчанию — всех найденных)' },
+    'dry-run': { type: 'boolean', desc: 'без вызовов модели и записи файлов, выход 0' },
+    dry: { type: 'boolean', desc: 'то же, что --dry-run' },
+    'seed-baseline': { type: 'boolean', desc: 'записать текущие доли в eval-baseline.json без проверки регрессии' },
+  },
+};
+
 // Сторож это сравнение с argv[1], а НЕ проверка флага: родительская команда со своим
 // `--self-test` запустила бы чужую самопроверку прямо при импорте (правило от 2026-08-15,
 // класс work-runs-at-import-time). Гейт import-safety поймал ровно эту ошибку здесь.
-if (process.argv[1] === fileURLToPath(import.meta.url) && args.includes('--self-test')) reducerSelfTest();
-const isDryRun = args.includes('--dry-run') || args.includes('--dry');
-const isSeedBaseline = args.includes('--seed-baseline');
-const agentFlag = args.indexOf('--agent');
-const targetAgent = agentFlag !== -1 ? args[agentFlag + 1] : null;
-
-
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) reducerSelfTest();
+  const isDryRun = values['dry-run'] === true || values.dry === true;
+  const isSeedBaseline = values['seed-baseline'] === true;
+  const targetAgent = values.agent ?? null;
+
   if (isDryRun) {
     process.stdout.write('[eval] DRY RUN — no LLM calls, no file writes.\n');
     process.stdout.write('[eval] Discovered agents:\n');

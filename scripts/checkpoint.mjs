@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // @closes-class: declaration-over-implementation
+// @divergence: "HITL: an interrupt node PARKS the run" — мера «все узлы записаны» говорит «можно продолжать», а правило «узел ждёт решения человека» нарушено
 // checkpoint — append-only event log per wave: the state of a run is what happened, not what
 // someone reconstructed afterwards.
 //
@@ -24,11 +25,13 @@
 //   node scripts/checkpoint.mjs --self-test
 //   node scripts/checkpoint.mjs record <wave> <node> <agent> <status> [outputHash]
 //   node scripts/checkpoint.mjs completed <wave>
+//   (full help: --help; an unknown flag, command or a stray word exits 2 before anything is appended)
 
 import { appendFileSync, readFileSync, existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
+import { runCli } from './lib/cli.mjs';
 
 export const STATUSES = ['done', 'failed', 'interrupt'];
 const STORE = process.env.CHECKPOINT_LOG || join(homedir(), '.jidoka', 'checkpoints');
@@ -165,10 +168,25 @@ function selfTest() {
   process.exit(0);
 }
 
+// Strict parsing (2026-09-16): an unknown flag, an unknown command or a stray word exits 2
+// before anything is appended. Before, `record w n a done out extra` silently dropped `extra`.
+export const CLI = {
+  name: 'checkpoint',
+  summary: 'Append-only event log per wave: record a node outcome, or print the reduced run state.',
+  selfTest: true,
+  commands: {
+    record: {
+      desc: 'append one event (status: done | failed | interrupt, default done)',
+      positionals: { min: 2, max: 5, name: 'wave node', label: '<wave> <node> [agent] [status] [output]' },
+    },
+    completed: { desc: 'reduced state of a wave', positionals: { min: 1, max: 1, name: 'wave' } },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const [cmd, ...rest] = process.argv.slice(2);
+  const { command: cmd, positionals: rest, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
   if (cmd === 'record') {
     const [wave, node, agent, status, output] = rest;
     console.log(JSON.stringify(record({ wave, node, agent, status: status || 'done', output: output || '' })));
@@ -181,6 +199,4 @@ if (isMain) {
     console.log(JSON.stringify(state, null, 2));
     process.exit(0);
   }
-  console.log('usage: checkpoint.mjs record <wave> <node> <agent> <status> [output] | completed <wave> | --self-test');
-  process.exit(0);
 }

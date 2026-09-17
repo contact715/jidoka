@@ -33,6 +33,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { recordTrip } from './meta-lib.mjs';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 // Files that legitimately contain pattern *definitions*, doc examples, or PII-shaped
 // test fixtures — skip these so the guard does not flag its own detection patterns or
@@ -184,10 +185,32 @@ function selfTest() {
 }
 
 
+// Разбор строгий (2026-09-16): флагов, кроме --self-test, у сторожа нет; незнакомый флаг
+// или слово — код 2 до сканирования. Код 3 по-прежнему значит «дерево непроверяемо».
+export const CLI = {
+  name: 'pre-publish-guard',
+  usage: `Сторож публикации: настоящие секреты в дереве И во всей истории git блокируют (код 1),
+домашние пути — только предупреждение. Запускать из корня рабочего дерева git.
+
+Использование:
+  node scripts/pre-publish-guard.mjs
+  node scripts/pre-publish-guard.mjs --self-test
+
+Флаги:
+  -h, --help     эта справка
+  --self-test    самопроверка (создаёт временные git-репозитории)
+
+Коды выхода: 0 — секретов нет, 1 — найден секрет (публикация заблокирована),
+2 — неверный вызов (ничего не выполнено), 3 — дерево непроверяемо (не git).`,
+  selfTest: true,
+  options: {},
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
-if (isMain && process.argv.includes('--self-test')) {
-  process.exit(selfTest() ? 0 : 1);
+if (isMain) {
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) process.exit(selfTest() ? 0 : 1);
 }
 
 if (isMain) {

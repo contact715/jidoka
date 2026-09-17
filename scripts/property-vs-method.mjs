@@ -44,10 +44,12 @@
 //   node scripts/property-vs-method.mjs --repo <путь> --tautology  # плюс слабая форма 3
 //   node scripts/property-vs-method.mjs --repo <путь> --ratchet    # выход 1 при находках
 //   node scripts/property-vs-method.mjs --self-test
+//   (полная справка: --help; незнакомый флаг, лишнее слово или --repo без пути — код 2 до обхода)
 
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 // ── словари ──────────────────────────────────────────────────────────────────
 // ПОВЕСТВОВАТЕЛЬНОЕ поле: человек рассказывает о работе. Здесь слово про действие
@@ -342,11 +344,24 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово или флаг без значения — код 2.
+// Раньше опечатка `--rachet` в pre-commit молча превращала храповик в отчёт с кодом 0.
+export const CLI = {
+  name: 'property-vs-method',
+  summary: 'Проверка смотрит на способ, а не на свойство? Сторож на повествовательном поле, утверждение шире замысла, тавтология.',
+  selfTest: true,
+  options: {
+    repo: { type: 'string', value: 'путь', desc: 'что обходить (обязательно)' },
+    tautology: { type: 'boolean', desc: 'показать и слабую форму 3 (тест засевает то, что проверяет)' },
+    ratchet: { type: 'boolean', desc: 'код 1 при любой находке форм 1 и 2' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const argAfter = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const root = argAfter('--repo');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const root = values.repo;
   if (!root || !existsSync(root)) { console.error('usage: --repo <путь>  (или --self-test)'); process.exit(2); }
   const r = auditTree(root);
   console.log(`property-vs-method — просмотрено файлов: ${r.scanned}  (${root})`);
@@ -359,7 +374,7 @@ if (isMain) {
   // и его же проверить — это и есть проверяемое свойство. Отличить её от теста, который
   // засеял СЛОМАННЫЙ контур, текстом нельзя. Печатать 51 подозрение с долей правды около
   // нуля значит научить пролистывать вывод, а это ровно тот вред, который прибор лечит.
-  if (process.argv.includes('--tautology')) {
+  if (values.tautology) {
     console.log(`  [слабый сигнал] тест засевает то, что проверяет: ${r.seeds.length}`);
     console.log('      Много ложных: законная проводка выглядит так же. Смотреть глазами.');
     for (const x of r.seeds.slice(0, 15)) console.log(`      ${x.file}:${x.line}  «${x.name}» литерал ${JSON.stringify(x.literal)}`);
@@ -371,6 +386,6 @@ if (isMain) {
   console.log('  Это ПОДОЗРЕНИЯ, а не приговор: разбор текстовый и ошибается в строгую сторону.');
   // Храповик: блокирует только когда его позвали с --ratchet по изменённым файлам.
   // Всё дерево он не блокирует никогда: старый долг виден, но не держит работу.
-  if (process.argv.includes('--ratchet') && total > 0) process.exit(1);
+  if (values.ratchet && total > 0) process.exit(1);
   process.exit(0);
 }

@@ -27,6 +27,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { writeHaltState, readAndonConfig } from './andon-halt-helpers.mjs';
 import { emitTelemetry } from './emit-telemetry.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -270,9 +271,17 @@ function main() {
 }
 
 
+// Разбор строгий (2026-09-16): флагов нет. Незнакомый флаг раньше молча давал прогон,
+// который может записать состояние остановки (andon); теперь — код 2 без прогона.
+export const CLI = {
+  name: 'audit-meta-process',
+  summary: 'Повтор задокументированных анти-паттернов в последних 5 ретро: PASS | REGRESSION_DETECTED | CATALOG_UPDATE_NEEDED.',
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
   try {
     main();
   } catch (e) {

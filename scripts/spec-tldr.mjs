@@ -13,6 +13,7 @@
 //   node scripts/spec-tldr.mjs --spec docs/specs/wave-x.md
 
 import { readFileSync, existsSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 function sectionBullets(lines, sectionRe, limit = 12) {
   let inSec = false; const items = [];
@@ -62,12 +63,20 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+export const CLI = {
+  name: 'spec-tldr',
+  summary: 'Короткая выжимка спеки: цель, задачи и критерии приёмки списком.',
+  selfTest: true,
+  options: {
+    spec: { type: 'string', value: 'файл.md', desc: 'спека (обязательна)' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const sp = arg('--spec');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const sp = values.spec;
   if (!sp || !existsSync(sp)) { console.error('usage: --spec <file.md>  (or --self-test)'); process.exit(2); }
   console.log(render(tldr(readFileSync(sp, 'utf8'))));
   process.exit(0);

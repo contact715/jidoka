@@ -19,6 +19,7 @@ import { existsSync, readFileSync, mkdtempSync, writeFileSync, rmSync } from 'no
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 // evaluate ONE evidence predicate against the real repo
 export function checkEvidence(ev, { root = process.cwd(), runCmd } = {}) {
@@ -80,15 +81,25 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до чтения цели.
+export const CLI = {
+  name: 'verify-goal-backward',
+  summary: 'Проследить цель волны назад до реальных доказательств: какие задачи цели не сданы.',
+  selfTest: true,
+  options: {
+    goal: { type: 'string', value: 'goal.json', desc: 'файл цели волны (обязательно)' },
+    root: { type: 'string', value: 'папка', desc: 'корень, где проверяются доказательства (по умолчанию текущая папка)' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const goalFile = arg('--goal');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const goalFile = values.goal;
   if (!goalFile) { console.error('usage: verify-goal-backward.mjs --goal <goal.json> [--root .]   (or --self-test)'); process.exit(2); }
   if (!existsSync(goalFile)) { console.error(`goal file not found: ${goalFile}`); process.exit(2); }
-  const root = arg('--root') || process.cwd();
+  const root = values.root || process.cwd();
   const goalSpec = JSON.parse(readFileSync(goalFile, 'utf8'));
   const t = traceGoalBackward(goalSpec, { root });
   console.log(`goal-backward: "${t.goal}"  (${t.objectives.length} objectives)\n`);

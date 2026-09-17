@@ -15,6 +15,7 @@
 
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join, dirname, basename } from 'node:path';
+import { runCli } from './lib/cli.mjs';
 
 // pure: parse one ESM module's exports + local imports
 export function parseModule(content) {
@@ -81,14 +82,27 @@ function scan(dir) {
   return files;
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово или флаг без значения — код 2
+// до чтения папки. Код 2 на «папка не найдена» был и раньше.
+export const CLI = {
+  name: 'code-map',
+  summary: 'Структурная карта кода (граф import/export): где определён символ и что сломается при правке файла.',
+  selfTest: true,
+  options: {
+    dir: { type: 'string', value: 'папка', desc: 'что сканировать (по умолчанию scripts)' },
+    symbol: { type: 'string', value: 'имя', desc: 'где определён экспорт и кто его импортирует' },
+    blast: { type: 'string', value: 'файл.mjs', desc: 'радиус поражения: кто импортирует файл, транзитивно' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const dir = arg('--dir') || 'scripts';
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const dir = values.dir || 'scripts';
   if (!existsSync(dir)) { console.error(`code-map: ${dir} not found`); process.exit(2); }
   const g = buildGraph(scan(dir));
-  const sym = arg('--symbol'), blast = arg('--blast');
+  const sym = values.symbol || null, blast = values.blast || null;
   if (sym) {
     const def = g.symbolIndex[sym] || [];
     console.log(`symbol "${sym}": ${def.length ? 'defined in ' + def.join(', ') : 'not found'}`);

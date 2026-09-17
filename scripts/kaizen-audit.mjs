@@ -15,13 +15,14 @@
 // Pure core (auditEntry / auditLedger) takes injected probes so it is fully testable offline.
 //
 // Usage:
-//   node scripts/kaizen-audit.mjs [--file <ledger>] [--week 2026-W27] [--dry]
+//   node scripts/kaizen-audit.mjs [--file <ledger>] [--week 2026-W27] [--dry] [--verify-checks]
 //   node scripts/kaizen-audit.mjs --self-test
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readLedger, writeLedger, upsert, DEFAULT_LEDGER } from './kaizen-ledger.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -420,12 +421,26 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до записи реестра. Раньше
+// `--dyr` (опечатка) молча проходил, и аудит переписывал реестр и витрину.
+export const CLI = {
+  name: 'kaizen-audit',
+  summary: 'Аудит исходов Kaizen: внедрён ли каждый пункт реестра на самом деле (shipped / open / regressed).',
+  selfTest: true,
+  options: {
+    file: { type: 'string', value: 'реестр', desc: `файл реестра (по умолчанию ${path.relative(ROOT, DEFAULT_LEDGER)})` },
+    week: { type: 'string', value: '2026-W27', desc: 'неделя аудита (по умолчанию текущая ISO-неделя)' },
+    dry: { type: 'boolean', desc: 'не записывать реестр и витрину' },
+    'verify-checks': { type: 'boolean', desc: 'запустить команды проверки из реестра (доказательство прогоном)' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const file = arg('--file') || DEFAULT_LEDGER;
-  const week = arg('--week') || isoWeek(new Date());
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const file = values.file || DEFAULT_LEDGER;
+  const week = values.week || isoWeek(new Date());
   const exists = (rel) => fs.existsSync(path.join(ROOT, rel));
   const read = (rel) => { try { return fs.readFileSync(path.join(ROOT, rel), 'utf8'); } catch { return null; } };
   let ciText = '';
@@ -445,7 +460,7 @@ if (isMain) {
   // только запуск. Режим отдельный намеренно: исполнять команды из файла на каждом
   // аудите дорого и небезопасно, а гейт, который дорого стоит на каждом шаге, учат
   // обходить (класс gate-cost-not-proportional-to-change).
-  if (process.argv.includes('--verify-checks')) {
+  if (values['verify-checks'] === true) {
     const { execSync } = await import('node:child_process');
     const run = (cmd) => {
       try { execSync(cmd, { cwd: ROOT, stdio: 'pipe', timeout: 120000 }); return { ok: true }; }
@@ -463,7 +478,7 @@ if (isMain) {
     console.log(`  доказано прогоном: ${passed} · упало: ${failed} · внедрено БЕЗ команды проверки: ${noCheck}`);
     if (failed) process.exit(1);
   }
-  if (!process.argv.includes('--dry')) {
+  if (values.dry !== true) {
     writeLedger(after, file);
     console.log(`[kaizen-audit] ledger updated: ${path.relative(ROOT, file)}`);
     // dashboard-regenerated-from-ledger (2026-W33-R9): the view is rebuilt from the source that

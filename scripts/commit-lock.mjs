@@ -27,12 +27,14 @@
 //   node scripts/commit-lock.mjs --acquire --repo <id> --session <id> [--wait 120] [--note "..."]
 //   node scripts/commit-lock.mjs --release --repo <id> --session <id>
 //   node scripts/commit-lock.mjs --check   --repo <id>
+//   (полная справка: --help; незнакомый флаг или лишнее слово — код 2 до любой записи замка)
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { hostname } from 'node:os';
 import { pathToFileURL } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const TTL_MS = 10 * 60 * 1000;      // a commit section idle for 10 min is assumed dead
 const POLL_MS = 1500;               // how often --acquire re-checks a held lock
@@ -124,25 +126,43 @@ function selfTest() {
 }
 
 // ---- CLI (only when run directly, NOT when imported by safe-commit) ----
-const arg = (k) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : undefined; };
-const has = (k) => process.argv.includes(k);
+// Разбор строгий (2026-09-16): незнакомый флаг или лишнее слово — код 2 до того, как замок
+// будет взят или снят. Раньше опечатка (`--sesion x`) молча брала замок от имени pid.
+export const CLI = {
+  name: 'commit-lock',
+  summary: 'Короткий замок на участок «коммит + пуш» одного репозитория: параллельные сессии не теряют коммиты друг друга.',
+  selfTest: true,
+  options: {
+    acquire: { type: 'boolean', desc: 'взять замок (ждёт, пока освободится)' },
+    release: { type: 'boolean', desc: 'снять свой замок' },
+    check: { type: 'boolean', desc: 'показать, кто держит замок' },
+    repo: { type: 'string', value: 'id', desc: 'опознаватель репозитория (адрес remote или путь)' },
+    session: { type: 'string', value: 'id', desc: 'кто держит замок (по умолчанию pid процесса)' },
+    wait: { type: 'number', value: 'секунды', desc: 'сколько ждать замок (по умолчанию 120)' },
+    note: { type: 'string', value: 'текст', desc: 'пометка к замку' },
+  },
+};
+
 const isMain = import.meta.url === pathToFileURL(process.argv[1] || '').href;
 
 if (!isMain) { /* imported as a module — expose functions, run no CLI */ }
-else if (has('--self-test')) selfTest();
-else if (has('--acquire')) {
-  const r = await acquire({ repoId: arg('--repo'), sessionId: arg('--session') || String(process.pid), note: arg('--note') || '', waitMs: (Number(arg('--wait')) || 120) * 1000 });
-  console.log(JSON.stringify(r));
-  process.exit(r.ok ? 0 : 1);
-} else if (has('--release')) {
-  const r = release({ repoId: arg('--repo'), sessionId: arg('--session') || String(process.pid) });
-  console.log(JSON.stringify(r));
-  process.exit(r.ok ? 0 : 1);
-} else if (has('--check')) {
-  const r = check({ repoId: arg('--repo') });
-  console.log(`${r.state}${r.holder ? ' — ' + holderLine(r.holder) : ''}`);
-  process.exit(0);
-} else {
-  console.log('commit-lock — usage: --self-test | --acquire --repo <id> --session <id> [--wait N] | --release --repo <id> --session <id> | --check --repo <id>');
-  process.exit(0);
+else {
+  const { values: v, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  else if (v.acquire) {
+    const r = await acquire({ repoId: v.repo, sessionId: v.session || String(process.pid), note: v.note || '', waitMs: (v.wait || 120) * 1000 });
+    console.log(JSON.stringify(r));
+    process.exit(r.ok ? 0 : 1);
+  } else if (v.release) {
+    const r = release({ repoId: v.repo, sessionId: v.session || String(process.pid) });
+    console.log(JSON.stringify(r));
+    process.exit(r.ok ? 0 : 1);
+  } else if (v.check) {
+    const r = check({ repoId: v.repo });
+    console.log(`${r.state}${r.holder ? ' — ' + holderLine(r.holder) : ''}`);
+    process.exit(0);
+  } else {
+    console.log('commit-lock — usage: --self-test | --acquire --repo <id> --session <id> [--wait N] | --release --repo <id> --session <id> | --check --repo <id>');
+    process.exit(0);
+  }
 }

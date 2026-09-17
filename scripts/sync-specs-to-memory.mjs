@@ -23,14 +23,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const SPECS_DIR = path.join(ROOT, 'docs/specs');
 const STAGING_DIR = path.join(ROOT, '.claude/memory-staging');
 
-const args = new Set(process.argv.slice(2));
-const isDry = args.has('--dry');
+// Задаётся разбором аргументов в точке входа (runCli); при импорте — обычный режим.
+let isDry = false;
 
 // Only scan first 20 lines for frontmatter (prevents body false-matches)
 function frontmatterSlice(content) {
@@ -322,6 +323,19 @@ function main() {
   console.log(`[sync-specs] wrote ${path.relative(ROOT, outPath)}`);
 }
 
+// Разбор строгий (2026-09-16): опечатка `--dyr` раньше молча писала staging-файл вместо
+// пробного прогона. Теперь незнакомый флаг или лишнее слово — код 2 до всякой работы.
+export const CLI = {
+  name: 'sync-specs-to-memory',
+  summary: 'Собрать из docs/specs/wave-*_MASTER_SPEC.md staging-файл для памяти (.claude/memory-staging/).',
+  options: {
+    dry: { type: 'boolean', desc: 'только посчитать, файл не писать' },
+  },
+};
+
 // Only run main() when executed directly (not when imported as a module)
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
-if (isMain) main();
+if (isMain) {
+  isDry = runCli(CLI).values.dry === true;
+  main();
+}

@@ -13,18 +13,26 @@
 //   mean time-to-gate  ↓  we build the gate sooner after the first incident
 //   regression rate    ↓  fewer gates leak after going live
 //
-// Usage: node scripts/meta-trend.mjs        (META_LEDGER overrides the ledger path)
+// Usage: node scripts/meta-trend.mjs        # META_LEDGER overrides the ledger path
 
 import { readFileSync, existsSync } from 'node:fs';
 import { loadLedgerUnion, groupByClass, daysBetween, todayISO, monthOf, recurrencesAfter } from './meta-lib.mjs';
 import { REMEDIES } from './meta-remedies.mjs';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
-const rows = loadLedgerUnion(); // union-ledger-read: both addresses, deduped (2026-W32-R2)
+// Разбор строгий (2026-09-16): флагов нет, незнакомый флаг или слово — код 2.
+export const CLI = {
+  name: 'meta-trend',
+  summary: 'Кривая обучения по реестру ошибок: покрытие гейтами, время до гейта, доля протечек (путь реестра — META_LEDGER).',
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  runCli(CLI);
+  // Чтение реестра — внутри сторожа: раньше оно стояло на верхнем уровне и шло при каждом импорте.
+  const rows = loadLedgerUnion(); // union-ledger-read: both addresses, deduped (2026-W32-R2)
   if (rows.length === 0) { console.log('meta-trend: ledger empty — no curve to plot yet.'); process.exit(0); }
 
   const byClass = groupByClass(rows);

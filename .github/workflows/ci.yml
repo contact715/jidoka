@@ -63,6 +63,11 @@ jobs:
       # один зависал, 19 файлов репозитория переписывались сами. Проверяется вся область.
       - name: import-safety (модуль импортируется без последствий)
         run: npm run gate:import-safety
+      # 2026-09-16: скрипты молча глотали незнакомый флаг — `safe-commit --help` запускал
+      # коммит и пуш в main. Статический сторож по всей области; живой договор (--help → 0,
+      # незнакомый флаг → 2, без действий) и сверка мест вызова — в engine unit tests ниже.
+      - name: cli-strictness (скрипт не глотает незнакомый флаг)
+        run: npm run gate:cli-strictness
       # ledger-pollution regression (2026-07-04): a judge-calibration/debias run streams
       # position-sensitivity telemetry — it must land in its sidecar, NEVER in the mistake ledger.
       # Prove it: run the debias-writing self-tests, assert the ledger is byte-unchanged, then that

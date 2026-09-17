@@ -15,6 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const DEFAULT_LEDGER = path.join(ROOT, 'docs', 'research', 'weekly', '_KAIZEN_LEDGER.jsonl');
@@ -218,14 +219,26 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): опечатка в `--flie` раньше молча писала в реестр по умолчанию.
+export const CLI = {
+  name: 'kaizen-ledger',
+  summary: 'Реестр исходов недельного Kaizen: показать записи или добавить/обновить одну.',
+  selfTest: true,
+  options: {
+    list: { type: 'boolean', desc: 'показать реестр (действие по умолчанию)' },
+    add: { type: 'string', value: 'json', desc: 'добавить или обновить одну запись' },
+    file: { type: 'string', value: 'путь', desc: 'файл реестра (по умолчанию docs/research/weekly/_KAIZEN_LEDGER.jsonl)' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const file = arg('--file') || DEFAULT_LEDGER;
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const file = values.file || DEFAULT_LEDGER;
 
-  if (process.argv.includes('--add')) {
-    const entry = JSON.parse(arg('--add') || '{}');
+  if (values.add !== undefined) {
+    const entry = JSON.parse(values.add || '{}');
     const next = upsert(readLedger(file), entry);
     writeLedger(next, file);
     console.log(`[kaizen-ledger] upserted ${entry.id} → ${path.relative(ROOT, file)} (${next.length} entries)`);

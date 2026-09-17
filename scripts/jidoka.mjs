@@ -3,7 +3,7 @@
 //
 // jidoka has 140+ scripts; remembering which to run is friction (gsd-core fronts its engine with one
 // `gsd-tools` CLI). This is that single door: `jidoka <subcommand> [args]` dispatches to the right
-// engine script and passes args through. `jidoka` (no args) or `--help` lists every subcommand.
+// engine script and passes args through. `--help` lists every subcommand; no args is a bad call (exit 2).
 //
 // Anti-ghost: the dispatch map only points at scripts that EXIST on disk — the self-test fails if a
 // subcommand maps to a missing script, so this CLI can never advertise a command that isn't real.
@@ -16,6 +16,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import { runCli } from './lib/cli.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -77,12 +78,26 @@ export function resolve(cmd) {
 }
 export const subcommands = () => Object.keys(CMDS);
 
-function help() {
-  console.log('jidoka — one CLI for the engine. Usage: jidoka <subcommand> [args]\n');
-  const w = Math.max(...subcommands().map((c) => c.length));
-  for (const c of subcommands()) console.log(`  ${c.padEnd(w)}  ${CMDS[c].help}`);
-  console.log('\n  e.g.  node scripts/jidoka.mjs eval   ·   node scripts/jidoka.mjs resume wave-1');
-}
+// Справка собирается из карты команд: одна правда на двоих.
+export const USAGE = [
+  'jidoka — one CLI for the engine. Usage: node scripts/jidoka.mjs <subcommand> [args]',
+  '',
+  ...(() => { const w = Math.max(...subcommands().map((c) => c.length)); return subcommands().map((c) => `  ${c.padEnd(w)}  ${CMDS[c].help}`); })(),
+  '',
+  '  e.g.  node scripts/jidoka.mjs eval   ·   node scripts/jidoka.mjs resume wave-1',
+  '  Everything after the subcommand goes to its engine script, which parses it strictly.',
+  '',
+  'Коды выхода: код целевого скрипта; 2 — неверный вызов диспетчера (ничего не выполнено).',
+].join('\n');
+
+// Диспетчер: всё после имени подкоманды — аргументы целевого скрипта, и --self-test тоже.
+// Раньше `jidoka relay --self-test` запускал самопроверку диспетчера, а не relay.
+export const CLI = {
+  name: 'jidoka',
+  usage: USAGE,
+  selfTest: true,
+  commands: Object.fromEntries(Object.entries(CMDS).map(([k, e]) => [k, { passthrough: e.s, prepend: e.prepend || [] }])),
+};
 
 function selfTest() {
   const fails = [];
@@ -105,12 +120,8 @@ function selfTest() {
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const cmd = process.argv[2];
-  if (!cmd || cmd === '--help' || cmd === '-h') { help(); process.exit(0); }
-  const r = resolve(cmd);
-  if (!r) { console.error(`unknown subcommand: ${cmd}\n`); help(); process.exit(2); }
-  const rest = process.argv.slice(3);
-  const res = spawnSync('node', [join(HERE, r.script), ...r.prepend, ...rest], { stdio: 'inherit' });
+  const r = runCli(CLI);
+  if (r.selfTest) selfTest();
+  const res = spawnSync('node', [join(HERE, r.forward), ...r.prepend, ...r.rest], { stdio: 'inherit' });
   process.exit(res.status ?? 1);
 }

@@ -25,39 +25,48 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 // Wave-166: constitutional_verdict emit to 13th stream
 import { emitTelemetry } from './emit-telemetry.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
 // ── CLI args ─────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-
-
-const isMain = process.argv[1] === fileURLToPath(import.meta.url);
-
-if (isMain) {
-  if (args.includes('--help')) {
-    console.log(`
-run-verification-pipeline.mjs — Full 4-tier verification pipeline
+// Строгий разбор (2026-09-16): незнакомый флаг или лишнее слово — код 2 до andon-проверки,
+// до запуска уровней и до вебхука эскалации.
+export const CLI = {
+  name: 'run-verification-pipeline',
+  usage: `run-verification-pipeline.mjs — Full 4-tier verification pipeline
 
 Orchestrates Tier 1 → Tier 2 → Tier 3 (conditional) → Tier 4 (if needed).
 Writes audit trail to docs/metrics/verification-pipeline-{wave}.json.
 
 Usage:
-  node scripts/run-verification-pipeline.mjs --wave <id> [--effort <S|M|L>] [--dry-run] [--help]
+  node scripts/run-verification-pipeline.mjs --wave <id> [--effort <S|M|L>] [--dry-run] [--cr-override <json>] [--help]
 
 Flags:
-  --wave <id>       Wave identifier (e.g. wave-103)
-  --effort <S|M|L>  Wave effort level. S skips Tier 3 unless security/billing flagged.
-  --dry-run         Print tier decisions without executing
-  --help            Show this message
+  --wave <id>            Wave identifier (e.g. wave-103)
+  --effort <S|M|L>       Wave effort level. S skips Tier 3 unless security/billing flagged. Default M.
+  --dry-run              Print tier decisions without executing
+  --cr-override <json>   Attributed override of a constitutional VIOLATION: {"approver":"…","reason":"…"}
+  -h, --help             Show this message
 
 Exit codes:
-  0  Pipeline passed all active tiers
-  1  BLOCK or DEADLOCK detected
-`);
-    process.exit(0);
-  }
+  0   Pipeline passed all active tiers
+  1   BLOCK or DEADLOCK detected
+  2   Bad call (unknown flag, stray word, missing value) — nothing was run
+  42  Andon halt state active (andonCord.enabled)`,
+  options: {
+    wave: { type: 'string', default: 'unknown' },
+    effort: { type: 'string', default: 'M', choices: ['S', 'M', 'L'] },
+    'dry-run': { type: 'boolean' },
+    'cr-override': { type: 'string' },
+  },
+};
+
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMain) {
+  const { values } = runCli(CLI);
 
   // ── Wave-158 Andon Cord — halt-state gate (before any pipeline work) ────────
   {
@@ -96,13 +105,9 @@ Exit codes:
   }
   // ─────────────────────────────────────────────────────────────────────────────
 
-  const waveIdx = args.indexOf('--wave');
-  const waveId = waveIdx !== -1 ? args[waveIdx + 1] : 'unknown';
-
-  const effortIdx = args.indexOf('--effort');
-  const effort = effortIdx !== -1 ? args[effortIdx + 1] : 'M';
-
-  const dryRun = args.includes('--dry-run');
+  const waveId = values.wave;
+  const effort = values.effort;
+  const dryRun = values['dry-run'] === true;
 
   // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -307,10 +312,7 @@ Exit codes:
   // A6: when constitutionalViolation: true WITH valid override, write WARN record
   // to verdict log and proceed to Tier 3 normally.
   // D1: constitutional VIOLATION is not ambiguous — hard stop, no debate.
-  const crOverrideRaw = (() => {
-    const idx = args.indexOf('--cr-override');
-    return idx !== -1 ? args[idx + 1] : null;
-  })();
+  const crOverrideRaw = values['cr-override'] ?? null;
   const crOverride = (() => {
     if (!crOverrideRaw) return null;
     try {

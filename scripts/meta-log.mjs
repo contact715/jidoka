@@ -23,17 +23,36 @@ import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, basename } from 'node:path';
 import { LEDGER, validateLedgerEntry, MAST_MODES } from './meta-lib.mjs';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 // Позиционные аргументы сохранены дословно: их форма записана в ~/.claude/CLAUDE.md и
 // вызывается из session-pattern-log. Режим отказа добавлен ФЛАГАМИ, чтобы старая форма вызова
-// не сломалась молча, а отказала громко с подсказкой.
-const argv = process.argv.slice(2);
-const flagAt = argv.findIndex((a) => a.startsWith('--'));
-const positional = flagAt === -1 ? argv : argv.slice(0, flagAt);
-const flag = (name) => { const i = argv.indexOf(name); return i >= 0 ? argv[i + 1] : undefined; };
-const [cls, claimed, real, caught = 'user', kind = 'incident'] = positional;
-const modeArg = flag('--mode');
-const noteArg = flag('--note');
+// не сломалась молча, а отказала громко с подсказкой. Разбор строгий (2026-09-16): незнакомый
+// флаг или шестое слово — код 2, строка в реестр не пишется.
+export const CLI = {
+  name: 'meta-log',
+  usage: `Записать ошибку процесса в реестр ошибок.
+
+Использование:
+  node scripts/meta-log.mjs <class> <claimed> <real> [caught_by] [kind] --mode <FM-x.y|none> [--note "<почему none>"]
+
+  class      короткий класс ошибки в kebab-case
+  claimed    что было заявлено сделанным или верным
+  real       как было на самом деле
+  caught_by  кто или что поймало (по умолчанию user)
+  kind       incident | remediation (по умолчанию incident)
+
+  --mode <FM-x.y|none>  режим отказа, обязателен
+  --note <текст>        объяснение, обязательно при --mode none
+  -h, --help            эта справка
+
+Коды выхода: 0 — записано, 2 — неверный вызов или строка не прошла схему (ничего не записано).`,
+  options: {
+    mode: { type: 'string' },
+    note: { type: 'string' },
+  },
+  positionals: { min: 3, max: 5, name: 'class claimed real' },
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
@@ -47,10 +66,10 @@ function modeHelp() {
 }
 
 if (isMain) {
-  if (!cls || !claimed || !real) {
-    console.error('usage: meta-log.mjs <class> <claimed> <real> [caught_by] [kind] --mode <FM-x.y|none> [--note "<почему none>"]');
-    process.exit(2);
-  }
+  const { values, positionals } = runCli(CLI);
+  const [cls, claimed, real, caught = 'user', kind = 'incident'] = positionals;
+  const modeArg = values.mode;
+  const noteArg = values.note;
   if (!modeArg) {
     console.error('meta-log: REJECTED — не указан режим отказа.');
     modeHelp();

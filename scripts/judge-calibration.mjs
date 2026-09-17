@@ -15,6 +15,7 @@
 //   node scripts/judge-calibration.mjs --verdicts <rows.json> --accuracy <series.json>
 
 import { readFileSync, existsSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 // pure: mean pairwise exact-match agreement across judges, over cases they BOTH judged
 export function agreement(verdictRows = []) {
@@ -147,18 +148,33 @@ function selfTest() {
   process.exit(0);
 }
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
 const load = (p) => (p && existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : null);
+
+// Строгий разбор (2026-09-16): незнакомый флаг или слово — код 2 до вызова модели и до записи файлов.
+export const CLI = {
+  name: 'judge-calibration',
+  summary: 'Калибровка судей: согласие между судьями и дрейф точности; --multi-trial производит недостающие прогоны.',
+  selfTest: true,
+  options: {
+    verdicts: { type: 'string', value: 'rows.json', desc: 'вердикты [{case, judge, verdict}]' },
+    accuracy: { type: 'string', value: 'series.json', desc: 'точность по прогонам {judge: [..]}' },
+    'multi-trial': { type: 'boolean', desc: 'прогнать золотые кейсы судьи несколько раз (зовёт claude --print)' },
+    agent: { type: 'string', value: 'slug', desc: 'судья для --multi-trial' },
+    trials: { type: 'number', default: 2, desc: 'сколько попыток для --multi-trial' },
+    date: { type: 'string', value: 'YYYY-MM-DD', desc: 'дата в имени файла прогона (по умолчанию сегодня)' },
+  },
+};
 
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
   // --multi-trial: ПРОИЗВЕСТИ недостающие точки, а не подождать их (2026-W35-B4)
-  if (process.argv.includes('--multi-trial')) {
-    const slug = arg('--agent');
-    const trials = Number(arg('--trials') || 2);
-    const today = arg('--date') || new Date().toISOString().slice(0, 10);
+  if (values['multi-trial']) {
+    const slug = values.agent || null;
+    const trials = values.trials;
+    const today = values.date || new Date().toISOString().slice(0, 10);
     if (!slug) { console.error('нужно --agent <slug> [--trials N]'); process.exit(2); }
     const { spawn } = await import('node:child_process');
     const callModel = (prompt) => new Promise((resolve) => {
@@ -186,8 +202,8 @@ if (isMain) {
     process.exit(0);
   }
 
-  const verdictRows = load(arg('--verdicts')) || [];
-  const accuracySeries = load(arg('--accuracy')) || {};
+  const verdictRows = load(values.verdicts) || [];
+  const accuracySeries = load(values.accuracy) || {};
   if (!verdictRows.length && !Object.keys(accuracySeries).length) { console.error('usage: --verdicts <rows.json> --accuracy <series.json>  (or --self-test)'); process.exit(2); }
   const r = calibrate({ verdictRows, accuracySeries });
   console.log(`judge-calibration: inter-judge agreement ${r.agreement}\n  drift: ${JSON.stringify(r.drift)}`);

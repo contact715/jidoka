@@ -22,6 +22,8 @@
 //   const s = scheduleDAG(nodes);   // → { ok, order, levels, criticalPath, cpw }
 //   node scripts/dag-schedule.mjs --self-test
 
+import { runCli } from './lib/cli.mjs';
+
 // ── cohesionPartition: edges from REAL imports, not from a hand-written list (2026-W28-R4) ────
 // scheduleDAG below takes `dependsOn` as given. That list is a DECLARATION: somebody typed what
 // they believed the dependencies were. When the belief is wrong the scheduler is confidently
@@ -187,8 +189,16 @@ export function scheduleDAG(nodes = [], { completed = [] } = {}) {
 }
 
 // ── self-test ──────────────────────────────────────────────────────────────
+// Разбор строгий (2026-09-16): как команда у модуля есть только --self-test; незнакомый
+// флаг — код 2, а не молчаливый выход 0, который выглядел как пройденная проверка.
+export const CLI = {
+  name: 'dag-schedule',
+  summary: 'Планировщик подзадач по зависимостям (модуль для планировщика оркестрации); как команда — только самопроверка.',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
-if (isMain && process.argv.includes('--self-test')) {
+if (isMain && runCli(CLI).selfTest) {
   let fails = 0;
   const ok = (name, cond) => { if (!cond) fails++; console.log(`  ${cond ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); };
 

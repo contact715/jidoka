@@ -6,7 +6,23 @@
 // Usage:  echo '{"agent":{"name":"backend-agent"},"model":{"display_name":"Sonnet 4.6"}}' | node statusline-subagent.mjs
 
 import { readFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+// Строгий разбор аргументов (2026-09-16). Строку зовёт Claude Code, как и хуки, поэтому договор
+// тот же: неверный вызов — код 1 (видимая ошибка без блокировки), stdin не читается.
+const HOOK_BAD_CALL_EXIT = 1;
+
+// Помощник грузится при запуске, не при импорте, через загрузчик хуков: в установке
+// (~/.claude/statusline-subagent.mjs) — ./hooks/lib/load-cli.mjs, в каноне (scripts/) —
+// ../hooks/lib/load-cli.mjs. Статический импорт ./lib/cli.mjs упал бы в установке.
+async function loadStrictCli() {
+  // общий загрузчик хуков (hooks/lib/load-cli.mjs) узнаёт наш помощник по тексту до импорта
+  const here = dirname(fileURLToPath(import.meta.url));
+  const loader = /[\\/]\.claude$/.test(here) ? './hooks/lib/load-cli.mjs' : '../hooks/lib/load-cli.mjs';
+  const { loadCli } = await import(new URL(loader, import.meta.url).href);
+  return loadCli(import.meta.url);
+}
 
 const C = {
   mint:  s => `\x1b[38;5;49m${s}\x1b[0m`,
@@ -35,9 +51,17 @@ export function render(ctx) {
   return parts.join(C.dim(' · '));
 }
 
+// settings.json → subagentStatusLine зовёт строку без аргументов; флагов у неё нет.
+export const CLI = {
+  name: 'statusline-subagent',
+  summary: 'Строка состояния субагента для Claude Code (subagentStatusLine). Контекст — JSON в stdin.',
+  badCallExit: HOOK_BAD_CALL_EXIT,
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  (await loadStrictCli()).runCli(CLI);
   // чтение stdin — работа: при импорте оно подвешивало модуль
   let raw = ''; try { raw = readFileSync(0, 'utf8'); } catch { /* no stdin */ }
   let ctx = {}; try { ctx = JSON.parse(raw || '{}'); } catch { /* none */ }

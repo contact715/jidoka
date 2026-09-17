@@ -25,6 +25,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 // ---------- нормализация ----------
 
@@ -301,27 +302,62 @@ function selfTest() {
 
 // ---------- CLI ----------
 
-function main() {
-  const argv = process.argv.slice(2);
-  if (argv.includes("--self-test")) return selfTest();
+// Разбор строгий (2026-09-16). Прибор зовут из ~/.claude/CLAUDE.md и из подсказки хука
+// synthesis-coverage-gate, а сам хук засчитывает сверку по тексту команды. Опечатка
+// `--source` вместо `--sources` раньше молча давала «использование» с кодом 1, а опечатка
+// в необязательном флаге (`--jsn`) — молчаливый прогон не в том виде. Теперь неверный вызов —
+// код 2 до чтения файлов. Отсутствие обязательной пары флагов, как и раньше, — код 1 со своим
+// текстом: это не опечатка, а незаданная сверка.
+export const CLI = {
+  name: 'synthesis-coverage-audit',
+  usage: `Механическая сверка документа-синтеза с источниками (что из источников не попало в документ).
 
-  const get = (flag) => {
-    const i = argv.indexOf(flag);
-    return i >= 0 ? argv[i + 1] : null;
-  };
+Использование:
+  node scripts/synthesis-coverage-audit.mjs --doc <файл> --sources <файлы через запятую или папка> [--json] [--limit 40]
+  node scripts/synthesis-coverage-audit.mjs --kind <design-port|code-import|doc-synthesis> --source <файл|папка> --target <файл|папка> [--json] [--limit 40]
+  node scripts/synthesis-coverage-audit.mjs --self-test
 
-  const docPath = get("--doc");
-  const sourcesSpec = get("--sources");
-  const asJson = argv.includes("--json");
-  const limit = Number(get("--limit") || 40);
+Флаги:
+  --doc <файл>          документ-синтез (ТЗ, смета, КП, итоги брифа)
+  --sources <список>    источники: файлы через запятую или папка
+  --kind <тип>          сверка по типу сдачи: design-port | code-import | doc-synthesis
+  --source <путь>       источник для --kind
+  --target <путь>       цель для --kind
+  --json                вывод в JSON
+  --limit <число>       сколько пропусков показать (по умолчанию 40)
+  -h, --help            эта справка
+  --self-test           самопроверка
+
+Коды выхода: 0 — сверка выполнена (пропуски печатаются, но не роняют код), 1 — сверка не задана
+или файлы не читаются, 2 — неверный вызов: незнакомый флаг, лишнее слово, флаг без значения
+(ничего не выполнено).`,
+  selfTest: true,
+  options: {
+    doc: { type: 'string', value: 'файл', desc: 'документ-синтез' },
+    sources: { type: 'string', value: 'файлы через запятую или папка', desc: 'источники' },
+    kind: { type: 'string', value: 'тип', desc: 'сверка по типу сдачи' },
+    source: { type: 'string', value: 'файл|папка', desc: 'источник для --kind' },
+    target: { type: 'string', value: 'файл|папка', desc: 'цель для --kind' },
+    json: { type: 'boolean', desc: 'вывод в JSON' },
+    limit: { type: 'number', default: 40, desc: 'сколько пропусков показать' },
+  },
+};
+
+function main(values) {
+  const get = (name) => values[name] || null;
+
+  const docPath = get("doc");
+  const sourcesSpec = get("sources");
+  const asJson = values.json === true;
+  const limit = values.limit ?? 40;
 
   // Режим по ТИПУ СДАЧИ. Отдельная ветка, потому что у переноса кода полнота меряется
   // файлами, а не словами, и склеивать это с извлечением сущностей значило бы врать
   // одним числом про две разные величины.
-  const kind = get("--kind");
+  const kind = get("kind");
   if (kind) {
-    const src = get("--source");
-    const tgt = get("--target");
+    const src = get("source");
+    const tgt = get("target");
     if (!src || !tgt) {
       console.error('использование: --kind <design-port|code-import|doc-synthesis> --source <файл|папка> --target <файл|папка> [--json]');
       process.exit(1);
@@ -404,5 +440,7 @@ function main() {
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  main();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  else main(values);
 }

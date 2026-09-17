@@ -17,9 +17,9 @@
  * scripts/run-pentest-harness.mjs:185-224. Not reimplemented — read from file.
  *
  * Usage:
- *   node scripts/run-sast-ingest.mjs --sarif <path>       parse SARIF output
- *   node scripts/run-sast-ingest.mjs --json  <path>       parse semgrep JSON output
- *   node scripts/run-sast-ingest.mjs --fixture            run against built-in fixture (test mode)
+ *   node scripts/run-sast-ingest.mjs --sarif <path>       # parse SARIF output
+ *   node scripts/run-sast-ingest.mjs --json  <path>       # parse semgrep JSON output
+ *   node scripts/run-sast-ingest.mjs --fixture            # run against built-in fixture (test mode)
  *   npm run security:sast -- --sarif semgrep.sarif
  *
  * Exit codes:
@@ -32,6 +32,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { emitTelemetry } from './emit-telemetry.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -51,13 +52,10 @@ const AGENT = 'run-sast-ingest';
 const RUN_TS = new Date().toISOString();
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-const sarifIdx = args.indexOf('--sarif');
-const jsonIdx = args.indexOf('--json');
-const isFixture = args.includes('--fixture');
-
-const SARIF_PATH = sarifIdx !== -1 && args[sarifIdx + 1] ? path.resolve(args[sarifIdx + 1]) : null;
-const JSON_PATH = jsonIdx !== -1 && args[jsonIdx + 1] ? path.resolve(args[jsonIdx + 1]) : null;
+// Задаются разбором аргументов в точке входа (runCli); при импорте — ничего не выбрано.
+let isFixture = false;
+let SARIF_PATH = null;
+let JSON_PATH = null;
 
 // ── Severity mapping ─────────────────────────────────────────────────────────
 // SARIF: error→high, warning→medium, note/none→low
@@ -385,8 +383,25 @@ function main() {
 }
 
 
+// Разбор строгий (2026-09-16): опечатка `--fixtrue` раньше молча давала «[SKIP] … no input»
+// с кодом 0, а `--sarif --fixture` терял режим фикстуры и писал в боевой реестр. Теперь
+// незнакомый флаг, флаг без пути или лишнее слово — код 2 до чтения и записи.
+export const CLI = {
+  name: 'run-sast-ingest',
+  summary: 'Разобрать вывод semgrep (SARIF или JSON) и дописать находки в docs/security/findings-register.json. Код 0 всегда: блокирует шаг semgrep в CI, а не этот скрипт.',
+  options: {
+    sarif: { type: 'string', value: 'путь', desc: 'разобрать SARIF' },
+    json: { type: 'string', value: 'путь', desc: 'разобрать JSON semgrep' },
+    fixture: { type: 'boolean', desc: 'встроенная фикстура; боевой реестр и поток не трогаются' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
+  const { values } = runCli(CLI);
+  isFixture = values.fixture === true;
+  SARIF_PATH = values.sarif ? path.resolve(values.sarif) : null;
+  JSON_PATH = values.json ? path.resolve(values.json) : null;
   main();
 }

@@ -14,9 +14,11 @@
 //
 // FULL & self-tested. Usage:
 //   node scripts/charter-check.mjs --self-test
-//   node scripts/charter-check.mjs --doc <project>/docs/PROJECT_CHARTER.md [--plan <plan.md>]
+//   node scripts/charter-check.mjs --doc <charter.md> [--plan <plan.md>]
+//   (--doc defaults to docs/PROJECT_CHARTER.md of the current directory)
 
 import { readFileSync, existsSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 const SECTIONS = 5; // template sections 1..5
 
@@ -78,12 +80,24 @@ conflicts → investigation: intent → breach → reject / adapt / evolve (logg
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово или флаг без значения — код 2 до
+// проверки. Код 2 здесь по-прежнему значит и «хартии нет» — оставлен как был.
+export const CLI = {
+  name: 'charter-check',
+  summary: 'Структурная проверка хартии целостности проекта; с --plan — что план к ней привязан.\nКод 2 также значит: файла хартии нет.',
+  selfTest: true,
+  options: {
+    doc: { type: 'string', value: 'хартия.md', default: 'docs/PROJECT_CHARTER.md', desc: 'хартия проекта' },
+    plan: { type: 'string', value: 'план.md', desc: 'план, который обязан назвать затронутый инвариант или зону' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const docPath = arg('--doc') || 'docs/PROJECT_CHARTER.md';
-  const planPath = arg('--plan');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const docPath = values.doc || 'docs/PROJECT_CHARTER.md';
+  const planPath = values.plan || null;
   if (!existsSync(docPath)) {
     console.error(`\x1b[31m✗ no Integrity Charter at ${docPath}\x1b[0m — the project-steward must create it from docs/PROJECT_CHARTER_TEMPLATE.md. The framework will not change a project with no integrity contract.`);
     process.exit(2);

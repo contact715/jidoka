@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { fileURLToPath } from 'node:url';
+import { runCli } from '../lib/cli.mjs';
 // gdoc-export.mjs — render a shareable snapshot of a project's jidoka state (DASHBOARD_SPEC AC6).
 // snapshotMarkdown(): plain snapshot serve.mjs writes to docs/dashboard-snapshot.md.
 // snapshotHtml(): rich HTML the Google Drive MCP imports straight into a real Google Doc
@@ -103,8 +104,19 @@ function selfTest() {
 }
 
 
+// Разбор строгий (2026-09-16): модуль — библиотека снимков для serve.mjs; из командной
+// строки у него только --self-test. Без флагов, как и раньше, ничего не делает (код 0).
+export const CLI = {
+  name: 'gdoc-export',
+  path: 'scripts/dashboard/gdoc-export.mjs',
+  summary: 'Библиотека снимков состояния jidoka (markdown и HTML для Google Doc); из командной строки — только --self-test.',
+  selfTest: true,
+  options: {},
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 }

@@ -27,6 +27,7 @@ import { execSync } from 'node:child_process';
 import { dirname, resolve, basename } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DEFAULT_POLICY } from './budget-gate.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const slug = (f) => String(f).toLowerCase().replace(/[^a-z0-9.-]+/g, '-').replace(/^-+|-+$/g, '');
@@ -112,16 +113,28 @@ function resolveContext(feature) {
   } catch { return { matched: null, ancestry: [] }; }
 }
 
-function arg(args, name) { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; }
+// Разбор строгий (2026-09-16): опечатка во флаге раньше молча пропускалась, и бандл
+// писался в docs/specs/stories под именем по умолчанию. Теперь — код 2 до записи.
+export const CLI = {
+  name: 'shard-story-bundle',
+  summary: 'Один самодостаточный story-файл на задачу: спека + вся цепочка предков + критерии приёмки.',
+  selfTest: true,
+  options: {
+    feature: { type: 'string', value: 'имя', desc: 'фича для get-spec-context' },
+    spec: { type: 'string', value: 'путь', desc: 'управляющая спека (если фича не задана — выводится из имени)' },
+    wave: { type: 'string', value: 'id', desc: 'волна (по умолчанию — имя фичи)' },
+    task: { type: 'string', value: 'slug', desc: 'задача (по умолчанию build)' },
+    out: { type: 'string', value: 'папка', desc: 'куда писать (по умолчанию docs/specs/stories)' },
+    print: { type: 'boolean', desc: 'напечатать в stdout, ничего не записывать' },
+    tier: { type: 'string', value: 'уровень', desc: 'уровень бюджета контекста (по умолчанию normal)' },
+  },
+};
 
-function main() {
-  const args = process.argv.slice(2);
-  if (args.includes('--self-test')) return selfTest();
-
-  const specPath = arg(args, '--spec');
-  const feature = arg(args, '--feature') || (specPath ? featureFromSpec(specPath) : null);
-  const wave = arg(args, '--wave') || feature || 'wave';
-  const task = slug(arg(args, '--task') || 'build');
+function main(values) {
+  const specPath = values.spec;
+  const feature = values.feature || (specPath ? featureFromSpec(specPath) : null);
+  const wave = values.wave || feature || 'wave';
+  const task = slug(values.task || 'build');
   if (!feature) { console.error('shard-story-bundle: --feature <name> or --spec <path> required'); process.exit(2); }
 
   const ctx = resolveContext(feature);
@@ -134,12 +147,12 @@ function main() {
   const acs = extractACs(matched.text);
 
   const story = buildStory({ wave, task, matched, ancestry, acs });
-  const outDir = arg(args, '--out') || 'docs/specs/stories';
+  const outDir = values.out || 'docs/specs/stories';
   const outPath = `${outDir}/${slug(wave)}-${task}.story.md`;
-  if (args.includes('--print')) { process.stdout.write(story + '\n'); return; }
+  if (values.print === true) { process.stdout.write(story + '\n'); return; }
   mkdirSync(resolve(ROOT, outDir), { recursive: true });
   writeFileSync(resolve(ROOT, outPath), story);
-  const tier = arg(args, '--tier') || 'normal';
+  const tier = values.tier || 'normal';
   const meter = contextBudgetLine(estimateTokens(story), tier);
   console.log(`shard-story-bundle: wrote ${outPath} (spec + ${ancestry.length} ancestor(s) + ${acs.length} AC) inlined · ${meter}`);
 }
@@ -185,4 +198,8 @@ function selfTest() {
   process.exit(fail === 0 ? 0 : 1);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || '').href) main();
+if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  else main(values);
+}

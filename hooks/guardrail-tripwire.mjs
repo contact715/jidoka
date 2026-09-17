@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // @closes-class: core-property-substituted-by-scaffold
+// @divergence: "scaffolding against a dynamic demand trips the wire" — запись выглядит готовой реализацией (код есть, список есть), а несущее свойство «генерируется моделью» подменено regex-каркасом
 /**
  * guardrail-tripwire — a PreToolUse tripwire that halts a run the MOMENT the core property is
  * being substituted by scaffolding, instead of discovering it at the end.
@@ -33,6 +34,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadCli } from './lib/load-cli.mjs';
+
+// Строгий разбор аргументов (2026-09-16). Код отказа 1, а не 2: для Claude Code код 2 у
+// PreToolUse значит «заблокировать вызов инструмента», и опечатка в settings.json заперла бы правку.
+const HOOK_BAD_CALL_EXIT = 1;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
@@ -167,9 +173,20 @@ function main() {
 // prove it works hung forever on reading stdin — the fourth import-side-effect of the day, and this
 // one I wrote myself while fixing the other three. A hook is a program AND a module; only the
 // program half may do work.
+// Разбор — первое, что делает хук: незнакомый флаг или лишнее слово — отказ до подгрузки
+// детектора и чтения stdin. Слово события хук не читает, поэтому слов не принимает.
+export const CLI = {
+  name: 'guardrail-tripwire',
+  path: 'hooks/guardrail-tripwire.mjs',
+  summary: 'Хук PreToolUse: останавливает запись, в которой несущее свойство волны подменено каркасом. Данные события — в stdin.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
+  const { selfTest: wantsSelfTest } = (await loadCli(import.meta.url)).runCli(CLI);
   await loadDetector();
-  if (process.argv.includes('--self-test')) selfTest();
+  if (wantsSelfTest) selfTest();
   main();
 }

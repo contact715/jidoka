@@ -25,6 +25,7 @@ import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readJsonlStream } from './emit-telemetry.mjs';
+import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -32,10 +33,8 @@ const LINEAGE_JSON = path.join(ROOT, 'docs/specs/_LINEAGE.json');
 const AGENT_EVENTS_PATH = path.join(ROOT, 'docs/audits/agent-events.jsonl');
 const AP_FILE = path.join(ROOT, 'docs/memory-anti-patterns.md');
 
-const args = process.argv.slice(2);
-const subcommand = args[0];
-const arg1 = args[1];
-const isTable = args.includes('--table');
+// Задаётся разбором аргументов в точке входа (runCli); при импорте — вывод JSON.
+let isTable = false;
 
 // ── Wave-169: ID normalization ─────────────────────────────────────────
 // Canonical wave ID: wave-NNN (3-digit zero-padded).
@@ -544,30 +543,35 @@ function cmdAntiPatternsOf(waveArg) {
 
 // ── Main dispatch ──────────────────────────────────────────────────────
 
+// Разбор строгий (2026-09-16): раньше `lineage --table x` брал «--table» за путь спеки,
+// а лишние слова молча пропускались. Теперь незнакомая команда или флаг, лишнее слово,
+// отсутствие аргумента — код 2 до чтения графа и git log.
+export const CLI = {
+  name: 'query-graph',
+  summary: 'Запросы к графу docs/specs/_LINEAGE.json (обновить: npm run kg:build). По умолчанию вывод JSON.',
+  options: {
+    table: { type: 'boolean', desc: 'таблица для человека вместо JSON' },
+  },
+  commands: {
+    'waves-touching': { desc: 'волны, трогавшие файл', positionals: { min: 1, max: 1, name: 'file-path' } },
+    lineage: { desc: 'цепочка предков спеки', positionals: { min: 1, max: 2, name: 'spec-path', label: '<spec-path> [<ancestor-path>]' } },
+    supersedes: { desc: 'кого заменяет ADR', positionals: { min: 1, max: 1, name: 'adr-id' } },
+    'anti-patterns-of': { desc: 'антипаттерны волны', positionals: { min: 1, max: 1, name: 'wave-id' } },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  if (!subcommand) {
-    process.stderr.write(
-      'Usage: node scripts/query-graph.mjs <subcommand> [args] [--table]\n\n' +
-      'Subcommands:\n' +
-      '  waves-touching <file-path>     — waves that touched a file\n' +
-      '  lineage <spec-path>            — transitive ancestor chain\n' +
-      '  supersedes <adr-id>            — ADR supersedes relationships\n' +
-      '  anti-patterns-of <wave-id>     — anti-patterns attributed to a wave\n\n' +
-      'Options:\n' +
-      '  --table                        — human-readable tabular output\n\n' +
-      'Run kg:build before querying to ensure _LINEAGE.json is fresh.\n'
-    );
-    process.exit(1);
-  }
+  const { command: subcommand, positionals: [arg1, arg2], values } = runCli(CLI);
+  isTable = values.table === true;
 
   switch (subcommand) {
     case 'waves-touching':
       cmdWavesTouching(arg1);
       break;
     case 'lineage':
-      cmdLineage(arg1, args[2]);
+      cmdLineage(arg1, arg2);
       break;
     case 'supersedes':
       cmdSupersedes(arg1);
@@ -575,11 +579,5 @@ if (isMain) {
     case 'anti-patterns-of':
       cmdAntiPatternsOf(arg1);
       break;
-    default:
-      process.stderr.write(
-        `[query-graph] ERROR — unknown subcommand: "${subcommand}"\n` +
-        `  Valid: waves-touching, lineage, supersedes, anti-patterns-of\n`
-      );
-      process.exit(1);
   }
 }

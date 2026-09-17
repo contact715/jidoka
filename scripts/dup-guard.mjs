@@ -28,9 +28,12 @@ import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 // Symbols so generic that two modules sharing them is not evidence of duplication.
-const GENERIC = new Set(['main', 'default', 'run', 'init', 'config', 'handler']);
+// CLI — обязательное имя спецификации аргументов (scripts/lib/cli.mjs, 2026-09-16): его
+// экспортирует КАЖДЫЙ скрипт движка, и совпадение по нему ничего не говорит о дубле.
+const GENERIC = new Set(['main', 'default', 'run', 'init', 'config', 'handler', 'CLI']);
 
 const isTest = (p) => /(^|\/)__tests__\//.test(p) || /\.test\.mjs$/.test(p);
 
@@ -93,12 +96,19 @@ function stagedAdded() {
   } catch { return []; }
 }
 
-function main() {
-  const args = process.argv.slice(2);
-  if (args.includes('--self-test')) return selfTest();
+// Разбор строгий (2026-09-16): стоит в pre-commit. Опечатка `--blok` раньше молча делала
+// гейт предупреждающим. Теперь — код 2 до чтения индекса.
+export const CLI = {
+  name: 'dup-guard',
+  summary: 'Гейт коммита: новый модуль не объявляет экспорт, который уже есть в другом модуле.',
+  selfTest: true,
+  options: {
+    staged: { type: 'boolean', desc: 'проверить модули, добавленные в индекс git (без флага — ничего не делает)' },
+    block: { type: 'boolean', desc: 'код 1 при совпадении (иначе — предупреждение)' },
+  },
+};
 
-  const staged = args.includes('--staged');
-  const block = args.includes('--block');
+function main({ staged = false, block = false } = {}) {
   if (!staged) { console.log('dup-guard: pass --staged to gate a commit. (dry mode, no-op)'); process.exit(0); }
 
   const added = stagedAdded();
@@ -152,6 +162,8 @@ function selfTest() {
 
   const generic = findCollisions('scripts/e.mjs', 'export function main(){}', buildExportIndex([{ path: 'scripts/f.mjs', content: 'export function main(){}' }]));
   ok(generic.length === 0, 'generic-named exports never collide');
+  const cliSpec = findCollisions('scripts/h.mjs', 'export const CLI = {};', buildExportIndex([{ path: 'scripts/i.mjs', content: 'export const CLI = {};' }]));
+  ok(cliSpec.length === 0, 'the mandatory CLI spec export (scripts/lib/cli.mjs) never collides');
 
   // string-literal robustness: an export-like token INSIDE a string must not count as an export.
   const fixturey = "const demo = { content: 'export function loadThing(){}' };\nexport const realOne = 1;";
@@ -163,4 +175,8 @@ function selfTest() {
   process.exit(fail === 0 ? 0 : 1);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || '').href) main();
+if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  else main({ staged: values.staged === true, block: values.block === true });
+}

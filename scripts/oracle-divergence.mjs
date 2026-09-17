@@ -42,6 +42,7 @@ import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runCli } from './lib/cli.mjs';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -222,24 +223,37 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг — код 2 до проверки. Раньше опечатка
+// `--ratchett` молча превращала гейт pre-commit в отчёт, который ничего не блокирует.
+export const CLI = {
+  name: 'oracle-divergence',
+  summary: 'У каждого прибора с @closes-class обязан быть кейс расхождения: вход, где мера говорит «чисто», а правило нарушено.',
+  selfTest: true,
+  options: {
+    changed: { type: 'boolean', desc: 'только изменённые в правке' },
+    ratchet: { type: 'boolean', desc: 'блокировать НОВЫЕ и изменённые приборы без кейса (код 1)' },
+    'check-file': { type: 'string', value: 'файл', desc: 'проверить один файл (0 — кейс есть, 1 — нет, 2 — файла нет)' },
+  },
+};
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
 
   // Режим одного файла. Нужен не для удобства: без него у САМОГО прибора нет входа,
   // на котором он обязан отказать, то есть он не может выполнить правило, которое
   // вводит. Механизм, не проходящий собственного правила, вводить нельзя.
-  const cfIdx = process.argv.indexOf('--check-file');
-  if (cfIdx !== -1) {
-    const target = process.argv[cfIdx + 1];
+  if (values['check-file'] !== undefined) {
+    const target = values['check-file'];
     if (!target || !existsSync(target)) { console.error('oracle-divergence --check-file: файл не найден'); process.exit(2); }
     const v = verifyDivergence(readFileSync(target, 'utf8'));
     console.log(`${target}: ${v.verdict}${v.assertion ? ` («${v.assertion}»)` : ''}`);
     process.exit(v.verdict === 'ok' ? 0 : 1);
   }
 
-  const onlyChanged = process.argv.includes('--changed');
-  const ratchet = process.argv.includes('--ratchet');
+  const onlyChanged = values.changed === true;
+  const ratchet = values.ratchet === true;
   const files = onlyChanged ? changedFiles() : listScripts(join(ROOT, 'scripts')).concat(listScripts(join(ROOT, 'hooks')));
   const rows = auditFiles(files);
   const missing = rows.filter((r) => r.verdict !== 'ok');

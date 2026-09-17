@@ -15,6 +15,7 @@
 //   node scripts/runtime-feedback.mjs --events <events.jsonl> --targets <kaizen-targets.json>
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 // append a real reading to the matching metric's series
 export function applyMetric(targets, metric, value) {
@@ -55,11 +56,23 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): незнакомый флаг, лишнее слово или флаг без значения — код 2 до
+// чтения событий и до записи targets. Код 2 здесь по-прежнему значит и «нет файла событий».
+export const CLI = {
+  name: 'runtime-feedback',
+  summary: 'События работающего продукта: показания метрик → ряды kaizen-targets, инциденты → кандидаты в уроки.',
+  selfTest: true,
+  options: {
+    events: { type: 'string', value: 'events.jsonl', desc: 'поток событий продукта (обязателен)' },
+    targets: { type: 'string', value: 'kaizen-targets.json', desc: 'цели Kaizen; файл дописывается показаниями' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-  const eventsPath = arg('--events'), targetsPath = arg('--targets');
+  const { values, selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const eventsPath = values.events || null, targetsPath = values.targets || null;
   if (!eventsPath || !existsSync(eventsPath)) {
     console.error('usage: --events <events.jsonl> --targets <kaizen-targets.json>');
     console.error('  DORMANT until the product emits events. Wire its analytics/error tracker to append events.jsonl');
@@ -76,7 +89,7 @@ if (isMain) {
   }
   if (targetsPath) { targets.data_status = `live — ${applied} reading(s) ingested from runtime`; writeFileSync(targetsPath, JSON.stringify(targets, null, 2) + '\n'); }
   console.log(`runtime-feedback: ${applied} metric reading(s) → ${targetsPath || '(no targets)'}, ${lessons.length} incident(s) → lessons`);
-  for (const l of lessons) console.log(`  · incident → node scripts/meta-log.mjs ${l.class} "${l.claimed}" "${l.real}" runtime`);
+  for (const l of lessons) console.log(`  · incident → node scripts/meta-log.mjs ${l.class} "${l.claimed}" "${l.real}" runtime --mode <FM-x.y>`);
   if (applied) console.log('  → now run kaizen-loop on the targets to assess trend-vs-North-Star on real data.');
   process.exit(0);
 }

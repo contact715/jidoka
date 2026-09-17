@@ -13,9 +13,10 @@
 //
 // FULL & self-tested. Usage:
 //   node scripts/northstar-check.mjs --self-test
-//   node scripts/northstar-check.mjs --doc <path>/docs/NORTH_STAR.md [--spec <path>/wave_SPEC.md]
+//   node scripts/northstar-check.mjs --doc <north-star-doc> [--spec <wave-spec>]
 
 import { readFileSync, existsSync } from 'node:fs';
+import { runCli } from './lib/cli.mjs';
 
 const SECTIONS = 7; // template sections 1..7
 
@@ -87,13 +88,25 @@ Every feature is run helps / neutral / conflicts before build; conflicts trigger
   process.exit(0);
 }
 
+// Строгий разбор (2026-09-16): незнакомый флаг или слово — код 2. Код 2 и раньше значил
+// «North Star не найден»: оба смысла блокируют волну, pre-push различать их не нужно.
+export const CLI = {
+  name: 'northstar-check',
+  summary: 'Структурная проверка North Star продукта: документ есть, заполнен, спека волны к нему привязана.',
+  selfTest: true,
+  options: {
+    doc: { type: 'string', value: 'путь', default: 'docs/NORTH_STAR.md', desc: 'документ North Star' },
+    spec: { type: 'string', value: 'путь', desc: 'спека волны, которая обязана упоминать North Star' },
+  },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-if (process.argv.includes('--self-test')) selfTest();
+const { values, selfTest: wantsSelfTest } = runCli(CLI);
+if (wantsSelfTest) selfTest();
 
-const arg = (k) => { const i = process.argv.indexOf(k); return i !== -1 ? process.argv[i + 1] : null; };
-const docPath = arg('--doc') || 'docs/NORTH_STAR.md';
-const specPath = arg('--spec');
+const docPath = values.doc || 'docs/NORTH_STAR.md';
+const specPath = values.spec || null;
 
 if (!existsSync(docPath)) {
   console.error(`\x1b[31m✗ no North Star at ${docPath}\x1b[0m — create it from docs/NORTH_STAR_TEMPLATE.md (the CPO owns this). A wave cannot run without the product's compass.`);

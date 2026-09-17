@@ -14,16 +14,21 @@ import { readFileSync, writeFileSync, mkdirSync, appendFileSync, existsSync } fr
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { pathToFileURL } from 'node:url';
+import { loadCli } from './lib/load-cli.mjs';
+
+// Строгий разбор аргументов: помощник ищется в собственном дереве хука (hooks/lib/load-cli.mjs).
+const HOOK_BAD_CALL_EXIT = 1;
 
 // stuck-detector lives in scripts/, which is a SIBLING of hooks/ in the repo but
 // installs to ~/.claude/jidoka/scripts/ globally (hooks install to ~/.claude/hooks/).
 // Resolve both layouts at runtime; a static import would crash the hook in the global
 // install (and a crashing PreToolUse hook blocks every tool call).
 async function loadStuckDetector() {
+  // Установка первой и от собственного дерева, без домашнего каталога: рядом с ~/.claude/hooks лежит
+  // чужой ~/.claude/scripts, и одноимённый файл там не должен перехватить детектор (урок load-cli).
   const candidates = [
-    new URL('../scripts/stuck-detector.mjs', import.meta.url),                 // repo layout
-    pathToFileURL(join(homedir(), '.claude', 'jidoka', 'scripts', 'stuck-detector.mjs')), // global install
+    new URL('../jidoka/scripts/stuck-detector.mjs', import.meta.url),  // ~/.claude/hooks → ~/.claude/jidoka/scripts
+    new URL('../scripts/stuck-detector.mjs', import.meta.url),         // <репо>/hooks, ~/.claude/jidoka/hooks
   ];
   for (const url of candidates) {
     try { if (url.protocol !== 'file:' || existsSync(url)) return await import(url.href); } catch { /* try next */ }
@@ -157,10 +162,23 @@ function selfTest() {
   process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): чужое имя события или незнакомый флаг — отказ до записи
+// состояния. Код отказа 1, а не 2: хук, ответивший 2 на UserPromptSubmit, стёр бы сообщение.
+export const EVENTS = ['UserPromptSubmit', 'PreToolUse', 'Stop', 'Notification'];
+export const CLI = {
+  name: 'session-state',
+  path: 'hooks/session-state.mjs',
+  summary: 'Хук строки состояния: одно событие Claude Code за вызов, данные события — в stdin.',
+  selfTest: true,
+  badCallExit: HOOK_BAD_CALL_EXIT,
+  positionals: { min: 1, max: 1, name: 'событие', choices: EVENTS },
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
 if (isMain) {
-  if (process.argv.includes('--self-test')) selfTest();
-  const event = process.argv[2] || '';
+  const { positionals, selfTest: wantsSelfTest } = (await loadCli(import.meta.url)).runCli(CLI);
+  if (wantsSelfTest) selfTest();
+  const event = positionals[0];
   try {
     const d = JSON.parse(readFileSync(0, 'utf8') || '{}');
     const sid = d.session_id;

@@ -12,6 +12,7 @@
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { runCli } from '../lib/cli.mjs';
 
 export const PRICES = {
   opus:   { in: 15, out: 75, cacheRead: 1.50, cacheWrite: 18.75 },
@@ -166,5 +167,17 @@ function selfTest() {
   console.log('\n\x1b[32m✓ wave-cost: prices + tiers + window bucketing (AC-8) correct\x1b[0m'); process.exit(0);
 }
 
+// Разбор строгий (2026-09-16): модуль — библиотека панели (tui-top импортирует
+// collectWaveCosts); напрямую запускается только самопроверка. Незнакомый флаг — код 2.
+export const CLI = {
+  name: 'wave-cost',
+  path: 'scripts/dashboard/wave-cost.mjs',
+  summary: 'Оценка длительности и стоимости волн для верхней панели jidoka. Напрямую — только самопроверка; без флагов ничего не делает.',
+  selfTest: true,
+};
+
 const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(import.meta.url);
-if (isMain && process.argv.includes('--self-test')) selfTest();
+if (isMain) {
+  const { selfTest: wantsSelfTest } = runCli(CLI);
+  if (wantsSelfTest) selfTest();
+}
