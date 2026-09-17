@@ -12,7 +12,8 @@
 // 773 изменённых строки, то есть 0,9 процента.
 //
 // Живёт в ~/.claude, а НЕ в репозитории продукта: правило линтера в общем конфиге
-// принуждало бы коллег к канону, о котором с ними не договаривались.
+// принуждало бы коллег к канону, о котором с ними не договаривались. Канон — hooks/
+// репозитория jidoka, установленная копия — ~/.claude/hooks/.
 //
 // Fail-open по построению: любая ошибка — выход 0. Пропущенное предупреждение это
 // неудобство, а хук, ломающий завершение сессии, ломает работу.
@@ -21,15 +22,26 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-// Механизм ищется сначала рядом с хуком (раскладка канона: hooks/ и scripts/ соседи), потом
-// в установленной копии. Пока путь был только домашним, кейс eval зеленел у владельца и
-// краснел в CI, где ~/.claude нет: main был красным с 2026-09-14 по 2026-09-16.
-const MECH = [
-  path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'sibling-parity.mjs'),
-  path.join(os.homedir(), '.claude', 'jidoka', 'scripts', 'sibling-parity.mjs'),
-].find((p) => fs.existsSync(p)) || '';
+/**
+ * Механизм ищется в СОБСТВЕННОМ дереве хука, а не в домашнем каталоге: установленная
+ * копия (~/.claude/hooks + ~/.claude/jidoka/scripts) и канон (<репо>/hooks +
+ * <репо>/scripts). Адрес от HOME заставлял хук из канона молча судить установленной
+ * копией, а в чистом клоне CI — молча выходить с нулём. Установленная раскладка
+ * проверяется первой: рядом с ней лежит ЧУЖОЙ ~/.claude/scripts, а в каноне
+ * каталога jidoka/ нет. Пока путь был только домашним, кейс eval зеленел у владельца
+ * и краснел в CI: main был красным с 2026-09-14 по 2026-09-16.
+ */
+export function resolveMech(hookDir, exists = fs.existsSync) {
+  const candidates = [
+    path.join(hookDir, '..', 'jidoka', 'scripts', 'sibling-parity.mjs'),
+    path.join(hookDir, '..', 'scripts', 'sibling-parity.mjs'),
+  ];
+  return candidates.find((p) => exists(p)) || null;
+}
+
+const ownMech = () => resolveMech(path.dirname(fileURLToPath(import.meta.url)));
 
 // Только исходники. Реестры, отчёты и снимки состоят из однотипных строк по построению,
 // и разбор их формы дал бы шум, не связанный с правилами.
@@ -66,7 +78,8 @@ async function main() {
   if (payload.stop_hook_active) process.exit(0);
 
   const cwd = payload.cwd || process.cwd();
-  if (!fs.existsSync(MECH)) process.exit(0);           // механизма нет — молча пропускаем
+  const mech = ownMech();
+  if (!mech) process.exit(0);                          // механизма нет — молча пропускаем
 
   // блокируем не больше одного раза за сессию
   const sessionId = payload.session_id || 'unknown';
@@ -82,7 +95,7 @@ async function main() {
   const byFile = addedLines(diff);
   if (!byFile.size) process.exit(0);
 
-  const { oddOneOut } = await import(MECH);
+  const { oddOneOut } = await import(pathToFileURL(mech).href);
   const findings = [];
   let examined = 0;
   for (const [rel, lines] of byFile) {
@@ -140,6 +153,24 @@ function selfTest() {
   ok('удалённые строки не считаются добавленными', m.get('x.tsx').length === 3);
   ok('пустой дифф даёт пустую карту', addedLines('').size === 0);
   ok('мусор не роняет разбор', addedLines('не дифф вовсе\n@@ кривой').size === 0);
+
+  const has = (...ps) => (p) => ps.includes(p);
+  const canon = path.join('/r', 'scripts', 'sibling-parity.mjs');
+  const installed = path.join('/h', '.claude', 'jidoka', 'scripts', 'sibling-parity.mjs');
+  ok('канон: механизм берётся из scripts/ того же репозитория',
+    resolveMech(path.join('/r', 'hooks'), has(canon)) === canon);
+  ok('установка: механизм берётся из ~/.claude/jidoka/scripts',
+    resolveMech(path.join('/h', '.claude', 'hooks'), has(installed)) === installed);
+  ok('установка: одноимённый файл в чужом ~/.claude/scripts не перехватывает механизм',
+    resolveMech(path.join('/h', '.claude', 'hooks'),
+      has(path.join('/h', '.claude', 'scripts', 'sibling-parity.mjs'), installed)) === installed);
+  ok('механизма нет нигде — null, хук молчит, а не падает',
+    resolveMech(path.join('/x', 'hooks'), () => false) === null);
+  ok('хук из канона не читает установленную копию в домашнем каталоге',
+    resolveMech(path.join('/r', 'hooks'), has(canon, path.join(os.homedir(), '.claude', 'jidoka', 'scripts', 'sibling-parity.mjs'))) === canon);
+  // Реальное дерево: хук, который не находит своего механизма, молчит вечно и выглядит здоровым.
+  const mech = ownMech();
+  ok('механизм найден из собственного дерева', !!mech && fs.existsSync(mech));
 
   console.log(`\nsibling-parity-gate self-test: ${pass} passed, ${fail} failed`);
   return fail === 0;

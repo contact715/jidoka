@@ -18,7 +18,7 @@
 //   node scripts/eval-suite.mjs --update-baseline
 //   npm run eval
 
-import { readFileSync, writeFileSync, existsSync, mkdtempSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdtempSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -41,7 +41,11 @@ if (isMain) {
 
   function runCase(c) {
     const dir = mkdtempSync(join(tmpdir(), 'eval-'));
-    const env = { ...process.env, ...(c.env || {}) };
+    // Пустой HOME на каждый кейс: иначе кейс незаметно опирается на установленную копию
+    // в ~/.claude, локально зелёный и красный в чистом клоне CI (sibling-parity, W38).
+    const home = join(dir, 'home');
+    mkdirSync(home);
+    const env = { ...process.env, HOME: home, ...(c.env || {}) };
     // If the case ships a ledger, write it to a temp file and point META_LEDGER at it.
     if (c.ledger) {
       const lp = join(dir, 'ledger.jsonl');
