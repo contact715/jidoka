@@ -30,7 +30,7 @@
 // An unknown flag exits 2 before any git call (2026-09-16: `--help` used to run the flow).
 
 import { execSync, spawnSync } from 'node:child_process';
-import { readFileSync, existsSync, writeFileSync, unlinkSync, statSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, unlinkSync, statSync, mkdtempSync, mkdirSync, rmSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -122,6 +122,28 @@ export function pushDecision(repoClass, { noPush = false } = {}) {
   return { ...base, reason: 'unknown remote → SAFE DEFAULT: local commit only, no push' };
 }
 
+// hook-refusal-readable (2026-09-16) — a hook that says "no" is an answer, not a crash.
+// `sh()` throws on a non-zero exit, and the commit and push calls did not catch it: Node
+// printed the error object with a stack and clipped the hook's text ("... 8910 more
+// characters"). Twice that day the reason (oracle-divergence in pre-commit,
+// spec-structural-gate in pre-push) had to be recovered by running the hook by hand.
+// Now git's whole output is printed as is, then one verdict line, and the run exits 1.
+// The verdict names what happened and what is left: git exits 128 when it dies on its own
+// (no identity, no network), a remote refusal carries "[rejected]", everything else on
+// exit 1 is the hook. A refused commit leaves staged changes, not a commit.
+/** @param {'commit'|'push'} step  @param {{stdout?:string, stderr?:string, status?:number|null, message?:string}} failure */
+export function gitRefusal(step, { stdout = '', stderr = '', status = null, message = '' } = {}) {
+  const streams = [stdout, stderr].map(s => String(s ?? '').replace(/\s+$/, '')).filter(Boolean);
+  const output = streams.length ? streams.join('\n') : String(message ?? '').trim();
+  const who = status === 128 ? `git ${step} failed`
+    : step === 'push' && /\[(remote )?rejected\]/.test(output) ? 'push rejected by the remote'
+    : `refused by ${step} hook`;
+  const left = step === 'push' ? 'commit is saved locally, nothing was pushed'
+    : 'nothing was committed, the changes stay staged';
+  const code = Number.isInteger(status) ? ` (git exit ${status})` : '';
+  return { output, verdict: `✗ ${who} — ${left}${code}` };
+}
+
 // ---- IO helpers ----
 const sh = (cmd, cwd) => execSync(cmd, { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
 const shOk = (cmd, cwd) => { try { sh(cmd, cwd); return true; } catch { return false; } };
@@ -198,7 +220,13 @@ async function run(opts) {
     // via a message file so multi-line messages keep their newlines (‑m would literalise them)
     const msgFile = join(tmpdir(), `safe-commit-${process.pid}.txt`);
     writeFileSync(msgFile, opts.message);
-    try { sh(`git commit -F ${JSON.stringify(msgFile)}`, facts.root); } finally { try { unlinkSync(msgFile); } catch {} }
+    try { sh(`git commit -F ${JSON.stringify(msgFile)}`, facts.root); }
+    catch (e) {
+      const r = gitRefusal('commit', e);
+      if (r.output) say(r.output);
+      say(r.verdict);
+      return { ok: false, cls, committed: false, pushed: false, refusedAt: 'commit', log };
+    } finally { try { unlinkSync(msgFile); } catch {} }
     say('✓ committed locally');
   }
   if (!plan.push) { say(`⚠ NOT pushing (${plan.reason}). Work is committed locally.`); return { ok: true, cls, committed: facts.dirty, pushed: false, log }; }
@@ -226,7 +254,13 @@ async function run(opts) {
         return { ok: false, cls, committed: true, pushed: false, conflict: true, log };
       }
     }
-    sh(`git push origin HEAD:${target}`, facts.root);
+    try { sh(`git push origin HEAD:${target}`, facts.root); }
+    catch (e) {
+      const r = gitRefusal('push', e);
+      if (r.output) say(r.output);
+      say(r.verdict);
+      return { ok: false, cls, committed: true, pushed: false, refusedAt: 'push', log };
+    }
     say(`✓ pushed → origin/${target} (fast-forward)`);
     return { ok: true, cls, committed: true, pushed: true, log };
   } finally {
@@ -324,13 +358,86 @@ function selfTest() {
       bogus.status === 2 && bogus.stderr.includes('--bogus') && !/fatal|repo:/.test(bogus.stdout + bogus.stderr));
   }
 
+  refusalChecks(ok);
+
   if (fails) { console.log('\n\x1b[31msafe-commit self-test FAILED\x1b[0m'); process.exit(1); }
   console.log('\n\x1b[32m✓ safe-commit: policy + push-decision correct\x1b[0m');
   process.exit(0);
 }
 
+// A throwaway repo whose hook refuses with a long report, the way real gates do, and one
+// safe-commit run against it. HOME points into the sandbox, so the commit-lock and git's
+// global config never touch the machine; GIT_* from a calling hook are dropped for the same
+// reason. For 'push' the origin is a local bare repo that a sandbox policy calls "own".
+function refusalSandbox(step) {
+  const root = mkdtempSync(join(tmpdir(), 'safe-commit-refusal-'));
+  const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_'))), HOME: root, GIT_CONFIG_NOSYSTEM: '1' };
+  const git = (args, cwd = repo) => spawnSync('git', args, { cwd, env, encoding: 'utf8' });
+  const repo = join(root, 'repo'), hooks = join(root, 'hooks'), bare = join(root, 'origin.git');
+  try {
+    mkdirSync(repo); mkdirSync(hooks);
+    git(['init', '-q']);
+    for (const [k, v] of [['user.email', 'sc@test'], ['user.name', 'sc'], ['commit.gpgsign', 'false']]) git(['config', k, v]);
+    git(['commit', '-q', '--allow-empty', '-m', 'init']);
+    const reason = `${step.toUpperCase()}-REFUSAL-REASON-AT-THE-END`;
+    const report = 'i=0\nwhile [ $i -lt 400 ]; do echo "gate report line $i: padding padding padding"; i=$((i+1)); done\n';
+    writeFileSync(join(hooks, `pre-${step}`), `#!/bin/sh\n${report}echo "${reason}"\nexit 1\n`, { mode: 0o755 });
+    git(['config', 'core.hooksPath', hooks]);
+    if (step === 'push') {
+      git(['init', '-q', '--bare', bare], root);
+      git(['remote', 'add', 'origin', bare]);
+      env.COMMIT_POLICY = join(root, 'policy.json');
+      writeFileSync(env.COMMIT_POLICY, JSON.stringify({ own: [bare], readOnly: [] }));
+    }
+    writeFileSync(join(repo, 'change.txt'), 'x\n');
+    const run = spawnSync(process.execPath, [fileURLToPath(import.meta.url), '-m', 'test: refusal', '--repo', repo, '--wait', '5'], { env, encoding: 'utf8' });
+    const lockDir = join(root, '.claude', 'session-env', 'commit-locks');
+    return {
+      status: run.status, out: `${run.stdout}${run.stderr}`, reason,
+      commits: Number(git(['rev-list', '--count', 'HEAD']).stdout.trim()),
+      staged: git(['diff', '--cached', '--name-only']).stdout.trim(),
+      locksLeft: existsSync(lockDir) ? readdirSync(lockDir).length : 0,
+    };
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}
+
+// ── hook refusal (2026-09-16): the refusal text must reach the reader whole, with a verdict
+// line and exit 1, never as a Node stack with "... N more characters".
+function refusalChecks(ok) {
+  const long = Array.from({ length: 400 }, (_, i) => `report line ${i}`).join('\n');
+  const c = gitRefusal('commit', { stdout: '', stderr: `${long}\nREASON-TAIL\n`, status: 1 });
+  ok('refusal keeps the whole hook text, tail included', c.output === `${long}\nREASON-TAIL`);
+  ok('commit hook refusal: verdict line, nothing claimed as committed',
+    c.verdict.startsWith('✗ refused by commit hook — ') && c.verdict.includes('nothing was committed') && !c.verdict.includes('saved locally'));
+  const p = gitRefusal('push', { stdout: 'out part', stderr: 'err part\nerror: failed to push some refs', status: 1 });
+  ok('push hook refusal: the requested verdict line', p.verdict.startsWith('✗ refused by push hook — commit is saved locally'));
+  ok('stdout and stderr are both printed, stdout first', p.output === 'out part\nerr part\nerror: failed to push some refs');
+  ok('a remote rejection is not called a hook refusal',
+    gitRefusal('push', { stderr: ' ! [rejected]        HEAD -> main (fetch first)', status: 1 }).verdict.startsWith('✗ push rejected by the remote — '));
+  ok('git dying on its own (exit 128) is not called a hook refusal',
+    gitRefusal('push', { stderr: 'fatal: could not read Username', status: 128 }).verdict.startsWith('✗ git push failed — '));
+  ok('no streams at all → the error message is shown instead of nothing',
+    gitRefusal('commit', { message: 'spawnSync /bin/sh ENOENT' }).output === 'spawnSync /bin/sh ENOENT');
+
+  const cm = refusalSandbox('commit');
+  ok('pre-commit refusal from the shell: exit 1', cm.status === 1);
+  ok('pre-commit refusal: the whole hook report is printed, first line to the tail',
+    cm.out.includes('gate report line 0:') && cm.out.includes('gate report line 399:') && cm.out.includes(cm.reason));
+  ok('pre-commit refusal: no Node stack, no clipping',
+    !cm.out.includes('at file://') && !/more characters/.test(cm.out));
+  ok('pre-commit refusal: verdict printed, no commit made, changes still staged',
+    cm.out.includes('✗ refused by commit hook — ') && cm.commits === 1 && cm.staged === 'change.txt');
+
+  const pu = refusalSandbox('push');
+  ok('pre-push refusal from the shell: exit 1 with the whole report',
+    pu.status === 1 && pu.out.includes('gate report line 0:') && pu.out.includes(pu.reason));
+  ok('pre-push refusal: no Node stack, verdict says the commit is kept',
+    !pu.out.includes('at file://') && pu.out.includes('✗ refused by push hook — commit is saved locally') && pu.commits === 2);
+  ok('pre-push refusal: the commit-lock is released', pu.out.includes('commit-lock released') && pu.locksLeft === 0);
+}
+
 // ---- CLI ----
-export const USAGE = `Usage:
+export const USAGE =`Usage:
   node scripts/safe-commit.mjs --message "feat: x" [--repo <path>] [--session <id>]
                                [--target main] [--no-push] [--dry-run] [--wait 120]
                                [--only-staged | --force-sweep]
