@@ -16,7 +16,8 @@
 // @closes-class: work-runs-at-import-time
 // @divergence: "process.argv.includes('--self-test') — дефект" — мера «работа стоит под if со словом process.argv» говорит «сторож есть», а импорт с таким флагом у родителя всё равно запустит работу
 
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, statSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { runCli } from './lib/cli.mjs';
 
@@ -353,19 +354,21 @@ const SKIP_DIR = /(?:^|\/)(?:__tests__|node_modules|\.git|fixtures|\.worktrees)(
 
 export function allModules(root = '.') {
   const out = [];
-  const walk = (dir) => {
+  // исключения сверяются с путём ВНУТРИ области: корень, лежащий в папке .worktrees или
+  // fixtures, не должен прятать все свои модули
+  const walk = (dir, rel) => {
     let entries;
     try { entries = readdirSync(dir); } catch { return; }
     for (const e of entries) {
       const full = `${dir}/${e}`;
-      if (SKIP_DIR.test(full)) continue;
+      if (SKIP_DIR.test(`${rel}/${e}`)) continue;
       let st;
       try { st = statSync(full); } catch { continue; }
-      if (st.isDirectory()) walk(full);
+      if (st.isDirectory()) walk(full, `${rel}/${e}`);
       else if (e.endsWith('.mjs')) out.push(full.replace(/^\.\//, ''));
     }
   };
-  for (const d of SCAN_DIRS) walk(`${root}/${d}`.replace(/^\.\//, ''));
+  for (const d of SCAN_DIRS) walk(`${root}/${d}`.replace(/^\.\//, ''), d);
   return out.sort();
 }
 
@@ -435,10 +438,23 @@ function selfTest() {
     analyze("import path from 'node:path';\nconst ROOT = path.join('a', 'b');\n", 'a.mjs').exec.length === 0,
   );
   // 46. обход области видит настоящие файлы движка и не лезет в тесты
-  const mods = allModules('.');
+  // корень — папка самого модуля, а не текущая: самопроверка не зависит от того, откуда её звали
+  const ownRoot = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '');
+  const mods = allModules(ownRoot).map((p) => p.slice(ownRoot.length + 1));
   ok('обход находит модули движка', mods.length > 100 && mods.includes('scripts/import-safety.mjs'));
   ok('тесты в область не входят', !mods.some((m) => m.includes('__tests__')));
   ok('образцы в область не входят', !mods.some((m) => m.includes('fixtures')));
+  {
+    const base = mkdtempSync(`${tmpdir()}/import-safety-`);
+    const root = `${base}/.worktrees/copy`;
+    mkdirSync(`${root}/scripts/fixtures`, { recursive: true });
+    writeFileSync(`${root}/scripts/a.mjs`, 'export const a = 1;\n');
+    writeFileSync(`${root}/scripts/fixtures/b.mjs`, 'export const b = 1;\n');
+    const found = allModules(root);
+    rmSync(base, { recursive: true, force: true });
+    ok('корень внутри .worktrees не прячет модули, а образцы внутри области пропускаются',
+      found.length === 1 && found[0] === `${root}/scripts/a.mjs`);
+  }
   // 44. необязательная загрузка модуля в одну строку — не работа
   ok(
     'try { await import } catch — не дефект',

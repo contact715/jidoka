@@ -62,7 +62,7 @@ if (isMain) {
 node scripts/import-safety.mjs --all          # вся область движка
 node scripts/import-safety.mjs <файлы…>       # выборочно
 node scripts/import-safety.mjs <файл> --fix   # обернуть хвост в сторож
-node scripts/import-safety.mjs --self-test    # 51 проверка
+node scripts/import-safety.mjs --self-test    # 52 проверки
 ```
 
 Гейт **статический и читающий**: он никогда не импортирует проверяемый файл,

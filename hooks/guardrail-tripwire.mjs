@@ -32,8 +32,9 @@
  */
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadCli } from './lib/load-cli.mjs';
 
 // Строгий разбор аргументов (2026-09-16). Код отказа 1, а не 2: для Claude Code код 2 у
@@ -41,7 +42,6 @@ import { loadCli } from './lib/load-cli.mjs';
 const HOOK_BAD_CALL_EXIT = 1;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(HERE, '..');
 
 /** The content an action is about to write, from whichever field the tool uses. Pure. */
 export function actionContent(input = {}) {
@@ -94,7 +94,33 @@ function selfTest() {
   let fails = 0;
   const ok = (n, c) => { if (!c) fails++; console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };
   // the real detector, not a stand-in: if it changes, this test changes with it
-  const detect = (cp, ev) => realDetect(cp, ev);
+  ok('детектор найден рядом с хуком (иначе живой хук пропускает всё)', typeof realDetect === 'function');
+  const detect = (cp, ev) => (realDetect ? realDetect(cp, ev) : []);
+
+  // где искать детектор: установка первой, канон вторым, чужой ~/.claude/scripts — никогда
+  const canon = path.join('/r', 'scripts', 'replan-ledger.mjs');
+  const installed = path.join('/h', '.claude', 'jidoka', 'scripts', 'replan-ledger.mjs');
+  const foreign = path.join('/h', '.claude', 'scripts', 'replan-ledger.mjs');
+  const has = (...files) => (p) => files.includes(p);
+  ok('канон: детектор из scripts/ того же репозитория', resolveDetector(path.join('/r', 'hooks'), has(canon)) === canon);
+  ok('установка: детектор из ~/.claude/jidoka/scripts', resolveDetector(path.join('/h', '.claude', 'hooks'), has(installed, foreign)) === installed);
+  {
+    // настоящие файлы: чужой одноимённый скрипт рядом с хуком детектором не считается
+    const base = fs.mkdtempSync(path.join(os.tmpdir(), 'tripwire-'));
+    const hooks = path.join(base, '.claude', 'hooks');
+    const alien = path.join(base, '.claude', 'scripts', 'replan-ledger.mjs');
+    fs.mkdirSync(hooks, { recursive: true });
+    fs.mkdirSync(path.dirname(alien), { recursive: true });
+    fs.writeFileSync(alien, 'export function main() {}\n');
+    const skipped = resolveDetector(hooks) === null;
+    fs.writeFileSync(alien, 'export function coreSubstitutionSignals() {}\n');
+    const taken = resolveDetector(hooks) === alien;
+    fs.rmSync(base, { recursive: true, force: true });
+    ok('чужой одноимённый файл не принимается за детектор', skipped);
+    ok('файл с детектором узнаётся по тексту', taken);
+  }
+  ok('установленная копия канона: ~/.claude/jidoka/hooks → ~/.claude/jidoka/scripts',
+    resolveDetector(path.join('/h', '.claude', 'jidoka', 'hooks'), has(installed)) === installed);
 
   ok('content is read from `content`', actionContent({ content: 'x' }) === 'x');
   ok('content is read from an edit replacement too', actionContent({ new_string: 'y' }) === 'y');
@@ -129,10 +155,32 @@ function selfTest() {
 
 // ── wiring ──────────────────────────────────────────────────────────────────
 let realDetect = null;
+
+const isDetector = (p) => {
+  try { return /export function coreSubstitutionSignals\b/.test(fs.readFileSync(p, 'utf8')); } catch { return false; }
+};
+
+/**
+ * Где лежит детектор. Хук живёт в двух раскладках: канон (<репо>/hooks → <репо>/scripts) и
+ * установка (~/.claude/hooks → ~/.claude/jidoka/scripts). До 2026-09-16 путь был только
+ * канонный, и живой хук у владельца ни разу не загрузил детектор: искал его в ~/.claude/scripts,
+ * где лежат чужие скрипты, и молча пропускал всё. Установка проверяется первой, а найденный файл
+ * узнаётся по тексту до импорта: импорт чужого одноимённого файла означал бы его запуск.
+ */
+export function resolveDetector(hookDir, exists = isDetector) {
+  const candidates = [
+    path.join(hookDir, '..', 'jidoka', 'scripts', 'replan-ledger.mjs'),
+    path.join(hookDir, '..', 'scripts', 'replan-ledger.mjs'),
+  ];
+  return candidates.find((p) => exists(p)) || null;
+}
+
 // подгрузка детектора — работа, поэтому только при прямом запуске хука
 async function loadDetector() {
+  const file = resolveDetector(HERE);
+  if (!file) return; // детектора нет → хук ниже пропускает всё и говорит об этом в самопроверке
   try {
-    ({ coreSubstitutionSignals: realDetect } = await import(path.join(ROOT, 'scripts', 'replan-ledger.mjs')));
+    ({ coreSubstitutionSignals: realDetect } = await import(pathToFileURL(file).href));
   } catch { /* detector unavailable → the hook fails open below */ }
 }
 

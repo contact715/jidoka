@@ -411,7 +411,7 @@ HARD EXCEPTION (overrides this rule): external/shared production repos (gitlab.c
 ```
 node ~/.claude/jidoka/scripts/import-safety.mjs --all          # вся область
 node ~/.claude/jidoka/scripts/import-safety.mjs <файл> --fix   # обернуть в сторож
-node ~/.claude/jidoka/scripts/import-safety.mjs --self-test    # 51 проверка
+node ~/.claude/jidoka/scripts/import-safety.mjs --self-test    # 52 проверки
 ```
 
 Гейт статический и читающий: он НИКОГДА не импортирует проверяемый файл, потому
