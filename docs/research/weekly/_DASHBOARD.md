@@ -2,7 +2,7 @@
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 69% · shipped 118/172, open 54, regressed 0, ~1.05w to ship, class-closure 50%**
+**adoption 62% · shipped 118/191, open 73, regressed 0, ~1.05w to ship, class-closure 48%**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -182,3 +182,22 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | open | 2026-W38-A6 | Бюджет контекста скиллов как ЧИСЛО из внешнего канона: 100 на витрину, 5000 на тело | scripts/skill-budget.mjs#startupTax | not yet present: scripts/skill-budget.mjs#startupTax |
 | open | 2026-W38-A8 | Отпечаток поверхности агента: имя плюс описание инструмента, перевыпуск при изменении | scripts/agent-surface-pin.mjs#surfaceFingerprint | not yet present: scripts/agent-surface-pin.mjs#surfaceFingerprint |
 | open | 2026-W38-R5 | Решение это не телеметрия: журналы решений и вердиктов начинают коммититься | scripts/cron-audit.mjs#persistRunJournal | not yet present: scripts/cron-audit.mjs#persistRunJournal |
+| open | 2026-W39-R1 | Хук проверки братьев начинает вызываться: строка в settings.json для sibling-parity-gate | hooks/sibling-parity-gate.mjs#registeredInSettings | not yet present: hooks/sibling-parity-gate.mjs#registeredInSettings |
+| open | 2026-W39-R2 | meta-trend читает strengthened так же, как meta-audit: вердикт LEARNING перестаёт быть недостижимым | scripts/meta-trend.mjs#leakedAfterStrengthening | not yet present: scripts/meta-trend.mjs#leakedAfterStrengthening |
+| open | 2026-W39-K1 | Одобрение класса стоит одно действие: .gitignore 39-40 убраны, gate-audit кладёт блок в approval-queue, дата включения берётся из git log | scripts/gate-audit.mjs#emitRegistrationForApproval | not yet present: scripts/gate-audit.mjs#emitRegistrationForApproval |
+| open | 2026-W39-K2 | Прибор доказывает, что смотрит на существующий объект: нет объекта — проверка не состоялась, а не вердикт | scripts/lib/probe-input.mjs#inputExists | not yet present: scripts/lib/probe-input.mjs#inputExists |
+| open | 2026-W39-R3 | Живой договор в песочнице для статических гейтов поверх cli-sandbox | scripts/__tests__/gate-contract.test.mjs#behaviourNotShape | not yet present: scripts/__tests__/gate-contract.test.mjs#behaviourNotShape |
+| open | 2026-W39-R4 | kaizen-audit признаёт починку, сделанную другим путём: второй сигнал и пометка shippedAs | scripts/kaizen-audit.mjs#shippedByAnotherRoute | not yet present: scripts/kaizen-audit.mjs#shippedByAnotherRoute |
+| open | 2026-W39-R5 | Отчёты и реестры недели доезжают до установленной копии, шаг проверяем в ежедневной рутине | scripts/routine-daily.sh#researchParity | not yet present: scripts/routine-daily.sh#researchParity |
+| open | 2026-W39-K3 | Потолок выписывания по измеренной пропускной способности: лист ожидания вместо роста знаменателя | scripts/kaizen-rank.mjs#throughputCap | not yet present: scripts/kaizen-rank.mjs#throughputCap |
+| open | 2026-W39-R6 | Фантомный каталог agents уходит из GLOBAL_SYNC_DIRS, существование каталога проверяется с обеих сторон | scripts/install-into.mjs#bothSidesExist | not yet present: scripts/install-into.mjs#bothSidesExist |
+| open | 2026-W39-A1 | Полевая эффективность гейтов из первопартийной телеметрии Claude Code: num_blocking и source=hook вместо разбора транскриптов | scripts/gate-field-efficacy.mjs#fromTelemetry | not yet present: scripts/gate-field-efficacy.mjs#fromTelemetry |
+| open | 2026-W39-A2 | Прибор расхождений печатает знаменатель: сколько механизмов вне проверки и какие именно | scripts/oracle-divergence.mjs#denominatorNamed | not yet present: scripts/oracle-divergence.mjs#denominatorNamed |
+| open | 2026-W39-A3 | Испытание мягкого гейта с истёкшим горизонтом требует решения: выпустить, снять или продлить с причиной | scripts/gate-graduation.mjs#horizonExpiredNeedsDecision | not yet present: scripts/gate-graduation.mjs#horizonExpiredNeedsDecision |
+| open | 2026-W39-A4 | У сторожа памяти появляется опровергающий вход: корпус записей, ложных по содержанию и проходящих все пять правил | scripts/memory-eval.mjs#judgePoisonCase | not yet present: scripts/memory-eval.mjs#judgePoisonCase |
+| open | 2026-W39-A5 | Замер уточняющих вопросов перестаёт быть замером константы: спрашивающий читает вход либо прибор честно переименован | scripts/clarify-engine.mjs#questionPlanReadsInput | not yet present: scripts/clarify-engine.mjs#questionPlanReadsInput |
+| open | 2026-W39-A6 | Вывод W38 «гейты не блокируют в поле» письменно отменён, ошибка замера занесена в реестр классом measurement-tool-error-read-as-product-defect | docs/audits/meta-mistakes.jsonl#w38MeasurementRetracted | not yet present: docs/audits/meta-mistakes.jsonl#w38MeasurementRetracted |
+| open | 2026-W39-A7 | Красные плечи для хуков в корпусе кейсов по образцу browser-verify-gate: синтетический транскрипт, spawnSync, код 2 и код 0 | docs/evals/_cases.jsonl#hookRedArms | not yet present: docs/evals/_cases.jsonl#hookRedArms |
+| open | 2026-W39-A8 | Сведение прогонов считается над числами, порог применяется после: один словарь правил mean/median/at_least/pass_at/max | scripts/lib/reducers.mjs#reduceThenThreshold | not yet present: scripts/lib/reducers.mjs#reduceThenThreshold |
+| open | 2026-W39-A9 | Релевантность в поиске по памяти нормируется: посторонний свежий документ перестаёт выигрывать у целевого | scripts/memory-retrieve.mjs#normalizedRelevance | not yet present: scripts/memory-retrieve.mjs#normalizedRelevance |
+| open | 2026-W39-A10 | Стеммер русского по спецификации Snowball с эталонными векторами voc.txt и output.txt вместо самодельного | scripts/lib/stem-ru.mjs#stemVerifiedAgainstVectors | not yet present: scripts/lib/stem-ru.mjs#stemVerifiedAgainstVectors |
