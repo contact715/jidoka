@@ -116,7 +116,12 @@ const EXTERNAL_WORDS_RE = /\p{L}*(?:конкурент|референс|рын(?
 /** Текст говорит о замере. */
 const MEASURE_WORDS_RE = /\p{L}*(?:замер|измер|measured|measurement)\p{L}*/iu;
 /** путь/до/файла.ext:НОМЕР — адрес с точностью до строки. */
-const PATH_WITH_LINE_RE = /[\w./@-]+\.(?:tsx?|jsx?|mjs|cjs|py|go|rs|java|rb|php|css|scss|json|ya?ml|md|sql|sh)\s*:\s*\d+/i;
+/**
+ * Файлы настроек (nginx `.conf`, systemd `.service`/`.timer`, `.toml`, `.ini`) тоже код:
+ * находка про сервер живёт именно в них. Без них адрес `deploy/nginx.conf:48` не засчитывался,
+ * и честная строка замера краснела (класс guard-unit-mismatched-to-rule).
+ */
+const PATH_WITH_LINE_RE = /[\w./@-]+\.(?:tsx?|jsx?|mjs|cjs|py|go|rs|java|rb|php|css|scss|json|ya?ml|md|sql|sh|conf|service|timer|toml|ini)\s*:\s*\d+/i;
 
 /**
  * Слова заголовка раздела «чего не проверил», в любом порядке. Прямой: «не проверил»,
@@ -540,6 +545,10 @@ function selfTest() {
     PATH_WITH_LINE_RE.test('lib/api/client.ts : 848'));
   check('.mjs распознаётся как путь',
     PATH_WITH_LINE_RE.test('scripts/gate.mjs:12'));
+  check('адрес в файле настроек nginx засчитывается',
+    PATH_WITH_LINE_RE.test('backend/deploy/nginx-hostinger.conf:48'));
+  check('адрес в таймере systemd засчитывается',
+    PATH_WITH_LINE_RE.test('deploy/aplus-backup.timer:5'));
 
   // Раздел непроверенного
   check('отсутствие раздела ловится',
