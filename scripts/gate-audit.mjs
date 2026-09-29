@@ -209,10 +209,18 @@ export function collectMechanisms(root, { extraDirs = [] } = {}, read = readFile
   return files;
 }
 
-/** A mechanism is WIRED when some standing caller names its file. `callerTexts` are joined verbatim. */
+/**
+ * A mechanism is WIRED when some standing caller names its file. `callerTexts` are joined verbatim.
+ * The name must stand ALONE: `adaptive-verify.mjs` in a workflow does not wire `verify.mjs`. A plain
+ * substring match counted such a file as wired with nobody calling it (2026-09-29, class
+ * green-check-that-checks-nothing): the audit that proves "this file really runs" proved it from
+ * someone else's name.
+ */
 export function wiredSetFrom(files = [], callerTexts = []) {
   const callers = callerTexts.filter(Boolean).join('\n');
-  return new Set(files.map((f) => f.path.replace(/^.*\//, '')).filter((b) => callers.includes(b)));
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const named = (b) => new RegExp(`(?<![\\w.-])${esc(b)}(?![\\w-])`).test(callers);
+  return new Set(files.map((f) => f.path.replace(/^.*\//, '')).filter(named));
 }
 
 /** Every text that can legitimately wire a mechanism: global hooks, CI, git hooks, npm scripts, installer. */
@@ -679,6 +687,11 @@ function selfTest() {
       wiredSetFrom([{ path: 'scripts/x.mjs' }], ['', '', '', '', 'node scripts/x.mjs']).has('x.mjs')],
     ['a mechanism nobody calls is still unwired',
       wiredSetFrom([{ path: 'scripts/x.mjs' }], ['', '', '', '', 'node scripts/other.mjs']).has('x.mjs') === false],
+    ['имя механизма внутри чужого имени файла не делает его подключённым',
+      wiredSetFrom([{ path: 'scripts/verify.mjs' }], ['node scripts/adaptive-verify.mjs --self-test']).has('verify.mjs') === false],
+    ['имя в кавычках, после пути и в конце строки по-прежнему подключает',
+      ['"command": "node ~/.claude/hooks/verify.mjs"', "payload: 'verify.mjs',", 'node scripts/verify.mjs']
+        .every((c) => wiredSetFrom([{ path: 'scripts/verify.mjs' }], [c]).has('verify.mjs'))],
   ];
   let fails = 0;
   for (const [name, ok] of T) { if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }
