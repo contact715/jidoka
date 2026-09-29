@@ -1,8 +1,8 @@
-# Kaizen Dashboard
+# Kaizen Dashboard — 2026-W40
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 62% · shipped 118/191, open 73, regressed 0, ~1.05w to ship, class-closure 48%**
+**adoption 63% · shipped 118/188, open 70, regressed 0, ~1.05w to ship, class-closure 45%**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -171,16 +171,16 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | open | 2026-W38-R3 | Отклонение уходит из знаменателя приёмки: kaizen-audit читает _REJECTED.jsonl | scripts/kaizen-audit.mjs#absorbRejections | not yet present: scripts/kaizen-audit.mjs#absorbRejections |
 | open | 2026-W38-R4 | Разобранный регресс получает датированное признание, счётчик перестаёт быть вечным | scripts/meta-audit.mjs#acknowledgedRegression | not yet present: scripts/meta-audit.mjs#acknowledgedRegression |
 | open | 2026-W38-A1 | Правило накрыло ВСЕ двери: структурный запрос по форме кода вместо текста, правила как данные | scripts/all-doors-audit.mjs#everyDoorReached | not yet present: scripts/all-doors-audit.mjs#everyDoorReached |
-| open | 2026-W38-A3 | Вердикт тренда считается доверительной последовательностью, а не порогом по уровню | scripts/meta-trend.mjs#confidenceSequence | not yet present: scripts/meta-trend.mjs#confidenceSequence |
-| open | 2026-W38-A4 | Дисперсия судьи меряется четырьмя прогонами без единой человеческой метки | scripts/judge-calibration.mjs#biasVarianceSplit | not yet present: scripts/judge-calibration.mjs#biasVarianceSplit |
-| open | 2026-W38-A7 | Корпус Who&When как РАЗЛИЧАЮЩИЙ вход для пилота парных судей | docs/evals/_pilot-judgebench.md#discrimination | not yet present: docs/evals/_pilot-judgebench.md#discrimination |
+| rejected | 2026-W38-A3 | Вердикт тренда считается доверительной последовательностью, а не порогом по уровню | scripts/meta-trend.mjs#confidenceSequence | отклонено 2026-09-29 (W40), причина в _REJECTED.jsonl |
+| rejected | 2026-W38-A4 | Дисперсия судьи меряется четырьмя прогонами без единой человеческой метки | scripts/judge-calibration.mjs#biasVarianceSplit | отклонено 2026-09-29 (W40), причина в _REJECTED.jsonl |
+| rejected | 2026-W38-A7 | Корпус Who&When как РАЗЛИЧАЮЩИЙ вход для пилота парных судей | docs/evals/_pilot-judgebench.md#discrimination | отклонено 2026-09-29 (W40), причина в _REJECTED.jsonl |
 | open | 2026-W38-A10 | Фаза прогона задаёт доступные инструменты: ограничение живёт в состоянии, а не в тексте задания | scripts/orchestration-planner.mjs#phaseScopedTools | not yet present: scripts/orchestration-planner.mjs#phaseScopedTools |
-| open | 2026-W38-A11 | Правила детектора инъекций живут в данных, а не в коде детектора | scripts/detect-injection.mjs#rulesFromData | not yet present: scripts/detect-injection.mjs#rulesFromData |
+| rejected | 2026-W38-A11 | Правила детектора инъекций живут в данных, а не в коде детектора | scripts/detect-injection.mjs#rulesFromData | отклонено 2026-09-29 (W40), причина в _REJECTED.jsonl |
 | open | 2026-W38-K0 | Гейт, который наблюдает гейты: полевая частота срабатывания и блокировок из собственных транскриптов | scripts/gate-field-efficacy.mjs#fieldVerdict | not yet present: scripts/gate-field-efficacy.mjs#fieldVerdict |
 | open | 2026-W38-K2 | Пустое наблюдение никогда не зелёное: зонд пригодности опускается со страницы на элемент | hooks/browser-verify-gate.mjs#elementObservable | not yet present: hooks/browser-verify-gate.mjs#elementObservable |
 | open | 2026-W38-A5 | Расписка о ВЫЖИВАНИИ правила после сжатия вместо расписки о самом сжатии | hooks/compaction-trace.mjs#constraintSurvival | not yet present: hooks/compaction-trace.mjs#constraintSurvival |
-| open | 2026-W38-A6 | Бюджет контекста скиллов как ЧИСЛО из внешнего канона: 100 на витрину, 5000 на тело | scripts/skill-budget.mjs#startupTax | not yet present: scripts/skill-budget.mjs#startupTax |
-| open | 2026-W38-A8 | Отпечаток поверхности агента: имя плюс описание инструмента, перевыпуск при изменении | scripts/agent-surface-pin.mjs#surfaceFingerprint | not yet present: scripts/agent-surface-pin.mjs#surfaceFingerprint |
+| rejected | 2026-W38-A6 | Бюджет контекста скиллов как ЧИСЛО из внешнего канона: 100 на витрину, 5000 на тело | scripts/skill-budget.mjs#startupTax | отклонено 2026-09-29 (W40), причина в _REJECTED.jsonl |
+| rejected | 2026-W38-A8 | Отпечаток поверхности агента: имя плюс описание инструмента, перевыпуск при изменении | scripts/agent-surface-pin.mjs#surfaceFingerprint | отклонено 2026-09-29 (W40), причина в _REJECTED.jsonl |
 | open | 2026-W38-R5 | Решение это не телеметрия: журналы решений и вердиктов начинают коммититься | scripts/cron-audit.mjs#persistRunJournal | not yet present: scripts/cron-audit.mjs#persistRunJournal |
 | open | 2026-W39-R1 | Хук проверки братьев начинает вызываться: строка в settings.json для sibling-parity-gate | hooks/sibling-parity-gate.mjs#registeredInSettings | not yet present: hooks/sibling-parity-gate.mjs#registeredInSettings |
 | open | 2026-W39-R2 | meta-trend читает strengthened так же, как meta-audit: вердикт LEARNING перестаёт быть недостижимым | scripts/meta-trend.mjs#leakedAfterStrengthening | not yet present: scripts/meta-trend.mjs#leakedAfterStrengthening |
@@ -201,3 +201,6 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | open | 2026-W39-A8 | Сведение прогонов считается над числами, порог применяется после: один словарь правил mean/median/at_least/pass_at/max | scripts/lib/reducers.mjs#reduceThenThreshold | not yet present: scripts/lib/reducers.mjs#reduceThenThreshold |
 | open | 2026-W39-A9 | Релевантность в поиске по памяти нормируется: посторонний свежий документ перестаёт выигрывать у целевого | scripts/memory-retrieve.mjs#normalizedRelevance | not yet present: scripts/memory-retrieve.mjs#normalizedRelevance |
 | open | 2026-W39-A10 | Стеммер русского по спецификации Snowball с эталонными векторами voc.txt и output.txt вместо самодельного | scripts/lib/stem-ru.mjs#stemVerifiedAgainstVectors | not yet present: scripts/lib/stem-ru.mjs#stemVerifiedAgainstVectors |
+| open | 2026-W40-R1 | Диспетчер Kaizen ставит задачи в канон, а не в недельный клон: папка задачи берётся из канонического репозитория, клон отказом | scripts/kaizen-dispatch.mjs#canonicalRepo | not yet present: scripts/kaizen-dispatch.mjs#canonicalRepo |
+| open | 2026-W40-A1 | instantiation-audit проверяет загружаемость агента и скилла (шапка, name, description, глубина SKILL.md), а не только наличие файла | scripts/instantiation-audit.mjs#loadable | not yet present: scripts/instantiation-audit.mjs#loadable |
+| open | 2026-W40-R2 | Самопроверка судей пишет во временный журнал: judge-debias-telemetry перестаёт засоряться (113 из 113 строк искусственные) | scripts/judge-panel.mjs#testLogPath | not yet present: scripts/judge-panel.mjs#testLogPath |
