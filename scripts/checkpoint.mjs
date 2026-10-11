@@ -36,7 +36,10 @@ import { runCli } from './lib/cli.mjs';
 export const STATUSES = ['done', 'failed', 'interrupt'];
 const STORE = process.env.CHECKPOINT_LOG || join(homedir(), '.jidoka', 'checkpoints');
 
-export const logPath = (wave, root = STORE) => join(root, `${String(wave).replace(/[^\w.-]/g, '_')}.jsonl`);
+// Имя волны придумывают люди и бывает русским. \w знает только латиницу (флаг u не лечит), и
+// «волна-1» с «проба-1» сливались в один файл «_____-1.jsonl»: две волны писали в один журнал.
+// \p{M} — для имён в NFD (так их хранит macOS: «й» это «и» и отдельный знак).
+export const logPath = (wave, root = STORE) => join(root, `${String(wave).replace(/[^\p{L}\p{M}\p{N}_.-]/gu, '_')}.jsonl`);
 
 /** Hash of a node's output, so a replay can tell "same node, different result". Pure. */
 export const outputHash = (text = '') => createHash('sha256').update(String(text)).digest('hex').slice(0, 12);
@@ -161,6 +164,12 @@ function selfTest() {
 
   ok('the output hash distinguishes a different result for the same node',
     outputHash('one') !== outputHash('two'));
+  ok('две русские волны пишут в разные журналы, а не в один «_____-1»',
+    logPath('волна-1', dir) !== logPath('проба-1', dir) && logPath('волна-1', dir).endsWith('волна-1.jsonl'));
+  ok('событие русской волны не попадает в журнал другой русской волны', (() => {
+    record({ wave: 'волна-1', node: 'a', status: 'done' }, dir);
+    return loadEvents('проба-1', dir).events.length === 0 && loadEvents('волна-1', dir).events.length === 1;
+  })());
 
   rmSync(dir, { recursive: true, force: true });
   if (fails) { console.log(`\n\x1b[31mcheckpoint self-test FAILED (${fails})\x1b[0m`); process.exit(1); }

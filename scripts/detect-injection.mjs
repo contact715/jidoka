@@ -73,12 +73,14 @@ const INJECTION_PATTERNS = [
   // ── ROLE_OVERRIDE ────────────────────────────────────────────────────────
   {
     label: 'ROLE_OVERRIDE:you_are_now',
-    pattern: /you\s+are\s+now\s+(?:a\s+|an\s+)?(?:\w+\s+){0,3}(?:assistant|bot|ai|model|system|gpt)/i,
+    // Слова между — любой буквой (\p{L}), флаг u: с `\w` (только латиница) атаку обходило одно
+    // русское слово внутри фразы: «you are now a полностью свободный assistant» (2026-10-10).
+    pattern: /you\s+are\s+now\s+(?:a\s+|an\s+)?(?:[\p{L}\p{N}_]+\s+){0,3}(?:assistant|bot|ai|model|system|gpt)/iu,
     severity: 'high',
   },
   {
     label: 'ROLE_OVERRIDE:act_as',
-    pattern: /(?:^|\s)act\s+as\s+(?:a\s+|an\s+)?(?:\w+\s+){0,3}(?:assistant|bot|ai|model|system|gpt|jailbreak|dan)/i,
+    pattern: /(?:^|\s)act\s+as\s+(?:a\s+|an\s+)?(?:[\p{L}\p{N}_]+\s+){0,3}(?:assistant|bot|ai|model|system|gpt|jailbreak|dan)/iu,
     severity: 'high',
   },
   {

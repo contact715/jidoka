@@ -36,6 +36,13 @@ const ROOT = path.resolve(__dirname, '..');
 const RETROS_DIR = path.join(ROOT, 'docs/retros');
 const STAGING_DIR = path.join(ROOT, '.claude/memory-staging');
 
+// Имя файла ретро: имя волны придумывают люди, бывает русским (wave-12-починка.md). Буква
+// [\p{L}\p{N}_] с флагом u, плюс \p{M} для имён в NFD (так их отдаёт macOS); \w знает только
+// латиницу, и такое ретро молча выпадало. Сестра: audit-meta-process.mjs, тот же текст.
+export const RETRO_FILE_RE = /^wave-[\p{L}\p{M}\p{N}_.-]+\.md$/u;
+// Имя навыка в пути .claude/skills/<имя>.md пишут люди: буква [\p{L}\p{N}_] с флагом u.
+export const SKILL_PATH_RE = /\.claude\/skills\/([\p{L}\p{N}_-]+)\.md/gu;
+
 export const CLI = {
   name: 'extract-retro-memory',
   summary: 'Выжать уроки из docs/retros в файл для графа памяти (.claude/memory-staging).',
@@ -132,7 +139,7 @@ function main({ isDry = false, isVerbose = false } = {}) {
 
   const files = fs
     .readdirSync(RETROS_DIR)
-    .filter((f) => /^wave-[\w.-]+\.md$/.test(f) && f !== '_TEMPLATE.md')
+    .filter((f) => RETRO_FILE_RE.test(f) && f !== '_TEMPLATE.md')
     .sort();
 
   const entities = [];
@@ -213,7 +220,7 @@ function parseRetro(filePath) {
   }
 
   // Collect skills mentioned anywhere in body for relation graph
-  for (const m of raw.matchAll(/\.claude\/skills\/([\w-]+)\.md/g)) {
+  for (const m of raw.matchAll(SKILL_PATH_RE)) {
     skillsReferenced.add(m[1]);
   }
 
@@ -356,6 +363,13 @@ function selfTest() {
   ok('an empty batch reports null coverage, never 100%', distillBatch([]).coveragePct === null);
   ok('the batch says out loud that unnamed ones need a human',
     /должен назвать человек/.test(distillBatch(['нечто постороннее']).reason));
+
+  // \w видит только латиницу (флаг u не лечит): русское ретро и русский навык пропадали молча.
+  ok('ретро с русским слагом волны не выпадает из разбора (wave-12-починка.md)',
+    RETRO_FILE_RE.test('wave-12-починка.md') && RETRO_FILE_RE.test('wave-12-сбой.md'.normalize('NFD')) // NFD: «й» = «и» + знак
+      && !RETRO_FILE_RE.test('_TEMPLATE.md') && !RETRO_FILE_RE.test('wave-12.txt'));
+  ok('навык с русским именем попадает в связи (.claude/skills/навык-тест.md)',
+    [...'см. .claude/skills/навык-тест.md и .claude/skills/dev-pipeline.md'.matchAll(SKILL_PATH_RE)].map((m) => m[1]).join() === 'навык-тест,dev-pipeline');
 
   if (fails) { console.log(`\n\x1b[31mextract-retro-memory self-test FAILED (${fails})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ extract-retro-memory: failure → reusable strategy, unrecognised stays unnamed\x1b[0m');

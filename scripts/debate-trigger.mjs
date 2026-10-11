@@ -24,9 +24,12 @@
 
 import { runCli } from './lib/cli.mjs';
 
-const COMPARE = [/\bcompare\b/, /\bvs\.?\b/, /which (is |one is )?(better|best|stronger)/, /pros and cons/, /trade-?offs?/, /сравн/, /что лучше/, /за и против/, /компромисс/, /лучше или/];
-const DECISION = [/should (we|i)\b/, /worth (it|doing|building)/, /\bdecide\b/, /\bchoose\b/, /стоит ли/, /выбра(ть|ть\b)|выбери/, /какой (подход|вариант)/, /go or no/];
-const ANALYSIS = [/\banaly[sz]e\b/, /\banaly[sz]is\b/, /\bevaluate\b/, /\bassess\b/, /\bcritique\b/, /проанализ/, /\bоцен(и|ить|ка)\b/, /аналитик/, /\bразбор\b/, /дебат/, /ai war|аи вар/];
+// Границы русских слов юникодные (?<![\p{L}\p{N}]) и (?![\p{L}\p{N}]) с флагом u: `\b` в
+// JavaScript считает буквой только латиницу, и до 2026-10-10 /\bоцен(и|ить|ка)\b/ и /\bразбор\b/
+// не срабатывали ни разу: «нужна оценка подхода» дебатов не включала.
+const COMPARE = [/\bcompare\b/, /\bvs\b/, /which (is |one is )?(better|best|stronger)/, /pros and cons/, /trade-?offs?/, /сравн/, /что лучше/, /за и против/, /компромисс/, /лучше или/];
+const DECISION = [/should (we|i)\b/, /worth (it|doing|building)/, /\bdecide\b/, /\bchoose\b/, /стоит ли/, /выбрать|выбери/, /какой (подход|вариант)/, /go or no/];
+const ANALYSIS = [/\banaly[sz]e\b/, /\banaly[sz]is\b/, /\bevaluate\b/, /\bassess\b/, /\bcritique\b/, /проанализ/, /(?<![\p{L}\p{N}])оцен(?:и|ить|ка)(?![\p{L}\p{N}])/u, /аналитик/, /(?<![\p{L}\p{N}])разбор(?![\p{L}\p{N}])/u, /дебат/, /ai war|аи вар/];
 const DEBATE_TYPES = ['analysis', 'comparison', 'decision', 'evaluation', 'research-synthesis'];
 
 export function shouldDebate(task = {}) {
@@ -56,6 +59,11 @@ function selfTest() {
   ok('decision "should we build Z" → full', shouldDebate({ prompt: 'should we build a plugin system?' }).mode === 'full');
   ok('RU decision "стоит ли" → debate', shouldDebate({ prompt: 'стоит ли это делать' }).debate === true);
   ok('analysis "проанализируй дыры" → debate', shouldDebate({ prompt: 'проанализируй дыры системы' }).debate === true);
+  // русские слова с границей (2026-10-10): раньше `\b` по латинице делала эти правила мёртвыми
+  ok('RU analysis «нужна оценка подхода» → debate', shouldDebate({ prompt: 'нужна оценка этого подхода' }).debate === true);
+  ok('RU analysis «сделай разбор» → debate', shouldDebate({ prompt: 'сделай разбор архитектуры' }).debate === true);
+  ok('RU decision «помоги выбрать» по-прежнему → debate', shouldDebate({ prompt: 'помоги выбрать базу данных' }).debate === true);
+  ok('граница слова работает: «оценщик» дебатов не включает', shouldDebate({ prompt: 'добавь поле оценщик в форму' }).debate === false);
   ok('N options → panel', shouldDebate({ prompt: 'pick one', options: ['a', 'b', 'c'] }).mode === 'panel');
   ok('critical risk → full', shouldDebate({ risk: 'critical', prompt: 'refactor auth' }).mode === 'full');
   ok('task type=comparison → full', shouldDebate({ type: 'comparison' }).mode === 'full');

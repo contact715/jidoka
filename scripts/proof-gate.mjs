@@ -25,6 +25,7 @@ import { runCli } from './lib/cli.mjs';
 // returns 'generic' unless the claim CLEARLY needs a browser run or a full-history scan.
 export function classifyClaim(claim = '') {
   const c = claim.toLowerCase();
+  // @ascii-ok: `redact\w*` — английские формы (redacted, redaction); русские основы перечислены отдельно, без \w и \b
   const removal = /\b(removed?|remove|cleaned?|clean|deleted?|delete|purged?|purge|scrubbed?|redact\w*)\b|вычищ|удал|стёр|стер|очищ/.test(c);
   const dataScope = /\b(history|git|data|pii|secret|credential|token|leak)\b|истори|данны|секрет|утечк/.test(c);
   if (removal && dataScope) return 'data-removal';

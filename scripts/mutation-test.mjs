@@ -73,7 +73,10 @@ export function mutate(src, max = Infinity) {
   const mask = stringMask(src);
   for (const op of OPS) {
     if (op.word) {
-      for (const m of src.matchAll(new RegExp(`\\b${op.from}\\b`, 'g'))) {
+      // граница ИМЕНИ, а не \b: вход — исходник, а в нём бывают русские имена. С \b «true» внутри
+      // `trueЗначение` или `естьtrue` считался отдельным словом (русская буква для \b не буква),
+      // мутант ломал имя и «убивался» ошибкой ReferenceError, завышая счёт. Флаг u обязателен.
+      for (const m of src.matchAll(new RegExp(`(?<![\\p{ID_Continue}$])${op.from}(?![\\p{ID_Continue}$])`, 'gu'))) {
         if (mask[m.index]) continue;
         mutants.push(mk(src, m.index, op.from, op.to));
         if (mutants.length >= max) return mutants;
@@ -182,6 +185,8 @@ function selfTest() {
   ok('mutate flips === to !==', ms.some(m => m.to === '!==' && m.from === '==='));
   ok('mutate flips && to ||', ms.some(m => m.from === '&&' && m.to === '||'));
   ok('mutate flips true to false', ms.some(m => m.from === 'true' && m.to === 'false'));
+  ok('true внутри русского имени не мутируется (мутант сломал бы имя, а не логику)',
+    mutate('const естьtrue = 1; const trueЗначение = 2;').filter(m => m.from === 'true').length === 0);
   ok('mutate respects max', mutate('a === b === c === d', 2).length === 2);
   {
     const lib = 'export function f(a) { return a > 0; }\n';

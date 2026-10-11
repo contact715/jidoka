@@ -242,7 +242,8 @@ export function wavesFromMetricsDashboard(md, cap = 30) {
     if (!l.startsWith('|')) continue; // prose/comments between appended rows don't end the table
     const c = l.split('|').map((s) => s.trim());
     const id = c[ix.wave];
-    if (!id || !/^wave[-\s]?\w/i.test(id)) continue; // separator / headers / non-wave rows
+    // имя волны бывает русским (wave-починка): буква [\p{L}\p{N}_] с флагом u, \w знает только латиницу
+    if (!id || !/^wave[-\s]?[\p{L}\p{N}_]/iu.test(id)) continue; // separator / headers / non-wave rows
     // shape guard: the file holds OTHER wave-keyed tables (carbon) AND tail rows appended
     // after them — a real metrics row is recognized by a date in the Date column, not by
     // its position in the file (the aggregator appends to the END, past the other tables)
@@ -456,6 +457,16 @@ function selfTest() {
   ok('activity tape maps recent traces (newest first)', summarizeActivity([{ agent: 'a', action: 'x' }, { agent: 'b', action: 'y' }])[0].agent === 'b');
   ok('activity surfaces the real outcome (VIOLATION/PASS), not a generic "activity"', summarizeActivity([{ agent: 'a', outcome: 'VIOLATION', label: 'CR-01' }])[0].action === 'VIOLATION');
   ok('lessons group by class, recurrence-sorted', summarizeLessons([{ class: 'c' }, { class: 'c' }, { class: 'd' }])[0].count === 2);
+  // \w видит только латиницу (флаг u не лечит): именная русская волна пропадала с доски молча
+  ok('metrics-md: волна с русским именем попадает на доску (wave-починка)', (() => {
+    const md = [
+      '| Wave | Date | Total tokens | Cache hit rate | Agent count | Wall-clock | Status | Budget % |',
+      '|---|---|---|---|---|---|---|---|',
+      '| wave-починка | 2026-10-10 | ~20K | n/a | 1 | ~5 min | Shipped | ~2% |',
+    ].join('\n');
+    const w = wavesFromMetricsDashboard(md);
+    return w.length === 1 && w[0].wave === 'wave-починка' && w[0].status === 'done';
+  })());
   if (f) { console.log(`\n\x1b[31mcollectors self-test FAILED (${f})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ collectors: pure summarizers correct\x1b[0m'); process.exit(0);
 }

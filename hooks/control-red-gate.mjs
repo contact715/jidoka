@@ -316,6 +316,7 @@ async function main() {
   const tp = payload.transcript_path;
   if (!tp || !fs.existsSync(tp)) process.exit(0);
 
+  // @ascii-ok: session_id — UUID из Claude Code, только латиница и цифры
   const sid = String(payload.session_id || path.basename(tp)).replace(/[^\w-]/g, '');
   const mark = path.join(MARK_DIR, `control-red-${sid}.json`);
   const nudged = readNudged(mark);

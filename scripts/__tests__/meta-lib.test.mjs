@@ -62,6 +62,24 @@ test('a merge whose halves prescribe opposite timing is blocked', () => {
   assert.match(v.reason, /момент действия/);
 });
 
+test('русское «до» против «после» тоже блокирует склейку', () => {
+  // /\bдо\b/ до 2026-10-10 молчало: граница по латинице, и эти два урока считались одним
+  const v = decisionConflict(
+    { cls: 'check-before-commit', text: 'прогонять проверку до коммита' },
+    { cls: 'check-later', text: 'прогонять проверку после коммита' },
+  );
+  assert.equal(v.conflict, true);
+  assert.match(v.reason, /момент действия/);
+});
+
+test('«до» внутри слова («доступ», «добавить») моментом не считается', () => {
+  const v = decisionConflict(
+    { cls: 'grant-access', text: 'добавить доступ' },
+    { cls: 'review-later', text: 'проверить после выкладки' },
+  );
+  assert.equal(v.conflict, false);
+});
+
 test('the class SLUG is read, not only the incident prose', () => {
   // the real case states its timing in the name and never in the text — reading prose alone
   // made the probe answer "safe" on the exact pair it exists for

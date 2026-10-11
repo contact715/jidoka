@@ -112,6 +112,7 @@ if (isMain) {
     const explicit = /<!--\s*counts:([^>]*)-->/.exec(text);
     if (explicit) {
       for (const [key] of Object.entries(labels)) {
+        // @ascii-ok: key — ключи объекта labels выше: agent, skill, script; запись counts пишется латиницей
         const em = new RegExp(`\\b${key}s?\\s*=\\s*(\\d+)`).exec(explicit[1]);
         if (!em) continue;
         const claimed = +em[1], actual = real[key];

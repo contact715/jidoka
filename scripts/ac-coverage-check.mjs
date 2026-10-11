@@ -61,8 +61,14 @@ const SKIP_DIRS = new Set(['.git', 'node_modules', 'venv', '.venv', 'dist', 'bui
 //
 // The fix is additive: the tagged form still matches, and the dotted, untagged form now matches
 // too. Labels may be AC-1, AC-1.1, AC-2b or a bare A1.
-export const AC_RE = /\*\*(AC-[\w.]+|[A-Z]\d+)\*\*\s+\[(?:micro|macro|carto|synthesis)\][^\n]*|^\s*[-*]?\s*\*\*(AC-[\w.]+|[A-Z]\d+)\*\*[^\n]*|^\d+\.\s+\[(?:micro|macro|carto|synthesis)\][^\n]*/gm;
-export const AC_LABEL_RE = /\*\*(AC-[\w.]+|[A-Z]\d+)\*\*/;
+// Номер критерия пишут люди, и спеки здесь по-русски: `**AC-вход.1**`. Буква в номере это
+// [\p{L}\p{N}_] с флагом u, а не \w: \w знает только латиницу, и русский номер пропадал молча
+// (флаг u \w не лечит). Сестра: scripts/sync-specs-to-memory.mjs, совпадение сверяет самопроверка.
+export const AC_RE = /\*\*(AC-[\p{L}\p{N}_.]+|[A-Z]\d+)\*\*\s+\[(?:micro|macro|carto|synthesis)\][^\n]*|^\s*[-*]?\s*\*\*(AC-[\p{L}\p{N}_.]+|[A-Z]\d+)\*\*[^\n]*|^\d+\.\s+\[(?:micro|macro|carto|synthesis)\][^\n]*/gmu;
+export const AC_LABEL_RE = /\*\*(AC-[\p{L}\p{N}_.]+|[A-Z]\d+)\*\*/u;
+// «Глазами» в проверке на реальном дереве: тот же алфавит номера, иначе русский критерий
+// не виден ни гейту, ни сверке с ним, и слепота не обнаруживается.
+const AC_BY_EYE_RE = /\*\*AC-[\p{L}\p{N}_.]+\*\*/gu;
 export const EARS_RE = /\[(EARS-\d+)\]/g;
 
 export function extractAcLabels(content) {
@@ -78,7 +84,11 @@ export function extractAcLabels(content) {
 // A test "references" an AC when the label appears as a token: AC-A1, [A1], EARS-3, 'A1:'
 export function testReferencesLabel(testContent, label) {
   const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(\\bAC-${esc}\\b|\\[${esc}\\]|\\b${esc}\\b)`).test(testContent);
+  // Граница слова юникодная: \b считает буквой только латиницу, и номер, который начинается
+  // или кончается русской буквой (AC-вход), не находился никогда. _ входит в «букву», как в \b.
+  // esc экранирует только синтаксические знаки — в режиме u это допустимо.
+  const L = '(?<![\\p{L}\\p{N}_])', R = '(?![\\p{L}\\p{N}_])';
+  return new RegExp(`(${L}AC-${esc}${R}|\\[${esc}\\]|${L}${esc}${R})`, 'u').test(testContent);
 }
 
 // ── runner ───────────────────────────────────────────────────────────────────
@@ -153,7 +163,7 @@ function run({ root: rootArg, specs: specsArg, staged = false, hard: hardArg = f
 
 // ── self-test ────────────────────────────────────────────────────────────────
 function selfTest() {
-  let pass = 0; const total = 8;
+  let pass = 0; const total = 11;
   // extraction
   const spec = '## ACs\n**A1** [micro] the panel renders the count badge always\n**AC-login** [macro] login flow round-trips the token correctly\nbody [EARS-3] WHEN x, the system SHALL y\n';
   const labels = extractAcLabels(spec);
@@ -164,13 +174,25 @@ function selfTest() {
   if (testReferencesLabel('it("badge renders", () => {}) // AC-A1', 'A1')) { pass++; console.log('  ok  matches AC-A1 tag'); } else console.log('  FAIL AC-A1 tag');
   if (testReferencesLabel('describe("[EARS-3] sla", ...)', 'EARS-3')) { pass++; console.log('  ok  matches [EARS-3]'); } else console.log('  FAIL [EARS-3]');
   if (!testReferencesLabel('nothing relevant here', 'A1')) { pass++; console.log('  ok  no false match'); } else console.log('  FAIL false match');
+  // ── русский номер критерия (2026-10-10): \w и \b видят только латиницу, и флаг u этого не
+  // меняет. Спеки здесь пишут по-русски, номер вида AC-вход.1 пропадал молча: ни ошибки, ни находки.
+  const RU = '- **AC-вход.1** вход по ссылке из письма работает без пароля\n';
+  if (extractAcLabels(RU).includes('AC-вход.1')) { pass++; console.log('  ok  русский номер критерия извлекается (**AC-вход.1**)'); }
+  else console.log('  FAIL русский номер критерия: ' + JSON.stringify(extractAcLabels(RU)));
+  if (testReferencesLabel('// AC-вход проверено', 'AC-вход') && !testReferencesLabel('// AC-входной', 'AC-вход')) { pass++; console.log('  ok  ссылка теста на русский номер: граница по букве, а не по латинице'); }
+  else console.log('  FAIL ссылка на русский номер (AC-вход) не найдена или найдена внутри слова');
+  const eye = (RU.match(AC_BY_EYE_RE) || []).length;
+  if (eye === 1 && eye === extractAcLabels(RU).length) { pass++; console.log('  ok  русский критерий виден и «глазами», и гейтом (сверка на реальном дереве)'); }
+  else console.log(`  FAIL русский критерий: глазами ${eye}, гейтом ${extractAcLabels(RU).length}`);
   // ── сторож против повторного расхождения двух копий одного правила ──────────
   // Правило разбора критериев живёт в ДВУХ файлах, и это уже разъезжалось: узкая
   // копия в sync-specs-to-memory требовала скобочную метку, из-за чего map-ac-coverage
   // печатал «Total ACs extracted: 0» при 81 критерии на диске. Пока копии две, их
   // совпадение проверяет машина, а не обещание в комментарии.
   const REAL = '- **AC-1.1** `docs/evals/x.jsonl` seeded for three key agents and wired\n'
-             + '- **AC-2.10** deterministic scoring layer with machine-checkable assertions\n';
+             + '- **AC-2.10** deterministic scoring layer with machine-checkable assertions\n'
+             // русский номер: копия, оставшаяся на \w, разойдётся с этой именно здесь
+             + '- **AC-вход.1** вход по ссылке из письма работает без пароля\n';
   const mine = extractAcLabels(REAL);
   // Вторая копия читается С ДИСКА, а не импортируется: импорт разорвал бы замкнутость
   // профиля установки (поймано его же самопроверкой), и проверял бы то, что удалось
@@ -181,7 +203,7 @@ function selfTest() {
     const lit = src.match(/export const AC_RE = \/(.+)\/([gimsuy]*);/);
     if (lit) {
       const re = new RegExp(lit[1], lit[2].includes('g') ? lit[2] : lit[2] + 'g');
-      theirs = [...REAL.matchAll(re)].map((m) => (m[0].match(/\*\*(AC-[\w.]+|[A-Z]\d+)\*\*/) || [])[1]).filter(Boolean);
+      theirs = [...REAL.matchAll(re)].map((m) => (m[0].match(/\*\*(AC-[\p{L}\p{N}_.]+|[A-Z]\d+)\*\*/u) || [])[1]).filter(Boolean);
     }
   } catch { theirs = null; }
   if (mine.includes('AC-1.1') && mine.includes('AC-2.10')) { pass++; console.log('  ok  точка в номере критерия разбирается'); }
@@ -223,7 +245,7 @@ function realArtifactCheck() {
     let c;
     try { c = readFileSync(p, 'utf8'); } catch { continue; }
     const got = extractAcLabels(c).length;
-    const raw = (c.match(/\*\*AC-[\w.]+\*\*/g) || []).length;
+    const raw = (c.match(AC_BY_EYE_RE) || []).length;
     extracted += got;
     byEye += raw;
     if (raw > 0 && got === 0) blind.push(p.replace(repoRoot + '/', '') + ': глазами ' + raw + ', гейтом 0');

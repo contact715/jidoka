@@ -82,7 +82,9 @@ export function extractEntities(text) {
 
   for (const line of lines) {
     // 1. Денежные суммы: $3,000 / 250 долларов / 2 процента
-    for (const m of line.matchAll(/\$\s?[\d][\d\s,.]*\d|\d[\d\s,.]*\s?(?:доллар\w*|процент\w*|%)/gi)) {
+    // Окончание — \p{L}*, флаг u (2026-10-10): `\w*` в JavaScript только латиница, и в находку
+    // попадал обрубок «3 000 доллар». Падежи при сверке снимает основа в checkCoverage.
+    for (const m of line.matchAll(/\$\s?[\d][\d\s,.]*\d|\d[\d\s,.]*\s?(?:доллар\p{L}*|процент\p{L}*|%)/giu)) {
       add(m[0], "сумма", line);
     }
 
@@ -251,6 +253,9 @@ function selfTest() {
   ok("находит название Vagaro", terms.includes("vagaro"));
   ok("находит сумму в долларах", terms.some((t) => t.includes("доллар")));
   ok("находит проценты", terms.some((t) => t.includes("процент")));
+  ok("сумма — слово целиком «3 000 долларов», а не обрубок «3 000 доллар»", terms.includes(normalize("3 000 долларов")));
+  ok("падеж в документе не мешает: «2 процента» покрыто текстом «2 процентов»",
+    checkCoverage(extractEntities("комиссия 2 процента"), "ставка 2 процентов").covered.length === 1);
   ok("находит цитату клиента", terms.some((t) => t.includes("слизать")));
   ok("не тащит служебные слова", !terms.includes("что") && !terms.includes("для"));
 

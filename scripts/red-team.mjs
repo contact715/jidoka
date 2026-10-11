@@ -41,6 +41,7 @@ export function verdict(blocked, expectBlocked) {
 // или падение (2026-09-16: строгий разбор отвечает хукам кодом 1), и считать его «защитились» нельзя —
 // Claude Code при таком коде действие пропускает. Обычный гейт блокирует любым ненулевым кодом.
 export function isBlocked(code, cmd) {
+  // @ascii-ok: имя файла движка: латиницу проверяет cyrillic-boundary (nonAsciiPath)
   return /hooks?\/[\w-]+\.mjs|policy-enforce-hook\.mjs/.test(cmd) ? code === 2 : code !== 0;
 }
 

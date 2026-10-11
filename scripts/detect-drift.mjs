@@ -88,8 +88,12 @@ const AUDITS_DIR = path.join(ROOT, 'docs', 'audits');
 //
 // Static and deterministic: a claim is words in the spec, evidence is a non-zero exit or a throw
 // in the named file. No judgement, no runtime.
-const BLOCK_INTENT = /\b(blocks?|blocking|refus\w*|rejects?|halts?|prevents?|forbids?|exits? (?:1|2)\b)|блокир\w*|отказ\w*|запрещ\w*|не пропуст\w*/i;
-const BLOCK_EVIDENCE = /process\.exit\(\s*(?!0\s*\))[1-9]|throw new \w*Error|exit\s+[1-9]/;
+// Слова — основы: правило проверяет только .test(), поэтому «блокир» находит «блокирует»,
+// «блокировка». `\w*` после основы (было до 2026-10-10) ничего не ел: `\w` в JavaScript —
+// только латиница, на русском окончании он останавливался. Убран, чтобы не вводил в заблуждение.
+const BLOCK_INTENT = /\b(blocks?|blocking|refus|rejects?|halts?|prevents?|forbids?|exits? (?:1|2)\b)|блокир|отказ|запрещ|не пропуст/i;
+// Имя класса ошибки — имя JavaScript, в движке бывают русские имена: [\p{ID_Continue}$]*, флаг u.
+const BLOCK_EVIDENCE = /process\.exit\(\s*(?!0\s*\))[1-9]|throw new [\p{ID_Continue}$]*Error|exit\s+[1-9]/u;
 
 /**
  * Does each claim of blocking have code that can actually block? Pure.
@@ -640,7 +644,7 @@ const DRIFT_RULES = [
         const closesMatch = spec.content.match(/closes_entries:\s*[""']?([^'"\n]+)['""]?/);
         if (closesMatch) {
           // Extract slug from the closes_entries value (e.g. "anti-pattern #7 wave-spec-drift (...)")
-          const slugMatch = closesMatch[1].match(/\b([a-z][a-z0-9-]{3,})\b/g);
+          const slugMatch = closesMatch[1].match(/\b([a-z][a-z0-9-]{3,})\b/g); // @ascii-ok: слаг каталога анти-паттернов — [a-z][a-z0-9-]+, как в extractCatalogSlugs; русские слова поля — пояснение
           if (slugMatch) {
             for (const slug of slugMatch) {
               if (!catalogSlugs.has(slug) && slug.includes('-')) {
@@ -861,6 +865,10 @@ function selfTest() {
     claim('this reports findings to a log', 'console.log(1)').length === 0);
   ok('Russian claims are read too (the ledger is bilingual)',
     claim('гейт блокирует пуш', 'console.log(1)').length === 1);
+  ok('русские формы с окончанием читаются как основа: «отказывает», «запрещено», «не пропустит»',
+    ['гейт отказывает в записи', 'коммит запрещено делать', 'хук не пропустит пуш'].every((t) => claim(t, 'console.log(1)').length === 1));
+  ok('русское имя класса ошибки — тоже доказательство блокировки',
+    claim('гейт блокирует пуш', 'throw new ОшибкаПроверкиError("нет")').length === 0);
   ok('an unreadable mechanism is drift, not silently fine',
     intentVsEvidence([{ spec: 's.md', mechanism: 'gone.mjs', specText: 'blocks', codeText: null }]).length === 1);
   ok('exit(0) alone is never mistaken for blocking',

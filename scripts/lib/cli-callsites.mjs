@@ -18,6 +18,7 @@ import { join, relative } from 'node:path';
 export const PLACEHOLDER = 'X';
 export const RUNTIME = '$X';
 const CONTINUED = Symbol('продолжение');
+// @ascii-ok: имя файла движка: латиницу проверяет cyrillic-boundary (nonAsciiPath); имя флага латиницей по контракту lib/cli.mjs (FLAG_SHAPED); русская раскладка (--фдд) отклоняется как lookalikeFlag
 const CALL = /\bnode\s+(?:--[\w-]+(?:=\S+)?\s+)*(["']?)([^\s"'`;|&<>()]*?)\b(scripts|hooks)\/((?:dashboard\/|lib\/)?[\w.-]+\.mjs)(["']?)/g;
 
 /** Чистая: разбить хвост команды на слова с учётом кавычек и заполнителей. */
@@ -83,21 +84,26 @@ export function normalizeWord({ w, quoted, holder }) {
   let t = w.replace(/^\[/, '').replace(/\]$/, '');
   if (!quoted && t === '\\') return CONTINUED;                  // перенос строки внутри строки JS
   if (holder) return PLACEHOLDER;
+  // @ascii-ok: имя флага латиницей по контракту lib/cli.mjs (FLAG_SHAPED); русская раскладка (--фдд) отклоняется как lookalikeFlag
   if (/^--?[\w-]+=X$/.test(t)) return t;
   if (!quoted && /^[A-Z]$/.test(t)) return PLACEHOLDER;          // N, S, W — заполнители чисел
   if (t === '' && !quoted) return null;
   if (/^(?:…|\.\.\.)$/.test(t)) return quoted ? PLACEHOLDER : CONTINUED;   // "..." — значение, … — продолжение
   if (!quoted && t.includes('|') && t.startsWith('-')) t = t.split('|')[0];
+  // @ascii-ok: начало имени переменной shell — POSIX допускает только [A-Za-z_]
   if (/\$\{?[\w]/.test(t)) {
     // значение запуска: "$f", ${ROOT}/x, $ARGUMENTS; флаг сохраняет имя
+    // @ascii-ok: имя флага латиницей по контракту lib/cli.mjs (FLAG_SHAPED); русская раскладка (--фдд) отклоняется как lookalikeFlag
     const m = t.match(/^(--?[\w-]+)=/);
     return m ? `${m[1]}=${RUNTIME}` : RUNTIME;
   }
   if (/^<[^>]*>$/.test(t) || /^\{[^}]*\}$/.test(t)) {
     // заполнитель документации: <файл>, {id}; флаг с заполнителем (--x=<v>) сохраняет имя
+    // @ascii-ok: имя флага латиницей по контракту lib/cli.mjs (FLAG_SHAPED); русская раскладка (--фдд) отклоняется как lookalikeFlag
     const m = t.match(/^(--?[\w-]+)=/);
     return m ? `${m[1]}=${PLACEHOLDER}` : PLACEHOLDER;
   }
+  // @ascii-ok: имя флага латиницей по контракту lib/cli.mjs (FLAG_SHAPED); русская раскладка (--фдд) отклоняется как lookalikeFlag
   if (/^--?[\w-]+=<[^>]*>$/.test(t)) return `${t.split('=')[0]}=${PLACEHOLDER}`;
   return t;
 }
@@ -116,6 +122,7 @@ function enclosingQuote(text, idx) {
 
 /** Чистая: все вызовы в тексте. */
 // Строки состояния живут в корне ~/.claude, а не в scripts/ или hooks/.
+// @ascii-ok: имя файла движка: латиницу проверяет cyrillic-boundary (nonAsciiPath)
 const STATUSLINE = /\bnode\s+(["']?)([^\s"'`;|&<>()]*?)\.claude\/(statusline-[\w-]+\.mjs)(["']?)/g;
 const STATUSLINE_CANON = { 'statusline-jidoka.mjs': 'global-setup/statusline-jidoka.mjs' };
 

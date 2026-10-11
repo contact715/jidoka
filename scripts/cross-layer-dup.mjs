@@ -25,8 +25,11 @@ function normalise(line) {
   return line
     .replace(/\/\/.*$/, '')           // strip line comments
     .replace(/"[^"]*"|'[^']*'/g, 'S') // collapse string literals
+    // @ascii-ok: числа из цифр ASCII; цифра внутри русского имени станет N, но следующая строка схлопнет имя целиком в I
     .replace(/\b\d+\.?\d*\b/g, 'N')  // collapse numbers
-    .replace(/\b([a-zA-Z_$][a-zA-Z0-9_$]*)\b/g, (m) => JS_KW.has(m) ? m : 'I') // user ids → I
+    // имя в JavaScript, а не только латиница: русские имена прежде оставались как есть, и одна и та же
+    // логика с разными русскими именами давала разные отпечатки. Граница имени юникодная, флаг u.
+    .replace(/(?<![\p{ID_Continue}$])([\p{ID_Start}$_][\p{ID_Continue}$]*)(?![\p{ID_Continue}$])/gu, (m) => JS_KW.has(m) ? m : 'I') // user ids → I
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -77,6 +80,8 @@ function selfTest() {
   // normalise strips identifiers but keeps structure
   ok('normalise collapses identifiers', normalise('const email = value.trim();') === normalise('const addr = input.trim();'));
   ok('normalise keeps structure differences', normalise('if (a > b)') !== normalise('while (a > b)'));
+  ok('русские имена схлопываются так же, как латинские',
+    normalise('const почта = значение.trim();') === normalise('const addr = input.trim();'));
 
   // windows with identical logic produce same fingerprints
   const logic = `function validate(x) {\n  if (!x) return false;\n  if (x.length < 3) return false;\n  return true;\n}`;

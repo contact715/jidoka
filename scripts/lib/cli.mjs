@@ -50,6 +50,7 @@ import { writeSync } from 'node:fs';
 import { basename } from 'node:path';
 
 export const EXIT_USAGE = 2;
+// @ascii-ok: это сам контракт имени флага — латиница; русская раскладка (--фдд) отклоняется как lookalikeFlag
 const FLAG_SHAPED = /^--?[A-Za-z][\w-]*(?:=[\s\S]*)?$/;
 const HELP = { help: { type: 'boolean', short: 'h', desc: 'эта справка' } };
 const SELF_TEST = { 'self-test': { type: 'boolean', desc: 'самопроверка' } };
@@ -132,6 +133,7 @@ function fold(argv) {
 
 function flagIn(message) {
   const quoted = (String(message).match(/'([^']+)'/) || [])[1] || '';
+  // @ascii-ok: имя флага латиницей по контракту lib/cli.mjs (FLAG_SHAPED); русская раскладка (--фдд) отклоняется как lookalikeFlag
   return (quoted.match(/--[\w-]+/) || quoted.match(/-[\w]/) || [quoted])[0];
 }
 

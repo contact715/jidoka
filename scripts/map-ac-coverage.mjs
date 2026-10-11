@@ -117,7 +117,9 @@ export function resolveNeeds(decl, exists, read) {
 //   // Falsifiability documentation (AC-7)   — section comment, not a linkage tag
 //   // AC-... inside a word like "CACHE"      — not matched (requires word boundary)
 
-const TAG_RE = /\/\/\s+(wave-\d+\s+)?AC-(\w+)(?::|[\s])/;
+// Номер после AC- пишут люди и бывает русским (// AC-вход:): буква [\p{L}\p{N}_] с флагом u.
+// \w знает только латиницу, и флаг u этого не меняет, — такая метка молча не засчитывалась.
+const TAG_RE = /\/\/\s+(wave-\d+\s+)?AC-([\p{L}\p{N}_]+)(?::|[\s])/u;
 
 /** @returns {Map<string, { file: string, line: number, isStub: boolean }[]>} wave-qualified-ac_id -> hits */
 function collectTestTags() {
@@ -486,6 +488,10 @@ function selfTest() {
     resolveNeeds(null, has, read).ok === false);
   ok('неподдержанный вид доказательства называется вслух',
     /не поддержан/.test(resolveNeeds({ kind: 'e2e', target: 'x' }, has, read).why));
+  // \w видит только латиницу: метка `// AC-вход:` в тесте не находилась, критерий числился непокрытым.
+  ok('метка теста с русским номером находится (// AC-вход:)',
+    (TAG_RE.exec('  // AC-вход: вход по ссылке') || [])[2] === 'вход'
+      && (TAG_RE.exec('// wave-12 AC-починка проверено') || [])[2] === 'починка');
 
   console.log(`\nmap-ac-coverage self-test: ${pass} passed, ${fail} failed`);
   return fail === 0;

@@ -72,7 +72,7 @@ const EXHAUSTIVE = [
   rx('вс[еехй]'), rx('кажд(ый|ую|ое|ой)'), rx('полн(ая|ую|ый|ой)\\s+цепочк[а-я]*'), rx('цепочк[аиу]\\s+предк[а-я]*'),
   rx('перебрал'), rx('перечислил'), rx('ни\\s+одного'), rx('по\\s+всем'),
   rx('all\\s+(of\\s+)?(them|repos|callers|parents)'), rx('exhaustive'), rx('every'),
-  /grep\s+-r/i, /pstree/i, /ps\s+-\w*ax/i,
+  /grep\s+-r/i, /pstree/i, /ps\s+-\w*ax/i,  // @ascii-ok: флаги утилиты ps (-ax, -eax) — латинские буквы по определению
 ];
 
 /**
@@ -173,6 +173,7 @@ async function main() {
   if (!text) process.exit(0);
 
   const findings = unprovenNegatives(text);
+  // @ascii-ok: session_id — UUID из Claude Code, только латиница и цифры
   const sid = String(payload.session_id || 'unknown').replace(/[^\w-]/g, '');
   const mark = path.join(MARK_DIR, `negative-claim-${sid}.mark`);
   const alreadyBlocked = fs.existsSync(mark);

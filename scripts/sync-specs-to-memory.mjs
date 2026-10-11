@@ -116,8 +116,10 @@ function extractDependsOn(content) {
 // «Total ACs extracted: 0». Широкий и проверенный вариант с 2026-08 живёт в
 // scripts/ac-coverage-check.mjs:63; здесь он теперь дословно тот же, а совпадение
 // двух копий проверяется машиной (ac-coverage-check --self-test).
-export const AC_RE = /\*\*(AC-[\w.]+|[A-Z]\d+)\*\*\s+\[(?:micro|macro|carto|synthesis)\][^\n]*|^\s*[-*]?\s*\*\*(AC-[\w.]+|[A-Z]\d+)\*\*[^\n]*|^\d+\.\s+\[(?:micro|macro|carto|synthesis)\][^\n]*/gm;
-export const AC_LABEL_RE = /\*\*(AC-[\w.]+|[A-Z]\d+)\*\*/;
+// Буква в номере [\p{L}\p{N}_] с флагом u, а не \w: спеки по-русски, номер `**AC-вход.1**`
+// \w терял молча (флаг u \w не лечит). Дословно как в ac-coverage-check.mjs.
+export const AC_RE = /\*\*(AC-[\p{L}\p{N}_.]+|[A-Z]\d+)\*\*\s+\[(?:micro|macro|carto|synthesis)\][^\n]*|^\s*[-*]?\s*\*\*(AC-[\p{L}\p{N}_.]+|[A-Z]\d+)\*\*[^\n]*|^\d+\.\s+\[(?:micro|macro|carto|synthesis)\][^\n]*/gmu;
+export const AC_LABEL_RE = /\*\*(AC-[\p{L}\p{N}_.]+|[A-Z]\d+)\*\*/u;
 
 export function extractACs(content) {
   const acs = [];

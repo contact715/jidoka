@@ -56,7 +56,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 // file in an unstaged tree is the signal that this tree is not exclusively yours.
 
 export const ARTIFACT_PATTERNS = [
-  /(^|\/)node_modules\//, /(^|\/)\.next(-[\w-]+)?\//, /(^|\/)dist\//, /(^|\/)build\//,
+  /(^|\/)node_modules\//, /(^|\/)\.next(-[\w-]+)?\//, /(^|\/)dist\//, /(^|\/)build\//,  // @ascii-ok: служебные папки сборки Next.js (.next, .next-<имя>) называет сама сборка
   /(^|\/)\.turbo\//, /(^|\/)coverage\//, /(^|\/)\.cache\//, /(^|\/)target\//,
   /(^|\/)__pycache__\//, /\.log$/,
 ];

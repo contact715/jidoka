@@ -149,7 +149,9 @@ export function classKeyOf(cls = '') {
 //   1. different registered mechanisms — two gates means two defects, whatever the words say;
 //   2. opposite temporal direction — "before/first" against "after/afterwards";
 //   3. opposite polarity — one prescribes doing a thing, the other prescribes not doing it.
-const BEFORE_WORDS = /(\bbefore\b|\bfirst\b|\bprior to\b|\bдо\b|сначала|заранее|перед)/i;
+// «до» с юникодной границей: /\bдо\b/ (было до 2026-10-10) не срабатывало никогда — `\b` в
+// JavaScript считает буквой только латиницу. Граница нужна, иначе «доступ» читался бы как «до».
+const BEFORE_WORDS = /(\bbefore\b|\bfirst\b|\bprior to\b|(?<![\p{L}\p{N}])до(?![\p{L}\p{N}])|сначала|заранее|перед)/iu;
 const AFTER_WORDS = /(\bafter\b|\bafterwards\b|\bonce\b.{0,20}\bdone\b|после|потом|задним числом|по факту)/i;
 const NEGATION = /(\bnever\b|\bdo ?n[o']t\b|\bmust not\b|\bwithout\b|никогда|нельзя|не следует|запрещ)/i;
 

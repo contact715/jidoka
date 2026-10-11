@@ -36,6 +36,11 @@ const CATALOG_PATH = path.join(ROOT, 'docs/ANTI_PATTERNS_CATALOG.md');
 
 /** @typedef {'PASS' | 'REGRESSION_DETECTED' | 'CATALOG_UPDATE_NEEDED'} Verdict */
 
+// Имя файла ретро: имя волны придумывают люди, бывает русским (wave-починка.md). Буква
+// [\p{L}\p{N}_] с флагом u, плюс \p{M} для имён в NFD (так их отдаёт macOS); \w знает только
+// латиницу, и такое ретро молча выпадало из аудита. Сестра: extract-retro-memory.mjs, тот же текст.
+export const RETRO_FILE_RE = /^wave-[\p{L}\p{M}\p{N}_.-]+\.md$/u;
+
 /**
  * Extract anti-pattern slugs from the catalog.
  * Looks for lines like "### N. slug-name"
@@ -57,6 +62,7 @@ function extractCatalogSlugs() {
   const content = fs.readFileSync(CATALOG_PATH, 'utf8');
   /** @type {string[]} */
   const slugs = [];
+  // @ascii-ok: слаг каталога анти-паттернов — [a-z][a-z0-9-]+, так же его читает detect-drift.mjs extractCatalogSlugs
   for (const match of content.matchAll(/^###\s+\d+\.\s+([\w-]+)/gm)) {
     slugs.push(match[1]);
   }
@@ -75,7 +81,7 @@ function getLastNRetros(n) {
   }
   const files = fs
     .readdirSync(RETROS_DIR)
-    .filter((f) => /^wave-[\w.-]+\.md$/.test(f) && f !== '_TEMPLATE.md')
+    .filter((f) => RETRO_FILE_RE.test(f) && f !== '_TEMPLATE.md')
     .map((f) => ({
       name: f,
       fullPath: path.join(RETROS_DIR, f),

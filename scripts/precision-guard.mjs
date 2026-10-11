@@ -20,6 +20,7 @@ const MONEY_IDS = /\b(price|cost|amount|total|fee|tax|discount|balance|charge|ra
 const QUANTITY_IDS = /\b(quantity|qty|count|weight|volume|percent|ratio|share|portion)\b/i;
 
 // float arithmetic operators in an expression context
+// @ascii-ok: \b стоит после цифр числа, а строки из кода уже вырезаны (scan); русская буква вплотную за числом в JS это ошибка синтаксиса
 const FLOAT_OPS = /[+\-*\/]\s*[\d.]+[eE]?[\d]*\b|[\d]+\.\d+\s*[+\-*\/]/;
 
 // safe patterns: integer cents, BigInt, or explicit decimal lib usage

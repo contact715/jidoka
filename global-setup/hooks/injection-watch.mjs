@@ -50,7 +50,7 @@ export const RULES = [
   { id: 'override-system', sev: 'high', re: /\b(system\s*prompt|developer\s*mode|jailbreak|DAN\s*mode)\b/i },
   { id: 'role-injection', sev: 'med', re: /(^|\n)\s*(\[?\s*(system|assistant|developer)\s*\]?\s*[:：]|<\/?\s*(system|im_start|im_end)\b)/i },
   { id: 'you-are-now', sev: 'med', re: /\byou\s+are\s+now\b|\bfrom\s+now\s+on\s+you\b|\bact\s+as\s+(an?\s+)?(unrestricted|jailbroken|evil)\b/i },
-  { id: 'exfiltrate-secret', sev: 'high', re: /\b(send|post|upload|exfiltrate|leak|email|forward)\b[^.\n]{0,40}\b(secret|token|api[\s_-]?key|password|credential|\.env|private[\s_-]?key|ssh\s+key)\b/i },
+  { id: 'exfiltrate-secret', sev: 'high', re: /\b(send|post|upload|exfiltrate|leak|email|forward)\b[^.\n]{0,40}\b(secret|token|api[\s_-]?key|password|credential|\.env|private[\s_-]?key|ssh\s+key)\b/i },  // @ascii-ok: английский словарь слов (send, secret, token…), граница слова стоит у латинских слов списка
   { id: 'exfiltrate-url', sev: 'high', re: /\b(curl|wget|fetch|POST)\b[^.\n]{0,60}https?:\/\/[^\s)"']+[^.\n]{0,40}\b(token|key|secret|cookie|session|credential)\b/i },
   { id: 'pipe-to-shell', sev: 'high', re: /\b(curl|wget)\b[^|\n]{0,80}\|\s*(sh|bash|zsh|python3?)\b/i },
   { id: 'destructive-cmd', sev: 'high', re: /\brm\s+-rf\s+[~/]|\b(DROP|TRUNCATE)\s+(TABLE|DATABASE)\b|\bgit\s+push\s+--force\b/i },

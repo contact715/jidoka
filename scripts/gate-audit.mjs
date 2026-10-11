@@ -117,6 +117,7 @@ export function findOrphanGateScripts(pkg, callersText) {
   const text = String(callersText);
   return names.filter(n => {
     if (text.includes(n)) return false;
+    // @ascii-ok: имя файла движка: латиницу проверяет cyrillic-boundary (nonAsciiPath)
     const file = (String(scripts[n]).match(/[\w./-]+\.(?:mjs|js|sh)/) || [])[0];
     return !(file && text.includes(file.replace(/^.*\//, '')));
   });
@@ -222,6 +223,7 @@ export function collectMechanisms(root, { extraDirs = [] } = {}, read = readFile
 export function wiredSetFrom(files = [], callerTexts = []) {
   const callers = callerTexts.filter(Boolean).join('\n');
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // @ascii-ok: имя файла движка: латиницу проверяет cyrillic-boundary (nonAsciiPath)
   const named = (b) => new RegExp(`(?<![\\w.-])${esc(b)}(?![\\w-])`).test(callers);
   return new Set(files.map((f) => f.path.replace(/^.*\//, '')).filter(named));
 }
@@ -283,7 +285,9 @@ export function stopGatesFrom(settingsText) {
   for (const g of groups) {
     for (const h of g.hooks || []) {
       const cmd = String(h.command || '');
-      const file = (cmd.match(/([\w-]+)\.mjs\b/) || [])[1];
+      // Имя Stop-хука — любой буквой (\p{L}\p{M}\p{N}), флаг u: в settings.json бывают хуки владельца
+      // вне движка, а их имена проверка nonAsciiPath не охраняет; с `\w` русское имя выпадало бы из карты.
+      const file = (cmd.match(/([\p{L}\p{M}\p{N}_-]+)\.mjs\b/u) || [])[1];
       if (!file || seen.has(file)) continue;
       seen.add(file);
       // a Stop hook that only records state is not a GATE; a gate is one that can block
@@ -338,6 +342,7 @@ export const SOFTENING_FLAGS = ['--warn', '--soft', '--dry-run', '--advisory', '
 function invocationSeverity(text) {
   const out = new Map();
   for (const line of String(text).split('\n')) {
+    // @ascii-ok: имя файла движка: латиницу проверяет cyrillic-boundary (nonAsciiPath)
     const m = line.match(/scripts\/([\w.-]+\.mjs)(.*)$/);
     if (!m) continue;
     const script = m[1];
@@ -526,6 +531,8 @@ function selfTest() {
       stopGatesFrom(JSON.stringify({ hooks: { Stop: [{ hooks: [{ command: 'a/x-gate.mjs' }] }, { hooks: [{ command: 'b/x-gate.mjs' }] }] } })).gates.length === 1],
     ['отсутствие Stop-секции это не проверено, а не пусто', stopGatesFrom(JSON.stringify({ hooks: {} })).checked === false],
     ['битый конфиг не роняет аудит', stopGatesFrom('{не json').checked === false],
+    ['Stop-хук владельца с русским именем попадает в карту гейтов',
+      stopGatesFrom(JSON.stringify({ hooks: { Stop: [{ hooks: [{ command: 'node ~/.claude/hooks/сторож-итога.mjs' }] }] } })).gates[0]?.id === 'сторож-итога'],
     ['fully-routed PreToolUse config → no missing', verifyPreToolUse(JSON.stringify({ hooks: { PreToolUse: [
       { matcher: 'Bash', hooks: [{ command: 'jidoka-guard.sh' }, { command: 'node policy-enforce-hook.mjs' }] },
       // 2026-W33-R5 raised the bar: "fully routed" now includes the MCP family, because that is

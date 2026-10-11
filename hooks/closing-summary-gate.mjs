@@ -112,6 +112,7 @@ async function main() {
   if (!v.missing) process.exit(0);
 
   // Напоминать раз в сессию: повторное напоминание это не защита, а фон.
+  // @ascii-ok: session_id — UUID из Claude Code, только латиница и цифры
   const sid = String(payload.session_id || 'unknown').replace(/[^\w-]/g, '');
   const mark = path.join(MARK_DIR, `closing-summary-${sid}.mark`);
   if (fs.existsSync(mark)) process.exit(0);

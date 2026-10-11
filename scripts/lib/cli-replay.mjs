@@ -17,6 +17,7 @@ import { PRELOAD } from './cli-probe.mjs';
 
 // Ошибки, которые у неполного вызова (package.json, упоминание в тексте) законны:
 // хвост аргументов допишет тот, кто зовёт.
+// @ascii-ok: имя флага латиницей по контракту lib/cli.mjs (FLAG_SHAPED); русская раскладка (--фдд) отклоняется как lookalikeFlag
 const PARTIAL_OK = /^(?:не хватает аргументов|нужна команда|флагу --[\w-]+ нужно значение)/;
 const mentionsPlaceholder = (msg) => msg.includes(`«${PLACEHOLDER}»`) || msg.includes(`«${RUNTIME}»`);
 

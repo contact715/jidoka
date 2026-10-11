@@ -69,6 +69,7 @@ const DRIVES_QUEUE = /task-queue(?:\.mjs)?\s+(next|done|fail)\b/;
  */
 export function commandSyntaxOnly(cmd = '') {
   return String(cmd)
+    // @ascii-ok: разделитель heredoc (EOF) — служебное слово; в худшем случае русский разделитель просто не вырежется
     .replace(/<<'?(\w+)'?[\s\S]*?^\1/gm, ' ')  // heredocs (commit messages usually arrive this way)
     .replace(/'[^']*'/g, ' ')
     .replace(/"[^"]*"/g, ' ');

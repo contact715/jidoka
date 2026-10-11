@@ -41,8 +41,11 @@ export function newLedger({ wave = '?', coreProperty = '', facts = [], guesses =
 // time / "any words" / self-learning) is SUBSTITUTED when the evidence for it shows only scaffold
 // markers (template/regex trigger, mock/stub, fixed list, demo, one hardcoded case). Returns the
 // findings [{demand, scaffold}] — empty means no mechanical tell (which is NOT proof of no drift).
-const DYNAMIC_DEMAND = /(недетерминированн|сама реша|любыми словами|в реальн\w* времени|генери\w*|самообуча\w*|non-?determinist|generat(e|ive|ion)|real-?time|any words|self-?learn)/i;
-const SCAFFOLD_MARK = /(шаблон\w*|регэксп\w*|мок\b|моку|заглушк\w*|фиксирован\w* список|захардкож\w*|template|regex|regexp|\bmock(s|ed|ing)?\b|\bstub(s|bed)?\b|hard-?cod\w*|fixed list|fixed-?list|demo(-| )scenario|single case)/i;
+// Окончания русских слов — \p{L}*, граница «мок» — юникодная, флаг u. До 2026-10-10 здесь стояли
+// `\w*` и `\b`: в JavaScript это только латиница, поэтому «в реальном времени», «фиксированный
+// список» и «мок» не находились вовсе, а в находку попадал обрубок «генери» вместо слова.
+const DYNAMIC_DEMAND = /(недетерминированн\p{L}*|сама реша\p{L}*|любыми словами|в реальн\p{L}* времени|генери\p{L}*|самообуча\p{L}*|non-?determinist|generat(e|ive|ion)|real-?time|any words|self-?learn)/iu;
+const SCAFFOLD_MARK = /(шаблон\p{L}*|регэксп\p{L}*|(?<![\p{L}\p{N}])мок(?![\p{L}\p{N}])|моку|заглушк\p{L}*|фиксирован\p{L}* список|захардкож\p{L}*|template|regex|regexp|\bmock(s|ed|ing)?\b|\bstub(s|bed)?\b|hard-?cod\p{L}*|fixed list|fixed-?list|demo(-| )scenario|single case)/iu;
 export function coreSubstitutionSignals(coreProperty = '', evidenceText = '') {
   if (!DYNAMIC_DEMAND.test(String(coreProperty))) return []; // property makes no dynamic demand → no mechanical rule
   const ev = String(evidenceText);
@@ -183,6 +186,16 @@ function selfTest() {
     coreSubstitutionSignals('render the count badge', 'hardcoded mock list of 3 items').length === 0);
   ok('English core property + mock evidence → substitution flagged',
     coreSubstitutionSignals('the assistant must generate answers to any words', 'returns a fixed list from a hardcoded stub').length === 1);
+  // русские окончания (2026-10-10): `\w*` и `\b` по латинице делали эти варианты мёртвыми
+  ok('RU «в реальном времени» + заглушка → подмена найдена',
+    coreSubstitutionSignals('ответы приходят в реальном времени', 'сделано через заглушку').length === 1);
+  ok('RU «фиксированный список» — признак заглушки',
+    coreSubstitutionSignals('бот генерирует ответы', 'там фиксированный список фраз').length === 1);
+  ok('RU «мок» отдельным словом — признак заглушки, «мокрый» — нет',
+    coreSubstitutionSignals('бот генерирует ответы', 'проверено на мок данных').length === 1
+      && coreSubstitutionSignals('бот генерирует ответы', 'мокрый асфальт на фото').length === 0);
+  ok('в находке слово целиком, а не обрубок «генери»',
+    (coreSubstitutionSignals('бот генерирует ответы', 'сделано через заглушку')[0] || {}).demand === 'генерирует');
 
   // replan decision
   const base = newLedger({ wave: 'w1', coreProperty: 'x', plan: ['stepA', 'stepB', 'stepC'] });

@@ -31,6 +31,11 @@ import { REMEDIES } from './meta-remedies.mjs'; // single source of truth for ga
 import { fileURLToPath } from 'node:url';
 import { runCli } from './lib/cli.mjs';
 
+// Первая папка пути механизма (внешний гейт в продуктовом репозитории): имя папки пишут
+// люди, бывает русским (проект/hooks/x.mjs). Буква [\p{L}\p{N}_] с флагом u; с \w такой
+// гейт считался сломанным, а не внешним. Экспорт — для scripts/__tests__/unicode-names.test.mjs.
+export const FIRST_DIR_RE = /^[\p{L}\p{N}_.-]+\//u;
+
 /**
  * 2026-W35-A1 — ВТОРАЯ ОСЬ РЕЦИДИВА: по режиму отказа, а не по имени класса.
  *
@@ -211,7 +216,7 @@ if (isMain) {
       .filter(Boolean);
 
     for (const mech of пути) {
-      const внешний = !mech.startsWith('/') && mech.includes('/') && !existsSync(mech) && /^[\w.-]+\//.test(mech) && !mech.startsWith('scripts/') && !mech.startsWith('hooks/');
+      const внешний = !mech.startsWith('/') && mech.includes('/') && !existsSync(mech) && FIRST_DIR_RE.test(mech) && !mech.startsWith('scripts/') && !mech.startsWith('hooks/');
       if (внешний) {
         externalGate++;
         console.log(`\x1b[33m  ↗ gate for "${cls}" lives outside this repo: ${mech}`);

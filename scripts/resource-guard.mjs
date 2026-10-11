@@ -34,7 +34,11 @@ const RESOURCE_OPS = [
   // db/storage verbs that do NOT collide with Set/Map/array methods. Mosco product wave showed
   // bare .delete/.create/.update flag Set.delete/Map.delete/factory.create — dropped them; keep the
   // unambiguous repo/db verbs + SQL DML. (.save/.insert/.upsert/.persist + prisma-style + INSERT/UPDATE).
-  { re: /\.(save|insert|upsert|persist)\s*\(|\b(prisma|db|repo|repository)\b[\w.]*\.(create|update|delete)\s*\(|\bINSERT\s+INTO\b|\bUPDATE\s+\w+\s+SET\b|\bDELETE\s+FROM\b/, kind: 'db/storage write' },
+  // Цепочка свойств и имя таблицы юникодные (2026-10-10): `[\w.]*` обрывался на русском имени,
+  // и `db.пользователи.create(x)` в цикле проходил мимо. Граница после db/repo тоже юникодная:
+  // `\b` считала русскую букву концом слова, и `dbТаблица` сошло бы за `db`. Граница ПЕРЕД
+  // именем остаётся `\b` намеренно: `this.$prisma.user.create(` — тоже запись в базу.
+  { re: /\.(save|insert|upsert|persist)\s*\(|\b(prisma|db|repo|repository)(?![\p{ID_Continue}$])[\p{ID_Continue}$.]*\.(create|update|delete)\s*\(|\bINSERT\s+INTO\b|\bUPDATE\s+[\p{ID_Continue}$]+\s+SET\b|\bDELETE\s+FROM\b/u, kind: 'db/storage write' },
   { re: /fetch\s*\(|axios\.|http\.request|https\.request/, kind: 'network call' },
   { re: /fs\.(write|append|createWriteStream)/, kind: 'file write' },
   { re: /\.emit\s*\(|\.publish\s*\(|\.send\s*\(/, kind: 'event/message dispatch' },
@@ -141,6 +145,10 @@ function selfTest() {
   ok('a 30s poll is NOT flagged — the interval delay IS the throttle (Mosco product wave)', scan('sub.id = setInterval(async () => {\n  const r = await fetch(u);\n  cb(r);\n}, 30_000);').ok === true);
   ok('a 1s db-write poll IS flagged (1 write/sec runaway)', scan('setInterval(() => { repo.save(x); }, 1000)').ok === false);
   ok('Set/Map .delete is NOT a db write (Mosco product wave)', scan('for (const x of xs) { seen.delete(x); }').ok === true);
+  // русские имена (2026-10-10): `[\w.]*` и `\w+` обрывались на кириллице
+  ok('запись через русское имя модели в цикле — находка', scan('for (const x of xs) { db.пользователи.create(x); }').ok === false);
+  ok('UPDATE русской таблицы в цикле — находка', scan('for (const x of xs) { sql(`UPDATE заказы SET итог = 1`); }').ok === false);
+  ok('$prisma (Nuxt) по-прежнему опознаётся как база', scan('for (const x of xs) { this.$prisma.user.create(x); }').ok === false);
 
   if (fails.length) { console.log(`\n\x1b[31mresource-guard self-test FAILED (${fails.length})\x1b[0m`); process.exit(1); }
   console.log('\n\x1b[32m✓ resource-guard: runaway-resource detection + budget validation correct\x1b[0m');

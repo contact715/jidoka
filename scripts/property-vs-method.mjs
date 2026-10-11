@@ -130,9 +130,10 @@ export function mentionNotAction(src = '') {
   lines.forEach((raw, i) => {
     const line = raw.trim();
     if (!line || line.startsWith('//') || line.startsWith('*') || line.startsWith('#')) return;
-    // ищем ЧТЕНИЕ подстроки из переменной
-    const reads = [...line.matchAll(/([A-Za-z_$][\w$.]*)\s*\.\s*(includes|indexOf|match|search)\s*\(/g)];
-    const tests = [...line.matchAll(/\.test\s*\(\s*([A-Za-z_$][\w$.]*)\s*\)/g)];
+    // ищем ЧТЕНИЕ подстроки из переменной. Имя юникодное: `[A-Za-z_$][\w$.]*` не видел русских
+    // имён (`/--force/.test(данные.prompt)` проходил мимо), флаг u обязателен для \p{...}.
+    const reads = [...line.matchAll(/([\p{ID_Start}$_][\p{ID_Continue}$.]*)\s*\.\s*(includes|indexOf|match|search)\s*\(/gu)];
+    const tests = [...line.matchAll(/\.test\s*\(\s*([\p{ID_Start}$_][\p{ID_Continue}$.]*)\s*\)/gu)];
     const names = [...reads.map((m) => m[1]), ...tests.map((m) => m[1])];
     if (!names.length) return;
     const tok = line.match(ACTION_TOKEN);
@@ -200,7 +201,8 @@ export function seedsWhatItAsserts(src = '') {
     depth += (raw.match(/\{/g) || []).length - (raw.match(/\}/g) || []).length;
     if (depth <= 0 && cur.lines.length > 1) { blocks.push(cur); cur = null; }
   });
-  const SEED = /(mockReturnValue|mockResolvedValue|\bseed\w*\(|\bgiven\w*\(|=\s*\{|\bsetup\w*\()/;
+  // продолжение имени после латинского начала юникодное: `seed\w*` не доходил до `(` в `seedДанные(`
+  const SEED = /(mockReturnValue|mockResolvedValue|\bseed[\p{ID_Continue}$]*\(|\bgiven[\p{ID_Continue}$]*\(|=\s*\{|\bsetup[\p{ID_Continue}$]*\()/u;
   for (const b of blocks) {
     const seeded = new Set();
     for (const { s } of b.lines) {
@@ -297,6 +299,11 @@ function selfTest() {
     mentionNotAction("// if (message.includes('--no-verify')) block();").length === 0);
   ok('находка называет поле и токен',
     (() => { const r = mentionNotAction("if (body.includes('--force')) x();")[0]; return r.field === 'body' && /--force/.test(r.token); })());
+  // русские имена (2026-10-10): разбор на [A-Za-z_$][\w$.]* их не видел
+  ok('регулярка по полю русского объекта ловится',
+    mentionNotAction('if (/--force/.test(данные.prompt)) deny();').length === 1);
+  ok('находка называет поле целиком, вместе с русским именем объекта',
+    (mentionNotAction("if (событие.message.includes('--no-verify')) block();")[0] || {}).field === 'событие.message');
 
   // ── ФОРМА 2 ────────────────────────────────────────────────────────────────
   ok('замысел «не падает», а сверяется точная строка — шире замысла',
@@ -328,6 +335,8 @@ function selfTest() {
     seedsWhatItAsserts("it('x', () => {\n  m.mockReturnValue('ab');\n  expect(y).toBe('ab');\n});").length === 0);
   ok('находка называет литерал',
     seedsWhatItAsserts("it('кладёт', () => {\n  m.mockReturnValue('ЗНАЧЕНИЕ');\n  expect(v).toBe('ЗНАЧЕНИЕ');\n});")[0].literal === 'ЗНАЧЕНИЕ');
+  ok('засев функцией с русским хвостом имени (seedДанные) тоже засев',
+    seedsWhatItAsserts("it('кладёт', () => {\n  seedДанные('ЗНАЧЕНИЕ');\n  expect(v).toBe('ЗНАЧЕНИЕ');\n});").length === 1);
 
   // ── границы ────────────────────────────────────────────────────────────────
   ok('пустой вход не притворяется измерением',

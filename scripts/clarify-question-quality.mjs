@@ -25,6 +25,7 @@ import { runCli } from './lib/cli.mjs';
 export const INTERVIEWER_ERRORS = [
   { id: 'leading', desc: 'leads to a preferred answer', test: (q) => /\b(don'?t you think|wouldn'?t you|isn'?t it|shouldn'?t we|surely|obviously|of course)\b/i.test(q) },
   { id: 'double-barrelled', desc: 'asks two things at once', test: (q) => /\?.*\?/.test(q) || /,?\s+and\s+(how|what|when|where|why|who|which|do|does|is|are|can|could|will|would|should)\b/i.test(q) },
+  // @ascii-ok: английский словарь пустых слов; \b стоит у латинских слов, находка только из-за «etc.» с точкой
   { id: 'vague', desc: 'vague filler instead of specifics', test: (q) => /\b(stuff|things|etc\.?|somehow|some kind of|whatever)\b/i.test(q) },
   { id: 'hypothetical', desc: 'hypothetical/future speculation (Mom Test violation)', test: (q) => /\b(would you|could you imagine|if you had|in the future|someday|hypothetically)\b/i.test(q) },
   { id: 'opinion-not-behaviour', desc: 'asks for opinion, not real past behaviour', test: (q) => /\b(do you like|would you like|do you prefer|what do you think of|how do you feel about)\b/i.test(q) },

@@ -56,7 +56,9 @@ export const CLI = {
 // Canonical wave ID: wave-NNN (3-digit zero-padded, no R2/Tn suffix).
 // Revision labels are preserved separately.
 // Input examples: "wave-145", "wave-9", "wave-148.R2", "wave-09", "wave-117-retro"
-const WAVE_NORM_RE = /wave-(\d+)(?:\.[RT]\d+)?(?:-[\w-]+)?/i;
+// Хвост-слаг волны придумывают люди и бывает русским (wave-117-ретро): буква [\p{L}\p{N}_] с
+// флагом u, \w знает только латиницу. Экспорт — для scripts/__tests__/unicode-names.test.mjs.
+export const WAVE_NORM_RE = /wave-(\d+)(?:\.[RT]\d+)?(?:-[\p{L}\p{N}_-]+)?/iu;
 
 function normalizeWaveId(raw) {
   if (!raw) return null;
@@ -121,7 +123,10 @@ function extractBoldField(content, fieldName) {
 // not file references. Only accept values matching ADR-NNN patterns or file paths.
 // Valid examples: "ADR-002-token-storage.md", "./ADR-002-foo.md", "docs/decisions/ADR-002.md"
 // Invalid (prose): "parts of DEC-002 (capabilities...)", "DEC-002 and foo", etc.
-const SUPERSEDES_TOKEN_RE = /^(ADR-\d+[\w.-]*|\.?\/?[\w./-]+\.md)$/;
+// Имя файла решения пишут люди, бывает по-русски (ADR-002-хранение.md): буква [\p{L}\p{N}_] с
+// флагом u, для пути ещё \p{M} (имена в NFD, как их хранит macOS). С \w русское имя считалось
+// прозой и поле Supersedes молча выбрасывалось. Экспорт — для unicode-names.test.mjs.
+export const SUPERSEDES_TOKEN_RE = /^(ADR-\d+[\p{L}\p{M}\p{N}_.-]*|\.?\/?[\p{L}\p{M}\p{N}_./-]+\.md)$/u;
 
 function extractSupersedesBoldField(content) {
   // Match both **Supersedes:** value  AND  **Supersedes** : value

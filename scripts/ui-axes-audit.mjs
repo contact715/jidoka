@@ -85,6 +85,7 @@ if (isMain) {
     for (const c of ['tailwind.config.ts', 'tailwind.config.js']) {
       const p = path.join(REPO, c);
       if (!fs.existsSync(p)) continue;
+      // @ascii-ok: ключ — только латинские ключи tailwind из вызовов в этом файле: spacing, borderRadius, fontSize
       if (new RegExp(`\\b${ключ}\\s*:\\s*\\{`).test(fs.readFileSync(p, 'utf8'))) return true;
     }
     return false;

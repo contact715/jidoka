@@ -87,7 +87,7 @@ const EXCLUDE = /((^|\/)(node_modules|\.next|dist|build|coverage)\/|\.d\.ts$)/i;
 // A Bash command that EXECUTES something — a test runner, a typecheck, a build, a script
 // run, a self-test. Read-only commands (ls/cat/grep/git status) do not count as proof.
 const PROOF_CMD =
-  /\b(vitest|jest|pytest|unittest|mocha|tsc\b|eslint|playwright|next build|npm (run |exec )?\S*(test|build|lint|check)|pnpm \S*(test|build|lint|check)|yarn \S*(test|build|lint|check)|node(\s+--\S+)*\s+\S+\.(mjs|cjs|js|ts)|python3?\s+\S+\.py|--self-test|go test|cargo (test|check|build)|make (test|check)|bash \S+\.sh|sh \S+\.sh|zsh \S+\.sh)\b/i;
+  /\b(vitest|jest|pytest|unittest|mocha|tsc\b|eslint|playwright|next build|npm (run |exec )?\S*(test|build|lint|check)|pnpm \S*(test|build|lint|check)|yarn \S*(test|build|lint|check)|node(\s+--\S+)*\s+\S+\.(mjs|cjs|js|ts)|python3?\s+\S+\.py|--self-test|go test|cargo (test|check|build)|make (test|check)|bash \S+\.sh|sh \S+\.sh|zsh \S+\.sh)\b/i;  // @ascii-ok: английский словарь команд (vitest, tsc, npm test…), граница слова стоит у латинских слов списка
 // Browser verification also proves observable behaviour (same set as browser-verify-gate).
 const BROWSER_TOOL =
   /(claude_browser__|playwright__browser_|(^|_)preview_(start|screenshot|navigate|snapshot|inspect|click|fill|eval|logs|console)|claude-in-chrome__|computer-use__screenshot|__screenshot|browser_take_screenshot|browser_snapshot|browser_navigate)/i;

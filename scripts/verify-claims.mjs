@@ -51,6 +51,7 @@ const MAX_CHECKS = 40;
 // Deliberately conservative: trailing punctuation is stripped so "see https://x.com."
 // does not become a claim about "x.com.".
 const URL_RE = /https?:\/\/[^\s<>"'`)\]}|]+/gi;
+// @ascii-ok: почта на наших доменах (owned-domains.json) — ASCII; кириллический домен вида .рф этот разбор не видит
 const EMAIL_RE = /\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/gi;
 const TRAILING_JUNK = /[.,;:!?)>\]}'"]+$/;
 

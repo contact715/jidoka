@@ -28,7 +28,9 @@ export const RULES = [
   { re: /\bdebug|\bbug|не работает|сломал|ошибк|\bbroken|\bfailing|traceback/i, skills: ['systematic-debugging', 'root-cause-tracing'] },
   { re: /\btest|тест|\bcoverage|покрыт|\btdd\b/i, skills: ['test-driven-development'] },
   { re: /\bnew feature|new project|from scratch|с нуля|brainstorm|explore (the )?options|придума|новая фича/i, skills: ['brainstorming'] },
-  { re: /\bspec\b|\bspecs\b|specification|требовани|\bplan\b|\bплан|design the/i, skills: ['writing-plans'] },
+  // «план» с юникодной границей, флаг u: /\bплан/ (до 2026-10-10) не срабатывало никогда — `\b` в
+  // JavaScript считает буквой только латиницу. Граница отсекает «аэроплан», «план» и «планы» находит.
+  { re: /\bspec\b|\bspecs\b|specification|требовани|\bplan\b|(?<![\p{L}\p{N}])план|design the/iu, skills: ['writing-plans'] },
   { re: /execute the plan|implement the plan|по плану|выполни план/i, skills: ['executing-plans'] },
   { re: /\bparallel|параллельн|worktree|multiple branches|in parallel/i, skills: ['using-git-worktrees', 'dispatching-parallel-agents'] },
   { re: /decompose|break (this|it) down|разбей|раздроби|too big|big feature|many subtasks/i, skills: ['subagent-driven-development'] },
@@ -64,6 +66,8 @@ function selfTest() {
   ok('testing → test-driven-development', selectSkills({ prompt: 'write tests for the parser' }).includes('test-driven-development'));
   ok('new feature → brainstorming', selectSkills({ prompt: 'lets build a new feature from scratch' }).includes('brainstorming'));
   ok('spec/plan → writing-plans', selectSkills({ prompt: 'design the spec for auth' }).includes('writing-plans'));
+  ok('RU «составь план» → writing-plans, «аэроплан» — нет',
+    selectSkills({ prompt: 'составь план работ' }).includes('writing-plans') && !selectSkills({ prompt: 'нарисуй аэроплан' }).includes('writing-plans'));
   ok('parallel work → using-git-worktrees + dispatching-parallel-agents', (() => { const s = selectSkills({ prompt: 'do these in parallel' }); return s.includes('using-git-worktrees') && s.includes('dispatching-parallel-agents'); })());
   ok('decompose → subagent-driven-development', selectSkills({ prompt: 'this is too big, break it down' }).includes('subagent-driven-development'));
   ok('security → defense-in-depth', selectSkills({ prompt: 'sanitize the untrusted input' }).includes('defense-in-depth'));

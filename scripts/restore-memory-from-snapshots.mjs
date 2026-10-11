@@ -49,6 +49,11 @@ const SNAPSHOT_FILES = {
 
 const STAGING_DIR = path.join(ROOT, '.claude/memory-staging');
 
+// Имя навыка пишут люди и бывает русским (skill-навык-тест): буква [\p{L}\p{N}_] с флагом u.
+// \w знает только латиницу (флаг u не лечит), и связь с таким навыком молча терялась.
+// Экспорт — для scripts/__tests__/unicode-names.test.mjs.
+export const SKILL_REF_RE = /skill-([\p{L}\p{N}_-]+)/gu;
+
 // ── Markdown entity block parser ─────────────────────────────────────────────
 
 /**
@@ -208,7 +213,7 @@ function main({ dry: isDry = false } = {}) {
     if (entity.entityType === 'wave' || entity.name.startsWith('wave-')) {
       // Look for skill references in observations
       for (const obs of entity.observations) {
-        const skillMatch = obs.match(/skill-([\w-]+)/g);
+        const skillMatch = obs.match(SKILL_REF_RE);
         if (skillMatch) {
           for (const skillName of skillMatch) {
             allRelations.push({

@@ -20,7 +20,9 @@ import { runCli } from './lib/cli.mjs';
 // pure: parse one ESM module's exports + local imports
 export function parseModule(content) {
   const exports = [];
-  for (const m of String(content).matchAll(/export\s+(?:async\s+)?(?:function|const|class|let|var)\s+([A-Za-z_$][\w$]*)/g)) exports.push(m[1]);
+  // имя в JavaScript, а не только латиница: `\w` и `[A-Za-z_$]` не видели 197 русских объявлений
+  // движка (gate-honesty-check: 1 экспорт из 4). Флаг u обязателен для \p{...}.
+  for (const m of String(content).matchAll(/export\s+(?:async\s+)?(?:function|const|class|let|var)\s+([\p{ID_Start}$_][\p{ID_Continue}$]*)/gu)) exports.push(m[1]);
   for (const m of String(content).matchAll(/export\s*\{([^}]+)\}/g)) for (const n of m[1].split(',')) { const parts = n.trim().split(/\s+as\s+/); const nm = (parts[1] || parts[0] || '').trim(); if (nm && nm !== 'default') exports.push(nm); }
   const imports = [];
   for (const m of String(content).matchAll(/import\s+[^;]*?from\s+['"]([^'"]+)['"]/g)) imports.push(m[1]);
@@ -62,6 +64,9 @@ function selfTest() {
   const g = buildGraph(files);
   const T = [
     ['parses exports', parseModule('export function foo(){}').exports[0] === 'foo'],
+    // имена образца нарочно не совпадают с настоящими экспортами: разбор текстовый, и строка
+    // самопроверки попадает в индекс символов так же, как код
+    ['видит экспорт с русским именем', parseModule('export function образецФункции() {}\nexport const образецСписка = [];').exports.join(',') === 'образецФункции,образецСписка'],
     ['parses brace exports', parseModule('export { a, b as c }').exports.join(',') === 'a,c'],
     ['parses imports', parseModule('import x from "./y.mjs"').imports[0] === './y.mjs'],
     ['symbol index points at definer', g.symbolIndex.x[0] === 'b.mjs'],

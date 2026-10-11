@@ -35,8 +35,10 @@ const NO_VALUE = new Set(['undefined', 'null', 'none', 'nan', '(null)', '<null>'
 // («error_count=0», «error_page 404», «no errors») ошибкой не считается.
 const ERROR_SHAPES = [
   [/^\s*(?:ERROR|FATAL|PANIC)\b/m, 'строка ERROR/FATAL (psql, mysql)'],
-  [/^\s*(?:[\w.-]+:\s*)?(?:\w+\s+)?(?:error|fatal|panic)\s*:/im, 'строка «error:»'],
-  [/^\s*[\w.]*(?:Error|Exception)\s*:/m, 'исключение «…Error:»'],
+  // Имя файла или программы перед «error:» бывает русским («отчёт.md: error: …»): класс \p{L}\p{M}\p{N},
+  // флаг u. До 2026-10-10 здесь был `\w` (только латиница), и такая строка ошибкой не считалась.
+  [/^\s*(?:[\p{L}\p{M}\p{N}_.-]+:\s*)?(?:[\p{L}\p{N}_]+\s+)?(?:error|fatal|panic)\s*:/imu, 'строка «error:»'],
+  [/^\s*[\p{L}\p{N}_.]*(?:Error|Exception)\s*:/mu, 'исключение «…Error:»'],
   [/Traceback \(most recent call last\)/, 'Traceback Python'],
   [/^\s*curl: \(\d+\)/m, 'ошибка curl'],
   [/\bcommand not found\b/, 'command not found'],
@@ -198,6 +200,8 @@ function selfTest() {
   ok('«error:» и «psql: error:» в начале строки — не проверено',
     ['error: no such table', 'psql: error: connection refused', 'Parse error: near "x"'].every((v) => sameNonEmpty(v, v) === 'unverified'));
   ok('исключение Python «sqlite3.OperationalError:» — не проверено', sameNonEmpty('sqlite3.OperationalError: no such column', 'x') === 'unverified');
+  ok('«error:» после русского имени файла — тоже ошибка, не значение',
+    ['отчёт.md: error: нет такого файла', 'выгрузка: fatal: не удалось'].every((v) => sameNonEmpty(v, v) === 'unverified'));
   ok('одинаковые непустые — равно', sameNonEmpty('42', '42') === 'equal');
   ok('разные непустые — различается', sameNonEmpty('42', '43') === 'different');
   ok('пробелы и перевод строки по краям не делают значения разными', sameNonEmpty(' 42\n', '42') === 'equal');

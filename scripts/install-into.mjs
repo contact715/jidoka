@@ -212,6 +212,7 @@ function profileSelfTest() {
       // only a real import statement starts its own line.
       // Подпапки тоже: до 2026-09-16 выражение видело только './x.mjs', и импорт
       // './lib/cli.mjs' проходил мимо — проверка была зелёной над сломанной установкой.
+      // @ascii-ok: имя файла движка: латиницу проверяет cyrillic-boundary (nonAsciiPath)
       for (const m of readFileSync(join(HERE, 'scripts', f), 'utf8').matchAll(/^\s*(?:import|export)[^'"\n]*from ['"]\.\/([\w./-]+\.mjs)['"]/gm)) {
         const dep = join(dirname(f), m[1]).replace(/\\/g, '/');
         if (!set.has(dep)) return { ok: false, f, missing: dep };
@@ -224,6 +225,7 @@ function profileSelfTest() {
   ok('full profile is import-closed', closure('full').ok);
   ok('closure sees an import from a subfolder (./lib/x.mjs), not only ./x.mjs', (() => {
     const src = "import { runCli } from './lib/cli.mjs';\nimport { x } from \"./lib/y.mjs\";\n";
+    // @ascii-ok: имя файла движка: латиницу проверяет cyrillic-boundary (nonAsciiPath)
     const found = [...src.matchAll(/^\s*(?:import|export)[^'"\n]*from ['"]\.\/([\w./-]+\.mjs)['"]/gm)].map((m) => m[1]);
     return found.length === 2 && found[0] === 'lib/cli.mjs' && found[1] === 'lib/y.mjs';
   })());

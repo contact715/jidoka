@@ -84,6 +84,7 @@ export function methodFromTerminalId(terminalId) {
 function ttyPathFromId(terminalId) {
   if (!terminalId) return null;
   const bare = terminalId.startsWith('tty:') ? terminalId.slice(4) : terminalId;
+  // @ascii-ok: имя терминала из /dev (ttys001) задаёт система
   if (!/^\/?(dev\/)?ttys?\w+$/i.test(bare)) return null;
   return bare.startsWith('/dev/') ? bare : `/dev/${bare.replace(/^\/?dev\//, '')}`;
 }

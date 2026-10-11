@@ -173,11 +173,13 @@ function parseAnchorUri(uri) {
  * @param {string} synonym
  * @returns {boolean}
  */
-function lineContainsSynonym(line, synonym) {
-  // Escape regex special chars in synonym
+export function lineContainsSynonym(line, synonym) {
+  // Escape regex special chars in synonym (только синтаксические знаки — допустимо и с флагом u)
   const escaped = synonym.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // Word boundary: start/end of string or non-word char (handles hyphenated terms too)
-  const pattern = new RegExp(`(?<![\\w-])${escaped}(?![\\w-])`, 'i');
+  // Word boundary: start/end of string or non-word char (handles hyphenated terms too).
+  // Буква — любая (\p{L}\p{N}), флаг u: до 2026-10-10 здесь был `\w` (только латиница), и русский
+  // термин «лид» находился внутри «лидер» — граница не видела русских букв.
+  const pattern = new RegExp(`(?<![\\p{L}\\p{N}_-])${escaped}(?![\\p{L}\\p{N}_-])`, 'iu');
   return pattern.test(line);
 }
 

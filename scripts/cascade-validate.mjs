@@ -471,6 +471,7 @@ function main({ root: rootArg = null, level: levelFilter = null, stamp = false }
       // Indentation is TAKEN FROM THE SIBLING FIELDS, never hardcoded: a hardcoded six spaces
       // made `fingerprint` look like a child of `relationship` instead of a peer of it. Malformed
       // YAML that a regex still parses is the worst kind: nothing complains until a real parser reads it.
+      // @ascii-ok: ключ YAML каскада — поле схемы латиницей
       const indent = (entry.match(/\n(\s+)version:/) || entry.match(/\n(\s+)\w+:/) || [null, '    '])[1];
       entry = /fingerprint:\s*[a-f0-9]{8}/i.test(entry)
         ? entry.replace(/fingerprint:\s*[a-f0-9]{8}/i, `fingerprint: ${fp}`)

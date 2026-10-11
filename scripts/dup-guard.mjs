@@ -47,7 +47,9 @@ const isTest = (p) => /(^|\/)__tests__\//.test(p) || /\.test\.mjs$/.test(p);
 export function extractExports(content) {
   const out = [];
   let m;
-  const decl = /^\s*export\s+(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/gm;
+  // имя в JavaScript, а не только латиница: [A-Za-z_$][\w$]* не видел русских объявлений
+  // (в движке их 197), и повтор такого экспорта проходил гейт молча. Флаг u обязателен.
+  const decl = /^\s*export\s+(?:async\s+)?(?:function|const|let|var|class)\s+([\p{ID_Start}$_][\p{ID_Continue}$]*)/gmu;
   while ((m = decl.exec(content))) out.push(m[1]);
   const named = /^\s*export\s*\{([^}]+)\}/gm;
   while ((m = named.exec(content))) for (const part of m[1].split(',')) {
@@ -170,6 +172,11 @@ function selfTest() {
   ok(extractExports(fixturey).join(',') === 'realOne', 'export inside a string literal is ignored');
   ok(findCollisions('scripts/g.mjs', fixturey, index).length === 0, 'a file with fixture strings does not false-collide');
   ok(isTest('scripts/__tests__/x.test.mjs') && isTest('scripts/y.test.mjs'), 'test files are recognised and excluded');
+
+  // русские имена (2026-10-10): прежний разбор на [A-Za-z_$][\w$]* их не видел вовсе
+  const ruIndex = buildExportIndex([{ path: 'scripts/j.mjs', content: 'export function образецПроверки() {}\nexport const образецНабора = [];' }]);
+  ok(extractExports('export function образецПроверки() {}').join(',') === 'образецПроверки', 'экспорт с русским именем виден');
+  ok(findCollisions('scripts/k.mjs', 'export function образецПроверки() {}', ruIndex).length === 1, 'повтор экспорта с русским именем — совпадение');
 
   console.log(fail === 0 ? '\ndup-guard: all self-tests passed' : `\ndup-guard: ${fail} self-test(s) FAILED`);
   process.exit(fail === 0 ? 0 : 1);

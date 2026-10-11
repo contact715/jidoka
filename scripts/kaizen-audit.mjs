@@ -131,7 +131,9 @@ export function anchorEvidence(body, anchor, filePath = '') {
   const isCode = CODE_FILE.test(filePath);
   if (isCode) {
     for (const n of names) {
-      const def = new RegExp(`(?:^|[^\\w$])(?:export\\s+)?(?:default\\s+)?(?:async\\s+)?(?:function|class|const|let|var)\\s+${escapeRe(n)}(?![\\w$])`);
+      // граница имени юникодная: с `\w` якорь «проверить» засчитывал объявление
+      // «проверитьВсё» (после имени шла русская буква, а для `\w` это не буква)
+      const def = new RegExp(`(?:^|[^\\p{ID_Continue}$])(?:export\\s+)?(?:default\\s+)?(?:async\\s+)?(?:function|class|const|let|var)\\s+${escapeRe(n)}(?![\\p{ID_Continue}$])`, 'u');
       // Объявление найдено. Но объявление это ИМЯ, а не поведение: пустая функция,
       // null и заглушка throw проходили как сильнейшее доказательство до 2026-W35-A10.
       if (def.test(body)) return isStubDefinition(body, n) ? 'stub' : 'symbol';
@@ -346,6 +348,12 @@ function selfTest() {
   ok('a block-comment line is also comment-tier', evi(' * anchor-here explained\ncode()', 'anchor-here') === 'comment');
   ok('a shell # comment is comment-tier', evi('# my-anchor\necho hi', 'my-anchor', 'scripts/x.sh') === 'comment');
   ok('absent anchor is absent', evi('nothing relevant', 'my-anchor') === 'absent');
+  // русские имена (2026-10-10): граница по `\w` считала русскую букву концом имени
+  // имена образца не совпадают с настоящими экспортами: code-map читает строки как код
+  ok('объявление с русским именем — символ',
+    evi('export function образецЯкоря(x) { return run(x); }', 'образецЯкоря') === 'symbol');
+  ok('более длинное русское имя не засчитывается за якорь-префикс',
+    evi('export function образецЯкоряДальше(x) { return run(x); }', 'образецЯкоря') !== 'symbol');
 
   // ── 2026-W35-A10: имя резолвится ≠ работа сделана ─────────────────────────
   // Замер 2026-08-24: anchorEvidence отдавал сильнейший уровень `symbol` в четырёх

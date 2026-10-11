@@ -49,6 +49,7 @@ export function extractMetrics(md = '') {
   return {
     objectives: objBullets || (md.match(/\bOBJ-?\d+/gi) || []).length,
     acceptanceCriteria: acBullets || (md.match(/\bAC-?\d+/gi) || []).length,
+    // @ascii-ok: слова из латинского списка в этой же строке; русская буква рядом считается границей, и это нужно: «backendе» тоже упоминание
     surfaces: ['backend', 'frontend', 'data', 'mobile', 'api', 'infra'].filter((s) => new RegExp(`\\b${s}\\b`, 'i').test(md)).length,
     specLoc: lines.length,
   };

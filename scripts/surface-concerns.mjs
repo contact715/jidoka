@@ -152,6 +152,7 @@ function extractCatalogSlugs() {
   }
   /** @type {string[]} */
   const slugs = [];
+  // @ascii-ok: слаг каталога анти-паттернов — [a-z][a-z0-9-]+, так же его читает detect-drift.mjs extractCatalogSlugs
   for (const m of content.matchAll(/^###\s+\d+\.\s+([\w-]+)/gm)) {
     slugs.push(m[1]);
   }
@@ -377,6 +378,11 @@ function scanRetrosForOpenProposals(retroPaths, addressed, currentWave) {
   return concerns;
 }
 
+// Строка таблицы снимка памяти: | `сущность` | Тип | Наблюдение | Волна |. Тип пишут люди, бывает
+// русским (Решение): буква [\p{L}\p{N}_] с флагом u. С \w такая строка не совпадала целиком и
+// застарелая сущность молча не всплывала. Экспорт — для scripts/__tests__/unicode-names.test.mjs.
+export const MEMORY_ROW_RE = /\|\s*`([^`]+)`\s*\|\s*([\p{L}\p{N}_]+)\s*\|\s*([^|]+)\|\s*([^|]+)\|/gu;
+
 /**
  * Memory snapshot scanner — entities with wave-origin 5+ waves old, no resolution.
  * @param {Set<string>} addressed
@@ -395,7 +401,7 @@ function scanMemorySnapshot(addressed, currentWave) {
   const concerns = [];
 
   // Table rows: | `entity-name` | Type | Latest observation | Wave |
-  for (const m of content.matchAll(/\|\s*`([^`]+)`\s*\|\s*(\w+)\s*\|\s*([^|]+)\|\s*([^|]+)\|/g)) {
+  for (const m of content.matchAll(MEMORY_ROW_RE)) {
     const entityName = m[1].trim();
     const entityType = m[2].trim();
     const latestObs = m[3].trim();

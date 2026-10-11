@@ -46,6 +46,11 @@ export const BASELINE = 'docs/metrics/cli-strictness-baseline.json';
 
 const REGEX_PRECEDERS = new Set(['(', ',', '=', ':', '[', '!', '&', '|', '?', '{', '}', ';', '+', '-', '*', '%', '<', '>', '~', '^']);
 const REGEX_KEYWORDS = new Set(['return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'yield', 'await', 'void', 'delete', 'throw', 'new', 'instanceof']);
+// Символ имени в коде (2026-10-10). `\w` считает буквой только латиницу, и флаг u этого не
+// меняет: /\w/u.test('ж') === false. В движке 197 объявлений с русскими именами, и разбор на
+// `\w` их не видел: `parseArgs as разобрать`, `for (const флаг of args)`, `.listen(порт)`.
+// Имя: [\p{ID_Start}$_][\p{ID_Continue}$]*, граница имени: (?<![\p{ID_Continue}$]) и (?![\p{ID_Continue}$]).
+const ID_CHAR = /[\p{ID_Continue}$]/u;
 
 export function lex(src = '') {
   const code = src.split('');
@@ -87,7 +92,7 @@ export function lex(src = '') {
       continue;
     }
     // state === 'code'
-    if (/[\w$]/.test(c)) { word += c; prevSig = c; continue; }
+    if (ID_CHAR.test(c)) { word += c; prevSig = c; continue; }
     if (word) { prevWord = word; word = ''; }
     if (c === '/' && n === '/') { blank(i, true); state = 'line'; continue; }
     if (c === '/' && n === '*') { blank(i, true); blank(i + 1, true); i++; state = 'block'; continue; }
@@ -95,7 +100,7 @@ export function lex(src = '') {
     if (c === '"') { state = 'dq'; continue; }
     if (c === '`') { state = 'tpl'; continue; }
     if (c === '/') {
-      const afterWord = /[\w$]/.test(prevSig);
+      const afterWord = ID_CHAR.test(prevSig);
       if (prevSig === '' || REGEX_PRECEDERS.has(prevSig) || (afterWord && REGEX_KEYWORDS.has(prevWord))) { state = 're'; continue; }
     }
     if (c === '{' || c === '(' || c === '[') depth++;
@@ -124,7 +129,8 @@ function lineAt(starts, idx) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const UTIL_IMPORT = /import\s*\{([^}]*)\}\s*from\s*['"](?:node:)?util['"]/;
-const UNKNOWN_CHECK = /(unknown|незнаком|неизвест)\w*\s+(flag|option|arg|argument|флаг|ключ|аргумент|параметр)/i;
+// русская фраза: окончание «-ый», «-ен» — буквы \p{L}, а не \w («незнакомый флаг» прежде не находился)
+const UNKNOWN_CHECK = /(unknown|незнаком|неизвест)\p{L}*\s+(flag|option|arg|argument|флаг|ключ|аргумент|параметр)/iu;
 
 /**
  * Чистая: как файл разбирает аргументы.
@@ -163,9 +169,9 @@ export function parsing(src = '') {
   let utilName = null;
   if (utilMatch) {
     const spec = utilMatch[1].split(',').map((s) => s.trim()).find((s) => /^parseArgs\b/.test(s));
-    if (spec) utilName = (spec.match(/^parseArgs\s+as\s+([\w$]+)$/) || [null, 'parseArgs'])[1];
+    if (spec) utilName = (spec.match(/^parseArgs\s+as\s+([\p{ID_Continue}$]+)$/u) || [null, 'parseArgs'])[1];
   }
-  const utilCallRe = utilName ? new RegExp(`\\b${utilName.replace(/\$/g, '\\$')}\\s*\\(\\s*\\{`) : null;
+  const utilCallRe = utilName ? new RegExp(`(?<![\\p{ID_Continue}$])${utilName.replace(/\$/g, '\\$')}\\s*\\(\\s*\\{`, 'u') : null;
   const utilCall = utilCallRe ? utilCallRe.exec(code) : null;
 
   if (!guard) {
@@ -195,7 +201,7 @@ export function parsing(src = '') {
     line = lineAt(starts, utilCall.index);
     rejects = loose ? 'нет' : 'да';
   } else if (readsArgs) {
-    const loop = /for\s*\(\s*(?:const|let|var)\s+[\w$]+\s+of\s+(?:[\w$]*args?|argv|rest|process\s*\.\s*argv)\b|for\s*\(\s*let\s+[\w$]+\s*=\s*\d+\s*;\s*[\w$]+\s*<\s*(?:[\w$]*args?|argv|process\s*\.\s*argv)[\w$.]*\s*\.\s*length|while\s*\(\s*(?:[\w$]*args?|argv)\s*\.\s*length|\b(?:args?|argv)\s*\.\s*shift\s*\(/;
+    const loop = /for\s*\(\s*(?:const|let|var)\s+[\p{ID_Continue}$]+\s+of\s+(?:[\p{ID_Continue}$]*args?|argv|rest|process\s*\.\s*argv)(?![\p{ID_Continue}$])|for\s*\(\s*let\s+[\p{ID_Continue}$]+\s*=\s*\d+\s*;\s*[\p{ID_Continue}$]+\s*<\s*(?:[\p{ID_Continue}$]*args?|argv|process\s*\.\s*argv)[\p{ID_Continue}$.]*\s*\.\s*length|while\s*\(\s*(?:[\p{ID_Continue}$]*args?|argv)\s*\.\s*length|(?<![\p{ID_Continue}$])(?:args?|argv)\s*\.\s*shift\s*\(/u;
     style = loop.test(code) ? 'loop' : 'search';
     rejects = UNKNOWN_CHECK.test(text) ? 'своя проверка (не доказана)' : 'нет';
   } else {
@@ -203,7 +209,7 @@ export function parsing(src = '') {
     line = firstAt(/process\s*\.\s*argv\s*\[\s*1\s*\]/g, code) ?? firstAt(/\bprocess\s*\.\s*exit\s*\(/g, code);
     rejects = 'нет (аргументы не читаются)';
   }
-  const positionals = readsArgs && /argv\s*\[\s*(?:0|[2-9])\s*\]|args?\s*\[\s*\d\s*\]|filter\s*\(\s*\(?\s*[\w$]+\s*\)?\s*=>\s*!\s*[\w$]+\s*\.\s*startsWith\s*\(|\.\s*_\b|positional/.test(code + text);
+  const positionals = readsArgs && /argv\s*\[\s*(?:0|[2-9])\s*\]|args?\s*\[\s*\d\s*\]|filter\s*\(\s*\(?\s*[\p{ID_Continue}$]+\s*\)?\s*=>\s*!\s*[\p{ID_Continue}$]+\s*\.\s*startsWith\s*\(|\.\s*_(?![\p{ID_Continue}$])|positional/u.test(code + text);
   // Строгим считается только разбор через помощник: у util.parseArgs нет экспортированной
   // спецификации, и места вызова такого скрипта сверить не с чем.
   return { style, line, rejects, cli: style !== 'library', positionals, badCallExit, exportsSpec, strict: style === 'helper' };
@@ -220,25 +226,26 @@ export const EFFECTS = [
   { kind: 'agent', weight: 5, where: 'text', re: /\b(?:claude\s+(?:-p|--print)|codex\s+exec)\b|['"`]claude['"`]\s*,\s*\[\s*['"`]-p|['"`]codex['"`]\s*,\s*\[\s*['"`]exec/, label: 'запускает агента' },
   { kind: 'delete', weight: 4, where: 'code', re: /\b(?:unlinkSync|rmSync|rmdirSync)\s*\(|\.\s*(?:unlink|rm|rmdir)\s*\(/, label: 'удаляет файлы' },
   { kind: 'delete', weight: 4, where: 'text', re: /\brm\s+-[a-zA-Z]*[rf]/, label: 'удаляет файлы' },
-  { kind: 'network', weight: 4, where: 'code', re: /(?<![\w$.])fetch\s*\(|\b(?:https?|net|tls|dgram)\s*\.\s*(?:request|get|connect|createConnection|createServer|createSocket)\s*\(|new\s+WebSocket\s*\(|\.\s*listen\s*\(\s*[\w$]/, label: 'ходит в сеть' },
+  { kind: 'network', weight: 4, where: 'code', re: /(?<![\p{ID_Continue}$.])fetch\s*\(|\b(?:https?|net|tls|dgram)\s*\.\s*(?:request|get|connect|createConnection|createServer|createSocket)\s*\(|new\s+WebSocket\s*\(|\.\s*listen\s*\(\s*[\p{ID_Continue}$]/u, label: 'ходит в сеть' },
   { kind: 'network', weight: 4, where: 'text', re: /\b(?:curl|wget|ssh|scp)\s+-?|\bgh\s+(?:api|pr|issue|release|repo|workflow|run|search|auth)\b|['"`]gh['"`]\s*,\s*\[|api\.telegram\.org|hooks\.slack\.com/, label: 'ходит в сеть' },
   // process.kill(pid, 0) только спрашивает, жив ли процесс, — это чтение, не сигнал
   { kind: 'process', weight: 4, where: 'code', re: /\bprocess\s*\.\s*kill\s*\((?![^()]*,\s*0\s*\))/, label: 'посылает сигналы процессам' },
   { kind: 'process', weight: 4, where: 'text', re: /\b(?:pkill|killall|launchctl)\b|\bkill\s+-/, label: 'посылает сигналы процессам' },
   // writeSync(1|2, …) — вывод в stdout/stderr, а не запись файла
   { kind: 'write', weight: 3, where: 'code', re: /\b(?:writeFileSync|appendFileSync|mkdirSync|renameSync|copyFileSync|cpSync|createWriteStream|symlinkSync|linkSync|chmodSync|truncateSync|utimesSync|mkdtempSync)\s*\(|\bwriteSync\s*\((?!\s*(?:1|2|process\s*\.\s*std(?:out|err)\s*\.\s*fd)\s*,)|\.\s*(?:writeFile|appendFile|mkdir|rename|copyFile|cp|symlink|chmod|truncate)\s*\(/, label: 'пишет файлы' },
+  // @ascii-ok: имена команд macOS (osascript, terminal-notifier, afplay, say) пишутся только латиницей
   { kind: 'notify', weight: 1, where: 'text', re: /\b(?:osascript|terminal-notifier|afplay|say\s+-)\b/, label: 'уведомляет' },
   // «.exec(» у регулярного выражения — не запуск команды
-  { kind: 'spawn', weight: 2, where: 'code', re: /\b(?:execSync|execFileSync|spawnSync|execFile|spawn|fork)\s*\(|(?<![.\w$])exec\s*\(/, label: 'запускает команды' },
+  { kind: 'spawn', weight: 2, where: 'code', re: /\b(?:execSync|execFileSync|spawnSync|execFile|spawn|fork)\s*\(|(?<![.\p{ID_Continue}$])exec\s*\(/u, label: 'запускает команды' },
 ];
 
 // Строка-сообщение: команда внутри неё — текст для человека или кейс проверки, а не действие.
-const MESSAGE_CALL = /\b(?:console\s*\.\s*\w+|log|say|warn|info|print|ok|check|assert\w*|fires|expect|note|hint|fail|bad|good|out\s*\.\s*push|lines\s*\.\s*push|report\s*\.\s*push)\s*\(|\bthrow\s+new\b/;
+const MESSAGE_CALL = /\b(?:console\s*\.\s*[\p{ID_Continue}$]+|log|say|warn|info|print|ok|check|assert[\p{ID_Continue}$]*|fires|expect|note|hint|fail|bad|good|out\s*\.\s*push|lines\s*\.\s*push|report\s*\.\s*push)\s*\(|\bthrow\s+new\b/u;
 // Только функции, которые И ЕСТЬ самопроверка; «pushAfterSelfTest» — рабочий путь.
 const SELF_TEST_NAME = '(?:selfTest|selfTestTail|runSelfTests?|selftest|self_test)';
 const SELF_TEST_HEAD = new RegExp(`\\b(?:async\\s+)?function\\s*\\*?\\s*${SELF_TEST_NAME}\\s*\\(|\\b(?:const|let)\\s+${SELF_TEST_NAME}\\s*=\\s*(?:async\\s*)?(?:function\\b|\\()`, 'g');
 // сообщение человеку, но не строка, где рядом запускается команда
-const RUNS_COMMAND = /\b(?:exec\w*|spawn\w*|run\w*|sh\w*|git\w*|cmd)\s*\(/;
+const RUNS_COMMAND = /\b(?:exec[\p{ID_Continue}$]*|spawn[\p{ID_Continue}$]*|run[\p{ID_Continue}$]*|sh[\p{ID_Continue}$]*|git[\p{ID_Continue}$]*|cmd)\s*\(/u;
 const FSP_WRITERS = new Set(['writeFile', 'appendFile', 'mkdir', 'rename', 'rm', 'rmdir', 'unlink', 'copyFile', 'cp', 'symlink', 'chmod', 'truncate', 'mkdtemp']);
 
 /** Чистая: диапазоны строк [от, до] внутри функций самопроверки (по виду code). */
@@ -283,7 +290,7 @@ export function effects(src = '') {
       if (FSP_WRITERS.has(orig)) fsp.add(alias || orig);
     }
   }
-  const fspRe = fsp.size ? new RegExp(`(?<![.\\w$])(?:${[...fsp].join('|')})\\s*\\(`) : null;
+  const fspRe = fsp.size ? new RegExp(`(?<![.\\p{ID_Continue}$])(?:${[...fsp].map((n) => n.replace(/\$/g, '\\$')).join('|')})\\s*\\(`, 'u') : null;
   const out = [];
   for (let i = 0; i < codeLines.length; i++) {
     const message = MESSAGE_CALL.test(codeLines[i]) && !RUNS_COMMAND.test(codeLines[i]);
@@ -369,6 +376,7 @@ export function hookNamesFrom(root = ROOT) {
   const names = new Set();
   try {
     const walk = (v) => {
+      // @ascii-ok: имя файла движка: латиницу проверяет cyrillic-boundary (nonAsciiPath)
       if (typeof v === 'string') for (const m of v.matchAll(/([\w-]+\.mjs)/g)) names.add(m[1]);
       else if (v && typeof v === 'object') for (const x of Object.values(v)) walk(x);
     };
@@ -381,7 +389,7 @@ export function hookNamesFrom(root = ROOT) {
 export function isHookFile(file, hookNames = new Set()) {
   const name = file.split('/').pop();
   return /^hooks\/[^/]+\.mjs$/.test(file) || /^global-setup\/hooks\//.test(file)
-    || /^statusline-[\w-]+\.mjs$/.test(name) || hookNames.has(name);
+    || /^statusline-[\w-]+\.mjs$/.test(name) || hookNames.has(name); // @ascii-ok: имя файла движка: латиницу проверяет cyrillic-boundary (nonAsciiPath)
 }
 
 export function loadBaseline(root = ROOT) {
@@ -569,6 +577,21 @@ export function selfTest() {
     effects("const selfTest = () => check();\nif (isMain) {\n  sh('git push');\n}\n").some((e) => e.kind === 'git' && !e.test));
   ok('writeSync(1, …) — вывод, не запись файла', !kinds('writeSync(1, text);\n').includes('write'));
   ok('/re/.exec(s) — не запуск команды', !kinds('const m = /a/.exec(s);\n').includes('spawn'));
+
+  // русские имена (2026-10-10): разбор на \w и \b их не видел, хотя в движке их 197
+  ok('util.parseArgs под русским именем опознан',
+    style(`import { parseArgs as разобрать } from 'node:util';\n${GUARD_SRC}if (isMain) { разобрать({ args: process.argv.slice(2), options: {} }); }\n`) === 'util-strict');
+  ok('свой цикл с русским именем переменной опознан',
+    style(`${GUARD_SRC}const args = process.argv.slice(2);\nfor (const флаг of args) { if (флаг === '--fix') f = 1; }\n`) === 'loop');
+  ok('отказ «незнакомый флаг» по-русски опознан как своя проверка',
+    parsing(`${GUARD_SRC}const a = process.argv.slice(2);\nif (isMain && a.some((x) => !KNOWN.has(x))) { console.error('незнакомый флаг'); process.exit(2); }\n`).rejects === 'своя проверка (не доказана)');
+  ok('позиционные слова через filter с русским именем опознаны',
+    parsing(`${GUARD_SRC}const a = process.argv.slice(2);\nconst файлы = a.filter((слово) => !слово.startsWith('-'));\nif (isMain) run(файлы);\n`).positionals === true);
+  ok('.listen(порт) — ходит в сеть', kinds('server.listen(порт);\n').includes('network'));
+  ok('запись fs/promises под русским именем ловится по имени, а не по хвосту чужого имени',
+    effects("import { writeFile as записать } from 'node:fs/promises';\nперезаписать(a);\nawait записать(p, 'x');\n").filter((e) => e.kind === 'write').map((e) => e.line).join() === '3');
+  ok('русское имя с латинским хвостом «in» — деление, а не начало регулярки',
+    kinds("const частьin = 4;\nconst x = частьin / 2; writeFileSync(p, 'x');\n").includes('write'));
 
   // режимы командной строки
   ok('самопроверка вместе с другим режимом — неверный вызов', Boolean(modeError({ 'self-test': true, all: true }, [])));

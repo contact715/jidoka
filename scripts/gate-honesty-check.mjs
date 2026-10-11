@@ -55,6 +55,7 @@ export function пробрасываетКод(строка) {
   if (!/^\S*node\s+\S+\.mjs/.test(т)) return true; // не прямой вызов — не наш случай
   if (/\|\|\s*exit/.test(т)) return true;          // || exit $?
   if (/\|\|\s*\{/.test(т)) return true;            // || { ...; exit 1; }
+  // @ascii-ok: имя переменной shell — POSIX допускает только [A-Za-z_][A-Za-z0-9_]*
   if (/^\w+=\$\(/.test(т)) return true;            // VAR=$(node ...) — код читают отдельно
   if (/^if\s|^\s*if\s/.test(т)) return true;       // if node ...; then
   if (/\|\|\s*true/.test(т)) return true;          // осознанно НЕблокирующий

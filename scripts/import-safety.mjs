@@ -94,6 +94,16 @@ export function scanLines(src) {
   return out;
 }
 
+// ИМЯ В КОДЕ разбирается юникодно (2026-10-10). `\w` и `\b` считают буквой только
+// латиницу, и флаг u этого не меняет: /\w/u.test('ж') === false. В движке 197 объявлений
+// с русскими именами, и прежний разбор их не видел: `function загрузить()` не попадала
+// в список своих функций, а `const cfg = загрузить()` проходила как безобидное объявление.
+// Имя: [\p{ID_Start}$_][\p{ID_Continue}$]*, граница имени — два значения ниже, флаг u.
+const NOT_AFTER_ID = '(?<![\\p{ID_Continue}$])';
+const NOT_BEFORE_ID = '(?![\\p{ID_Continue}$])';
+/** Имя для new RegExp: в именах бывает `$`, а он в регулярке значит «конец строки». */
+const escName = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const DECLARATION = /^(?:export\s|import\s|import\(|const\s|let\s|var\s|function[\s*]|async\s+function[\s*]|class\s|#!|\/\/|\/\*|\*|\*\/)/;
 // Узкое исключение: однострочная необязательная загрузка соседнего модуля
 // `try { ({ x } = await import('./y.mjs')); } catch { }`. Это загрузка модуля,
@@ -103,7 +113,7 @@ function isOptionalImport(line) {
   const m = line.match(OPTIONAL_IMPORT);
   if (!m || !/await\s+import\(/.test(m[1])) return false;
   // в теле не должно быть НИКАКИХ других вызовов — иначе это уже работа
-  return !/[\w$]\s*\(/.test(m[1].replace(/await\s+import\([^)]*\)/g, ''));
+  return !/[\p{ID_Continue}$]\s*\(/u.test(m[1].replace(/await\s+import\([^)]*\)/g, ''));
 }
 const CLOSER = /^[}\])`;,]/;
 
@@ -116,7 +126,7 @@ const CLOSER = /^[}\])`;,]/;
  */
 export function guardNames(src) {
   const names = new Set();
-  for (const m of src.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([\s\S]{0,220}?);/g)) {
+  for (const m of src.matchAll(/(?:const|let|var)\s+([\p{ID_Start}$_][\p{ID_Continue}$]*)\s*=\s*([\s\S]{0,220}?);/gu)) {
     if (m[2].includes('import.meta.url') && m[2].includes('process.argv')) names.add(m[1]);
   }
   return names;
@@ -131,7 +141,7 @@ export function guardNames(src) {
 export function isGuard(line, names, basename = '') {
   if (!/^(?:if|else\s+if)\s*\(/.test(line)) return false;
   if (line.includes('import.meta.url')) return true;
-  for (const n of names) if (new RegExp(`\\b${n}\\b`).test(line)) return true;
+  for (const n of names) if (new RegExp(`${NOT_AFTER_ID}${escName(n)}${NOT_BEFORE_ID}`, 'u').test(line)) return true;
   if (basename && line.includes('process.argv[1]') && line.includes(`'${basename}'`)) return true;
   return false;
 }
@@ -140,7 +150,7 @@ export function isGuard(line, names, basename = '') {
 export function basenameGuardNames(src, basename) {
   const names = new Set();
   if (!basename) return names;
-  for (const m of src.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*([^\n;]*);/g)) {
+  for (const m of src.matchAll(/(?:const|let|var)\s+([\p{ID_Start}$_][\p{ID_Continue}$]*)\s*=\s*([^\n;]*);/gu)) {
     if (m[2].includes('process.argv[1]') && m[2].includes(`'${basename}'`)) names.add(m[1]);
   }
   return names;
@@ -153,7 +163,7 @@ export function declaredIn(src, from, to) {
   const names = new Set();
   for (let i = from; i < Math.min(to, lines.length); i++) {
     if (!info[i] || info[i].depth !== 0 || !info[i].clean) continue;
-    const m = (info[i].code || lines[i]).match(/^(?:const|let|var|function\*?|async\s+function\*?|class)\s+([A-Za-z_$][\w$]*)/);
+    const m = (info[i].code || lines[i]).match(/^(?:const|let|var|function\*?|async\s+function\*?|class)\s+([\p{ID_Start}$_][\p{ID_Continue}$]*)/u);
     if (m) names.add(m[1]);
   }
   return names;
@@ -168,12 +178,13 @@ export function declaredIn(src, from, to) {
 export function freeReferenceAbove(lines, info, limit, name) {
   // ключ объектного литерала (`missing: x`) ссылкой не является; сокращённая
   // запись `{ missing }` без двоеточия — является, её не исключаем
-  const word = new RegExp(`(^|[^\\w$.])${name}(?![\\w$])(?!\\s*:)`);
-  const FN_HEAD = /^(?:export\s+)?(?:async\s+)?(?:function\*?\s+[\w$]*\s*\(([^)]*)\)|(?:const|let|var)\s+[\w$]+\s*=\s*(?:async\s+)?\(([^)]*)\)\s*=>)/;
+  const n = escName(name);
+  const word = new RegExp(`(^|[^\\p{ID_Continue}$.])${n}${NOT_BEFORE_ID}(?!\\s*:)`, 'u');
+  const FN_HEAD = /^(?:export\s+)?(?:async\s+)?(?:function\*?\s+[\p{ID_Continue}$]*\s*\(([^)]*)\)|(?:const|let|var)\s+[\p{ID_Continue}$]+\s*=\s*(?:async\s+)?\(([^)]*)\)\s*=>)/u;
   for (let i = 0; i < limit; i++) {
     const code = info[i] && info[i].clean !== undefined ? info[i].code || '' : '';
     if (!word.test(code)) continue;
-    if (new RegExp(`^(?:export\\s+)?(?:const|let|var|function\\*?|async\\s+function\\*?|class)\\s+${name}\\b`).test(code)) continue;
+    if (new RegExp(`^(?:export\\s+)?(?:const|let|var|function\\*?|async\\s+function\\*?|class)\\s+${n}${NOT_BEFORE_ID}`, 'u').test(code)) continue;
 
     // ближайший сверху заголовок функции на верхнем уровне
     let head = -1;
@@ -187,17 +198,19 @@ export function freeReferenceAbove(lines, info, limit, name) {
 
     const m = (info[head].code || '').match(FN_HEAD);
     const params = (m && (m[1] || m[2])) || '';
-    if (word.test(params) || new RegExp(`\\b${name}\\b`).test(params)) continue;
+    // отдельное слово: граница имени юникодная, а не \b (см. NOT_AFTER_ID)
+    const solo = `${NOT_AFTER_ID}${n}${NOT_BEFORE_ID}`;
+    if (word.test(params) || new RegExp(solo, 'u').test(params)) continue;
 
     let boundLocally = false;
     for (let j = head; j <= i; j++) {
       const c = (info[j] && info[j].code) || '';
-      const declared = new RegExp(`(?:const|let|var)\\s+\\b${name}\\b`).test(c)
+      const declared = new RegExp(`(?:const|let|var)\\s+${solo}`, 'u').test(c)
         // объявление через разбор: const [pass, detail] = … / const { a, b } = …
-        || new RegExp(`(?:const|let|var)\\s*[[{][^\\]}]*\\b${name}\\b`).test(c)
-        || new RegExp(`for\\s*\\((?:const|let|var)\\s+[[{]?[^\\]})]*\\b${name}\\b`).test(c)
+        || new RegExp(`(?:const|let|var)\\s*[[{][^\\]}]*${solo}`, 'u').test(c)
+        || new RegExp(`for\\s*\\((?:const|let|var)\\s+[[{]?[^\\]})]*${solo}`, 'u').test(c)
         // параметр стрелочной функции внутри тела: (a, name) => …
-        || new RegExp(`\\([^)]*\\b${name}\\b[^)]*\\)\\s*=>`).test(c);
+        || new RegExp(`\\([^)]*${solo}[^)]*\\)\\s*=>`, 'u').test(c);
       if (declared) { boundLocally = true; break; }
     }
     if (!boundLocally) return true;
@@ -218,13 +231,13 @@ export function analyze(src, filePath = '') {
   const names = new Set([...guardNames(src), ...basenameGuardNames(src, basename)]);
   // функции, объявленные в этом же файле: вызов такой функции из объявления
   // верхнего уровня — это работа, спрятанная за словом const
-  const localFns = new Set([...src.matchAll(/^(?:export\s+)?(?:async\s+)?function\*?\s+([A-Za-z_$][\w$]*)/gm)].map((m) => m[1]));
+  const localFns = new Set([...src.matchAll(/^(?:export\s+)?(?:async\s+)?function\*?\s+([\p{ID_Start}$_][\p{ID_Continue}$]*)/gmu)].map((m) => m[1]));
   // Вызовы, у которых есть ПОСЛЕДСТВИЯ, даже если функция не своя. Список
   // намеренно узкий: path.join и JSON.parse сюда не входят, иначе гейт зашумит.
   // Ловится только НАСТОЯЩИЙ вызов — определение функции (const f = () => …)
   // при импорте ничего не делает.
   const EFFECTFUL = /(?:execSync|execFileSync|spawnSync|fetch|readFileSync|readdirSync|writeFileSync|appendFileSync|mkdirSync|rmSync|unlinkSync|copyFileSync)\s*\(/;
-  const IS_FN_DEF = /=\s*(?:async\s*)?(?:\([^)]*\)|[\w$]+)\s*=>|=\s*(?:async\s+)?function\b/;
+  const IS_FN_DEF = /=\s*(?:async\s*)?(?:\([^)]*\)|[\p{ID_Continue}$]+)\s*=>|=\s*(?:async\s+)?function(?![\p{ID_Continue}$])/u;
   const exec = [];
   let guardedTail = false;
   // цепочка if / else if / else на верхнем уровне — ОДНО целое: если её голова
@@ -239,7 +252,7 @@ export function analyze(src, filePath = '') {
     if (DECLARATION.test(line) || CLOSER.test(line)) {
       inChain = false;
       const code = info[i].code || line;
-      const call = code.match(/^(?:export\s+)?(?:const|let|var)\s+[^=]*=\s*(?:await\s+)?([A-Za-z_$][\w$]*)\s*\(/);
+      const call = code.match(/^(?:export\s+)?(?:const|let|var)\s+[^=]*=\s*(?:await\s+)?([\p{ID_Start}$_][\p{ID_Continue}$]*)\s*\(/u);
       const isDecl = /^(?:export\s+)?(?:const|let|var)\s/.test(code);
       if ((call && localFns.has(call[1])) || (isDecl && !IS_FN_DEF.test(code) && EFFECTFUL.test(code))) {
         exec.push({ line: i, text: line.trim().slice(0, 80) });
@@ -307,7 +320,7 @@ export function applyGuard(src, filePath = '') {
     // может импортировать оттуда pathToFileURL — тогда имени нет, и модуль
     // падает с ReferenceError уже при импорте. Синтаксическая проверка такое
     // пропускает; поймал прогон поведения.
-    const hasName = /(?:^|[^\w$])fileURLToPath(?:[^\w$]|$)/m.test(src.split('\n').filter((l) => /^import\s/.test(l)).join('\n'));
+    const hasName = /(?:^|[^\p{ID_Continue}$])fileURLToPath(?:[^\p{ID_Continue}$]|$)/mu.test(src.split('\n').filter((l) => /^import\s/.test(l)).join('\n'));
     if (!hasName) pre.push("import { fileURLToPath } from 'node:url';");
     pre.push(`const ${guardVar} = process.argv[1] === fileURLToPath(import.meta.url);`);
   }
@@ -514,6 +527,35 @@ function selfTest() {
   ok(
     'const x = path.join(...) — не дефект',
     analyze("import path from 'node:path';\nconst ROOT = path.join('a', 'b');\n", 'a.mjs').exec.length === 0,
+  );
+  // 52-58. русские имена (2026-10-10): разбор на [A-Za-z_$][\w$]* и \b их не видел вовсе
+  ok(
+    'const x = своя функция с русским именем() — дефект',
+    analyze('function загрузить() { console.log(1); }\nconst настройки = загрузить();\n', 'a.mjs').exec.length === 1,
+  );
+  ok(
+    'сторож с русским именем — сторож, а не дефект',
+    analyze("import { fileURLToPath } from 'node:url';\nconst главный = process.argv[1] === fileURLToPath(import.meta.url);\nif (главный) {\n  main();\n}\n", 'a.mjs').exec.length === 0,
+  );
+  ok(
+    'русский вызов рядом с import снова дефект',
+    analyze("try { await import('./p.mjs'); запустить(); } catch { }\n", 'a.mjs').exec.length === 1,
+  );
+  ok(
+    'стрелка с русским параметром — определение, а не ввод-вывод',
+    analyze("import { readFileSync } from 'node:fs';\nconst прочесть = путь => readFileSync(путь, 'utf8');\n", 'a.mjs').exec.length === 0,
+  );
+  ok(
+    'русское объявление, используемое выше, блокирует',
+    analyze('export function f() { return НАСТРОЙКИ.x; }\nmain();\nconst НАСТРОЙКИ = {};\n', 'a.mjs').blockers.length >= 1,
+  );
+  ok(
+    'русский параметр функции не блокирует',
+    analyze('export function сумма(строки) { return строки.length; }\nmain();\nconst строки = [];\n', 'a.mjs').blockers.length === 0,
+  );
+  ok(
+    'русская локальная переменная не блокирует',
+    analyze('function f() { const строки = g(); return строки; }\nmain();\nconst строки = 1;\n', 'a.mjs').blockers.length === 0,
   );
   // 31. node:url импортирован, но БЕЗ нужного имени — импорт всё равно нужен
   ok(
