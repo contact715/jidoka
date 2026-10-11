@@ -1,7 +1,7 @@
 # Global Claude Instructions
 
 Ядро правил. Полный текст каждого правила с историей и разбором:
-`~/.claude/jidoka/docs/GLOBAL_RULES_FULL.md` (канон: `~/jidoka-framework/docs/GLOBAL_RULES_FULL.md`).
+`~/.claude/jidoka/docs/GLOBAL_RULES_FULL.md` (канон: `~/jidoka-framework/global-setup/GLOBAL_RULES_FULL.md`).
 Открывай полный текст, когда правило применяется в задаче, а не по умолчанию. Сжато 2026-10-10 по
 просьбе владельца: было 110 КБ, грузилось в каждую сессию.
 

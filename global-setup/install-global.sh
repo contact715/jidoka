@@ -59,6 +59,8 @@ for d in NORTH_STAR CONSTITUTION MISSION HIERARCHICAL_SPEC_SYSTEM MODULE_SPEC_SY
   [ -f "$FW/docs/$d.md" ] && cp "$FW/docs/$d.md" "$DEST/jidoka/docs/$d.md"
 done
 [ -d "$FW/docs/templates" ] && cp "$FW/docs/templates/"*.md "$DEST/jidoka/docs/templates/" 2>/dev/null || true
+# Full text of the global rules; the CLAUDE.md core links here instead of carrying it (2026-10-10).
+cp "$SRC/GLOBAL_RULES_FULL.md" "$DEST/jidoka/docs/GLOBAL_RULES_FULL.md"
 # Drop docs that were archived in the repo (no longer canon) from the global copy.
 rm -f "$DEST/jidoka/docs/AGENT_LAYER_ARCHITECTURE.md" "$DEST/jidoka/docs/AGENT_LAYER_QUALITY_SPEC.md" "$DEST/jidoka/docs/KAIZEN_PHILOSOPHY.md" 2>/dev/null || true
 echo "  ✓ canon docs → ~/.claude/jidoka/docs/"
