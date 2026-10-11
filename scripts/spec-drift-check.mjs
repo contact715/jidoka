@@ -45,6 +45,15 @@ import { runCli } from './lib/cli.mjs';
 // (a command like `git log`, a flag, a method like `brain.draft`) is ignored.
 const FILE_EXT = /\.(md|py|mjs|cjs|js|jsx|ts|tsx|json|jsonl|sh|ya?ml|toml|cfg|ini|txt|sql|css|scss|html|png|svg|env)$/i;
 
+// A token that is ONLY a dot and a word (`.json`, `.ts`) names a file TYPE in prose ("types
+// stay in `.ts` files"), not a file. It passes FILE_EXT, so before 2026-10-10 each such
+// mention counted as a missing file and raised the brokenRefs ratchet (151 -> 155 blocked a
+// push). The exception is a real dotfile whose whole name is one of the FILE_EXT words:
+// "never commit `.env`" points at an actual file. That overlap is only `.env` today:
+// .gitignore, .npmrc, .nvmrc never match FILE_EXT, so they never reach this check. Add a
+// name here only when FILE_EXT gains a word that is also a dotfile's full name.
+const DOTFILE_NAMES = new Set(['.env']);
+
 // Directories never worth walking for the existence index (heavy / vendored / generated).
 const SKIP_DIRS = new Set([
   '.git', 'node_modules', 'venv', '.venv', 'env', '__pycache__', 'dist', 'build',
@@ -74,6 +83,7 @@ export function looksLikeFileRef(raw) {
   if (s.startsWith('/') || s.startsWith('~')) return false; // absolute / home — out of scope (+ privacy)
   if (s.startsWith('#')) return false;                  // anchors
   if (s.endsWith('/')) return false;                    // a directory mention, not a file artifact
+  if (/^\.[^./\\]+$/.test(s) && !DOTFILE_NAMES.has(s.toLowerCase())) return false; // `.json` = a file type
   const hasSep = s.includes('/');
   const hasExt = FILE_EXT.test(s);
   return hasSep || hasExt;                              // a path, or a bare filename with a known ext
@@ -276,6 +286,15 @@ function selfTest() {
     ['a date placeholder (YYYY-WNN) is NOT a file ref', looksLikeFileRef('docs/audit-reports/routine-weekly-YYYY-WNN.md') === false],
     ['a braces placeholder ({wave-id}) is NOT a file ref', looksLikeFileRef('docs/specs/{wave-id}_MASTER_SPEC.md') === false],
     ['a real path is still a file ref after placeholder filters', looksLikeFileRef('docs/specs/wave-188_MASTER_SPEC.md') === true],
+    ['a bare extension (.txt) is NOT a file ref', looksLikeFileRef('.txt') === false],
+    ['every bare extension seen as a false broken ref on 2026-10-10 is NOT a file ref',
+      ['.json', '.jsonl', '.ts', '.md', '.mjs'].every(e => looksLikeFileRef(e) === false)],
+    ['a known dotfile (.env) IS a file ref', looksLikeFileRef('.env') === true],
+    ['a dotfile with its own extension (.eslintrc.json) IS a file ref', looksLikeFileRef('.eslintrc.json') === true],
+    ['a dotfile under a dir (config/.env) IS a file ref', looksLikeFileRef('config/.env') === true],
+    ['a path with an extension (docs/a.md) IS a file ref', looksLikeFileRef('docs/a.md') === true],
+    ['a bare filename with an extension (a.md) IS a file ref', looksLikeFileRef('a.md') === true],
+    ['prose naming an extension yields no ref', extractLocalRefs('a `.mjs` cannot dispatch; types stay in `.ts` files').length === 0],
     ['extractLocalRefs pulls backticks + md links, drops noise + dedups', extractLocalRefs(specOK).length === 3],
     ['declared parents are extracted from a prose line', extractDeclaredParents(specOK).includes('../NORTH_STAR.md')],
     ['a clean spec yields zero findings', fOK.length === 0],

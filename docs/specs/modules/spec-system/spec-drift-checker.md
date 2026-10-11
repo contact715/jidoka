@@ -1,6 +1,6 @@
 ---
 status: Active
-version: 1.0.0
+version: 1.1.0
 level: L3
 type: module
 owner_role: platform
@@ -12,7 +12,7 @@ children: []
 breaking_change_in_v: null
 created: 2026-06-05
 last_validated_against_parents: 2026-06-05
-last_updated: 2026-06-05
+last_updated: 2026-10-10
 ---
 
 # Module — Spec-vs-File Drift Checker
@@ -23,6 +23,8 @@ last_updated: 2026-06-05
 
 Portable, zero-dependency check that every file reference and declared parent in spec markdown resolves to a real file. Skips docs/archive; ignores template placeholders.
 
+A token that is only a dot and a word (`.json`, `.ts`) names a file type, not a file, and is not a reference. The one exception is a known dotfile whose full name is such a word (today only .env, kept in `DOTFILE_NAMES`), because "never commit .env" points at a real file. Added 2026-10-10 after five such mentions inflated the brokenRefs ratchet.
+
 ## Lives in
 
 - `scripts/spec-drift-check.mjs`
@@ -31,7 +33,7 @@ Portable, zero-dependency check that every file reference and declared parent in
 
 Each AC names the executable check that proves it. ACs are the contract; the command is how the line verifies it.
 
-### AC-1 — Self-test passes (26 pure-logic assertions)
+### AC-1 — Self-test passes (32 pure-logic assertions)
 
 ```
 node scripts/spec-drift-check.mjs --self-test
