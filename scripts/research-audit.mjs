@@ -115,13 +115,22 @@ const BARE_HOST_RE = /(?<![\p{L}\p{N}_@/.:=&?#%+~-])(?:[a-z0-9](?:[a-z0-9-]*[a-z
 const EXTERNAL_WORDS_RE = /\p{L}*(?:конкурент|референс|рын(?:ок|к|оч)|competitor|benchmark)\p{L}*/iu;
 /** Текст говорит о замере. */
 const MEASURE_WORDS_RE = /\p{L}*(?:замер|измер|measured|measurement)\p{L}*/iu;
-/** путь/до/файла.ext:НОМЕР — адрес с точностью до строки. */
 /**
+ * путь/до/файла.ext:НОМЕР — адрес с точностью до строки.
+ *
  * Файлы настроек (nginx `.conf`, systemd `.service`/`.timer`, `.toml`, `.ini`) тоже код:
  * находка про сервер живёт именно в них. Без них адрес `deploy/nginx.conf:48` не засчитывался,
  * и честная строка замера краснела (класс guard-unit-mismatched-to-rule).
+ *
+ * Имя файла пишется буквами любого алфавита (класс `\p{L}` с флагом `u`), а не только `\w`:
+ * `\w` без `u` не видит кириллицу, и адрес `CORP_структура_компании.md:15` не засчитывался.
+ * `\p{M}` нужен для имён в разложенной форме (NFD, так их хранит macOS): «й» и «ё» там это
+ * буква и отдельный знак. Ресёрч по документам держит доказательства в выписках, переписке и
+ * расшифровках, поэтому засчитываются `.csv`, `.txt`, `.pdf`, `.eml`, `.html`, `.srt`.
+ * Случай 2026-10-10: пять честных строк замера в юридическом разборе краснели
+ * (класс measurement-tool-error-read-as-product-defect).
  */
-const PATH_WITH_LINE_RE = /[\w./@-]+\.(?:tsx?|jsx?|mjs|cjs|py|go|rs|java|rb|php|css|scss|json|ya?ml|md|sql|sh|conf|service|timer|toml|ini)\s*:\s*\d+/i;
+const PATH_WITH_LINE_RE = /[\p{L}\p{M}\p{N}_./@-]+\.(?:tsx?|jsx?|mjs|cjs|py|go|rs|java|rb|php|css|scss|json|ya?ml|md|sql|sh|conf|service|timer|toml|ini|csv|txt|pdf|eml|html?|srt)\s*:\s*\d+/iu;
 
 /**
  * Слова заголовка раздела «чего не проверил», в любом порядке. Прямой: «не проверил»,
@@ -549,6 +558,32 @@ function selfTest() {
     PATH_WITH_LINE_RE.test('backend/deploy/nginx-hostinger.conf:48'));
   check('адрес в таймере systemd засчитывается',
     PATH_WITH_LINE_RE.test('deploy/aplus-backup.timer:5'));
+
+  // Адрес в документе, а не в коде (случай 2026-10-10, юридический разбор): кириллица в
+  // имени и выгрузки .csv/.txt. Проверяется вердикт по строке таблицы, а не только регулярка.
+  const withEvidence = (/** @type {string} */ addr) => CLEAN.replace('components/inbox/Tags.tsx:42', addr);
+  check('кириллическое имя файла засчитывается',
+    !codes(withEvidence('`CORP_структура_компании.md:15`')).includes('STATUS-NO-EVIDENCE'),
+    'буква перед расширением не должна решать');
+  check('кириллица в имени и в папке засчитывается',
+    !codes(withEvidence('`папка_отчётов/для_партнёров_отчёт.md:29`')).includes('STATUS-NO-EVIDENCE'));
+  check('имя в разложенной форме (NFD, как в macOS) засчитывается',
+    !codes(withEvidence('`выписка_май.md:3`'.normalize('NFD'))).includes('STATUS-NO-EVIDENCE'),
+    '«й» в NFD это «и» и отдельный знак');
+  check('.csv:3 засчитывается',
+    !codes(withEvidence('`evidence/csv_по_вкладкам/Mosco_gid0.csv:3`')).includes('STATUS-NO-EVIDENCE'));
+  for (const ext of ['txt', 'pdf', 'eml', 'html', 'srt']) {
+    check(`.${ext} со строкой засчитывается`,
+      !codes(withEvidence(`\`переписка/письмо.${ext}:6\``)).includes('STATUS-NO-EVIDENCE'));
+  }
+  check('кириллический путь без номера строки по-прежнему не засчитывается',
+    codes(withEvidence('`CORP_структура_компании.md`')).includes('STATUS-NO-EVIDENCE'));
+  check('.csv без номера строки не засчитывается',
+    codes(withEvidence('`evidence/Mosco_gid0.csv`')).includes('STATUS-NO-EVIDENCE'));
+  check('свободный текст «файл.md» без двоеточия не засчитывается',
+    codes(withEvidence('см. «файл.md», там всё')).includes('STATUS-NO-EVIDENCE'));
+  check('кириллическое слово с номером, но без расширения не засчитывается',
+    codes(withEvidence('строка:15')).includes('STATUS-NO-EVIDENCE'));
 
   // Раздел непроверенного
   check('отсутствие раздела ловится',
