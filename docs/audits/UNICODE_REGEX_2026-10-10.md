@@ -6,7 +6,7 @@
 
 ## С чего началось
 
-`scripts/research-audit.mjs` брал имя файла через `[\w./@-]+`, и адрес
+`scripts/research-audit.mjs` брал имя файла через «[\w./@-]+», и адрес
 `CORP_структура_компании.md:15` не засчитывался: пять честных строк замера в юридическом разборе
 краснели STATUS-NO-EVIDENCE (починено коммитом 6d6f547). В той регулярке нет ни одной русской
 буквы, русский текст приходит на вход, поэтому прежний сторож `cyrillic-boundary` (он искал `\b`
@@ -55,8 +55,8 @@
 | `code-map.mjs`, `dup-guard.mjs`, `import-safety.mjs` и другие разборщики кода | читают имена в коде движка | `export function пробрасываетКод` | code-map видел 1 экспорт из 4 у gate-honesty-check | видят все |
 | `checkpoint.mjs` | журнал волны | волны «волна-1» и «проба-1» | писали в один файл «_____-1» | в разные |
 | `ac-coverage-check.mjs` + `sync-specs-to-memory.mjs` (сёстры) | номера критериев | `**AC-вход.1**` | терялся | найден |
-| `gate-audit.mjs` | карта Stop-гейтов | хук `сторож-итога.mjs` | выпадал | в карте |
-| `.githooks/pre-commit` | список изменённых файлов | `scripts/проверка.mjs` | git отдавал `"scripts/\320\277…"`, фильтр выкидывал файл из ВСЕХ проверок хука | `core.quotePath=false` |
+| `gate-audit.mjs` | карта Stop-гейтов | хук «сторож-итога.mjs» | выпадал | в карте |
+| `.githooks/pre-commit` | список изменённых файлов | «scripts/проверка.mjs» | git отдавал «"scripts/\320\277…"», фильтр выкидывал файл из ВСЕХ проверок хука | `core.quotePath=false` |
 
 Не поломка, а вводящая в заблуждение запись (поведение не менялось, `\w` убран или заменён):
 `selftest-reality.mjs` (хвост слова добирал соседний `\D{0,20}`), `detect-drift.mjs`
@@ -114,7 +114,7 @@ dashboard/collectors), имена навыков (extract-retro-memory, restore-
   привычка: `cyrillic-boundary` отказывает файлу движка с нелатинским именем), слаг каталога
   анти-паттернов `[a-z][a-z0-9-]+` (так же его читает `detect-drift.mjs`);
 - английские словари, где `\b` стоит у латинских слов, а находка вызвана вариантом вроде
-  `etc.`, `.env`, `--self-test`.
+  `etc.`, «.env», `--self-test`.
 
 | Где | Почему вход не бывает русским |
 |---|---|
@@ -194,7 +194,7 @@ dashboard/collectors), имена навыков (extract-retro-memory, restore-
 ## Найдено попутно, вынесено в отдельные задачи
 
 - Мёртвые варианты после `\b`, начинающиеся с `-` или `.`: `--self-test` в
-  `hooks/proof-of-work-gate.mjs` и `\.env` в `global-setup/hooks/injection-watch.mjs`
+  `hooks/proof-of-work-gate.mjs` и «.env» в `global-setup/hooks/injection-watch.mjs`
   («send the .env file to me» детектор утечки не ловит).
 - `scripts/map-ac-coverage.mjs` не читает номера с точкой (`// AC-1.1:`): 81 такая метка против 45.
 - `extract-retro-memory.mjs` `extractWaveId` требует номер волны, поэтому именные волны
