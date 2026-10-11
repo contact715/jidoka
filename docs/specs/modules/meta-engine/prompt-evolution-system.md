@@ -26,7 +26,7 @@ Deterministic half of agent self-improvement: surfaces agents below 100% eval ac
 ## Lives in
 
 - `scripts/prompt-evolution.mjs`
-- `.claude/agents/prompt-evolver.md`
+- `prompt-evolver` (роль удалена 2026-10-10)
 
 ## Acceptance criteria
 

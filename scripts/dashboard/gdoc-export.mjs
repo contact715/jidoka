@@ -79,7 +79,7 @@ export function snapshotHtml(project, data, now = '') {
 
 function selfTest() {
   const DEMO = {
-    pipeline: { branch: 'main', stageCount: 1, wave: 'wave-x', progress: 57, stages: [{ label: 'Impl', status: 'running', current: true, agents: [{ name: 'security-scanner', outcome: 'FAIL' }] }] },
+    pipeline: { branch: 'main', stageCount: 1, wave: 'wave-x', progress: 57, stages: [{ label: 'Impl', status: 'running', current: true, agents: [{ name: 'reflexion-critic', outcome: 'FAIL' }] }] },
     production: { deployCount: 2, events: [{ payload: { metric: 'Lead Time', band: 'Elite' } }] },
     tasks: [{ priority: 'high', source: 'gate', text: 'x <failed> & broke' }],
     lessons: [{ class: 'self-test-blindspot', count: 3 }],
@@ -96,7 +96,7 @@ function selfTest() {
   ok('md: lists hanging task with priority + source', md.includes('[high] gate: x <failed> & broke'));
   ok('html: native h1 title', html.includes('<h1>demo — jidoka snapshot</h1>'));
   ok('html: branch + health + wave', html.includes('<b>Branch:</b> main') && html.includes('AMBER') && html.includes('wave-x'));
-  ok('html: stage marked current with agent outcome', html.includes('Impl') && html.includes('← сейчас') && html.includes('security-scanner: FAIL'));
+  ok('html: stage marked current with agent outcome', html.includes('Impl') && html.includes('← сейчас') && html.includes('reflexion-critic: FAIL'));
   ok('html: task in table, escaped', html.includes('<td>high</td>') && html.includes('x &lt;failed&gt; &amp; broke'));
   ok('html: active lessons surfaced', html.includes('self-test-blindspot ×3'));
   if (f) { console.log(`\n\x1b[31mgdoc-export self-test FAILED (${f})\x1b[0m`); process.exit(1); }

@@ -3,8 +3,10 @@
 #
 # Runs from .githooks/post-commit. When a commit lands a "wave-NN" message
 # where NN is divisible by 5, drops a queue file at
-# .claude/self-improvement-queue/wave-NN.md telling the next agent to
-# dispatch the Self-Improvement Reviewer.
+# .claude/self-improvement-queue/wave-NN.md telling the next session to run
+# a cross-wave self-improvement review. The review runs in the main session
+# (or a general-purpose subagent): the self-improvement-reviewer role agent
+# was removed 2026-10-10, so the steps live in the queue file itself.
 #
 # Same shape as wave-33's auto-Reflexion queue. Non-blocking — the hook
 # never fails. Manual dispatch always available via
@@ -47,7 +49,7 @@ QUEUE_FILE="$QUEUE_DIR/wave-${WAVE_RAW}.md"
 
 mkdir -p "$QUEUE_DIR"
 
-# Idempotent — don't overwrite an existing queue file (the agent may
+# Idempotent — don't overwrite an existing queue file (a session may
 # already have it in-flight from an earlier sub-wave of the same major)
 if [ -f "$QUEUE_FILE" ]; then
   exit 0
@@ -61,15 +63,17 @@ cat > "$QUEUE_FILE" <<EOF
 
 ---
 
-## Dispatch hint for next agent session
+## What the next session does
 
 \`\`\`
-Run the Self-Improvement Reviewer (see .claude/agents/self-improvement-reviewer.md):
+Run a cross-wave self-improvement review (main session or a general-purpose subagent):
 
-  1. Read the last 5 retros: ls -t docs/retros/wave-*.md | head -5
-  2. Apply the 6-step search protocol
-  3. Write the report to docs/audit-reports/$(date +%Y-%m-%d)-self-improvement-wave-${WAVE_RAW}.md
-  4. Delete this queue file when done: rm .claude/self-improvement-queue/wave-${WAVE_RAW}.md
+  1. Read the last 5 retros as ONE window: ls -t docs/retros/wave-*.md | head -5
+  2. List patterns that recur in 2+ of them (same friction, same miss, same workaround)
+  3. For each: propose a skill addition or retirement, an anti-pattern catalog entry,
+     or an architectural change; name the retros it came from
+  4. Write the report to docs/audit-reports/$(date +%Y-%m-%d)-self-improvement-wave-${WAVE_RAW}.md
+  5. Delete this queue file when done: rm .claude/self-improvement-queue/wave-${WAVE_RAW}.md
 \`\`\`
 
 ---
@@ -77,8 +81,8 @@ Run the Self-Improvement Reviewer (see .claude/agents/self-improvement-reviewer.
 ## Why this was queued
 
 Every 5 waves the system pauses to look at ITSELF, not just the last
-feature. The Self-Improvement Reviewer reads a window of retros and
-surfaces RECURRING patterns the per-wave Skill Extractor cannot see.
+feature. The review reads a window of retros and surfaces RECURRING
+patterns that reading one retro at a time cannot see.
 
 This is the agent-system equivalent of a sprint retrospective: not
 "did this wave go well" but "is our process drifting".

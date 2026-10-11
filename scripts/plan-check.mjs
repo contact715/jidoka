@@ -9,7 +9,7 @@
 // learning/memory dropped). Complements goal-backward (which runs AFTER) — this is the front gate.
 //
 // HONEST boundary: structural dimensions (phase shape, agent presence, risk-appropriate gates). It
-// does not judge whether the plan's APPROACH is wise — that is the chief-architect's / spec's job.
+// does not judge whether the plan's APPROACH is wise — that is the orchestrator's / spec's job.
 //
 // FULL & self-tested. Usage:
 //   node scripts/plan-check.mjs --self-test

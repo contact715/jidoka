@@ -97,7 +97,7 @@
           },
           {
             "type": "command",
-            "command": "node \"$HOME/.claude/hooks/task-queue-gate.mjs\""
+            "command": "node \"$HOME/.claude/hooks/control-red-gate.mjs\""
           }
         ]
       },
@@ -136,11 +136,6 @@
           {
             "type": "command",
             "command": "$HOME/.claude/hooks/jidoka-feature-reminder.sh",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "node $HOME/.claude/jidoka/scripts/skill-selector.mjs --hook",
             "timeout": 10
           },
           {

@@ -71,10 +71,10 @@ const enrichPhases = (phases) => phases.map((p) => ({ ...p, skills: PHASE_SKILLS
 // build-phase agents, so the DAG can never name an agent the phase does not dispatch.
 export function buildDag(task = {}) {
   const has = (s) => (task.surfaces || []).includes(s);
-  const nodes = [{ id: 'lead', agent: 'engineering-lead', dependsOn: [] }];
+  const nodes = [{ id: 'lead', agent: 'general-purpose', dependsOn: [] }];
   if (has('data')) {
-    nodes.push({ id: 'data-schema', agent: 'data-engineer', dependsOn: ['lead'] });
-    nodes.push({ id: 'data-pipeline', agent: 'data-lead', dependsOn: ['data-schema'] });
+    nodes.push({ id: 'data-schema', agent: 'general-purpose', dependsOn: ['lead'] });
+    nodes.push({ id: 'data-pipeline', agent: 'general-purpose', dependsOn: ['data-schema'] });
   }
   if (has('backend')) {
     nodes.push({ id: 'api', agent: 'backend-agent', dependsOn: [has('data') ? 'data-schema' : 'lead'] });
@@ -89,44 +89,41 @@ export function plan(task = {}) {
   const { risk = 'normal', surfaces = [] } = task;
   const has = (s) => surfaces.includes(s);
   const phases = [];
-  phases.push({ phase: 'discovery', parallel: true, agents: ['user-researcher', 'product-strategist'] });
+  phases.push({ phase: 'discovery', agents: ['clarify-engine'] });
 
   if (risk === 'trivial') {
     phases.push({ phase: 'build', agents: [has('backend') ? 'backend-agent' : 'frontend-agent'] });
     phases.push({ phase: 'gate', agents: ['reflexion-critic', 'budget-gate', 'policy-sandbox'], verifyN: planN(task) });
-    phases.push({ phase: 'memory', agents: ['skill-extractor'] });
+    phases.push({ phase: 'memory', agents: ['extract-retro-memory'] });
     return { task, phases: enrichPhases(phases), postWaveEval: POST_WAVE_EVAL, note: 'trivial → minimal graph (architects skipped)' };
   }
 
-  const spec = ['chief-architect', 'micro-architect', 'macro-architect', 'surface-cartographer',
-    'chief-product-officer', 'business-process-architect', 'kaizen-officer'];
-  if (has('frontend')) spec.push('design-system-architect', 'ux-designer', 'ux-writer');
-  phases.push({ phase: 'spec', parallel: true, agents: spec });
-  phases.push({ phase: 'tests', agents: ['test-engineer'] });
+  // 2026-10-10: role agents (architects, CPO, UX, data, devops…) were removed after 30 days with zero
+  // dispatches. The orchestrator writes the spec with general-purpose helpers and the spec-context chain.
+  phases.push({ phase: 'spec', parallel: true, agents: ['get-spec-context', 'general-purpose'] });
+  phases.push({ phase: 'tests', agents: ['general-purpose'] });
 
-  const build = ['engineering-lead'];
+  const build = ['general-purpose'];
   if (has('backend')) build.push('backend-agent');
   if (has('frontend')) build.push('frontend-agent');
-  if (has('data')) build.push('data-engineer', 'data-lead');
   // Attach the dependency-aware sub-task DAG: independent leaves parallelise, the API waits
   // for the schema, the UI for the API contract, and the longest chain is emitted first so it
   // bounds — not tails — the build's wall-clock. The flat agents[] stays for back-compat.
   const dagNodes = buildDag(task);
   phases.push({ phase: 'build', agents: build, dag: { nodes: dagNodes, schedule: scheduleDAG(dagNodes) } });
 
-  const gates = ['reflexion-critic', 'constitutional-reviewer', 'coverage-auditor', 'budget-gate', 'policy-sandbox'];
-  if (has('backend')) gates.push('security-scanner');
-  if (has('frontend')) gates.push('a11y-auditor', 'perf-profiler', 'visual-qa');
+  const gates = ['reflexion-critic', 'execution-gate', 'coverage-gate', 'budget-gate', 'policy-sandbox'];
+  if (has('backend')) gates.push('dependency-audit');
   // adversarial debate fires whenever the task warrants it (critical risk OR an analytical/comparison/
   // decision task), not only on critical code — debate-trigger is the single router.
   const dbt = shouldDebate(task);
   if (dbt.debate && dbt.mode === 'full') gates.push('debate-prosecutor', 'debate-defender', 'debate-judge');
-  if (risk === 'critical') gates.push('judge-panel', 'best-of-N-judge');
+  if (risk === 'critical') gates.push('judge-panel');
   phases.push({ phase: 'gate', parallel: true, agents: gates, verifyN: planN(task) });
-  phases.push({ phase: 'debug', agents: ['debug-agent'] });
+  phases.push({ phase: 'debug', agents: ['general-purpose'] });
 
-  if (has('deploy') || task.deploy) phases.push({ phase: 'launch', agents: ['devops-lead', 'release-engineer'] });
-  phases.push({ phase: 'memory', agents: ['skill-extractor', 'data-analyst', 'kaizen-officer'] });
+  if (has('deploy') || task.deploy) phases.push({ phase: 'launch', agents: ['general-purpose'] });
+  phases.push({ phase: 'memory', agents: ['extract-retro-memory', 'memory-consolidate'] });
   return { task, phases: enrichPhases(phases), postWaveEval: POST_WAVE_EVAL };
 }
 
@@ -172,15 +169,15 @@ if (wantsSelfTest) {
   const IS_FRAMEWORK = existsSync(join(HERE, 'install-into.mjs'));
   const missingHere = KNOWN_GATES.filter(g => !existsSync(join(HERE, `${g}.mjs`)));
   const T = [
-    ['trivial skips architects', !ta.has('chief-architect')],
+    ['trivial skips the spec helpers', !ta.has('get-spec-context')],
     ['trivial skips the spec phase', !trivial.phases.some(p => p.phase === 'spec')],
-    ['critical runs full spec', ca.has('chief-architect') && ca.has('chief-product-officer')],
-    ['critical backend → security-scanner', ca.has('security-scanner')],
+    ['critical runs full spec (spec chain + helpers)', ca.has('get-spec-context') && ca.has('general-purpose')],
+    ['critical backend → dependency-audit', ca.has('dependency-audit')],
     ['critical → debate + judge-panel', ca.has('debate-judge') && ca.has('judge-panel')],
-    ['frontend → ux-designer + a11y', ca.has('ux-designer') && ca.has('a11y-auditor')],
+    ['frontend → frontend-agent builds it', ca.has('frontend-agent')],
     ['always: budget + policy gate', ca.has('budget-gate') && ca.has('policy-sandbox')],
-    ['always: kaizen in memory', ca.has('kaizen-officer')],
-    ['backend-only skips frontend gates', !agentsIn(plan({ risk: 'normal', surfaces: ['backend'] })).has('visual-qa')],
+    ['always: lessons extracted in memory', ca.has('extract-retro-memory')],
+    ['backend-only skips the frontend agent', !agentsIn(plan({ risk: 'normal', surfaces: ['backend'] })).has('frontend-agent')],
     ['gate carries adaptive verifyN (critical ≥ 3)', (critical.phases.find(p => p.phase === 'gate')?.verifyN ?? 0) >= 3],
     ['trivial gate verifyN === 1 (no wasted verification compute)', trivial.phases.find(p => p.phase === 'gate')?.verifyN === 1],
     ['plan lists post-wave frontier evals (benchmark/trajectory/calibration)', Array.isArray(critical.postWaveEval) && critical.postWaveEval.includes('agent-benchmark')],

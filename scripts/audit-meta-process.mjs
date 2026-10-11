@@ -168,7 +168,7 @@ function detectUnknownPatterns(retroPaths, knownSlugs) {
  * @param {string} msg
  */
 function log(msg) {
-  process.stderr.write(`[meta-process-auditor] ${msg}\n`);
+  process.stderr.write(`[audit-meta-process] ${msg}\n`);
 }
 
 function main() {
@@ -211,7 +211,7 @@ function main() {
     emitTelemetry('meta_process_regression', {
       source: 'scripts/audit-meta-process.mjs',
       wave: 'wave-current',
-      agent: 'meta-process-auditor',
+      agent: 'audit-meta-process',
       verdict: 'REGRESSION_DETECTED',
       payload: {
         slugs: regressions.map((r) => r.slug),
@@ -226,7 +226,7 @@ function main() {
     readAndonConfig(); // side-effect: confirms config is readable; result drives common-launcher, not this script
     writeHaltState(
       'wave-current',
-      'meta-process-auditor',
+      'audit-meta-process',
       `REGRESSION_DETECTED: ${regressions.map((r) => r.slug).join(', ')} in ${regressions.flatMap((r) => r.retros).join(', ')}`
     );
     // writeHaltState always calls process.exit(42) — line below is unreachable but kept as marker
@@ -244,7 +244,7 @@ function main() {
     emitTelemetry('meta_process_regression', {
       source: 'scripts/audit-meta-process.mjs',
       wave: 'wave-current',
-      agent: 'meta-process-auditor',
+      agent: 'audit-meta-process',
       verdict: 'CATALOG_UPDATE_NEEDED',
       payload: {
         slugs: [],
@@ -256,7 +256,7 @@ function main() {
     // T2 — halt-state wiring (wave-150)
     writeHaltState(
       'wave-current',
-      'meta-process-auditor',
+      'audit-meta-process',
       `CATALOG_UPDATE_NEEDED: ${unknown.description}`
     );
     // writeHaltState always calls process.exit(42) — line below is unreachable but kept as marker

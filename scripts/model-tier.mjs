@@ -4,7 +4,7 @@
 // GSD's config has model profiles (quality / balanced / budget) that scale which model each agent
 // runs on. jidoka dispatched every agent on the session model. This advises a per-agent model so a
 // throwaway task can run cheap and a critical one runs strong — WITH one hard rule: high-reasoning
-// roles (architects, judges, debate, reviewers) are never cheaped out to haiku, even on budget. You
+// roles (judges, debate, reviewers) are never cheaped out to haiku, even on budget. You
 // can save on implementation, not on judgement.
 //
 // HONEST boundary: this is ADVICE. The orchestrator passes the chosen model to the Agent tool; this
@@ -12,20 +12,17 @@
 //
 // FULL & self-tested. Usage:
 //   node scripts/model-tier.mjs --self-test
-//   node scripts/model-tier.mjs --role chief-architect --tier budget
+//   node scripts/model-tier.mjs --role debate-judge --tier budget
 //   (library) import { modelForAgent, planModels } from './model-tier.mjs'
 
 import { runCli } from './lib/cli.mjs';
 
-// high-reasoning roles: architecture, product strategy, judgement, adversarial review — never haiku
+// high-reasoning roles: judgement and adversarial review — never haiku
 const HIGH = new Set([
-  'chief-architect', 'micro-architect', 'macro-architect', 'surface-cartographer', 'design-system-architect',
-  'chief-product-officer', 'business-process-architect', 'product-strategist', 'user-researcher',
-  'reflexion-critic', 'constitutional-reviewer', 'debate-prosecutor', 'debate-defender', 'debate-judge',
-  'judge-panel', 'best-of-N-judge', 'security-scanner', 'engineering-lead', 'data-lead', 'kaizen-officer',
+  'reflexion-critic', 'debate-prosecutor', 'debate-defender', 'debate-judge', 'judge-panel',
 ]);
-// mechanical / low-reasoning roles: formatting, extraction, status
-const LOW = new Set(['statusline', 'skill-extractor', 'ux-writer', 'metrics-aggregator']);
+// mechanical / low-reasoning roles: status
+const LOW = new Set(['statusline']);
 
 const TABLE = {
   quality: { high: 'opus', mid: 'opus', low: 'sonnet' },
@@ -52,9 +49,9 @@ function selfTest() {
   const fails = [];
   const ok = (n, c) => { if (!c) fails.push(n); console.log(`  ${c ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${n}`); };
 
-  ok('quality: architect → opus', modelForAgent('chief-architect', 'quality') === 'opus');
+  ok('quality: critic → opus', modelForAgent('reflexion-critic', 'quality') === 'opus');
   ok('quality: implementer → opus', modelForAgent('backend-agent', 'quality') === 'opus');
-  ok('balanced: architect → opus', modelForAgent('chief-architect', 'balanced') === 'opus');
+  ok('balanced: critic → opus', modelForAgent('reflexion-critic', 'balanced') === 'opus');
   ok('balanced: implementer → sonnet', modelForAgent('backend-agent', 'balanced') === 'sonnet');
   ok('balanced: mechanical → haiku', modelForAgent('statusline', 'balanced') === 'haiku');
   ok('budget: implementer → haiku', modelForAgent('backend-agent', 'budget') === 'haiku');

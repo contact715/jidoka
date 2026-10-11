@@ -22,7 +22,7 @@
 //   code_references AND S itself is not staged → WARN/BLOCK with the spec named.
 //   SEMANTIC (DORMANT → an agent): "is this code change actually a CONTRACT
 //   change, or an internal refactor the spec doesn't care about?" — judgement
-//   for the committer / project-steward. That is exactly why the waiver exists
+//   for the committer / orchestrator. That is exactly why the waiver exists
 //   and why soft mode is the default during trial.
 //
 // WAIVER (explicit, logged — never silent): set SPEC_AMEND_WAIVE=1 on the commit

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // code-map — a STRUCTURAL map of the codebase (import/export graph), so agents orient by structure
 // instead of grepping blind. Honest naming: this is a deterministic import/export graph, NOT ML
-// embeddings. It answers the two questions surface-cartographer can't from grep alone:
+// embeddings. It answers the two questions grep alone can't:
 //   • "where is symbol X defined?"            (symbol → file index)
 //   • "what breaks if I touch file Y?"        (blast radius — who imports it, transitively)
 // On a large repo this is the difference between an agent finding the right file and missing it.

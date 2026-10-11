@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// trend-scan — feed an EXTERNAL signal into the self-improvement loop. jidoka's self-improvement-reviewer
+// trend-scan — feed an EXTERNAL signal into the self-improvement loop. jidoka's meta-trend
 // looks INWARD (retros); a high-volume practitioner also scans OUTWARD weekly (trending repos, AI news,
 // market pain) and borrows the best — exactly how the GSD borrow happened here, but by hand. This keeps
 // a ranked ledger of candidates to evaluate, so "what's worth borrowing this week" is a managed queue,

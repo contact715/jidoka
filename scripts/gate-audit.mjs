@@ -77,18 +77,21 @@ export const GATES = [
   { id: 'change-ceremony', layer: 'product', mode: 'soft', token: 'change-ceremony.mjs' },
   { id: 'detect-injection', layer: 'runtime', mode: 'soft', token: null },
   { id: 'detect-constitutional-drift', layer: 'runtime', mode: 'soft', token: null },
-  // LLM judges — measured via golden cases
-  { id: 'constitutional-reviewer', layer: 'LLM', mode: 'measured', token: null },
+  // LLM judges — measured via golden cases. Only agents that EXIST (.claude/agents/<id>.md) belong here:
+  // 2026-10-10 the roster was cut to the dispatched agents, and a judge listed here without a
+  // definition would be counted as "measured" while nobody can dispatch it. Security, coverage,
+  // bundle size and a11y are enforced by deterministic gates (check:security, coverage-gate,
+  // the orchestrator's browser check), not by an LLM judge.
   { id: 'reflexion-critic', layer: 'LLM', mode: 'measured', token: null },
   { id: 'debate-judge', layer: 'LLM', mode: 'measured', token: null },
-  { id: 'best-of-N-judge', layer: 'LLM', mode: 'measured', token: null },
-  { id: 'security-scanner', layer: 'LLM', mode: 'measured', token: null },
-  { id: 'a11y-auditor', layer: 'LLM', mode: 'measured', token: null },
-  { id: 'perf-profiler', layer: 'LLM', mode: 'measured', token: null },
-  { id: 'coverage-auditor', layer: 'LLM', mode: 'measured', token: null },
   { id: 'debate-prosecutor', layer: 'LLM', mode: 'measured', token: null },
   { id: 'debate-defender', layer: 'LLM', mode: 'measured', token: null },
 ];
+
+/** LLM gates whose agent definition is missing: listed as measured, dispatchable by nobody. */
+export function llmGatesWithoutAgent(gates, agentsDir, exists = existsSync) {
+  return gates.filter((g) => g.layer === 'LLM' && !exists(join(agentsDir, `${g.id}.md`))).map((g) => g.id);
+}
 
 // a CI gate is "present" if its token appears in a workflow; selfTestOnly flags when its ONLY
 // appearance is a --self-test invocation — the gate's LOGIC is CI-verified, but it does NOT enforce on
@@ -267,9 +270,9 @@ export function remedyPasteBlock(pending = []) {
 // stale: a number a human maintains, guarding a property a machine could read.
 //
 // REJECTED half of this recommendation, with evidence. It also asked to "drop the unbacked
-// measured claim for 10 judges". Checked on disk: all ten have docs/evals/<agent>/golden-cases.jsonl
-// AND a recorded run-*.jsonl. The claim is backed, so it stays. Removing it would have deleted a
-// true statement on the strength of a plausible-sounding report line.
+// measured claim for 10 judges". Checked on disk then: all ten had docs/evals/<agent>/golden-cases.jsonl
+// AND a recorded run-*.jsonl, so the claim stayed. (2026-10-10 six of those agents were removed from
+// the roster; their entries left the LLM layer with them — llmGatesWithoutAgent guards that.)
 export function stopGatesFrom(settingsText) {
   let cfg;
   try { cfg = JSON.parse(String(settingsText)); } catch { return { checked: false, gates: [] }; }
@@ -498,6 +501,13 @@ function selfTest() {
     ['a real-run CI gate is NOT flagged selfTestOnly', stOnly['eval-suite'] === false],
     ['layers cover CI/runtime/product/LLM/PreToolUse', new Set(GATES.map(g => g.layer)).size >= 5],
     ['soft gates are explicitly marked', GATES.some(g => g.mode === 'soft')],
+    ['every LLM-layer gate has a live agent definition (.claude/agents/<id>.md)', (() => {
+      const agentsDir = join((new URL('..', import.meta.url)).pathname, '.claude', 'agents');
+      const dir = existsSync(agentsDir) ? agentsDir : join(homedir(), '.claude', 'agents');
+      return GATES.some(g => g.layer === 'LLM') && llmGatesWithoutAgent(GATES, dir).length === 0;
+    })()],
+    ['an LLM gate with no agent definition is caught',
+      llmGatesWithoutAgent([{ id: 'gone-judge', layer: 'LLM' }, { id: 'live-judge', layer: 'LLM' }, { id: 'x', layer: 'CI' }], '/a', (p) => p === '/a/live-judge.md').join() === 'gone-judge'],
     ['orphan gate:* script (no caller anywhere) is caught', findOrphanGateScripts({ scripts: { 'gate:x': 'node scripts/x.mjs' } }, 'run: npm test').includes('gate:x')],
     ['gate:* called by name (CI/hook) is NOT an orphan', findOrphanGateScripts({ scripts: { 'gate:x': 'node scripts/x.mjs' } }, 'run: npm run gate:x').length === 0],
     ['gate:* whose FILE ships via installer is NOT an orphan', findOrphanGateScripts({ scripts: { 'gate:x': 'node scripts/x.mjs' } }, "payload: 'x.mjs',").length === 0],

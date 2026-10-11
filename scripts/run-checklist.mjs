@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
- * run-checklist.mjs — Wave-159 PFCA (Pre-Flight Checklist Agent) enforcement.
+ * run-checklist.mjs — Wave-159 PFCA (Pre-Flight Checklist) enforcement. This script IS the
+ * executor: the pfca-agent role definition was removed 2026-10-10, and the audit record and
+ * halt state name this script (slug `run-checklist`) as the dispatcher.
  *
  * Reads pfca config from .sdd-config.json, evaluates 5 universal killer items
  * (K1-K5) plus optional per-tier additions from docs/checklists/phase-{phase}.md,
@@ -36,6 +38,9 @@ const CHECKLIST_DIR = path.join(ROOT, 'docs', 'checklists');
 const AUDIT_LOG_PATH = path.join(ROOT, 'docs', 'audits', 'checklist-runs.jsonl');
 
 // ── Valid phases ───────────────────────────────────────────────────────────
+// Who ran the check: written to the audit record and to the andon halt state.
+export const DISPATCHER = 'run-checklist';
+
 const VALID_PHASES = ['dor', 'dod', 'spec-review', 'task-decomp', 'closure', 'impl', 'premortem'];
 const VALID_TIERS = ['L0', 'L1', 'L2', 'L3', 'L4'];
 
@@ -45,7 +50,7 @@ const VALID_TIERS = ['L0', 'L1', 'L2', 'L3', 'L4'];
 export const CLI = {
   name: 'run-checklist',
   usage: `
-[pfca] Pre-Flight Checklist Agent — Wave-159
+[pfca] Pre-Flight Checklist — Wave-159
 
 Usage:
   node scripts/run-checklist.mjs --phase <phase> --wave <wave-NNN> [--tier <tier>] [--dry-run] [--staged]
@@ -425,7 +430,7 @@ if (isMain) {
     checklist: tier || 'universal',
     verdict,
     items: results,
-    dispatcher: 'pfca-agent',
+    dispatcher: DISPATCHER,
     haltStateWritten: false,
   };
 
@@ -480,7 +485,7 @@ if (isMain) {
       const { writeHaltState } = await import('./andon-halt-helpers.mjs');
       writeHaltState(
         wave,
-        'pfca-agent',
+        DISPATCHER,
         `PFCA BLOCK — killer item(s) unmet: ${failingItems.map(i => i.question.substring(0, 60)).join('; ')}`
       );
       // writeHaltState calls process.exit(42) — unreachable

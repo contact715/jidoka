@@ -39,7 +39,11 @@ const MATRIX = [
 ];
 
 // resolve a graph node to a real agent file or engine script (or null = ghost)
+// Claude Code ships these agents itself: they have no file in .claude/agents, yet are real.
+export const BUILTIN_AGENTS = new Set(['general-purpose', 'Explore']);
+
 export function resolveNode(name, root = process.cwd()) {
+  if (BUILTIN_AGENTS.has(name)) return 'builtin';
   if (existsSync(join(root, '.claude', 'agents', `${name}.md`))) return 'agent';
   if (existsSync(join(root, 'scripts', `${name}.mjs`))) return 'script';
   return null;
@@ -75,7 +79,10 @@ function selfTest() {
   const T = [
     ['real matrix has 0 ghost nodes', real.ghosts.length === 0],
     ['real matrix has 0 phases without an artifact contract', real.missing.length === 0],
-    ['matrix actually covered the graph (>20 nodes)', real.nodeCount > 20],
+    // 17 distinct nodes after the 2026-10-10 slim (42 unused role agents removed); the floor guards
+    // against an empty or truncated matrix, not against a lean team.
+    ['matrix actually covered the graph (>=15 nodes)', real.nodeCount >= 15],
+    ['resolveNode knows Claude Code built-in agents', resolveNode('general-purpose', root) === 'builtin'],
     ['a fake agent is caught as a ghost', fake.ghosts.includes('definitely-not-an-agent-xyz')],
     ['an undefined phase is caught', badPhase.phasesWithoutArtifact.includes('mystery-phase')],
     ['resolveNode finds an agent (.md)', resolveNode('reflexion-critic', root) === 'agent'],

@@ -204,8 +204,8 @@ if (isMain && runCli(CLI).selfTest) {
 
   // A linear chain: lead → schema → api → ui.
   const chain = scheduleDAG([
-    { id: 'lead', agent: 'engineering-lead' },
-    { id: 'schema', agent: 'data-engineer', dependsOn: ['lead'] },
+    { id: 'lead', agent: 'general-purpose' },
+    { id: 'schema', agent: 'backend-agent', dependsOn: ['lead'] },
     { id: 'api', agent: 'backend-agent', dependsOn: ['schema'] },
     { id: 'ui', agent: 'frontend-agent', dependsOn: ['api'] },
   ]);
@@ -215,9 +215,9 @@ if (isMain && runCli(CLI).selfTest) {
 
   // A fan: lead → {api, docs}; api → ui. docs is an independent leaf, ui is on the long chain.
   const fan = scheduleDAG([
-    { id: 'lead', agent: 'engineering-lead' },
+    { id: 'lead', agent: 'general-purpose' },
     { id: 'api', agent: 'backend-agent', dependsOn: ['lead'] },
-    { id: 'docs', agent: 'ux-writer', dependsOn: ['lead'] },
+    { id: 'docs', agent: 'general-purpose', dependsOn: ['lead'] },
     { id: 'ui', agent: 'frontend-agent', dependsOn: ['api'] },
   ]);
   ok('fan: api and docs share a level (parallel)', fan.levels[1].includes('api') && fan.levels[1].includes('docs'));

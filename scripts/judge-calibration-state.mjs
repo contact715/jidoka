@@ -37,9 +37,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
 // The LLM judges whose verdicts the pipeline trusts (render a verdict a downstream step relies on).
+// Only judges that have an agent definition (.claude/agents/<slug>.md); the self-test enforces it.
 export const JUDGE_SLUGS = [
-  'constitutional-reviewer', 'debate-judge', 'debate-prosecutor', 'debate-defender',
-  'best-of-N-judge', 'reflexion-critic', 'self-improvement-reviewer',
+  'debate-judge', 'debate-prosecutor', 'debate-defender', 'reflexion-critic',
 ];
 
 /**
@@ -92,18 +92,20 @@ function selfTest() {
   let fails = 0;
   const ok = (name, cond) => { if (!cond) fails++; console.log(`  ${cond ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); };
 
-  // Injected probe: only reflexion-critic is fully calibrated; best-of-N-judge has a dataset only.
+  // Injected probe: only reflexion-critic is fully calibrated; debate-judge has a dataset only.
   const probe = (rel) =>
     rel === 'docs/evals/reflexion-critic/golden-cases.jsonl' ||
     rel === 'docs/evals/reflexion-critic/calibration.json' ||
-    rel === 'docs/evals/best-of-N-judge/golden-cases.jsonl';
+    rel === 'docs/evals/debate-judge/golden-cases.jsonl';
   const s = computeState(probe);
   const bySlug = Object.fromEntries(s.judges.map((j) => [j.slug, j]));
   ok('reflexion-critic with dataset+calibration → measured', bySlug['reflexion-critic'].status === 'measured');
-  ok('best-of-N-judge with dataset only → dormant', bySlug['best-of-N-judge'].status === 'dormant');
+  ok('debate-judge with dataset only → dormant', bySlug['debate-judge'].status === 'dormant');
   ok('a judge with no dataset → no-dataset', bySlug['debate-prosecutor'].status === 'no-dataset');
   ok('measuredJudges counts only the calibrated', s.measuredJudges === 1);
   ok('total covers every judge slug', s.total === JUDGE_SLUGS.length);
+  ok('every judge slug has a live agent definition (.claude/agents/<slug>.md)',
+    JUDGE_SLUGS.length > 0 && JUDGE_SLUGS.every((slug) => existsRel(`.claude/agents/${slug}.md`)));
 
   // None calibrated → measuredJudges 0 (the honest gate-closed state).
   const none = computeState(() => false);

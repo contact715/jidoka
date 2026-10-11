@@ -197,7 +197,7 @@ ${e.observations.map((o) => `- ${o}`).join('\n')}
 ---
 
 *To regenerate: \`node scripts/export-memory-anti-patterns.mjs\`*
-*To run live MCP query and update: dispatch meta-process-auditor or re-run script after MCP sync.*
+*To run live MCP query and update: run scripts/audit-meta-process.mjs or re-run script after MCP sync.*
 `;
 }
 

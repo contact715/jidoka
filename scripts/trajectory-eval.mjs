@@ -9,7 +9,7 @@
 // THE KEY FIT: agentevals needs hand-authored reference traces (its main dead-weight risk). We don't:
 // the EXPECTED trajectory is plan(task) from orchestration-planner — the single definition of the
 // agent graph. The ACTUAL trajectory is what really ran (agent-traces.jsonl). So this catches a wave
-// that SKIPPED a required agent (e.g. shipped a critical wave without security-scanner / debate),
+// that SKIPPED a required agent (e.g. shipped a critical wave without reflexion-critic / debate),
 // using data that already exists — no manual reference traces.
 //
 // FULL & self-tested. Usage:
@@ -70,7 +70,7 @@ function selfTest() {
   ok('superset: expected is ordered subsequence → pass', compareTrajectory(['x', 'a', 'y', 'b'], ['a', 'b'], 'superset').pass === true);
   ok('superset: out-of-order expected → fail', compareTrajectory(['b', 'a'], ['a', 'b'], 'superset').pass === false);
   ok('contains: all required present (extra ok) → pass', compareTrajectory(['a', 'b', 'extra'], ['a', 'b'], 'contains').pass === true);
-  ok('contains: a required step missing → fail + names it', (() => { const r = compareTrajectory(['a'], ['a', 'security-scanner'], 'contains'); return r.pass === false && r.missing.includes('security-scanner'); })());
+  ok('contains: a required step missing → fail + names it', (() => { const r = compareTrajectory(['a'], ['a', 'reflexion-critic'], 'contains'); return r.pass === false && r.missing.includes('reflexion-critic'); })());
   ok('partial: half overlap → score 0.5, pass at threshold', (() => { const r = compareTrajectory(['a'], ['a', 'b'], 'partial'); return r.score === 0.5 && r.pass === true; })());
   ok('reports extra steps', compareTrajectory(['a', 'rogue'], ['a'], 'contains').extra.includes('rogue'));
   ok('isOrderedSubsequence basic', isOrderedSubsequence(['a', 'b'], ['x', 'a', 'b']) === true && isOrderedSubsequence(['b', 'a'], ['a', 'b']) === false);

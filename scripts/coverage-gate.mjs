@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// coverage-gate — deterministic coverage ratchet. The coverage-auditor AGENT gives an opinion; this
+// coverage-gate — deterministic coverage ratchet. This
 // is the hard number: it reads a coverage summary (vitest/c8 coverage-summary.json), compares the
 // total line-% to a committed baseline, and FAILS if it dropped more than maxDrop. The baseline can
 // only go UP (ratchet) — a passing run with higher coverage updates it. Portable; ships to products

@@ -2,15 +2,18 @@
 /**
  * run-tier-2-checks.mjs — Tier 2 specialist check orchestrator.
  *
- * Runs reflexion-critic, constitutional-reviewer, visual-qa, and
- * integration-tester in sequence. Outer iteration cap: 5 routing cycles.
- * When a specialist returns REVISE, routes to the category-specific fix agent.
+ * Runs reflexion-critic (the one LLM specialist left after the 2026-10-10 roster cut).
+ * Outer iteration cap: 5 routing cycles. On REVISE, routes to the fix agent.
+ *
+ * What the removed specialists did is done elsewhere now:
+ *   - Mission alignment       → Tier 3 debate (debate-prosecutor / debate-judge)
+ *   - visual / a11y check     → the orchestrator's browser check
+ *   - E2E run                 → execution-gate.mjs / e2e-run-gate in the product's CI
  *
  * Tier 2 PASS is a prerequisite for Tier 3 activation.
  *
  * Usage:
  *   node scripts/run-tier-2-checks.mjs --wave wave-103
- *   node scripts/run-tier-2-checks.mjs --wave wave-103 --skip-visual
  *   node scripts/run-tier-2-checks.mjs --help
  */
 
@@ -29,15 +32,14 @@ const ROOT = path.resolve(__dirname, '..');
 const USAGE = `
 run-tier-2-checks.mjs — Tier 2 specialist check orchestrator
 
-Runs 4 specialist checks with smart routing on REVISE verdicts.
+Runs the reflexion-critic specialist check with routing on REVISE verdicts.
 Outer iteration cap: 5 routing cycles per specialist.
 
 Usage:
-  node scripts/run-tier-2-checks.mjs --wave <wave-id> [--skip-visual] [--dry-run] [--help]
+  node scripts/run-tier-2-checks.mjs --wave <wave-id> [--dry-run] [--help]
 
 Flags:
   --wave <id>      Wave identifier (e.g. wave-103; default "unknown")
-  --skip-visual    Skip visual-qa check (no screenshot baseline required)
   --dry-run        Print routing decisions without executing agents
   --help           Show this message
 
@@ -52,7 +54,6 @@ export const CLI = {
   usage: USAGE,
   options: {
     wave: { type: 'string', value: 'id', default: 'unknown', desc: 'wave identifier' },
-    'skip-visual': { type: 'boolean', desc: 'skip visual-qa' },
     'dry-run': { type: 'boolean', desc: 'print routing decisions without executing agents' },
   },
 };
@@ -63,7 +64,6 @@ if (isMain) {
   const { values } = runCli(CLI);
 
   const waveId = values.wave;
-  const skipVisual = values['skip-visual'] === true;
   const dryRun = values['dry-run'] === true;
 
   /** Max outer routing cycles before escalating. */
@@ -142,9 +142,6 @@ if (isMain) {
  */
   const FIX_AGENT = {
     'reflexion-critic': 'frontend-agent',
-    'constitutional-reviewer': 'constitutional-reviewer',
-    'visual-qa': 'visual-qa',
-    'integration-tester': 'frontend-agent',
   };
 
   // ── Specialist runner ────────────────────────────────────────────────────
@@ -201,14 +198,12 @@ if (isMain) {
 
   // ── Orchestrate ─────────────────────────────────────────────────────────
 
-  console.log(`\n=== Tier 2 Checks (${waveId})${dryRun ? ' [DRY-RUN]' : ''}${skipVisual ? ' [--skip-visual]' : ''} ===\n`);
+  console.log(`\n=== Tier 2 Checks (${waveId})${dryRun ? ' [DRY-RUN]' : ''} ===\n`);
 
   const specPath = `docs/specs/${waveId}_MASTER_SPEC.md`;
   const contextHint = `wave=${waveId} spec=${specPath}`;
 
-  const specialists = ['reflexion-critic', 'constitutional-reviewer'];
-  if (!skipVisual) specialists.push('visual-qa');
-  specialists.push('integration-tester');
+  const specialists = ['reflexion-critic'];
 
   const results = [];
   let anyBlock = false;

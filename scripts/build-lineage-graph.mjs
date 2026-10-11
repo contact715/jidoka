@@ -736,7 +736,7 @@ function buildJsonGraph(specMap, orphans) {
           rel: 'triggered',
           dst: apNodeId,
           wave: waveNorm,
-          agent: 'meta-process-auditor',
+          agent: 'audit-meta-process',
         });
       }
     }

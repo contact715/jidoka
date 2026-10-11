@@ -7,9 +7,13 @@
  *
  * Tier 3 activation criteria:
  *   - --effort L (large wave)
- *   - Diff touches security-critical paths (flagged by security-scanner BLOCK)
+ *   - Diff touches security-critical paths (diffTouchesSecurity)
  *   - Diff touches billing/payment files
- *   - constitutional-reviewer emitted VIOLATION in Tier 2
+ *
+ * Mission alignment is argued in Tier 3 (debate-prosecutor / debate-judge). The Tier-2
+ * constitutional-VIOLATION hard stop was removed with its reviewer agent on 2026-10-10:
+ * nothing emitted VIOLATION any more, so the stop could only fire on stray text and the
+ * telemetry it wrote recorded PASS verdicts from a reviewer that no longer ran.
  *
  * Tier 3 skipped for --effort S unless security or billing paths are flagged.
  *
@@ -23,8 +27,6 @@ import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-// Wave-166: constitutional_verdict emit to 13th stream
-import { emitTelemetry } from './emit-telemetry.mjs';
 import { runCli } from './lib/cli.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -41,13 +43,12 @@ Orchestrates Tier 1 → Tier 2 → Tier 3 (conditional) → Tier 4 (if needed).
 Writes audit trail to docs/metrics/verification-pipeline-{wave}.json.
 
 Usage:
-  node scripts/run-verification-pipeline.mjs --wave <id> [--effort <S|M|L>] [--dry-run] [--cr-override <json>] [--help]
+  node scripts/run-verification-pipeline.mjs --wave <id> [--effort <S|M|L>] [--dry-run] [--help]
 
 Flags:
   --wave <id>            Wave identifier (e.g. wave-103)
   --effort <S|M|L>       Wave effort level. S skips Tier 3 unless security/billing flagged. Default M.
   --dry-run              Print tier decisions without executing
-  --cr-override <json>   Attributed override of a constitutional VIOLATION: {"approver":"…","reason":"…"}
   -h, --help             Show this message
 
 Exit codes:
@@ -59,7 +60,6 @@ Exit codes:
     wave: { type: 'string', default: 'unknown' },
     effort: { type: 'string', default: 'M', choices: ['S', 'M', 'L'] },
     'dry-run': { type: 'boolean' },
-    'cr-override': { type: 'string' },
   },
 };
 
@@ -170,9 +170,7 @@ if (isMain) {
 
   /**
  * Determine whether Tier 3 should be activated.
- * Wave-154 D1: constitutionalViolation removed from this function — a CR VIOLATION
- * now exits the pipeline with a hard stop before Tier 3 is reached. Tier 3 activates
- * on effort level and security/billing path signals only.
+ * Tier 3 activates on effort level and security/billing path signals only.
  * @param {string} effort - 'S'|'M'|'L'
  * @param {{ tier1Blocked: boolean }} ctx
  * @returns {{ activate: boolean, reason: string }}
@@ -271,105 +269,16 @@ if (isMain) {
   });
   const t2Elapsed = `${((Date.now() - t2Start) / 1000).toFixed(1)}s`;
   const tier2Blocked = !t2.ok;
-  const constitutionalViolation = t2.stdout.includes('VIOLATION') || t2.stdout.includes('constitutional-reviewer: BLOCK');
-
-  // Wave-166 T.1: parse Q-number + Q-detail from CR stdout; emit constitutional_verdict to 13th stream.
-  // Runs AFTER the boolean detection above (cross-cutting gate §13).
-  // CR agent contract is UNCHANGED — capture happens at the pipeline layer only.
-  {
-    const qMatch = t2.stdout.match(/VIOLATION\s*\(Q([1-5]):\s*(.+?)\)/);
-    const qNumber = qMatch ? `Q${qMatch[1]}` : null;
-    const qDetail = qMatch ? qMatch[2].trim() : null;
-    try {
-      emitTelemetry('constitutional_verdict', {
-        source: 'scripts/run-verification-pipeline.mjs',
-        wave: waveId,
-        agent: 'constitutional-reviewer',
-        verdict: constitutionalViolation ? 'VIOLATION' : 'PASS',
-        payload: {
-          q_number: qNumber,
-          q_detail: qDetail,
-          pipeline_mode: 'tier2',
-        },
-      });
-    } catch {
-      // Non-fatal — telemetry failure must not disrupt the pipeline
-    }
-  }
-
   auditTrail.tiers.tier2 = {
     status: tier2Blocked ? 'BLOCK' : 'PASS',
     elapsed: t2Elapsed,
-    constitutionalViolation,
     output: t2.stdout.slice(0, 1000),
   };
 
   if (t2.stdout) process.stdout.write(t2.stdout);
 
-  // ── Wave-154 CR binding hard-stop ────────────────────────────────────────
-  // A5: when constitutionalViolation: true and no valid attributed override,
-  // exit 1 BEFORE shouldActivateTier3 is reached (VIOLATION is not Tier 3 input).
-  // A6: when constitutionalViolation: true WITH valid override, write WARN record
-  // to verdict log and proceed to Tier 3 normally.
-  // D1: constitutional VIOLATION is not ambiguous — hard stop, no debate.
-  const crOverrideRaw = values['cr-override'] ?? null;
-  const crOverride = (() => {
-    if (!crOverrideRaw) return null;
-    try {
-      const obj = JSON.parse(crOverrideRaw);
-      const approver = (obj.approver || '').trim();
-      const reason = (obj.reason || '').trim();
-      if (!approver || !reason) return null;
-      return { approver, reason };
-    } catch { return null; }
-  })();
-
-  if (constitutionalViolation) {
-    const verdictsPath = path.join(ROOT, 'docs', 'audits', 'cross-line-verdicts.jsonl');
-    const verdictsDir = path.dirname(verdictsPath);
-    if (!fs.existsSync(verdictsDir)) fs.mkdirSync(verdictsDir, { recursive: true });
-
-    if (crOverride) {
-      // A6: valid override — WARN record, proceed to Tier 3
-      const warnRecord = {
-        timestamp: timestamp(),
-        wave: waveId,
-        agent: 'constitutional-reviewer',
-        callerLine: 'pipeline',
-        calleeLine: 'Second',
-        verdict: 'WARN',
-        principle: 'IIA Three Lines Model 2020 — CR VIOLATION with attributed override (A6)',
-        override: crOverride,
-      };
-      fs.appendFileSync(verdictsPath, JSON.stringify(warnRecord) + '\n', 'utf8');
-      log('[PIPELINE] CR VIOLATION — attributed override accepted, proceeding to Tier 3 (A6)');
-      log(`  Approver: ${crOverride.approver} | Reason: ${crOverride.reason}`);
-    } else {
-      // A5: no override — hard stop before shouldActivateTier3
-      const blockRecord = {
-        timestamp: timestamp(),
-        wave: waveId,
-        agent: 'constitutional-reviewer',
-        callerLine: 'pipeline',
-        calleeLine: 'Second',
-        verdict: 'BLOCK',
-        principle: 'IIA Three Lines Model 2020 — CR VIOLATION without attributed override (A5)',
-        override: null,
-      };
-      fs.appendFileSync(verdictsPath, JSON.stringify(blockRecord) + '\n', 'utf8');
-      auditTrail.finalStatus = 'BLOCKED';
-      auditTrail.escalations = auditTrail.escalations || [];
-      auditTrail.escalations.push({ type: 'CR_VIOLATION', timestamp: timestamp() });
-      writeAuditTrail();
-      log('[PIPELINE] CR VIOLATION — hard stop (wave-154 A5). No attributed --cr-override provided.');
-      log('  To proceed: add --cr-override \'{"approver":"<name>","reason":"<justification>"}\'');
-      process.exit(1);
-    }
-  }
-
   // ── Tier 3 ────────────────────────────────────────────────────────────────
-  // D1: constitutionalViolation is no longer passed to shouldActivateTier3 —
-  // a CR VIOLATION now exits above (hard stop). Tier 3 activates on effort/security/billing only.
+  // Tier 3 activates on effort/security/billing only.
   const { activate: activateTier3, reason: tier3Reason } = shouldActivateTier3(effort, {
     tier1Blocked,
   });

@@ -3,12 +3,12 @@
 /**
  * Wave-158 — Andon Cord halt-state helpers
  *
- * Shared by all 9 halt-authority agents:
- *   test-runner, coverage-auditor, a11y-auditor, security-scanner,
- *   constitutional-reviewer, debate-judge, meta-process-auditor,
- *   proactive-surfacing-agent (blocking severity only), pfca-agent
+ * Shared by every halt-authority caller. Since the 2026-10-10 roster cut these are
+ * deterministic scripts, not agents: run-checklist, audit-meta-process, detect-recurrences,
+ * detect-constitutional-drift, detect-injection, surface-concerns (blocking severity only),
+ * compute-cost, compute-slos, compute-dora, compute-carbon.
  *
- * Canonical source for this list: docs/governance/raci.json halt-gate responsible[]
+ * Canonical source for this list: the callers of writeHaltState (grep the scripts/ tree).
  *
  * Exit codes:
  *   42 — halted, awaiting human resume via `node scripts/andon-resume.mjs`
@@ -103,7 +103,7 @@ function appendHaltEvent(record) {
  * Then exits the process with code 42.
  *
  * @param {string} wave          - e.g. "wave-158"
- * @param {string} agent         - e.g. "constitutional-reviewer"
+ * @param {string} agent         - who halted, e.g. "detect-injection"
  * @param {string} reason        - human-readable reason for the halt
  * @param {string|null} [runbook] - wave-171: optional path to the runbook that covers this
  *                                  halt type, e.g. "docs/runbooks/incident-response.md".

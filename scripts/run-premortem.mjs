@@ -23,7 +23,8 @@
  * Model: claude-sonnet-4-5
  * Cost estimate: ~$0.25 per wave (5 LLM calls: 4 lenses + 1 synthesis)
  *
- * Authority: .claude/agents/pre-mortem-agent.md
+ * Authority: this script (the pre-mortem-agent role definition was removed 2026-10-10;
+ *   telemetry names this script, slug `run-premortem`, as the agent that ran).
  * Spec: docs/specs/wave-156_MASTER_SPEC.md
  */
 
@@ -521,7 +522,7 @@ ${synthesisText}
     emitTelemetry('pre_mortem_run', {
       source: 'scripts/run-premortem.mjs',
       wave: waveId,
-      agent: 'pre-mortem-agent',
+      agent: 'run-premortem',
       verdict: themes.length >= 3 ? 'PASS' : 'WARN',
       payload: {
         lens_count: 4,

@@ -19,7 +19,7 @@
  *
  * Usage (ESM import):
  *   import { emitTelemetry } from './emit-telemetry.mjs';
- *   emitTelemetry('halt', { wave: 'wave-147', agent: 'pfca-agent', ... });
+ *   emitTelemetry('halt', { wave: 'wave-147', agent: 'reflexion-critic', ... });
  *
  * Stream routing:
  *   halt | resume | forced_resume             → docs/audits/halt-events.jsonl
@@ -495,7 +495,7 @@ export function readJsonlChainIntegrity(filePath) {
  *
  * Required fields in `fields`:
  *   wave      {string}         e.g. "wave-147"
- *   agent     {string}         e.g. "pfca-agent"
+ *   agent     {string}         e.g. "reflexion-critic"
  *
  * Optional but recommended:
  *   trace_id        {string}   UUID-v4 per top-level dispatch (generated if absent)

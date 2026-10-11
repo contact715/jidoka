@@ -19,7 +19,7 @@
 //   not exist; a declared parent spec must exist on disk. Checkable, deterministic.
 //   SEMANTIC (DORMANT → an agent): "does the prose still describe what the code DOES"
 //   (e.g. status says P3-done but the code is mid-wave) is a judgement the
-//   meta-process-auditor / chief-architect makes. It is NOT automatable here and is
+//   orchestrator makes (or a reflexion-critic pass). It is NOT automatable here and is
 //   deliberately left to the agent — the script guarantees the cheap, certain half.
 //
 // SOFT / HARD (graduation, K8s admission-webhook warn→enforce — HIERARCHICAL_SPEC_SYSTEM §8):
@@ -381,6 +381,6 @@ if (isMain) {
     process.exit(1);
   }
   console.log(`\n\x1b[33m○ soft mode: ${findings.length} finding(s) reported, not blocking. Set driftDetection.hardBlockEnabled=true to enforce after the trial.\x1b[0m`);
-  console.log('  \x1b[2msemantic drift (status vs real progress) — hand to meta-process-auditor / chief-architect.\x1b[0m');
+  console.log('  \x1b[2msemantic drift (status vs real progress) — hand to the orchestrator / reflexion-critic.\x1b[0m');
   process.exit(0);
 }

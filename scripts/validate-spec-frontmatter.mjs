@@ -22,7 +22,7 @@
 //   wave id. Checkable, deterministic.
 //   SEMANTIC (DORMANT → an agent): "is this the RIGHT parent", "is the status
 //   truthful", "does the content match the level" — judgement calls for the
-//   project-steward / chief-architect, deliberately NOT automated here.
+//   orchestrator, deliberately NOT automated here.
 //
 // SOFT / HARD (graduation, warn→enforce — HIERARCHICAL_SPEC_SYSTEM §8):
 //   .sdd-config.json → specFrontmatter.hardBlockEnabled

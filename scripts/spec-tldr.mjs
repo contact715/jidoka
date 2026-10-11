@@ -3,7 +3,7 @@
 // criteria into a compact bullet list, so a human can approve the GIST without reading the whole spec.
 // Borrow from a practitioner who has the spec-writer ALSO summarise the spec in plain language — he
 // approves the summary, not the 600-line document. This is the deterministic extraction half; the
-// chief-architect adds the plain-language semantic gloss (an agent-prompt instruction).
+// orchestrator adds the plain-language semantic gloss (an agent-prompt instruction).
 //
 // HONEST boundary: structural extraction (headers + list items), not semantic rewriting. It surfaces
 // what the spec SAYS in its objective/AC sections; it does not interpret intent.

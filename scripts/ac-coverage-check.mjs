@@ -22,7 +22,7 @@
 //   Checkable, deterministic. A matching token does NOT prove the test MEANINGFULLY
 //   covers the AC —
 //   SEMANTIC (DORMANT → an agent): "does this test actually verify the AC's
-//   behaviour" is judgement for test-engineer / best-of-N-judge, not this script.
+//   behaviour" is judgement for reflexion-critic, not this script.
 //
 // SOFT / HARD (graduation, warn→enforce — HIERARCHICAL_SPEC_SYSTEM §8):
 //   .sdd-config.json → acCoverage.hardBlockEnabled  (false → WARN, true → exit 1)

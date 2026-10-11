@@ -1,6 +1,6 @@
 ---
 status: Active
-version: 2.0.0
+version: 2.0.1
 level: L0
 type: constitution
 owner_role: platform
@@ -153,7 +153,7 @@ This is our **Jidoka** pillar: quality is built into each unit of work, not insp
 
 **Reconciliation with Minimal footprint** (CLAUDE.md Engineering Principles): minimal footprint still holds against padding and duplication, never against clarity or defensive code. Clarity outranks line count. The two rules meet at: no bloat, no shortcut.
 
-**Enforcement point**: [`.claude/agents/best-of-N-judge.md`](../.claude/agents/best-of-N-judge.md). The judge applies this definition as its rubric — AC-compliance and coverage are disqualification gates, the four criteria are the primary selection weight, efficiency breaks ties only.
+**Enforcement point**: none since 2026-10-10. The `best-of-N-judge` agent that applied this definition as its rubric (AC-compliance and coverage as disqualification gates, the four criteria as the primary selection weight, efficiency as tie-break only) was removed with 41 other role agents after 30 days with zero dispatches. `scripts/adaptive-verify.mjs` selects among N variants by a weighted rubric, which is NOT this definition (no disqualification gates). Restoring an enforcement point is an open owner decision.
 
 ---
 

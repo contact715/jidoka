@@ -44,7 +44,7 @@ export function extractVerdict(text) {
 //   no-verdict    the agent answered, but no verdict could be extracted — a format problem
 //   wrong-verdict the agent decided, and decided wrong — the only kind a prompt patch addresses
 
-/** Why a case did not match, in a form a prompt-evolver can act on. Pure. */
+/** Why a case did not match, in a form a prompt patch can act on. Pure. */
 export function classifyMiss(expected, got, hasRun) {
   if (!hasRun) return 'no-run';
   if (got === null) return 'no-verdict';

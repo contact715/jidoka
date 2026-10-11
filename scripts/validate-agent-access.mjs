@@ -164,7 +164,7 @@ function parseAgentToolsFromMd(slug) {
   if (fs.existsSync(kebabPath)) {
     return extractToolsFromFile(kebabPath);
   }
-  // Orchestrator, CPO, CIO are L0/L0.5 agents without dedicated .md files
+  // Orchestrator and CIO are L0 roles without dedicated .md files
   return null;
 }
 
@@ -294,16 +294,17 @@ function main() {
     const llm06Category = entry.llm06_category || 'none';
     const lineStr = entry.line || '';
 
-    // Skip L0/L0.5 agents without dedicated .md files (Orchestrator, CPO, CIO)
-    const L0_AGENTS = ['orchestrator', 'chief-product-officer', 'competitive-intelligence-officer'];
+    // Skip L0 roles without dedicated .md files (Orchestrator, CIO). chief-product-officer left
+    // this list 2026-10-10 with the role-agent purge: a registry row for it is now an orphan,
+    // not an exempt L0 role.
+    const L0_AGENTS = ['orchestrator', 'competitive-intelligence-officer'];
     const isL0Agent = L0_AGENTS.includes(slug);
 
     // ── I0 — Grant-drift check ─────────────────────────────────────────
     if (!isL0Agent) {
       const actualTools = parseAgentToolsFromMd(slug);
       if (actualTools === null) {
-        // .md file has no frontmatter tools: line (older-format agents like
-        // proactive-surfacing-agent and pre-mortem-agent use body-only format).
+        // No .md, or an .md with no frontmatter tools: line (body-only format).
         // If declared_tools is also [] (empty), both sources agree: no grant declared.
         // Only flag a drift if the registry declares non-empty tools but .md has none.
         if (declaredTools.length > 0) {

@@ -9,7 +9,7 @@
 //
 // HONEST boundary: planN is a deterministic policy (risk tier × hardness, capped at 8); it sits ABOVE
 // the LLM work — the orchestrator runs that many attempts and scores each against the rubric; this file
-// decides HOW MANY and picks the winner. Aligns with the N-policy the best-of-N-judge already enforces
+// decides HOW MANY and picks the winner. Aligns with the N-policy the orchestrator already enforces
 // (critical ≥ 3).
 //
 // FULL & self-tested. Usage:

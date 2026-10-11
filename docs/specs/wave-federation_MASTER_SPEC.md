@@ -88,7 +88,7 @@ The semantic helps/adapt/conflicts judgement is the steward's LLM call (PROXY/ag
   (consistent with the hardening roadmap's honest sandbox boundary).
 
 ## §4 Implementation order (each: mechanism + self-test/proof + commit)
-- **F1** `project-steward.md` role + `PROJECT_CHARTER_TEMPLATE.md` + `charter-check.mjs` (+ self-test, eval).
+- **F1** ``project-steward` (роль удалена 2026-10-10)` role + `PROJECT_CHARTER_TEMPLATE.md` + `charter-check.mjs` (+ self-test, eval).
 - **F2** Handshake wired into `dev-pipeline` (step 0.5: in a project → steward + charter before work)
   and into the framework Orchestrator playbook.
 - **F3** `install-into` ships project-steward + charter template + charter-check into new projects;

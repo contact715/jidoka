@@ -99,7 +99,7 @@
       "spec": "docs/specs/modules/installer-federation/project-federation.md",
       "id": "AC-2",
       "title": "The project-steward agent definition exists and references the Defense Process",
-      "command": "grep: .claude/agents/project-steward.md mentions Defense Process",
+      "command": "grep: `project-steward` (роль удалена 2026-10-10) mentions Defense Process",
       "kind": "manual",
       "script": null,
       "wired": true

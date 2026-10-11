@@ -192,7 +192,7 @@ Example entry:
 
 ## Reference
 
-- Agent definition: `.claude/agents/proactive-surfacing-agent.md` (gitignored)
+- Agent definition: `proactive-surfacing-agent` (роль удалена 2026-10-10) (gitignored)
 - Skill mirror: `docs/skills/proactive-surfacing.md` (git-tracked, portability)
 - Script: `scripts/surface-concerns.mjs`
 - Current queue: `docs/surfacing-concerns-current.md`

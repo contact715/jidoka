@@ -18,14 +18,14 @@ Claude Code из коробки — это один агент, который �
 
 | Что реализовано | Файл во фреймворке | Industry-паттерн | Источник |
 |---|---|---|---|
-| Конституция + Constitutional Reviewer (блокирует диспатч при нарушении) | `docs/CONSTITUTION.md`, `.claude/agents/constitutional-reviewer.md` | **Constitutional AI** | Anthropic (Bai et al., 2022) |
+| Конституция + Constitutional Reviewer (блокирует диспатч при нарушении) | `docs/CONSTITUTION.md`, `constitutional-reviewer` (роль удалена 2026-10-10) | **Constitutional AI** | Anthropic (Bai et al., 2022) |
 | Дебаты prosecutor / defender / judge, 3 раунда | `.claude/agents/debate-*.md` | **Multi-Agent Debate** | Du et al., 2023; Irving et al., OpenAI 2018 |
-| Best-of-N Judge — выбор лучшего из N реализаций | `.claude/agents/best-of-N-judge.md` | **Best-of-N sampling** | AlphaCode, DeepMind (Li et al., 2022) |
+| Best-of-N Judge — выбор лучшего из N реализаций | `best-of-N-judge` (роль удалена 2026-10-10) | **Best-of-N sampling** | AlphaCode, DeepMind (Li et al., 2022) |
 | Reflexion Critic — adversarial review каждого коммита | `.claude/agents/reflexion-critic.md` | **Reflexion (verbal RL)** | Shinn et al., 2023 (NeurIPS) |
 | 8 гейтов L0.95–L0.99 (security, coverage, a11y, perf, constitutional) | `.claude/agents/*-auditor.md` | **Process supervision / PRM** | OpenAI, Lightman et al., 2023 |
 | Andon-halt, верифицированный в TLA+ | `docs/formal/AndonHalt.tla`, `scripts/run-tla.mjs` | **Formal verification** | Lamport TLA+; AWS, Azure |
-| Skill Extractor — накопление навыков из ретро | `.claude/agents/skill-extractor.md`, `.claude/skills/` | **Skill library** | Voyager, NVIDIA (Wang et al., 2023) |
-| Self-Improvement Reviewer — кросс-волновые паттерны | `.claude/agents/self-improvement-reviewer.md` | **Meta-learning / self-improvement** | — |
+| Skill Extractor — накопление навыков из ретро | `skill-extractor` (роль удалена 2026-10-10), `.claude/skills/` | **Skill library** | Voyager, NVIDIA (Wang et al., 2023) |
+| Self-Improvement Reviewer — кросс-волновые паттерны | `self-improvement-reviewer` (роль удалена 2026-10-10) | **Meta-learning / self-improvement** | — |
 | 5-уровневая иерархия спеков (L0→L4) | `docs/HIERARCHICAL_SPEC_SYSTEM.md` | **Spec-driven development / MDA** | Karpathy; OMG MDA |
 | EARS acceptance criteria | `.claude/skills/ears-acceptance-criteria.md` | **Requirements engineering** | EARS (Mavin et al.) |
 | DORA-метрики | `scripts/compute-dora.mjs` | **DORA / DevOps Research** | Google DORA; "Accelerate" |
@@ -128,7 +128,7 @@ ls scripts/*.mjs scripts/*.sh | wc -l # движок
 cat docs/formal/AndonHalt.tla         # формальная верификация
 cat docs/CONSTITUTION.md              # конституция
 cat docs/TOYOTA_WAY.md                # философия качества
-cat .claude/agents/best-of-N-judge.md # как выбирается лучшее решение
+cat `best-of-N-judge` (роль удалена 2026-10-10) # как выбирается лучшее решение
 ```
 
 Снимок на 2026-05-29.

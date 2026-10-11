@@ -76,7 +76,7 @@ export function declaresSelfTest(src) {
 
 // Classify one run by (exit code, captured output):
 //   blindspot — exit 0 but no assertion output  → the bug we gate (green, proved nothing)
-//   failing   — non-zero exit                    → a real self-test failure (test-runner's concern)
+//   failing   — non-zero exit                    → a real self-test failure (the test run's concern)
 //   thin      — exit 0, asserted, but only one marker → ran on too little (WARN, not block)
 //   real      — exit 0 with assertion output
 export function classifyRun({ exit, output }) {

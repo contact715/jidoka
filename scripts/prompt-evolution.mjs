@@ -5,7 +5,7 @@
 // improvement with NO regression — so a fix for one case can't silently break another.
 //
 // HONEST SPLIT: candidate detection + the improvement/regression guard = FULL (here). Generating the
-// prompt patch and applying it = an LLM + human step (the prompt-evolver agent proposes; a human
+// prompt patch and applying it = an LLM + human step (the orchestrator proposes; a human
 // accepts). The guard below is what makes that safe: a patch only counts if it strictly improves
 // accuracy AND regresses nothing. Never auto-applied.
 //
@@ -184,7 +184,7 @@ if (isMain) {
   }
   if (!cands.length) { console.log('  🟢 every measured agent is at 100% — nothing to evolve.'); }
   else {
-    console.log('\n  Next: dispatch the prompt-evolver agent on a candidate → it proposes a MINIMAL prompt patch →');
+    console.log('\n  Next: the orchestrator takes a candidate → it proposes a MINIMAL prompt patch →');
     console.log('  re-run the golden cases → prompt-evolution verifies isImprovement (strict gain, no regression) → human accepts.');
   }
   process.exit(0);

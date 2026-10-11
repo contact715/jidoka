@@ -27,7 +27,7 @@ One steward agent per project as the single door to the framework; conflicts ope
 
 - `docs/specs/wave-federation_MASTER_SPEC.md`
 - `docs/PROJECT_CHARTER_TEMPLATE.md`
-- `.claude/agents/project-steward.md`
+- `project-steward` (роль удалена 2026-10-10)
 
 ## Acceptance criteria
 
@@ -42,7 +42,7 @@ grep: four required headers present
 ### AC-2 — The project-steward agent definition exists and references the Defense Process
 
 ```
-grep: .claude/agents/project-steward.md mentions Defense Process
+grep: `project-steward` (роль удалена 2026-10-10) mentions Defense Process
 ```
 
 ## Linked waves

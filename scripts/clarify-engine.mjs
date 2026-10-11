@@ -17,7 +17,7 @@
  * and a machine-readable coverage JSON + an append-only trace.
  *
  * It does NOT itself talk to the user — the harness AskUserQuestion primitive
- * does, driven by the CPO / business-process-architect / user-researcher roles.
+ * does, driven by the orchestrator.
  * The engine records and scores the answers and exposes the completeness state
  * that clarify-gate.mjs enforces before the spec phase.
  *

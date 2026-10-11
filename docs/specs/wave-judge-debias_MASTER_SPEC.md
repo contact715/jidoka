@@ -59,8 +59,8 @@ Framework Compass answers (all five must be "yes" per `docs/NORTH_STAR.md §Fram
 | `scripts/judge-panel.mjs` | 59-82 `--self-test` block | Extend with position-debias cases |
 | `~/.claude/agents/debate-judge.md` | Lines 29-35 Inputs table | Add `spec-anchor` input row |
 | `~/.claude/agents/debate-judge.md` | Lines 78-99 Evaluation rubric | Add spec-anchor citation requirement |
-| `~/.claude/agents/best-of-N-judge.md` | Lines 29-36 Inputs table | Add `spec-anchor` input row |
-| `~/.claude/agents/best-of-N-judge.md` | Lines 64-113 rubric | Add spec-anchor citation requirement + position-swap note |
+| `~/`best-of-N-judge` (роль удалена 2026-10-10) | Lines 29-36 Inputs table | Add `spec-anchor` input row |
+| `~/`best-of-N-judge` (роль удалена 2026-10-10) | Lines 64-113 rubric | Add spec-anchor citation requirement + position-swap note |
 
 `judge-calibration.mjs` — does NOT exist in the repo; skip.
 `dispatch-parallel-implementations.mjs` — does NOT exist in the repo; skip.
@@ -74,7 +74,7 @@ Framework Compass answers (all five must be "yes" per `docs/NORTH_STAR.md §Fram
 | Modify | `scripts/debate-engine.mjs` | Add `positionSwap(plan)` helper and `debiasedVerdict()` that calls the judge twice, merges, flags |
 | Modify | `scripts/judge-panel.mjs` | Extend `aggregate()` signature to accept optional `swappedVotes`; add `positionSensitive` to return; extend `--self-test` |
 | Modify | `~/.claude/agents/debate-judge.md` | Add spec-anchor input row + citation requirement in rubric + POSITION-SWAP instruction |
-| Modify | `~/.claude/agents/best-of-N-judge.md` | Add spec-anchor input row + citation requirement + position-swap instruction |
+| Modify | `~/`best-of-N-judge` (роль удалена 2026-10-10) | Add spec-anchor input row + citation requirement + position-swap instruction |
 | Create | nothing new | all mechanics fit in the files above |
 
 LOC budget: `debate-engine.mjs` stays under 120 LOC total; `judge-panel.mjs` stays under 120 LOC
@@ -125,7 +125,7 @@ This keeps the merge logic in one canonical place.
 
 ### 4.3 SPEC-ANCHOR — agent prompts
 
-Both `debate-judge.md` and `best-of-N-judge.md` get the same three changes:
+Both `debate-judge.md` and ``best-of-N-judge` (роль удалена 2026-10-10)` get the same three changes:
 
 **a. Inputs table** — new row:
 ```
@@ -204,7 +204,7 @@ existing test cases before any new cases are added.
 | `scripts/debate-engine.mjs` | 83 | ≤ 120 |
 | `scripts/judge-panel.mjs` | 99 | ≤ 130 |
 | `~/.claude/agents/debate-judge.md` | 123 | ≤ 160 |
-| `~/.claude/agents/best-of-N-judge.md` | 221 | ≤ 250 |
+| `~/`best-of-N-judge` (роль удалена 2026-10-10) | 221 | ≤ 250 |
 
 ---
 

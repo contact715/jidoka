@@ -7,7 +7,7 @@
 // This is what turns "the product improves every day" from a document into a data loop.
 //
 // HONEST SPLIT: the routing/ingest logic is FULL & self-tested. The DATA — the real event stream
-// from production — is DORMANT until the product's data-analyst wires its analytics/error tracker
+// from production — is DORMANT until the product wires its analytics/error tracker
 // to emit events.jsonl. Mechanism here; the stream comes from the running product.
 //
 // FULL logic / DORMANT data. Usage:

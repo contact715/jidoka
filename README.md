@@ -13,20 +13,21 @@
 2. **`docs/ENGINEERING_SYSTEM_ASSESSMENT.md`** — структурированная оценка с маппингом каждого механизма на работы Anthropic / OpenAI / DeepMind.
 3. **`docs/CONSTITUTION.md`** — конституция среды (включая §8 Quality-First).
 4. **`docs/TOYOTA_WAY.md`** — две философии Toyota (Jidoka + Kaizen), заложенные в процесс.
-5. **`.claude/agents/best-of-N-judge.md`** — как из N реализаций выбирается лучшая по качеству, а не по «прошло и покороче».
+5. **`best-of-N-judge` (роль удалена 2026-10-10)** — как из N реализаций выбирается лучшая по качеству, а не по «прошло и покороче».
 6. **`docs/AUTONOMOUS_PIPELINE.md`** + **`docs/MULTI_LEVEL_VERIFICATION.md`** — как устроен конвейер и гейты.
 
 ## Структура
 
 ```
 .claude/
-  agents/            47 агентов-ролей + _TEMPLATE (вкл. project-steward, spec-custodian, prompt-evolver, red-team — непрерывная самоатака) (полная продуктовая студия: продукт/архитектура/build/дизайн/данные/запуск/качество) (chief-architect, reflexion-critic,
-                     best-of-N-judge, debate-*, security-scanner, ...)
+  agents/            6 агентов, которые реально вызываются: backend-agent, frontend-agent,
+                     debate-prosecutor / debate-defender / debate-judge, reflexion-critic
+                     (остальные 42 роли удалены 2026-10-10: ноль вызовов за 30 дней)
   skills/            32 навыка + _INDEX/_TEMPLATE (переиспользуемые паттерны)
   AGENT_PLAYBOOK.md  главный плейбук агентства
   settings.local.json
 
-scripts/             263 скриптов-движка (245 .mjs + 18 .sh в корне; плюс 28 в подпапках):
+scripts/             264 скриптов-движка (246 .mjs + 18 .sh в корне; плюс 28 в подпапках):
                      andon-halt (stop-the-line), run-tla (формальная проверка),
                      compute-dora/slos/cost/carbon (observability),
                      detect-injection/drift/hallucinations (защита),

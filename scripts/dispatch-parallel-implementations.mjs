@@ -3,8 +3,10 @@
  * dispatch-parallel-implementations.mjs — Parallel best-of-N branch dispatcher.
  *
  * Creates N git branches (via git worktree) for parallel implementation attempts
- * of the same spec. After all N attempts complete, --collect mode invokes the
- * best-of-N-judge for comparison and writes results to docs/debates/.
+ * of the same spec. After all N attempts complete, --collect mode runs a judge
+ * (`npx claude --print` with the self-contained rubric from buildJudgePrompt) and
+ * writes the comparison to docs/debates/. The rubric lives here, not in an agent
+ * file: the best-of-N-judge role agent was removed 2026-10-10.
  *
  * Uses git worktree to avoid stashing conflicts (preferred over sequential
  * checkout per wave-103 open question resolution).
@@ -33,7 +35,7 @@ export const CLI = {
   usage: `dispatch-parallel-implementations.mjs — Best-of-N parallel implementation dispatcher
 
 Creates N git branches via git worktree for parallel implementations. After all
-N attempts complete, --collect mode runs best-of-N-judge for comparison.
+N attempts complete, --collect mode runs a judge (npx claude --print) to compare them.
 
 Usage:
   # Create N parallel implementation branches
@@ -50,7 +52,7 @@ Flags:
   --wave <id>      Wave identifier (e.g. wave-103)
   --spec <path>    Path to master spec (optional, copied to each attempt branch)
   --story          Also build + copy a flattened story bundle (spec + inlined ancestry + ACs)
-  --collect        Collect and compare completed attempts via best-of-N-judge
+  --collect        Collect and compare completed attempts with the built-in judge rubric
   --dry-run        Print what would happen without executing git commands
   -h, --help       Show this message
 
@@ -70,6 +72,27 @@ Exit codes:
     'dry-run': { type: 'boolean', desc: 'только напечатать, git не трогать' },
   },
 };
+
+// Judge prompt for --collect. Self-contained: the rubric used to live in
+// .claude/agents/best-of-N-judge.md, removed 2026-10-10. AC compliance and coverage are
+// disqualifying gates; the winner is picked on quality, efficiency only breaks ties.
+export function buildJudgePrompt(waveId, judgeSummary) {
+  return [
+    `You are judging ${waveId}: N parallel implementation attempts of the same spec.`,
+    '',
+    'Attempts:',
+    judgeSummary,
+    '',
+    'Step 1, gates (an attempt failing either is disqualified, say which and why):',
+    '  - every acceptance criterion in the spec is met, with the file:line that meets it;',
+    '  - test coverage does not drop against the base branch.',
+    'Step 2, rank the remaining attempts on four criteria, each scored 1-5 with one line of evidence:',
+    '  correctness, readability, fit with the existing code, size of the change.',
+    'Step 3, ties only: prefer fewer LOC, smaller bundle impact, fewer lint warnings.',
+    '',
+    `Name the winner and write the full comparison to docs/debates/${waveId}-bestofN.md.`,
+  ].join('\n');
+}
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 
@@ -214,7 +237,7 @@ if (isMain) {
     console.log(`\nNext steps:`);
     console.log(`  1. Implement ${storyRel ? `the story bundle (${storyRel}) — everything is inlined` : 'the spec'} in each worktree independently.`);
     console.log(`  2. Run: node scripts/dispatch-parallel-implementations.mjs --wave ${waveId} --collect`);
-    console.log(`  3. best-of-N-judge will compare all ${n} implementations and select the winner.\n`);
+    console.log(`  3. --collect runs the judge over all ${n} implementations and names the winner.\n`);
 
     process.exit(0);
   }
@@ -239,16 +262,7 @@ if (isMain) {
 
   console.log(`[PARALLEL] Found ${branchList.length} attempt branch(es): ${branchList.join(', ')}`);
 
-  // Invoke best-of-N-judge agent.
-  const agentDefPath = path.join(ROOT, '.claude', 'agents', 'best-of-N-judge.md');
-
-  if (!fs.existsSync(agentDefPath)) {
-    console.log(`[PARALLEL] SKIP — best-of-N-judge.md not found at ${agentDefPath}.`);
-    console.log(`[PARALLEL] Deploy .claude/agents/best-of-N-judge.md to enable comparison.`);
-    process.exit(0);
-  }
-
-  // Build judge prompt.
+  // Build judge prompt (rubric is self-contained, see buildJudgePrompt).
   const judgeSummary = branchList
     .map((b, i) => {
       const wtp = path.join(ROOT, '.claude', 'worktrees', b);
@@ -257,9 +271,9 @@ if (isMain) {
     })
     .join('\n');
 
-  const judgePrompt = `You are the best-of-N-judge agent per ${agentDefPath}.\n\nWave: ${waveId}\nAttempts:\n${judgeSummary}\n\nCompare all attempts on 5 metrics (LOC efficiency, test coverage delta, bundle size impact, spec AC compliance score, lint warning count) and write your comparison to docs/debates/${waveId}-bestofN.md.`;
+  const judgePrompt = buildJudgePrompt(waveId, judgeSummary);
 
-  console.log(`[PARALLEL] Invoking best-of-N-judge for ${branchList.length} attempt(s)…`);
+  console.log(`[PARALLEL] Invoking the best-of-N judge for ${branchList.length} attempt(s)…`);
 
   const judgeR = run(`echo ${JSON.stringify(judgePrompt)} | npx claude --print 2>/dev/null`, { timeout: 300000 });
 

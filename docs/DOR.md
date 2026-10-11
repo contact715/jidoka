@@ -40,7 +40,7 @@ See `docs/checklists/phase-dor.md` for the full per-tier checklist including L0-
 
 - Checklist runner: `scripts/run-checklist.mjs --phase dor --wave wave-NNN`
 - Checklist definitions: `docs/checklists/phase-dor.md`
-- PFCA agent spec: `.claude/agents/pfca-agent.md` (mirrored at `docs/skills/pfca-checklist.md`)
+- PFCA agent spec: `pfca-agent` (роль удалена 2026-10-10) (mirrored at `docs/skills/pfca-checklist.md`)
 - Anti-pattern catalog: `docs/ANTI_PATTERNS_CATALOG.md`
 - Config: `.sdd-config.json` key `pfca`
 

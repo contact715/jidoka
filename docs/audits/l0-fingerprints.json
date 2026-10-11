@@ -1,17 +1,17 @@
 {
   "docs/CONSTITUTION.md": {
-    "fingerprint": "84ccc2fc",
-    "version": "2.0.0",
-    "stampedAt": "2026-08-08"
+    "fingerprint": "50cae5d1",
+    "version": "2.0.1",
+    "stampedAt": "2026-10-11"
   },
   "docs/MISSION.md": {
     "fingerprint": "b8fb6ba7",
     "version": "1.0.0",
-    "stampedAt": "2026-08-08"
+    "stampedAt": "2026-10-11"
   },
   "docs/NORTH_STAR.md": {
     "fingerprint": "0c898d66",
     "version": "1.0.0",
-    "stampedAt": "2026-08-08"
+    "stampedAt": "2026-10-11"
   }
 }

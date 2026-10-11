@@ -192,7 +192,7 @@ function selfTest() {
   ok('under budget → still claude-api', route({ role: 'backend-agent' }, { usageRatio: 0.5 }).provider === 'claude-api');
   ok('allowLocal + mechanical role → cheap local light', route({ role: 'statusline' }, { allowLocal: true }).model === LOCAL.light);
   ok('allowLocal + HIGH role → NOT the light local (judgement not cheaped out)', route({ role: 'debate-judge' }, { allowLocal: true }).model !== LOCAL.light);
-  ok('privacy + HIGH role → capable local, not light', route({ role: 'chief-architect' }, { privacy: true }).model === LOCAL.capable);
+  ok('privacy + HIGH role → capable local, not light', route({ role: 'reflexion-critic' }, { privacy: true }).model === LOCAL.capable);
   ok('privacy + mechanical role → light local, not the expensive capable (closes the dead-ternary blindspot)', route({ role: 'statusline' }, { privacy: true }).model === LOCAL.light);
   ok('reason is always explained', typeof route({ role: 'backend-agent' }).reason === 'string' && route({ role: 'backend-agent' }).reason.length > 0);
   // inherits the model-tier invariant on the API path: a judge is never haiku

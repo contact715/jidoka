@@ -680,7 +680,7 @@ async function main({ isDry, respond, words }) {
       const currentWaveArg = words[0] ?? 'unknown';
       writeHaltState(
         currentWaveArg,
-        'proactive-surfacing-agent',
+        'surface-concerns',
         `BLOCKING concern surfaced: ${firstBlocking.title}`
       );
       // writeHaltState calls process.exit(42) — code below is unreachable

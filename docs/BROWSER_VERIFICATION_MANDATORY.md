@@ -1,6 +1,6 @@
 ---
 status: Active
-version: 1.0.0
+version: 1.1.0
 level: L1
 type: core-arch
 owner_role: platform
@@ -13,7 +13,7 @@ children: []
 breaking_change_in_v: null
 created: 2026-07-02
 last_validated_against_parents: 2026-07-02
-last_updated: 2026-07-12
+last_updated: 2026-09-29
 ---
 
 # Browser Verification is Mandatory (dev-engine forcing function)
@@ -55,6 +55,21 @@ Construct the state instead of skipping the look:
   worktree, or point the browser tool at the running server's port (HMR already has your
   edit).
 - **Mocks** — enable only on a server you own; never restart or re-env another session's.
+
+## A hidden pane cannot show motion (learned twice: 2026-08-23, 2026-09-25)
+
+The built-in Browser pane keeps answering while it is hidden, but a hidden document
+(`visibilityState: hidden`, a 0×0 window) does not run smooth scrolling,
+`requestAnimationFrame`, `IntersectionObserver` or appear-on-scroll animations. A
+measurement taken there reads 0 "before" and 0 "after" and proves nothing: on 2026-08-23 a
+prefetch check saw zero links in view, on 2026-09-25 a scroll check moved nothing. Class
+`verified-where-failure-cannot-show`.
+
+Before measuring anything that moves or depends on visibility, check
+`document.visibilityState === 'visible'` (`tabs_context` also says whether the pane is
+displayed). If it is hidden, open the pane or measure in Playwright with a real window. Then
+prove the probe can see the failure at all: run it on a known-broken variant first with
+`~/.claude/jidoka/scripts/control-red.mjs` (doc: `~/.claude/jidoka/docs/CONTROL_RED.md`).
 
 ## Forcing function
 

@@ -55,24 +55,24 @@ Each TPS principle below is mapped to the file that implements it today. Where a
 
 Quality is verified at the station, not after merge. Our quality gates (L0.95–L0.99) block a commit the moment a defect appears, and the Andon primitive halts the whole line.
 
-- Gates: [`.claude/agents/security-scanner.md`](../.claude/agents/security-scanner.md), [`coverage-auditor.md`](../.claude/agents/coverage-auditor.md), [`a11y-auditor.md`](../.claude/agents/a11y-auditor.md), [`perf-profiler.md`](../.claude/agents/perf-profiler.md), [`constitutional-reviewer.md`](../.claude/agents/constitutional-reviewer.md)
+- Gates: `security-scanner` (роль удалена 2026-10-10), ``coverage-auditor` (роль удалена 2026-10-10)` (роль удалена 2026-10-10), ``a11y-auditor` (роль удалена 2026-10-10)` (роль удалена 2026-10-10), ``perf-profiler` (роль удалена 2026-10-10)` (роль удалена 2026-10-10), ``constitutional-reviewer` (роль удалена 2026-10-10)` (роль удалена 2026-10-10)
 - Halt primitive: `scripts/andon-halt-helpers.mjs:112` (`writeHaltState`)
-- **New (wave-188)**: quality-andon — the line now stops when a winning candidate is *below the quality floor* on a critical phase, not only on a defect. Enforced in [`.claude/agents/best-of-N-judge.md`](../.claude/agents/best-of-N-judge.md).
+- **New (wave-188)**: quality-andon — the line now stops when a winning candidate is *below the quality floor* on a critical phase, not only on a defect. Enforced in `best-of-N-judge` (роль удалена 2026-10-10).
 
 ### 2. Kaizen — continuous improvement of the process
 
 The system reads its own history and improves itself. Patterns that recur across waves become skills or architectural changes.
 
-- Cross-wave loop: `docs/SELF_IMPROVEMENT_PROTOCOL.md` + `.claude/agents/self-improvement-reviewer.md` (every 5 waves)
-- Per-wave extraction: `.claude/agents/skill-extractor.md`
-- Anti-pattern recurrence: `.claude/agents/meta-process-auditor.md`
+- Cross-wave loop: `docs/SELF_IMPROVEMENT_PROTOCOL.md` + `self-improvement-reviewer` (роль удалена 2026-10-10) (every 5 waves)
+- Per-wave extraction: `skill-extractor` (роль удалена 2026-10-10)
+- Anti-pattern recurrence: `meta-process-auditor` (роль удалена 2026-10-10)
 - The record itself: `docs/retros/` (100+ wave retros)
 
 ### 3. Poka-yoke — mistake-proofing on the way in
 
 Prevent the defect before it can be written, instead of catching it at the end. Partially built; the upstream half lands in W3.
 
-- Today: type system, EARS acceptance criteria (`.claude/skills/ears-acceptance-criteria.md`), pre-flight checklist (`.claude/agents/pfca-agent.md`), security-pattern scan (`scripts/check-security-patterns.sh`)
+- Today: type system, EARS acceptance criteria (`.claude/skills/ears-acceptance-criteria.md`), pre-flight checklist (`pfca-agent` (роль удалена 2026-10-10)), security-pattern scan (`scripts/check-security-patterns.sh`)
 - **Gap (→ W3)**: TS strict exhaustive checks and property-based invariants that make low-quality output structurally impossible to generate.
 
 ### 4. Andon — the stop-the-line cord
@@ -87,7 +87,7 @@ Anyone on the line can halt it. The halt is formally verified, not just coded.
 
 Do not trust a summary of the result. Look at the rendered, running thing.
 
-- Visual verification: `.claude/agents/visual-qa.md`, `.claude/skills/rendered-verification.md`
+- Visual verification: `visual-qa` (роль удалена 2026-10-10), `.claude/skills/rendered-verification.md`
 - Applied this wave: the spec was read line-by-line before implementation, not approved from its summary.
 
 ### 6. Standardized Work — today's best way becomes the standard
@@ -111,7 +111,7 @@ Every wave ends with an honest look at what went wrong, down to the root cause, 
 
 Before: the judge picked the candidate that passed the spec with the fewest lines. Quality was a side effect.
 
-After: quality is the primary axis. AC-compliance and coverage are disqualification gates (a defect cannot win). The four quality criteria from Constitution §8 are the selection weight. Efficiency breaks ties only. A higher-quality candidate never loses to a cheaper one. See [`.claude/agents/best-of-N-judge.md`](../.claude/agents/best-of-N-judge.md).
+After: quality is the primary axis. AC-compliance and coverage are disqualification gates (a defect cannot win). The four quality criteria from Constitution §8 are the selection weight. Efficiency breaks ties only. A higher-quality candidate never loses to a cheaper one. See `best-of-N-judge` (роль удалена 2026-10-10).
 
 ---
 

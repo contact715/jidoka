@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // charter-check — structural gate for a project's Integrity Charter (docs/PROJECT_CHARTER.md).
 //
-// The Charter is the trunk of the project tree (grown from the North Star root); the project-steward
+// The Charter is the trunk of the project tree (grown from the North Star root); the orchestrator
 // owns it and defends it. This script enforces the HONEST, checkable part: the Charter exists, is
 // filled (not the template, no leftover <placeholders>, every section has a body), and — optionally
-// — that an incoming plan is BOUND to it (names the invariant/zone it touches), so the steward's
+// — that an incoming plan is BOUND to it (names the invariant/zone it touches), so the orchestrator's
 // helps/adapt/conflicts verdict can't be skipped.
 //
 // HONEST SPLIT: the semantic judgement — does THIS change contradict the philosophy/invariants — is
-// the project-steward's LLM call (a defense investigation), NOT automatable here and not faked. What
+// the orchestrator's LLM call (a defense investigation), NOT automatable here and not faked. What
 // IS automatable, and enforced here: you cannot run a wave against a project that has no integrity
 // contract, or skip binding a plan to it.
 //
@@ -99,7 +99,7 @@ if (isMain) {
   const docPath = values.doc || 'docs/PROJECT_CHARTER.md';
   const planPath = values.plan || null;
   if (!existsSync(docPath)) {
-    console.error(`\x1b[31m✗ no Integrity Charter at ${docPath}\x1b[0m — the project-steward must create it from docs/PROJECT_CHARTER_TEMPLATE.md. The framework will not change a project with no integrity contract.`);
+    console.error(`\x1b[31m✗ no Integrity Charter at ${docPath}\x1b[0m — the orchestrator must create it from docs/PROJECT_CHARTER_TEMPLATE.md. The framework will not change a project with no integrity contract.`);
     process.exit(2);
   }
   const { filled, issues } = checkCharter(readFileSync(docPath, 'utf8'));
@@ -113,6 +113,6 @@ if (isMain) {
     process.exit(1);
   }
   console.log(`\x1b[32m✓ Integrity Charter at ${docPath} exists and is complete${planPath ? ', and the plan is bound to it' : ''}.\x1b[0m`);
-  console.log(`  \x1b[2mhelps/adapt/conflicts is the project-steward's defense judgement (not automatable here) — this gate guarantees the contract exists to defend.\x1b[0m`);
+  console.log(`  \x1b[2mhelps/adapt/conflicts is the orchestrator's defense judgement (not automatable here) — this gate guarantees the contract exists to defend.\x1b[0m`);
   process.exit(0);
 }

@@ -1,4 +1,4 @@
-<!-- counts: agents=47 scripts=263 -->
+<!-- counts: agents=6 scripts=264 -->
 # Honest System State — что реально работает, что каркас, где границы
 
 > Снимок на 2026-08-15 (предыдущий был от 2026-05-31 и протух на 76 дней). Этот документ намеренно честный: он отделяет «доказуемо
@@ -45,7 +45,7 @@ node-builtins).
 | North Star gate | `node scripts/northstar-check.mjs --self-test` | продукт без полного North Star не проходит pre-push |
 | Product Kaizen loop | `node scripts/kaizen-loop.mjs --self-test` | тренд метрики vs цель North Star (логика live, данные продукта dormant) |
 
-Плюс архитектура, проверяемая чтением: **47 агентов-ролей** (53 в глобальной установке;
+Плюс архитектура, проверяемая чтением: **6 агентов** (столько же в глобальной установке; 42 неиспользуемые роли удалены 2026-10-10;
 точное число сверяется машиной, см. блок counts в начале файла) в трёх линиях защиты (`docs/governance/AGENT_TOPOLOGY.md`), debate / best-of-N / reflexion,
 TLA+-спека andon (`docs/formal/AndonHalt.tla`), и таблица «механизм → файл → research-паттерн»
 в `ENGINEERING_SYSTEM_ASSESSMENT.md` (8/8 гейтов резолвятся на диск).

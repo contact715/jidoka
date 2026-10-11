@@ -3,12 +3,13 @@
  * run-tier-1-checks.mjs — Tier 1 automated check orchestrator.
  *
  * Wraps the existing run-quality-gates.mjs checks and adds formal Tier 1
- * isolation. Runs 7 checks in parallel via Promise.allSettled:
- *   tsc, lint, test-runner, coverage-auditor, perf-profiler, a11y-auditor, security-scanner
+ * isolation. Runs 7 deterministic checks in parallel via Promise.allSettled:
+ *   tsc, lint, vitest, coverage-delta, bundle-delta, a11y-axe (playwright @a11y), npm-audit
  *
  * Writes structured results to docs/metrics/verification-{wave}.json.
  * Exits 1 only on BLOCK (not SKIP or WARN).
- * Prints [ROUTE] debug-agent: <check-name> for FAIL with < 20 LOC fix hints.
+ * Prints [ROUTE] small fix → implementing agent: <check-name> for FAIL with < 20 LOC fix hints
+ * (the fix goes back to backend-agent / frontend-agent, whoever wrote the change).
  *
  * Usage:
  *   node scripts/run-tier-1-checks.mjs --wave wave-103
@@ -144,8 +145,8 @@ if (isMain) {
     return { name, status: 'PASS', elapsed: r.elapsed, details: '' };
   }
 
-  async function checkTestRunner() {
-    const name = 'test-runner';
+  async function checkVitest() {
+    const name = 'vitest';
     const vitestJson = path.join(ROOT, '.test-results', 'vitest-tier1.json');
     fs.mkdirSync(path.join(ROOT, '.test-results'), { recursive: true });
     const r = run(`npx vitest run --reporter=json --outputFile=${vitestJson}`, { timeout: 120000 });
@@ -157,8 +158,8 @@ if (isMain) {
     return { name, status: 'BLOCK', elapsed: r.elapsed, details: r.stdout.slice(0, 400) };
   }
 
-  async function checkCoverageAuditor() {
-    const name = 'coverage-auditor';
+  async function checkCoverageDelta() {
+    const name = 'coverage-delta';
     const r = run(`node ${path.join(__dirname, 'coverage-delta.mjs')}`, { timeout: 60000 });
     if (!r.ok) {
       if (r.stdout.includes('SKIP') || r.stderr.includes('SKIP') || r.stderr.includes('not found')) {
@@ -170,8 +171,8 @@ if (isMain) {
     return { name, status: 'PASS', elapsed: r.elapsed, details: '' };
   }
 
-  async function checkPerfProfiler() {
-    const name = 'perf-profiler';
+  async function checkBundleDelta() {
+    const name = 'bundle-delta';
     const r = run(`node ${path.join(__dirname, 'bundle-delta.mjs')}`, { timeout: 120000 });
     if (!r.ok) {
       if (r.stderr.includes('not found') || r.stderr.includes('Cannot find') || r.stdout.includes('SKIP')) {
@@ -185,8 +186,8 @@ if (isMain) {
     return { name, status: 'PASS', elapsed: r.elapsed, details: '' };
   }
 
-  async function checkA11yAuditor() {
-    const name = 'a11y-auditor';
+  async function checkA11yAxe() {
+    const name = 'a11y-axe';
     // axe-core scan via playwright — gracefully skip if playwright not configured.
     const r = run(
       'npx playwright test --grep @a11y --reporter=compact 2>&1 || true',
@@ -201,8 +202,8 @@ if (isMain) {
     return { name, status: 'PASS', elapsed: r.elapsed, details: '' };
   }
 
-  async function checkSecurityScanner() {
-    const name = 'security-scanner';
+  async function checkNpmAudit() {
+    const name = 'npm-audit';
     const r = run('npm audit --audit-level=high --json 2>/dev/null || true', { timeout: 30000 });
     try {
       const audit = JSON.parse(r.stdout);
@@ -222,11 +223,11 @@ if (isMain) {
   const CHECKS = [
     checkTsc,
     checkLint,
-    checkTestRunner,
-    checkCoverageAuditor,
-    checkPerfProfiler,
-    checkA11yAuditor,
-    checkSecurityScanner,
+    checkVitest,
+    checkCoverageDelta,
+    checkBundleDelta,
+    checkA11yAxe,
+    checkNpmAudit,
   ];
 
   console.log(`\n=== Tier 1 Checks (${waveId})${dryRun ? ' [DRY-RUN]' : ''} ===\n`);
@@ -250,7 +251,7 @@ if (isMain) {
 
     if (r.status === 'FAIL' || r.status === 'BLOCK') {
       if (isSmallFix(r.name, r.details, '')) {
-        console.log(`[ROUTE] debug-agent: ${r.name}`);
+        console.log(`[ROUTE] small fix → implementing agent: ${r.name}`);
       }
       if (r.status === 'BLOCK') blocked = true;
     }

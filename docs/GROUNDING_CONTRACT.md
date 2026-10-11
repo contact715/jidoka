@@ -18,7 +18,7 @@ against declared source citations. It defines:
 
 Referenced by:
 - `scripts/check-source-grounding.mjs` — detection script
-- `.claude/agents/_TEMPLATE.md` — agent definition template (source_grounding stanza)
+- `_TEMPLATE` (роль удалена 2026-10-10) — agent definition template (source_grounding stanza)
 - `docs/checklists/phase-dor.md` K6 — DOR gate for new agents
 - `docs/compliance/eu-ai-act/hrais-classification.md` — Art 15 Para 3 declarable metric
 

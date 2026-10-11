@@ -1,13 +1,13 @@
 # Wave Metrics
 
-This directory captures per-wave economics for this project development sessions. Data is written automatically by the Metrics Aggregator agent (`.claude/agents/metrics-aggregator.md`) at the end of every wave.
+This directory captures per-wave economics for this project development sessions. Data is written automatically by the Metrics Aggregator agent (`metrics-aggregator` (роль удалена 2026-10-10)) at the end of every wave.
 
 ## Files
 
 | File | Purpose |
 |---|---|
 | `_DASHBOARD.md` | Aggregated table across all waves — one row per wave |
-| `_TEMPLATE.md` | Per-wave file template (reference only) |
+| ``_TEMPLATE` (роль удалена 2026-10-10)` | Per-wave file template (reference only) |
 | `wave-NN.md` | Per-wave detailed metrics (created automatically) |
 
 ## Schema columns

@@ -97,7 +97,7 @@ if (isMain) {
   if (r.debate) {
     console.log(`\x1b[1m⚔️  debate: YES (${r.mode})\x1b[0m — ${r.reason}`);
     console.log(r.mode === 'panel'
-      ? '  → run a judge-panel / best-of-N over the options (scripts/judge-panel.mjs, best-of-N-judge).'
+      ? '  → run a judge-panel / best-of-N over the options (scripts/judge-panel.mjs, debate-judge).'
       : '  → run the adversarial debate: prosecutor → defender → judge (scripts/debate-engine.mjs).');
     process.exit(0);
   }

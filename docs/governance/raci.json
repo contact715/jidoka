@@ -6,8 +6,8 @@
       "label": "Author the master spec for a wave",
       "frame": "RACI",
       "accountable": "human:tech-lead",
-      "responsible": ["chief-architect"],
-      "consulted": ["micro-architect", "macro-architect", "surface-cartographer", "design-system-architect"],
+      "responsible": ["orchestrator"],
+      "consulted": ["orchestrator"],
       "informed": ["reflexion-critic"]
     },
     {
@@ -16,15 +16,15 @@
       "frame": "RACI",
       "accountable": "human:tech-lead",
       "responsible": ["frontend-agent"],
-      "consulted": ["chief-architect"],
-      "informed": ["test-engineer"]
+      "consulted": ["orchestrator"],
+      "informed": ["orchestrator"]
     },
     {
       "id": "RA-VERIFY",
       "label": "Verify a change before merge",
       "frame": "RACI",
       "accountable": "human:tech-lead",
-      "responsible": ["reflexion-critic", "constitutional-reviewer"],
+      "responsible": ["reflexion-critic"],
       "consulted": ["debate-prosecutor", "debate-defender"],
       "informed": ["debate-judge"]
     },
@@ -33,9 +33,9 @@
       "label": "Run the security gate on a change",
       "frame": "RACI",
       "accountable": "human:tech-lead",
-      "responsible": ["security-scanner"],
-      "consulted": ["pfca-agent"],
-      "informed": ["meta-process-auditor"]
+      "responsible": ["dependency-audit"],
+      "consulted": ["run-checklist"],
+      "informed": ["audit-meta-process"]
     },
     {
       "id": "RA-MERGE",
@@ -43,25 +43,25 @@
       "frame": "RACI",
       "accountable": "human:tech-lead",
       "responsible": ["orchestrator"],
-      "consulted": ["meta-process-auditor"],
-      "informed": ["metrics-aggregator"]
+      "consulted": ["audit-meta-process"],
+      "informed": ["orchestrator"]
     },
     {
       "id": "RA-DISCOVERY",
       "label": "Discover the product/business problem before a wave (positioning, user need, process)",
       "frame": "RACI",
       "accountable": "human:product-lead",
-      "responsible": ["chief-product-officer", "product-strategist", "user-researcher"],
-      "consulted": ["business-process-architect", "competitive-intelligence-officer"],
-      "informed": ["chief-architect"]
+      "responsible": ["orchestrator"],
+      "consulted": ["orchestrator"],
+      "informed": ["orchestrator"]
     },
     {
       "id": "RA-DESIGN",
       "label": "Design the user flow, screen states, and interface copy for a wave",
       "frame": "RACI",
       "accountable": "human:tech-lead",
-      "responsible": ["ux-designer", "ux-writer"],
-      "consulted": ["design-system-architect"],
+      "responsible": ["orchestrator"],
+      "consulted": ["orchestrator"],
       "informed": ["frontend-agent"]
     },
     {
@@ -69,17 +69,17 @@
       "label": "Implement the server/data side of a wave to the approved contract",
       "frame": "RACI",
       "accountable": "human:tech-lead",
-      "responsible": ["backend-agent", "data-engineer"],
-      "consulted": ["engineering-lead"],
-      "informed": ["test-engineer"]
+      "responsible": ["backend-agent", "orchestrator"],
+      "consulted": ["orchestrator"],
+      "informed": ["orchestrator"]
     },
     {
       "id": "RA-TIER1",
       "label": "Run the parallel automated quality gates after a commit",
       "frame": "RACI",
       "accountable": "human:tech-lead",
-      "responsible": ["test-runner", "coverage-auditor", "a11y-auditor", "perf-profiler"],
-      "consulted": ["integration-tester"],
+      "responsible": ["execution-gate", "coverage-gate"],
+      "consulted": ["execution-gate"],
       "informed": ["reflexion-critic"]
     },
     {
@@ -87,7 +87,7 @@
       "label": "Select the best of N parallel implementations",
       "frame": "RACI",
       "accountable": "human:tech-lead",
-      "responsible": ["best-of-n-judge"],
+      "responsible": ["debate-judge"],
       "consulted": ["reflexion-critic"],
       "informed": ["orchestrator"]
     },
@@ -96,17 +96,17 @@
       "label": "Triage and recover from a test/gate failure or andon halt",
       "frame": "RACI",
       "accountable": "human:tech-lead",
-      "responsible": ["debug-agent"],
-      "consulted": ["error-recovery-stub"],
-      "informed": ["test-runner"]
+      "responsible": ["orchestrator"],
+      "consulted": ["orchestrator"],
+      "informed": ["execution-gate"]
     },
     {
       "id": "RA-VISUAL",
       "label": "Verify the rendered UI against the spec (visual QA)",
       "frame": "RACI",
       "accountable": "human:tech-lead",
-      "responsible": ["visual-qa"],
-      "consulted": ["a11y-auditor"],
+      "responsible": ["orchestrator"],
+      "consulted": [],
       "informed": ["reflexion-critic"]
     },
     {
@@ -114,17 +114,17 @@
       "label": "Turn a completed wave into durable improvement (skills, cross-wave patterns)",
       "frame": "RACI",
       "accountable": "human:tech-lead",
-      "responsible": ["self-improvement-reviewer", "skill-extractor"],
-      "consulted": ["kaizen-officer"],
-      "informed": ["proactive-surfacing-agent"]
+      "responsible": ["orchestrator"],
+      "consulted": ["orchestrator"],
+      "informed": ["orchestrator"]
     },
     {
       "id": "RA-SURFACE",
       "label": "Proactively surface unaddressed concerns across waves",
       "frame": "RACI",
       "accountable": "human:tech-lead",
-      "responsible": ["proactive-surfacing-agent"],
-      "consulted": ["meta-process-auditor"],
+      "responsible": ["orchestrator"],
+      "consulted": ["audit-meta-process"],
       "informed": ["orchestrator"]
     },
     {
@@ -132,17 +132,17 @@
       "label": "Measure whether the product/process metric actually moved",
       "frame": "RACI",
       "accountable": "human:product-lead",
-      "responsible": ["data-analyst", "data-engineer"],
-      "consulted": ["data-lead"],
-      "informed": ["chief-product-officer"]
+      "responsible": ["orchestrator"],
+      "consulted": ["orchestrator"],
+      "informed": ["orchestrator"]
     },
     {
       "id": "RA-DEPLOY",
       "label": "Ship a green build to production with a tested rollback",
       "frame": "RACI",
       "accountable": "human:tech-lead",
-      "responsible": ["release-engineer"],
-      "consulted": ["devops-lead"],
+      "responsible": ["orchestrator"],
+      "consulted": ["orchestrator"],
       "informed": ["orchestrator"]
     }
   ],
@@ -151,9 +151,9 @@
       "id": "DA-ARCH",
       "label": "Adopt an architecture decision (ADR)",
       "frame": "DACI",
-      "driver": "chief-architect",
+      "driver": "orchestrator",
       "approver": "human:tech-lead",
-      "contributors": ["micro-architect", "macro-architect", "surface-cartographer"],
+      "contributors": ["orchestrator"],
       "informed": ["reflexion-critic"]
     }
   ]

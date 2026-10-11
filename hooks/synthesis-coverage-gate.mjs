@@ -175,12 +175,24 @@ export function commandSkeleton(cmd = '') {
     .replace(/#.*$/gm, '');
 }
 
+/**
+ * Свои репозитории: их клон это обновление рабочей копии, а не перенос чужого кода.
+ * 2026-10-05: недельный прогон делал `git clone …/contact715/jidoka.git` и получал блок.
+ */
+const OWN_REPO = /(?:github\.com[/:]|\s)contact715\/[\w.-]+/;
+
+/** Клоны в команде, кроме клонов своих репозиториев. */
+function foreignClones(cmd) {
+  return cmd.split(/&&|\|\||;|\bthen\b|\belse\b/)
+    .filter((part) => /\bgit\s+clone\b|\bgh\s+repo\s+clone\b/.test(part))
+    .filter((part) => !OWN_REPO.test(part));
+}
+
 /** Перенос ЧУЖОГО кода к себе: клон, скачивание архива, копирование дерева. */
 export function isCodeImport(tool) {
   if (tool.name !== 'Bash') return false;
   const cmd = commandSkeleton(tool.input?.command || '');
-  if (/\bgit\s+clone\b/.test(cmd)) return true;
-  if (/\bgh\s+repo\s+clone\b/.test(cmd)) return true;
+  if (foreignClones(cmd).length > 0) return true;
   if (/\bdegit\b|\bsvn\s+checkout\b/.test(cmd)) return true;
   if (/\bscp\s+-r\b|\brsync\s+-[a-z]*a/.test(cmd)) return true;
   if (/\bcurl\b.*-[oO]\b.*\.(zip|tar\.gz|tgz)\b/.test(cmd)) return true;
@@ -377,6 +389,11 @@ function selfTest() {
   ok("обычный инструмент не считается источником дизайна", !isDesignSource({ name: "Read" }));
   ok("git clone опознаётся как перенос кода", isCodeImport(clone));
   ok("gh repo clone опознаётся", isCodeImport({ name: "Bash", input: { command: "gh repo clone org/back" } }));
+  ok("клон СВОЕГО репозитория (contact715) не перенос чужого кода",
+    !isCodeImport({ name: "Bash", input: { command: "if [ -d x/.git ]; then git fetch; else git clone -q https://github.com/contact715/jidoka.git /Users/mityamit/.jidoka-weekly; fi" } }));
+  ok("gh repo clone своего репозитория не перенос", !isCodeImport({ name: "Bash", input: { command: "gh repo clone contact715/jidoka" } }));
+  ok("чужой клон рядом со своим всё равно перенос",
+    isCodeImport({ name: "Bash", input: { command: "git clone https://github.com/contact715/jidoka.git a && git clone https://github.com/x/back.git b" } }));
   ok("скачивание архива опознаётся", isCodeImport({ name: "Bash", input: { command: "curl -O https://x/y.tar.gz" } }));
   ok("обычная команда не считается переносом", !isCodeImport({ name: "Bash", input: { command: "npm test" } }));
   ok("git clone ВНУТРИ кавычек не срабатывает (упоминание, а не действие)",

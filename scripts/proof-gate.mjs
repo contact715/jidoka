@@ -37,7 +37,7 @@ export function classifyClaim(claim = '') {
 export function proofTypeMismatch(claimType, proof = '') {
   const p = proof.toLowerCase();
   if (claimType === 'ui') {
-    const browser = /playwright|puppeteer|cypress|webdriver|browser_|screenshot|\be2e\b|--headed|computer-use|integration-tester|visual-qa|execution-gate[^|]*--run/.test(p);
+    const browser = /playwright|puppeteer|cypress|webdriver|browser_|screenshot|\be2e\b|--headed|computer-use|execution-gate[^|]*--run/.test(p);
     if (!browser) return { need: 'a live browser / E2E run', why: 'a UI / render / console claim cannot be proven by a unit test — run the app and observe (Playwright console + screenshot, or execution-gate --run)' };
   }
   if (claimType === 'data-removal') {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// wave-134 — Retrospective cross-wave AC auditor. NOT test-engineer (per-wave prospective agent).
+// wave-134 — Retrospective cross-wave AC auditor. NOT per-wave prospective test writing.
 // NOT wave-130 (property testing). NOT wave-131 (mutation testing). Dev-tooling only.
 // Reads docs/specs/wave-*_MASTER_SPEC.md, maps each AC to test files, writes
 // docs/metrics/ac-coverage-map.json and tests/spec-stubs/wave-NN.spec-stubs.test.ts stubs.
@@ -222,7 +222,7 @@ function generateStubFile(waveId, uncoveredAcs) {
   if (uncoveredAcs.length === 0) return null;
 
   const lines = [
-    `// wave-134 generated stub — it.todo stubs are NOT coverage. Fill assertions via test-engineer dispatch.`,
+    `// wave-134 generated stub — it.todo stubs are NOT coverage. Fill assertions in the implementing agent's task.`,
     `// SOURCE: docs/specs/${waveId}_MASTER_SPEC.md — ACs with no linked test as of generation time.`,
     `// AC-N tags must be added above each it() when a real assertion is written.`,
     ``,
@@ -436,7 +436,7 @@ function main({ strict: isStrict = false, dry: isDry = false } = {}) {
 
     if (stubFilesWritten > 0) {
       console.log(`[map-ac-coverage] wrote ${stubFilesWritten} stub file(s) to tests/spec-stubs/`);
-      console.log(`[map-ac-coverage] REMINDER: it.todo stubs are NOT coverage. Fill via test-engineer dispatch.`);
+      console.log(`[map-ac-coverage] REMINDER: it.todo stubs are NOT coverage. Fill in the implementing agent's task.`);
     }
   }
 

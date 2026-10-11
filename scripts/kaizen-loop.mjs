@@ -6,7 +6,7 @@
 // where we are going, this says whether the numbers are actually getting there.
 //
 // HONEST SPLIT: the LOGIC (trend vs goal direction) is FULL & self-tested. The DATA — a product's
-// real metric series — is DORMANT here: it is wired in the product (data-analyst feeds the
+// real metric series — is DORMANT here: it is wired in the product (the product feeds the
 // measurements from the product's analytics into a kaizen-targets.json). This script is the
 // mechanism; the product supplies the numbers. Without numbers it has nothing to assess, by design.
 //
@@ -32,7 +32,7 @@ export function trend(series) {
 
 // assess one target. `direction` is the DESIRED trend: 'down' to reduce a metric, 'up' to grow it.
 export function assessOne(t) {
-  if (!Array.isArray(t.series) || t.series.length === 0) return { metric: t.metric, status: 'no-data', trend: 'n/a', recommendation: "no measurements yet — the product's data-analyst must feed the series before this can be assessed (DORMANT)" };
+  if (!Array.isArray(t.series) || t.series.length === 0) return { metric: t.metric, status: 'no-data', trend: 'n/a', recommendation: "no measurements yet — the product must feed the series before this can be assessed (DORMANT)" };
   if (t.series.length === 1) return { metric: t.metric, status: 'baseline', trend: 'first reading', recommendation: `baseline recorded (${t.series[0]}) — feed a 2nd reading to assess the trend toward ${t.target}` };
   const tr = trend(t.series);
   const last = t.series.at(-1);
@@ -103,7 +103,7 @@ if (isMain) {
   const tp = values.targets || null;
   if (!tp || !existsSync(tp)) {
     console.error('usage: --targets <kaizen-targets.json>  { "product": "...", "targets": [ { "metric","direction":"up|down","target",series:[...] } ] }');
-    console.error('  (DORMANT until a product supplies real measurements — the product\'s data-analyst writes this file)');
+    console.error('  (DORMANT until a product supplies real measurements — the product writes this file)');
     process.exit(2);
   }
   const cfg = JSON.parse(readFileSync(tp, 'utf8'));

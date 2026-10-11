@@ -3,7 +3,7 @@
 // from GROUND TRUTH, not fabrication:
 //   declared_tools  ← each agent's tools: frontmatter (.claude/agents/*.md), verbatim
 //   line            ← the agent's Line cell in docs/AGENT_ROSTER.md
-//   write_scope     ← quoted from the agent's own role, ONLY for the four Second/Third
+//   write_scope     ← quoted from the agent's own role, ONLY for the Second/Third
 //                     line agents that hold Write + a scope-contradicting description
 //                     (so validate-agent-access I1 over-privilege does not fire)
 //
@@ -22,15 +22,11 @@ const ROSTER = 'docs/AGENT_ROSTER.md';
 const OUT = 'docs/governance/agent-access-registry.json';
 
 // Real write scopes, quoted from each agent's stated role (not invented):
-//   skill-extractor: "Write access: .claude/skills/ and docs/retros/_FINDINGS.md only"
-//   self-improvement-reviewer: queues to .claude/self-improvement-queue/ (ROUTINES)
 //   reflexion-critic: queues verdicts to .claude/reflexion-queue/<sha>.md (AGENT_ROSTER)
-//   test-engineer: "Produces *.test.ts files co-located with implementation targets"
-const WRITE_SCOPES = {
-  'skill-extractor': '.claude/skills/**, docs/retros/_FINDINGS.md',
-  'self-improvement-reviewer': '.claude/self-improvement-queue/**',
+// skill-extractor, self-improvement-reviewer and test-engineer held scopes here until their
+// agent files were removed 2026-10-10; a scope for an agent with no .md would be an orphan row.
+export const WRITE_SCOPES = {
   'reflexion-critic': '.claude/reflexion-queue/**',
-  'test-engineer': '**/*.test.ts, **/*.spec.ts',
 };
 
 // Mirror validate-agent-access.mjs:extractToolsFromFile exactly so I0 matches.

@@ -108,6 +108,9 @@ export function resolveProfile(name = 'standard') {
 // so the weekly reports and the kaizen registries were invisible from the live environment.
 // Nothing was wrong with either copy on its own; there was simply no instrument that looked at both.
 // The drift is two-directional, so the report names both sides rather than only what is missing.
+// Federation files copied into a product as-is (source path == target path). Every entry must
+// exist in the canon; the self-test asserts it, so a removed file cannot be silently skipped.
+export const FEDERATION_FILES = ['docs/NORTH_STAR_TEMPLATE.md', 'docs/PROJECT_CHARTER_TEMPLATE.md'];
 export const GLOBAL_SYNC_DIRS = ['scripts', 'hooks', 'agents', 'docs/research', 'docs/audits'];
 
 /**
@@ -179,6 +182,18 @@ function profileSelfTest() {
     GLOBAL_SYNC_DIRS.includes('docs/research'));
   ok('the global sync carries hooks and agents, not only scripts',
     GLOBAL_SYNC_DIRS.includes('hooks') && GLOBAL_SYNC_DIRS.includes('agents'));
+  // agent purge 2026-10-10: the federation step copied the project-steward and spec-custodian
+  // agent files, which no longer exist — an install would crash on copyFileSync.
+  ok('every federation file exists in the canon', FEDERATION_FILES.every((f) => existsSync(join(HERE, f))));
+  ok('federation copies no agent definition', FEDERATION_FILES.every((f) => !f.startsWith('.claude/agents/')));
+  ok('the install source copies no removed role agent', (() => {
+    const src = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+    // names assembled at run time so this assertion does not match itself
+    return ['project', 'spec'].map((p, i) => `.claude/agents/${p}-${['steward', 'custodian'][i]}.md`)
+      .every((path) => !src.includes(path));
+  })());
+  ok('charter-check.mjs ships in a profile (it gates the Charter the templates seed)',
+    resolveProfile('standard').includes('charter-check.mjs'));
   ok('core profile = kernel only', resolveProfile('core').length === KERNEL.length);
   ok('standard contains all of core + more', KERNEL.every(k => resolveProfile('standard').includes(k)) && resolveProfile('standard').length > KERNEL.length);
   ok('full contains all of standard + more', resolveProfile('standard').every(s => resolveProfile('full').includes(s)) && resolveProfile('full').length > resolveProfile('standard').length);
@@ -400,14 +415,15 @@ if (isMain) {
     log('  • .sdd-config.json exists — left as is (add a driftDetection block if missing)');
   }
 
-  // ── 3b. Federation: project-steward (guardian) + North Star/Charter templates ──
-  mkdirSync(T('.claude/agents'), { recursive: true });
-  if (!existsSync(T('.claude/agents/project-steward.md'))) copyFileSync(join(HERE, '.claude/agents/project-steward.md'), T('.claude/agents/project-steward.md'));
-  if (!existsSync(T('.claude/agents/spec-custodian.md'))) copyFileSync(join(HERE, '.claude/agents/spec-custodian.md'), T('.claude/agents/spec-custodian.md'));
-  for (const tpl of ['NORTH_STAR_TEMPLATE.md', 'PROJECT_CHARTER_TEMPLATE.md']) {
-    if (existsSync(join(HERE, 'docs', tpl)) && !existsSync(T('docs/' + tpl))) copyFileSync(join(HERE, 'docs', tpl), T('docs/' + tpl));
+  // ── 3b. Federation: North Star / Charter templates ──
+  // The product owner fills them; charter-check.mjs (shipped in the kernel/common set) gates the
+  // filled Charter on pre-push. No agent file is copied: the project-steward and spec-custodian
+  // role agents were removed 2026-10-10 (zero dispatches in 30 days).
+  mkdirSync(T('docs'), { recursive: true });
+  for (const rel of FEDERATION_FILES) {
+    if (!existsSync(T(rel))) copyFileSync(join(HERE, rel), T(rel));
   }
-  log('  ✓ federation: project-steward + North Star/Charter templates → project (steward fills them)');
+  log('  ✓ federation: North Star/Charter templates → project (fill them; charter-check.mjs gates the Charter)');
 
   // ── 4. Install hooks (only if git, and only if not clobbering existing hooks) ──
   const existingHooksPath = (() => { try { return execSync('git config core.hooksPath', { cwd: target, encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -451,12 +467,12 @@ node "$ROOT/.jidoka/scripts/pre-publish-guard.mjs" || exit 1
 if [ -f "$ROOT/docs/NORTH_STAR.md" ]; then
   node "$ROOT/.jidoka/scripts/northstar-check.mjs" --doc "$ROOT/docs/NORTH_STAR.md" || exit 1
 else
-  echo "  ○ no docs/NORTH_STAR.md yet — the CPO owns it; create one so features can be checked against the goal"
+  echo "  ○ no docs/NORTH_STAR.md yet — create one from docs/NORTH_STAR_TEMPLATE.md so features can be checked against the goal"
 fi
 if [ -f "$ROOT/docs/PROJECT_CHARTER.md" ]; then
   node "$ROOT/.jidoka/scripts/charter-check.mjs" --doc "$ROOT/docs/PROJECT_CHARTER.md" || exit 1
 else
-  echo "  ○ no docs/PROJECT_CHARTER.md yet — the project-steward owns it; create one to defend integrity"
+  echo "  ○ no docs/PROJECT_CHARTER.md yet — create one from docs/PROJECT_CHARTER_TEMPLATE.md to defend integrity"
 fi
 exit 0
 `;

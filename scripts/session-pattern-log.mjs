@@ -4,8 +4,7 @@
  * session-pattern-log — the REAL-TIME tier of the self-improvement engine.
  *
  * The existing engine catches recurrence at WAVE/RETRO granularity:
- *   - self-improvement-reviewer: every 5 waves, threshold 3-of-5 retros
- *   - meta-log / meta-trend / meta-process-auditor: post-wave, manual or modulo
+ *   - meta-log / meta-trend / meta-audit: post-wave, manual or modulo
  * What was missing (owner, 2026-06-24): a pattern that recurs ≥2× WITHIN one
  * live session never got surfaced until a retro — hours later, if ever.
  *

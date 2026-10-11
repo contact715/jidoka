@@ -26,7 +26,7 @@ Attacks the framework's own defenses across six classes; every success becomes a
 ## Lives in
 
 - `scripts/red-team.mjs`
-- `.claude/agents/red-team.md`
+- `red-team` (роль удалена 2026-10-10)
 
 ## Acceptance criteria
 

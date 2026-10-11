@@ -340,7 +340,7 @@ ${details || '*No entities in this class. Run `npm run memory:snapshot` to expor
 ---
 
 *To regenerate: \`${regenCmd}\`*
-*To run live MCP query and update: dispatch meta-process-auditor or re-run script after MCP sync.*
+*To run live MCP query and update: run scripts/audit-meta-process.mjs or re-run script after MCP sync.*
 `;
   }
 
@@ -417,7 +417,7 @@ ${details}
 ---
 
 *To regenerate: \`node scripts/export-memory-anti-patterns.mjs\`*
-*To run live MCP query and update: dispatch meta-process-auditor or re-run script after MCP sync.*
+*To run live MCP query and update: run scripts/audit-meta-process.mjs or re-run script after MCP sync.*
 `;
   }
 

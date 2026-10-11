@@ -10,7 +10,7 @@
 // machine-checked claim: it measures OUTCOME quality, not just process. (Gap #1 from the
 // frontier analysis — see docs/specs/wave-frontier_MASTER_SPEC.md §2 Module 1.)
 //
-// LLM-agent evals (constitutional-reviewer etc.) live in docs/evals/<agent>/golden-cases.jsonl
+// LLM-agent evals (reflexion-critic etc.) live in docs/evals/<agent>/golden-cases.jsonl
 // and run via run-evals.mjs WITH a model — DORMANT until a model is wired. Honest split.
 //
 // Usage:

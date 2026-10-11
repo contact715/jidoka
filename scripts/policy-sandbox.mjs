@@ -11,7 +11,7 @@
 //
 // FULL & self-tested. Usage:
 //   node scripts/policy-sandbox.mjs --self-test
-//   node scripts/policy-sandbox.mjs --agent skill-extractor --files ".claude/skills/x.md,src/app.ts"
+//   node scripts/policy-sandbox.mjs --agent reflexion-critic --files ".claude/reflexion-queue/abc.md,src/app.ts"
 //   node scripts/policy-sandbox.mjs --agent reflexion-critic --tools "Read,Write,Bash"
 
 import { readFileSync, existsSync } from 'node:fs';
@@ -67,20 +67,32 @@ const isMain = process.argv[1] === (await import('node:url')).fileURLToPath(impo
 if (isMain) {
 const { values, selfTest: wantsSelfTest } = runCli(CLI);
 if (wantsSelfTest) {
+  // Fixture registry. `fixture-*` slugs are synthetic and exist only to exercise the glob shapes;
+  // reflexion-critic is a real agent with its real scope. (The old fixture named skill-extractor
+  // and test-engineer, role agents removed 2026-10-10.)
   const reg = { agents: [
-    { slug: 'skill-extractor', write_scope: '.claude/skills/**, docs/retros/_FINDINGS.md', declared_tools: ['Read', 'Grep', 'Write'] },
-    { slug: 'test-engineer', write_scope: '**/*.test.ts, **/*.spec.ts', declared_tools: ['Read', 'Write', 'Edit'] },
+    { slug: 'fixture-prefix-and-file', write_scope: '.claude/skills/**, docs/retros/_FINDINGS.md', declared_tools: ['Read', 'Grep', 'Write'] },
+    { slug: 'fixture-test-glob', write_scope: '**/*.test.ts, **/*.spec.ts', declared_tools: ['Read', 'Write', 'Edit'] },
     { slug: 'reflexion-critic', write_scope: '.claude/reflexion-queue/**', declared_tools: ['Read', 'Glob', 'Grep', 'Bash', 'Write'] },
   ] };
+  // Live truth: every write_scope in the generated registry belongs to an agent that still exists.
+  const liveScopedOrphans = () => {
+    if (!existsSync(REGISTRY)) return [];
+    return (JSON.parse(readFileSync(REGISTRY, 'utf8')).agents || [])
+      .filter((a) => a.write_scope && !existsSync(`.claude/agents/${a.slug}.md`)).map((a) => a.slug);
+  };
   const T = [
-    ['write in-scope (skill)', () => checkWrites('skill-extractor', ['.claude/skills/foo.md'], reg).ok === true],
-    ['write in-scope (exact file)', () => checkWrites('skill-extractor', ['docs/retros/_FINDINGS.md'], reg).ok === true],
-    ['write OUT-of-scope (src)', () => checkWrites('skill-extractor', ['src/app.ts'], reg).ok === false],
-    ['test-engineer .test.ts in', () => checkWrites('test-engineer', ['src/a.test.ts'], reg).ok === true],
-    ['test-engineer .ts OUT', () => checkWrites('test-engineer', ['src/a.ts'], reg).ok === false],
+    ['write in-scope (prefix glob)', () => checkWrites('fixture-prefix-and-file', ['.claude/skills/foo.md'], reg).ok === true],
+    ['write in-scope (exact file)', () => checkWrites('fixture-prefix-and-file', ['docs/retros/_FINDINGS.md'], reg).ok === true],
+    ['write OUT-of-scope (src)', () => checkWrites('fixture-prefix-and-file', ['src/app.ts'], reg).ok === false],
+    ['test glob .test.ts in', () => checkWrites('fixture-test-glob', ['src/a.test.ts'], reg).ok === true],
+    ['test glob .ts OUT', () => checkWrites('fixture-test-glob', ['src/a.ts'], reg).ok === false],
+    ['reflexion-critic queue write in', () => checkWrites('reflexion-critic', ['.claude/reflexion-queue/abc.md'], reg).ok === true],
+    ['reflexion-critic src write OUT', () => checkWrites('reflexion-critic', ['src/app.ts'], reg).ok === false],
     ['tool granted', () => checkTools('reflexion-critic', ['Read', 'Bash'], reg).ok === true],
     ['tool NOT granted', () => checkTools('reflexion-critic', ['Edit'], reg).ok === false],
     ['unknown agent', () => checkWrites('ghost', ['x'], reg).ok === false],
+    ['live registry: no write_scope for a removed agent', () => liveScopedOrphans().length === 0],
   ];
   let fails = 0;
   for (const [name, fn] of T) { const ok = fn(); if (!ok) fails++; console.log(`  ${ok ? '\x1b[32m✓\x1b[0m' : '\x1b[31m✗\x1b[0m'} ${name}`); }

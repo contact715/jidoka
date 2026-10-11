@@ -11,7 +11,7 @@
 > **ASVS reference**: OWASP Application Security Verification Standard L2. See table at bottom.
 > **LLM exposure map**: this project-specific OWASP LLM Top 10 ratings at bottom.
 >
-> **Agent reference**: `.claude/agents/security-scanner.md`
+> **Agent reference**: `security-scanner` (роль удалена 2026-10-10)
 > **Criteria doc**: This file. Referenced by security-scanner `## Contract` for design-phase gate.
 
 ---

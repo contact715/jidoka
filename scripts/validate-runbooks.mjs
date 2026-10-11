@@ -18,9 +18,10 @@
  *         steps, rollback, verification). Heading-label-aware matching is used
  *         (aliases permitted; the _TEMPLATE.md defines canonical slugs).
  *   V5 — Every trigger_halt_types[] entry must match a known halt-authority
- *         agent slug from scripts/andon-halt-helpers.mjs:3-11 (9 agents).
+ *         slug: the identifier a writeHaltState() caller passes (see
+ *         HALT_AUTHORITY_AGENTS below and the header of andon-halt-helpers.mjs).
  *   V6 — _INDEX.md: every runbook_path entry must resolve to a real file.
- *   V7 — _INDEX.md: every halt_agent entry must be a known agent slug (9 agents).
+ *   V7 — _INDEX.md: every halt_agent entry must be a known halt-authority slug.
  *   WARN — last_tested older than 90 days emits a warning (not exit 1).
  *
  * Flags:
@@ -70,21 +71,23 @@ export const CLI = {
   },
 };
 
-// ── Known halt-authority agents ────────────────────────────────────────────
-// Canonical source: docs/governance/raci.json halt-gate responsible[] (9 agents).
-// Mirrors the comment in scripts/andon-halt-helpers.mjs:3-11. AC-5 / AC-7.
-// If the halt-authority list changes, update raci.json first, then here and
-// andon-halt-helpers.mjs together.
-const HALT_AUTHORITY_AGENTS = new Set([
-  'test-runner',
-  'coverage-auditor',
-  'a11y-auditor',
-  'security-scanner',
-  'constitutional-reviewer',
-  'debate-judge',
-  'meta-process-auditor',
-  'proactive-surfacing-agent',
-  'pfca-agent',
+// ── Known halt-authority slugs ─────────────────────────────────────────────
+// Canonical source: the second argument of every writeHaltState() call in scripts/
+// (grep "writeHaltState(" — the header of andon-halt-helpers.mjs names the callers).
+// Since the 2026-10-10 roster cut the halt authorities are deterministic scripts, not role
+// agents; the old list named test-runner, coverage-auditor, a11y-auditor, security-scanner,
+// constitutional-reviewer, proactive-surfacing-agent and pfca-agent, none of which exists or
+// halts any more. detect-injection.mjs halts under its --agent value and has no fixed slug.
+export const HALT_AUTHORITY_AGENTS = new Set([
+  'run-checklist',                // run-checklist.mjs (PFCA BLOCK)
+  'audit-meta-process',           // audit-meta-process.mjs
+  'detect-recurrences',           // detect-recurrences.mjs
+  'constitutional-drift-monitor', // detect-constitutional-drift.mjs
+  'surface-concerns',             // surface-concerns.mjs (blocking severity)
+  'cost-compute',                 // compute-cost.mjs
+  'slo-monitor',                  // compute-slos.mjs
+  'dora-compute',                 // compute-dora.mjs
+  'carbon-compute',               // compute-carbon.mjs
 ]);
 
 // ── Mandatory section aliases ──────────────────────────────────────────────
@@ -116,8 +119,8 @@ const MANDATORY_SECTION_CONCEPTS = [
 // ── Parse trigger_halt_types[] from YAML block ─────────────────────────────
 // The YAML block contains a multi-line list like:
 //   trigger_halt_types:
-//     - constitutional-reviewer
-//     - meta-process-auditor
+//     - run-checklist
+//     - detect-recurrences
 // extractYamlField only handles single-line values, so we parse the block
 // manually for this specific array field.
 function extractHaltTypes(yamlBlock) {

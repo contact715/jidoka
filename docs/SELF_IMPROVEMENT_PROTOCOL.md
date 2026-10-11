@@ -53,7 +53,7 @@ Report at `docs/audit-reports/{YYYY-MM-DD}-self-improvement-wave-{NN}.md`. Targe
 
 ## File locations
 
-- Agent charter: `.claude/agents/self-improvement-reviewer.md` (gitignored)
+- Agent charter: `self-improvement-reviewer` (роль удалена 2026-10-10) (gitignored)
 - Trigger script: `scripts/check-self-improvement-due.sh` (tracked)
 - npm command: `npm run agents:improve` (tracked via package.json)
 - Queue: `.claude/self-improvement-queue/wave-NN.md` (gitignored, ephemeral)

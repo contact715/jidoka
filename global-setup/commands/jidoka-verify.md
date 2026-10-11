@@ -6,9 +6,9 @@ allowed-tools: Read, Bash, Agent
 Verify wave $1.
 
 1. `node scripts/run-state.mjs --advance $1 --phase gate --status running`.
-2. Run the gates: reflexion-critic (spec compliance), constitutional-reviewer (mission), plus
-   security-scanner / coverage / a11y / perf as the surfaces require. On a critical wave run the
-   adversarial debate: `node scripts/debate-engine.mjs`.
+2. Run the gates: reflexion-critic (spec compliance), `node scripts/coverage-gate.mjs`, and
+   `node scripts/dependency-audit.mjs` when there is a backend; for UI, look at it in the browser.
+   On a critical wave run the adversarial debate: `node scripts/debate-engine.mjs`.
 3. Execution proof, not just static checks: actually run the project's tests/command via
    `node scripts/execution-gate.mjs --run`. Untrusted or generated code runs isolated:
    `node scripts/sandbox-run.mjs --scope <build-dir> --cmd "<test>"` (kernel sandbox, no escape).
@@ -24,11 +24,11 @@ Verify wave $1.
      `node scripts/acceptance-verdict.mjs $1` → writes `docs/runs/$1/verdict.json` with each exit code.
      Re-running in a fresh context is what makes the verdict independent (the reflexion-critic pattern).
    - Not optional: `run-state.mjs` REFUSES to close the wave's final phase without a passing
-     `verdict.json`. A red verdict keeps the wave open and routes to debug-agent.
+     `verdict.json`. A red verdict keeps the wave open and routes to debugging (`systematic-debugging` skill).
 6. Trajectory check (optional, path-not-just-outcome): `node scripts/trajectory-eval.mjs --wave $1`
    compares the agents that actually ran (agent-traces) against the agents plan() requires for the
    wave's task — surfacing a required agent that was SKIPPED (e.g. a critical wave shipped without
-   security-scanner / debate). Precise only when agent-trace --ingest tags rows with the wave; else
+   debate). Precise only when agent-trace --ingest tags rows with the wave; else
    it reports approximate and does not fail.
 7. Green → `node scripts/run-state.mjs --advance $1 --phase gate --status done`. Red →
-   `--status failed --note "<what broke>"` and route to debug-agent before re-running.
+   `--status failed --note "<what broke>"` and debug (`systematic-debugging` skill) before re-running.
