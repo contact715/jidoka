@@ -79,7 +79,8 @@ done
 echo "  ✓ team agents → ~/.claude/agents/"
 
 # 5. CLAUDE.md method (append the senior section if not already present)
-if [ -f "$DEST/CLAUDE.md" ] && grep -q "Engineering Discipline" "$DEST/CLAUDE.md"; then
+# Marker: the 2026-10-10 core links GLOBAL_RULES_FULL.md; older installs carry "Engineering Discipline".
+if [ -f "$DEST/CLAUDE.md" ] && grep -qE "GLOBAL_RULES_FULL.md|Engineering Discipline" "$DEST/CLAUDE.md"; then
   echo "  • CLAUDE.md method already present (skipped)"
 else
   cat "$SRC/CLAUDE.md" >> "$DEST/CLAUDE.md" 2>/dev/null || cp "$SRC/CLAUDE.md" "$DEST/CLAUDE.md"
