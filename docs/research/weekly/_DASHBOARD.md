@@ -1,4 +1,4 @@
-# Kaizen Dashboard — 2026-W42
+# Kaizen Dashboard — 2026-W44
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
