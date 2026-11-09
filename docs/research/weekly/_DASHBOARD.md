@@ -1,8 +1,8 @@
-# Kaizen Dashboard — 2026-W45
+# Kaizen Dashboard — 2026-W46
 
 _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs --dashboard` (or any `node scripts/kaizen-audit.mjs` run)._
 
-**adoption 63% · shipped 116/183, open 67, regressed 0, ~0.99w to ship, class-closure 45%**
+**adoption 60% · shipped 116/192, open 76, regressed 0, ~0.99w to ship, class-closure 45%**
 
 | status | id | recommendation | point-of-integration | evidence |
 | --- | --- | --- | --- | --- |
@@ -206,10 +206,20 @@ _Generated from the outcome ledger. Regenerate: `node scripts/kaizen-engine.mjs 
 | rejected | 2026-W40-R2 | Самопроверка судей пишет во временный журнал: judge-debias-telemetry перестаёт засоряться (113 из 113 строк искусственные) | scripts/judge-panel.mjs#testLogPath | отклонено 2026-10-12 (2026-W42), причина в _REJECTED.jsonl |
 | open | 2026-W45-R2 | Запись о починке не считается инцидентом: 4 строки «systemic fix» с kind incident исправить, validateLedgerEntry запрещает такое сочетание | scripts/meta-lib.mjs#fixRecordedAsIncident | not yet present: scripts/meta-lib.mjs#fixRecordedAsIncident |
 | open | 2026-W45-R5 | Обновить числа в HONEST_SYSTEM_STATE и пометить ENGINEERING_SYSTEM_ASSESSMENT устаревшим на 2026-10-10 | docs/ENGINEERING_SYSTEM_ASSESSMENT.md#устарел на 2026-10-10 | not yet present: docs/ENGINEERING_SYSTEM_ASSESSMENT.md#устарел на 2026-10-10 |
-| open | 2026-W45-S1 | Project 192: вызов сторожей без цикла в zsh, один вход tools/preflight.py (каждая сессия теряет один вызов) | product:nutrition-system/tools/preflight.py | not yet present: product:nutrition-system/tools/preflight.py |
+| rejected | 2026-W45-S1 | Project 192: вызов сторожей без цикла в zsh, один вход tools/preflight.py (каждая сессия теряет один вызов) | product:nutrition-system/tools/preflight.py | поглощена 2026-W46-R1 (сторож оболочки для всех проектов), причина в _REJECTED.jsonl 2026-W46-REJ-01 |
 | open | 2026-W45-K2 | У сигнала обязан быть читатель: gate-audit краснеет на журнале и лампе, которые никто не читает | scripts/gate-audit.mjs#orphanSignalAudit | not yet present: scripts/gate-audit.mjs#orphanSignalAudit |
 | open | 2026-W45-R1 | Сторож инъекций видит MCP: в настройках `mcp__` заменить на `mcp__.*`, в settings-integrity новый класс «matcher не совпадёт ни с чем», журналу назвать читателя | scripts/settings-integrity.mjs#matcherCanMatch | not yet present: scripts/settings-integrity.mjs#matcherCanMatch |
 | open | 2026-W45-R3 | Разбор сессий читает, что было ПОСЛЕ сбоя: находка называется только по цепочке вызовов, а не по фрагменту поиска | docs/KAIZEN_ENGINE.md#что было после сбоя | not yet present: docs/KAIZEN_ENGINE.md#что было после сбоя |
 | open | 2026-W45-R4 | Норма «факт выясняю сам, решение спрашиваю» текстом в правилах, без установки и кода, с условием смерти 2026-12-02 | global-setup/GLOBAL_RULES_FULL.md#факт выясняю сам | not yet present: global-setup/GLOBAL_RULES_FULL.md#факт выясняю сам |
 | open | 2026-W45-K1 | Один список решений: всё, что красное дольше 7 дней, собирается в 3-5 вопросов да/нет с готовой командой | scripts/red-digest.mjs#buildDecisionList | not yet present: scripts/red-digest.mjs#buildDecisionList |
 | open | 2026-W45-K3 | Сторож пустой переменной перед rm и подобным (из листа ожидания W42) | hooks/destructive-empty-var-guard.mjs#findEmptyPathVar | not yet present: hooks/destructive-empty-var-guard.mjs#findEmptyPathVar |
+| open | 2026-W46-R1 | Сторож оболочки zsh: PreToolUse на Bash ловит три ловушки zsh (голая звёздочка в --include=*, слово с ведущим =, переменная с пробелами без массива) и отвечает исправленной командой | hooks/shell-pitfall-guard.mjs#findZshPitfalls | not yet present: hooks/shell-pitfall-guard.mjs#findZshPitfalls |
+| open | 2026-W46-R2 | Подключить призрачный sibling-parity-gate в ~/.claude/settings.json и научить instantiation-audit классу «хук лежит в ~/.claude/hooks, но не подключён» | scripts/instantiation-audit.mjs#unwiredHooks | not yet present: scripts/instantiation-audit.mjs#unwiredHooks |
+| open | 2026-W46-R3 | Установка отстала от канона: gate-audit --self-test в ~/.claude/jidoka красный, в клоне зелёный; переустановить и добавить сверку самопроверок установки в стартовую сводку | scripts/install-into.mjs#postInstallSelfTests | not yet present: scripts/install-into.mjs#postInstallSelfTests |
+| open | 2026-W46-R4 | Урок в момент действия: хук lesson-recall на UserPromptSubmit плюс режим abstain в memory-retrieve (идея claude-mem, плагин отклонён) | scripts/memory-retrieve.mjs#abstain | not yet present: scripts/memory-retrieve.mjs#abstain |
+| open | 2026-W46-R5 | Слепая трассировка ветвей (Gate 0) в reflexion-critic до чтения спеки (идея BMAD edge-case-hunter) | .claude/agents/reflexion-critic.md#gate-0-blind-path-trace | not yet present: .claude/agents/reflexion-critic.md#gate-0-blind-path-trace |
+| open | 2026-W46-R6 | «Измерен» только при достаточном объёме: TPR/TNR по классу и статус underpowered для LLM-судей, удалённые роли убрать из judge-calibration-state.json | scripts/judge-calibration-state.mjs#underpoweredStatus | not yet present: scripts/judge-calibration-state.mjs#underpoweredStatus |
+| open | 2026-W46-R7 | Воркфлоу недельного ресёрча читает _REJECTED.jsonl до поиска: 8 из 24 кандидатов W46 были повторами уже отклонённых | .claude/workflows/jidoka-enrichment.js#loadRejected | not yet present: .claude/workflows/jidoka-enrichment.js#loadRejected |
+| open | 2026-W46-R8 | Починить датчик сжатия контекста: summaryChars пуст в 211 из 211 событий, metaSource пуст в 172 | hooks/compaction-trace.mjs#readCompactSummary | not yet present: hooks/compaction-trace.mjs#readCompactSummary |
+| open | 2026-W46-K1 | Сторож оболочки для всех проектов (см. W46-R1) с контрольным красным на корпусе реальных сбоев из транскриптов | hooks/shell-pitfall-guard.mjs#findZshPitfalls | not yet present: hooks/shell-pitfall-guard.mjs#findZshPitfalls |
+| open | 2026-W46-K2 | Недельный прогон сначала закрывает, потом планирует: при нуле внедрений две недели подряд новых рекомендаций не выпускает, а выдаёт одну готовую правку P0 на одобрение | scripts/kaizen-dispatch.mjs#throughputGate | not yet present: scripts/kaizen-dispatch.mjs#throughputGate |
