@@ -17,6 +17,10 @@ docs/audits/gate-trips.jsonl
 # judge position-sensitivity telemetry (debate-engine debiasedVerdict) — a validator-regenerated
 # stream, NOT the mistake ledger. Kept out of docs/audits/meta-mistakes.jsonl on purpose (ledger-pollution, 2026-07-04).
 docs/audits/judge-debias-telemetry.jsonl
+# Очередь человеческих шагов одна и живёт в УСТАНОВЛЕННОМ движке ($JIDOKA_HOME, по умолчанию
+# ~/.claude/jidoka), см. scripts/pending-human.mjs#ledgerRoot. Копия в каноне была вторым
+# источником одного факта: 18 шагов против 21 живого, три шага видел только канон (2026-11-11).
+docs/audits/_PENDING_HUMAN.jsonl
 
 # OS / editor
 .DS_Store

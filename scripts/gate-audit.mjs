@@ -718,7 +718,8 @@ function selfTest() {
 }
 
 // Строгий разбор (2026-09-16): незнакомый флаг или слово — код 2 до аудита и до записи
-// очереди человеческих шагов (--emit-pending пишет в docs/audits/_PENDING_HUMAN.jsonl).
+// очереди человеческих шагов (--emit-pending пишет в единственную очередь установленного
+// движка, pending-human#ledgerRoot, а не в текущую папку).
 export const CLI = {
   name: 'gate-audit',
   summary: 'Карта всех гейтов по слоям и проверка, что каждый реально стоит где заявлено (CI, хуки, реестр классов, область).',
@@ -758,8 +759,17 @@ if (isMain) {
       source: `gate-audit#reverseRemedyAudit ← ${pnd.mechanism}`,
       since: pnd.since || day,
     }));
-    ph.saveLedger(ph.upsertRows(ph.loadLedger(process.cwd()), rows), process.cwd());
-    console.log(`pending-human: объявлено ${rows.length} шаг(ов) (возраст известных сохранён)`);
+    // Очередь одна, в установленном движке (pending-human#ledgerRoot), а не в текущей папке:
+    // раньше здесь стоял process.cwd(), и прогон из канона или из клона недельного кайдзена
+    // заводил там собственную копию очереди, которую сводка не читает (замер 2026-11-11).
+    // Установки нет — очередь не наполняется, но и фантомный каталог не создаётся.
+    const queueRoot = ph.ledgerRoot();
+    if (!existsSync(queueRoot)) {
+      console.log(`pending-human: установленной копии нет (${queueRoot}), объявлять некуда — ${rows.length} шаг(ов) не записано`);
+      process.exit(0);
+    }
+    ph.saveLedger(ph.upsertRows(ph.loadLedger(queueRoot), rows), queueRoot);
+    console.log(`pending-human: объявлено ${rows.length} шаг(ов) в ${queueRoot} (возраст известных сохранён)`);
     process.exit(0);
   }
 

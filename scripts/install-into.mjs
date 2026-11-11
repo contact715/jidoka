@@ -113,13 +113,22 @@ export function resolveProfile(name = 'standard') {
 export const FEDERATION_FILES = ['docs/NORTH_STAR_TEMPLATE.md', 'docs/PROJECT_CHARTER_TEMPLATE.md'];
 export const GLOBAL_SYNC_DIRS = ['scripts', 'hooks', 'agents', 'docs/research', 'docs/audits'];
 
+// Живое состояние, которое по устройству существует ТОЛЬКО в установке и в канон не едет.
+// Очередь человеческих шагов одна, её адрес pending-human#ledgerRoot (2026-11-11). Без этой
+// строки сверка звала живую очередь «есть ТОЛЬКО в копии — почини в каноне», то есть
+// советовала завести обратно вторую копию, которую только что убрали.
+// Путь сверяется с LEDGER_REL в pending-human.mjs самопроверкой (чтением с диска, не импортом).
+export const INSTALL_ONLY_STATE = ['docs/audits/_PENDING_HUMAN.jsonl'];
+
 /**
  * Compare two file lists (relative paths) and say how the copies differ. Pure, order-independent.
  * `missing` = in canon, absent from the install. `extra` = in the install, absent from canon —
  * that half matters just as much: a file only the install has is a fix that never reached the canon.
+ * INSTALL_ONLY_STATE is left out on both sides: it is live state, not source.
  */
 export function parityReport(canonFiles = [], installFiles = []) {
-  const canon = new Set(canonFiles), install = new Set(installFiles);
+  const live = new Set(INSTALL_ONLY_STATE);
+  const canon = new Set(canonFiles.filter((f) => !live.has(f))), install = new Set(installFiles.filter((f) => !live.has(f)));
   const missing = [...canon].filter((f) => !install.has(f)).sort();
   const extra = [...install].filter((f) => !canon.has(f)).sort();
   return { missing, extra, inSync: missing.length === 0 && extra.length === 0, canonCount: canon.size, installCount: install.size };
@@ -163,6 +172,13 @@ function profileSelfTest() {
   })());
   ok('an empty install is fully missing, not silently in sync',
     parityReport(['a.mjs'], []).inSync === false && parityReport(['a.mjs'], []).missing.length === 1);
+  // one human-step queue (2026-11-11): the live queue is install-only state, never «fix it in canon»
+  ok('the live human-step queue is not drift: it lives only in the install',
+    parityReport(['a.mjs'], ['a.mjs', 'docs/audits/_PENDING_HUMAN.jsonl']).inSync === true);
+  ok('the install-only list names the address pending-human really uses', (() => {
+    const m = /LEDGER_REL = '([^']+)'/.exec(readFileSync(join(HERE, 'scripts', 'pending-human.mjs'), 'utf8'));
+    return Boolean(m) && INSTALL_ONLY_STATE.includes(m[1]);
+  })());
 
   // ── 2026-W35-A5: the gate must be safe to CALL from anywhere ───────────────
   // It was built in W33, it works, and nothing ever ran it. Wiring it into the daily

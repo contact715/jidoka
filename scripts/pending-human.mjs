@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @closes-class: mechanism-built-human-step-never-taken
+// @closes-class: mechanism-built-human-step-never-taken, state-file-resolved-from-cwd
 // @divergence: "повторное объявление НЕ перезаписывает since" — мера «возраст от последнего объявления» говорила «свежий», а правило «шаг ждёт человека с первого объявления» нарушено
 // @scope: all
 /**
@@ -31,20 +31,44 @@
  * ровно тот класс, против которого этот файл и написан. Поэтому upsertRows НИКОГДА не
  * трогает `since` у уже известного id.
  *
+ * ОЧЕРЕДЬ ОДНА, И ЖИВЁТ ОНА В УСТАНОВЛЕННОМ ДВИЖКЕ (класс `state-file-resolved-from-cwd`).
+ * Адрес: $JIDOKA_HOME (по умолчанию ~/.claude/jidoka) + docs/audits/_PENDING_HUMAN.jsonl.
+ * Туда пишет ежедневная рутина, оттуда читает стартовая сводка. Текущая папка адрес НЕ
+ * выбирает: раньше выбирала, и замер 2026-11-11 нашёл четыре файла с этим именем. В каноне
+ * 18 шагов против 21 живого, у шести живых шагов копии в каноне не было, а три шага (хук
+ * sibling-parity, два кириллических класса) были объявлены ТОЛЬКО в каноне: сводка их не
+ * показывала 32–63 дня. Недельные отчёты кайдзен (клон ~/.jidoka-weekly) печатали число
+ * из устаревшей копии. Третий путь к той же ошибке: gate-audit --emit-pending из любой
+ * папки создавал в ней новую копию. Другой адрес только явным --root (проверки, временные
+ * папки). Установки нет — так и сказано, а не «шагов нет»: пустое против пустого не
+ * проверка. Записи в несуществующую установку нет: фантомный каталог стал бы ещё одной копией.
+ *
  * Использование:
  *   node scripts/pending-human.mjs                 # список открытых, старшие сверху
  *   node scripts/pending-human.mjs --json
  *   node scripts/pending-human.mjs --add '{"id":"...","what":"...","why":"...","source":"..."}'
  *   node scripts/pending-human.mjs --emit '[{...},{...}]'   # идемпотентно, для механизмов
  *   node scripts/pending-human.mjs --close <id> [--by <имя>]
+ *   node scripts/pending-human.mjs --absorb <файл>  # влить устаревшую копию, возраст не теряется
  *   node scripts/pending-human.mjs --self-test
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { runCli } from './lib/cli.mjs';
 
 export const LEDGER_REL = 'docs/audits/_PENDING_HUMAN.jsonl';
+
+/**
+ * Корень, в котором лежит очередь. Пустая (окружение и домашняя папка передаются).
+ * Явный --root побеждает; иначе установленный движок. Текущая папка не участвует НИКОГДА.
+ * Имя переменной то же, что у meta-lib (JIDOKA_HOME), чтобы у адреса установки было одно имя.
+ */
+export function ledgerRoot({ root, env = process.env, home = homedir() } = {}) {
+  if (root) return root;
+  return env.JIDOKA_HOME || join(home, '.claude', 'jidoka');
+}
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -173,23 +197,60 @@ export function mergeGatePending(classes = [], known = []) {
   return [...rows, ...open.filter((k) => !seen.has(k.id))];
 }
 
+/**
+ * Влить устаревшую копию очереди в живую. Пустая. Правила, каждое против конкретной потери:
+ *  - шаг, которого живая очередь не знает, добавляется КАК ЕСТЬ, со своим since: это не новое
+ *    объявление, и штамп «сегодня» омолодил бы его (а без since возраст честно неизвестен);
+ *  - у общего шага since берётся САМЫЙ РАННИЙ: возраст считается от первого объявления, где
+ *    бы оно ни случилось (замер 2026-11-11: канон 08-24, живая 08-25);
+ *  - текст общего шага берётся из живой очереди: она моложе по содержанию;
+ *  - закрытие из копии переносится (человек закрыл шаг там), закрытое в живой не открывается.
+ * Возвращает {rows, added, aged, closed}.
+ */
+export function absorbRows(live = [], other = []) {
+  const out = live.map((r) => ({ ...r }));
+  const byId = new Map(out.map((r, i) => [r.id, i]));
+  let added = 0, aged = 0, closed = 0;
+  for (const raw of other) {
+    if (!raw || !raw.id) continue;
+    const idx = byId.get(raw.id);
+    if (idx === undefined) {
+      out.push({ ...raw });
+      byId.set(raw.id, out.length - 1);
+      added++;
+      continue;
+    }
+    const next = { ...out[idx] };
+    const mine = parseDay(next.since), theirs = parseDay(raw.since);
+    if (!Number.isNaN(theirs) && (Number.isNaN(mine) || theirs < mine)) { next.since = raw.since; aged++; }
+    if (!next.closedAt && raw.closedAt) { next.closedAt = raw.closedAt; next.closedBy = raw.closedBy || 'human'; closed++; }
+    out[idx] = next;
+  }
+  return { rows: out, added, aged, closed };
+}
+
 export function todayIso(d = new Date()) { return d.toISOString().slice(0, 10); }
 
 // ---------- ввод-вывод (не пустые, поэтому отделены от логики) ----------
 
-export function loadLedger(root = process.cwd(), rel = LEDGER_REL) {
-  const p = join(root, rel);
-  if (!existsSync(p)) return [];
-  const out = [];
+/** Строки файла и число битых строк. Битая строка не роняет реестр, но и не прячется. */
+export function readRows(p) {
+  const rows = [];
+  let bad = 0;
+  if (!existsSync(p)) return { rows, bad };
   for (const line of readFileSync(p, 'utf8').split('\n')) {
     const s = line.trim();
     if (!s) continue;
-    try { out.push(JSON.parse(s)); } catch { /* битая строка не роняет реестр */ }
+    try { rows.push(JSON.parse(s)); } catch { bad++; }
   }
-  return out;
+  return { rows, bad };
 }
 
-export function saveLedger(rows, root = process.cwd(), rel = LEDGER_REL) {
+export function loadLedger(root = ledgerRoot(), rel = LEDGER_REL) {
+  return readRows(join(root, rel)).rows;
+}
+
+export function saveLedger(rows, root = ledgerRoot(), rel = LEDGER_REL) {
   const p = join(root, rel);
   mkdirSync(dirname(p), { recursive: true });
   writeFileSync(p, rows.map((r) => JSON.stringify(r)).join('\n') + (rows.length ? '\n' : ''));
@@ -261,6 +322,33 @@ function selfTest() {
   ok('строка сводки даёт команду', /pending-human\.mjs/.test(digestLine(steps)));
   ok('без просрочки хвост не печатается', !/просрочено/.test(digestLine(pendingSteps([step('a', '2026-08-17')], '2026-08-17'))));
 
+  // ОДИН АДРЕС: текущая папка его не выбирает
+  ok('по умолчанию очередь в установленном движке',
+    ledgerRoot({ env: {}, home: '/h' }) === join('/h', '.claude', 'jidoka'));
+  ok('JIDOKA_HOME переносит адрес установки',
+    ledgerRoot({ env: { JIDOKA_HOME: '/x/inst' }, home: '/h' }) === '/x/inst');
+  ok('явный --root сильнее установки', ledgerRoot({ root: '/tmp/r', env: { JIDOKA_HOME: '/x' }, home: '/h' }) === '/tmp/r');
+
+  // слияние устаревшей копии
+  const liveQ = [step('both', '2026-08-25'), { ...step('live-only', '2026-09-08') }];
+  const copyQ = [{ ...step('both', '2026-08-24'), what: 'старый текст' }, step('canon-only', '2026-09-09'),
+    { ...step('closed-there', '2026-08-01'), closedAt: '2026-08-05', closedBy: 'владелец' }];
+  const ab = absorbRows(liveQ, copyQ);
+  ok('у общего шага берётся самый ранний since', ab.rows.find((r) => r.id === 'both').since === '2026-08-24');
+  ok('текст общего шага остаётся живым', ab.rows.find((r) => r.id === 'both').what === 'вставить блок');
+  ok('шаг только из копии добавляется со своим возрастом', ab.rows.find((r) => r.id === 'canon-only').since === '2026-09-09');
+  ok('закрытый в копии шаг приходит закрытым', ab.rows.find((r) => r.id === 'closed-there').closedAt === '2026-08-05');
+  ok('счётчики слияния честные', ab.added === 2 && ab.aged === 1 && ab.closed === 0);
+  ok('более поздний since копии возраст не омолаживает',
+    absorbRows([step('a', '2026-08-01')], [step('a', '2026-09-01')]).rows[0].since === '2026-08-01');
+  ok('шаг без since из копии не получает «сегодня»',
+    absorbRows([], [{ id: 'n', what: 'a', why: 'b', source: 'c' }]).rows[0].since === undefined);
+  const closeThere = absorbRows([step('k', '2026-08-01')], [{ ...step('k', '2026-08-01'), closedAt: '2026-08-03', closedBy: 'владелец' }]);
+  ok('закрытие из копии переносится на открытый шаг', closeThere.rows[0].closedAt === '2026-08-03' && closeThere.closed === 1);
+  const keepClosed = absorbRows([{ ...step('k', '2026-08-01'), closedAt: '2026-08-02', closedBy: 'a' }], [step('k', '2026-08-01')]);
+  ok('закрытое в живой очереди копия не открывает', keepClosed.rows[0].closedAt === '2026-08-02');
+  ok('слияние дубль не плодит', absorbRows(liveQ, liveQ).rows.length === liveQ.length);
+
   const total = checks;
   console.log(`\n${fails.length ? `\x1b[31mpending-human self-test FAILED (${fails.length}): ${fails.join(', ')}\x1b[0m` : `\x1b[32m✓ pending-human self-test: ${total} проверок пройдено\x1b[0m`}`);
   process.exit(fails.length ? 1 : 0);
@@ -278,15 +366,53 @@ export const CLI = {
     emit: { type: 'string', value: 'json', desc: 'добавить список шагов идемпотентно (для механизмов)' },
     close: { type: 'string', value: 'id', desc: 'закрыть шаг' },
     by: { type: 'string', value: 'имя', desc: 'кто закрыл (по умолчанию human)' },
-    root: { type: 'string', value: 'папка', desc: 'корень репозитория (по умолчанию текущая папка)' },
+    absorb: { type: 'string', value: 'файл', desc: 'влить устаревшую копию очереди: самый ранний since, новые шаги, закрытия; файл не трогается' },
+    root: { type: 'string', value: 'папка', desc: 'корень с очередью (по умолчанию установленный движок: $JIDOKA_HOME или ~/.claude/jidoka; текущая папка не участвует)' },
   },
 };
 
+/** Где очереди нет — сказать прямо. Отдельно от «шагов нет»: это разные состояния. */
+function missingRootText(root, explicit) {
+  return explicit
+    ? `папки ${root} нет`
+    : `установленной копии нет (${root}): очередь живёт только там, другой адрес — явным --root`;
+}
+
 function main() {
   const { values, selfTest: wantsSelfTest } = runCli(CLI);
-  const root = values.root || process.cwd();
-
   if (wantsSelfTest) return selfTest();
+
+  const explicit = values.root !== undefined;
+  const root = ledgerRoot({ root: values.root });
+  const writes = values.add !== undefined || values.emit !== undefined || values.close !== undefined || values.absorb !== undefined;
+  if (!existsSync(root)) {
+    if (writes) {
+      console.error(`pending-human: запись не сделана — ${missingRootText(root, explicit)}. Каталог не создаётся: он стал бы ещё одной копией очереди.`);
+      process.exit(2);
+    }
+    if (values.json) {
+      console.error(`pending-human: ${missingRootText(root, explicit)} — пустой список ниже значит «читать неоткуда», а не «шагов нет»`);
+      console.log('[]');
+      return;
+    }
+    console.log(`○ pending-human: ${missingRootText(root, explicit)}. Это не «шагов нет»: на этой машине очереди просто не существует.`);
+    return;
+  }
+
+  if (values.absorb !== undefined) {
+    const src = resolve(values.absorb);
+    const dst = resolve(join(root, LEDGER_REL));
+    if (!existsSync(src)) { console.error(`pending-human: файла ${src} нет`); process.exit(2); }
+    if (src === dst) { console.error('pending-human: это и есть живая очередь, вливать нечего'); process.exit(2); }
+    const { rows: incoming, bad } = readRows(src);
+    const problems = incoming.flatMap((r) => validateStep(r).map((m) => `${r?.id || '?'}: ${m}`));
+    if (problems.length) { console.error('строки копии не прошли схему, ничего не влито:\n  ' + problems.join('\n  ')); process.exit(2); }
+    const { rows, added, aged, closed } = absorbRows(loadLedger(root), incoming);
+    saveLedger(rows, root);
+    console.log(`pending-human: из ${src} взято ${added} новых, возраст удлинён у ${aged}, закрытий перенесено ${closed}` +
+      `${bad ? `, битых строк пропущено ${bad}` : ''}; источник не тронут, очередь ${dst}`);
+    return;
+  }
 
   if (values.add !== undefined || values.emit !== undefined) {
     const raw = values.add || values.emit || '[]';

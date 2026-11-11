@@ -280,7 +280,8 @@ if (isMain) {
       // наполняет ежедневная рутина. Если рутина ещё не отработала, шаг всё равно виден,
       // просто с честным «возраст неизвестен» вместо выдуманного нуля.
       const ph = await import(pathToFileURL(join(jidoka, 'scripts', 'pending-human.mjs')).href);
-      const merged = ph.mergeGatePending(rev.pending.map((pnd) => pnd.cls), ph.loadLedger(jidoka));
+      // адрес очереди выбирает pending-human#ledgerRoot, один на всех читателей и писателей
+      const merged = ph.mergeGatePending(rev.pending.map((pnd) => pnd.cls), ph.loadLedger(ph.ledgerRoot()));
       humanLine = ph.digestLine(ph.pendingSteps(merged));
     } catch { /* fail-open: нет строки лучше, чем задержанный старт */ }
 
