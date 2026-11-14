@@ -48,17 +48,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node $HOME/.claude/hooks/session-state.mjs PreToolUse",
-            "timeout": 5,
-            "async": true
-          }
-        ]
-      },
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
             "command": "node $HOME/.claude/hooks/outbound-claims-gate.mjs PreToolUse",
             "timeout": 20
           }
@@ -73,12 +62,6 @@
             "type": "command",
             "command": "afplay $HOME/.claude/sounds/done.wav",
             "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "node $HOME/.claude/hooks/session-state.mjs Stop",
-            "timeout": 5,
-            "async": true
           },
           {
             "type": "command",
@@ -119,12 +102,6 @@
             "type": "command",
             "command": "afplay $HOME/.claude/sounds/attention.wav",
             "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "node $HOME/.claude/hooks/session-state.mjs Notification",
-            "timeout": 5,
-            "async": true
           }
         ]
       }
@@ -137,11 +114,6 @@
             "type": "command",
             "command": "$HOME/.claude/hooks/jidoka-feature-reminder.sh",
             "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "node $HOME/.claude/hooks/session-state.mjs UserPromptSubmit",
-            "timeout": 5
           },
           {
             "type": "command",

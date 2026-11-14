@@ -1,5 +1,15 @@
 # CLI Appearance — внешний вид Claude Code
 
+> **Снято 2026-11-14 по решению владельца.** С рабочей машины убраны: «пульт миссии»
+> (хук `session-state.mjs` на 4 событиях и его файлы `state-*` / `ring-*` в
+> `~/.claude/session-env`), строка статуса и строка статуса агентов, автозапуск панели
+> агентов (`com.mityamit.agent-monitor`) и дашборда (`com.jidoka.dashboard`), команда
+> `jidoka-top`, раскладка zellij `jidoka`, программы ccboard и claude-squad. Установщик
+> `global-setup/install-global.sh` и `settings-hooks-fragment.json` их больше не ставят.
+> Всё ниже про эти части описывает историю, а не текущую установку. Исходники
+> (`scripts/tui-top.mjs`, `scripts/statusline-*.mjs`, `hooks/session-state.mjs`,
+> `scripts/dashboard/`) остались в репозитории: на них опираются `stuck-detector.mjs` и тесты.
+
 Настроено 2026-06-05. Все файлы живут глобально в `~/.claude/`, копии скриптов и темы — здесь, в jidoka (правило: изменения среды записываются в обоих местах).
 
 ## Что включено
